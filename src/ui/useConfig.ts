@@ -116,17 +116,16 @@ export function useConfig(requested: string | null | undefined) {
   const [usage, setUsage] = useState<{ path: string; data: Usage | null } | null>(null);
   useEffect(() => {
     if (!scanned) return;
-    let current = true;
+    // Aborting tells the server nobody waits for this count any more, so it stops.
+    const stop = new AbortController();
     const rules = scanned.permissions.flatMap((p) =>
       p.kind === "rule" && p.inEffect ? [{ list: p.list, rule: p.rule }] : []
     );
-    api.usage(scanned.path, rules).then(
-      (data) => current && setUsage({ path: scanned.path, data }),
-      () => current && setUsage({ path: scanned.path, data: null })
+    api.usage(scanned.path, rules, stop.signal).then(
+      (data) => !stop.signal.aborted && setUsage({ path: scanned.path, data }),
+      () => !stop.signal.aborted && setUsage({ path: scanned.path, data: null })
     );
-    return () => {
-      current = false;
-    };
+    return () => stop.abort();
   }, [scanned]);
 
   const data = useMemo(

@@ -76,8 +76,11 @@ export const api = {
   directory: (path: string) =>
     request<DirectoryView>(`/api/directory?path=${encodeURIComponent(path)}`),
   /** How Claude used tools in the sessions started in `path`, and how many calls each rule covers. */
-  usage: (path: string, rules: Array<{ list: PermissionList; rule: string }>) =>
-    request<Usage>("/api/usage", { method: "POST", body: { path, rules } }),
+  usage: (
+    path: string,
+    rules: Array<{ list: PermissionList; rule: string }>,
+    signal: AbortSignal
+  ) => request<Usage>("/api/usage", { method: "POST", body: { path, rules } }, signal),
   /** What a memory action would change; `path` is the memory, or MEMORY.md for remove-dead. */
   previewMemory: (action: MemoryAction, path: string) =>
     request<MemoryChangePreview>("/api/memory/preview", { method: "POST", body: { action, path } }),

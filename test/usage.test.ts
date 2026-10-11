@@ -3,7 +3,7 @@ import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { storeDirName } from "../src/server/scan/memory.ts";
-import { readUsage } from "../src/server/scan/usage.ts";
+import { CountStopped, readUsage } from "../src/server/scan/usage.ts";
 import { type PermissionList } from "../src/shared/types.ts";
 import { type Fixture, makeFixture } from "./helpers/fixture.ts";
 
@@ -372,6 +372,49 @@ test("a line longer than one read is counted whole", async () => {
   f.write(join(storeOf(f, dir), "one.jsonl"), bash("make") + long + bash("ls"));
 
   assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 3);
+});
+
+/** A transcript of `n` calls, each line longer than one read, so counting it takes many reads. */
+function longCalls(n: number): string {
+  return call("Bash", { command: "ls", description: "x".repeat(9 * 1024 * 1024) }).repeat(n);
+}
+
+test("a count that takes too long stops, and the next count continues it exactly", async () => {
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  f.write(join(storeOf(f, dir), "one.jsonl"), longCalls(4));
+
+  await assert.rejects(readUsage(f.env, dir, [], { timeLimitMs: 1 }), CountStopped);
+  assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 4);
+});
+
+test("a count nobody waits for any more stops without holding up the next one", async () => {
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  f.write(join(storeOf(f, dir), "one.jsonl"), longCalls(4));
+  const other = f.at("work", "other");
+  f.write(join(storeOf(f, other), "one.jsonl"), bash("ls"));
+
+  const page = new AbortController();
+  const abandoned = readUsage(f.env, dir, [], { signal: page.signal });
+  const next = readUsage(f.env, other, []);
+  page.abort();
+  await assert.rejects(abandoned, CountStopped);
+  assert.equal((await next).tools[0]?.calls, 1);
+  assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 4);
+});
+
+test("a count shared by two pages keeps going when one of them leaves", async () => {
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  f.write(join(storeOf(f, dir), "one.jsonl"), bash("ls").repeat(3));
+
+  const left = new AbortController();
+  const first = readUsage(f.env, dir, [], { signal: left.signal });
+  const second = readUsage(f.env, dir, [], { signal: new AbortController().signal });
+  left.abort();
+  assert.equal((await second).tools[0]?.calls, 3);
+  assert.equal((await first).tools[0]?.calls, 3);
 });
 
 test("only counts and rule patterns are returned, never commands or results", async () => {

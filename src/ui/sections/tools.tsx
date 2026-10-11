@@ -27,7 +27,7 @@ function callsOf(usage: Usage | null | undefined, name: string): number | null {
 /** What the transcripts say about the tool here, as one sentence. */
 function usedHere(usage: Usage | null | undefined, name: string): string {
   if (usage === undefined) return "counting…";
-  if (usage === null) return "ccdesk could not read the transcripts";
+  if (usage === null) return "ccdesk could not finish counting the transcripts";
   if (usage.sessions === 0) return "no sessions here yet";
   const tool = usage.tools.find((t) => t.tool === name);
   if (!tool) return `not called in ${sessionsHere(usage)}`;

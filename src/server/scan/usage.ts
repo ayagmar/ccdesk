@@ -53,30 +53,93 @@ const transcripts = new Map<string, Transcript>();
 const CHUNK = 8 * 1024 * 1024;
 
 let queue: Promise<unknown> = Promise.resolve();
+
+interface Run {
+  promise: Promise<Usage>;
+  /** Stops the count once nobody who asked for it is still waiting. */
+  stop: AbortController;
+  waiters: number;
+}
+
 /** Requests waiting their turn, so a burst of the same request runs once. */
-const waiting = new Map<string, Promise<Usage>>();
+const waiting = new Map<string, Run>();
+
+/** How long one count may take before it stops; what it read by then stays counted. */
+export const TIME_LIMIT_MS = 60_000;
+
+/** A count that stopped before it finished, because it took too long or nobody wanted it. */
+export class CountStopped extends Error {}
 
 /**
  * Counts the tool calls in the sessions started in `dir`, or anywhere in its repository and its
  * worktrees, since rules at a repository's root apply there too (docs: permissions#permission-system).
  * Subagents are included. It also counts the calls you approved or refused by hand, which Claude
  * Code records on each call's result as `permissionDecision` (not documented; older transcripts
- * lack it), and how many calls each rule covers. Requests run one at a time, since they share the cache.
+ * lack it), and how many calls each rule covers. Requests run one at a time, since they share the
+ * cache. A count stops when every `signal` it was asked with aborts, or after `timeLimitMs`; the
+ * next one then starts, even if a read of the stopped count never returns.
  */
-export function readUsage(env: ScanEnv, dir: string, rules: RuleInEffect[]): Promise<Usage> {
-  const key = JSON.stringify([env.claudeDir, resolve(dir), rules]);
-  const queued = waiting.get(key);
-  if (queued) return queued;
-  const run = queue.then(() => {
-    waiting.delete(key);
-    return count(env, resolve(dir), rules);
-  });
-  waiting.set(key, run);
-  queue = run.catch(() => undefined);
-  return run;
+export function readUsage(
+  env: ScanEnv,
+  dir: string,
+  rules: RuleInEffect[],
+  { signal, timeLimitMs = TIME_LIMIT_MS }: { signal?: AbortSignal; timeLimitMs?: number } = {}
+): Promise<Usage> {
+  const key = JSON.stringify([env.claudeDir, resolve(dir), rules, timeLimitMs]);
+  let run = waiting.get(key);
+  if (!run) {
+    const stop = new AbortController();
+    let stopped: AbortSignal = stop.signal;
+    const started = queue.then(() => {
+      waiting.delete(key);
+      stopped = AbortSignal.any([stop.signal, AbortSignal.timeout(timeLimitMs)]);
+      return stopped;
+    });
+    const promise = started.then((during) => count(env, resolve(dir), rules, during));
+    run = { promise, stop, waiters: 0 };
+    waiting.set(key, run);
+    // The queue moves on when the count settles or stops: a stopped count changes nothing more.
+    queue = started
+      .then(() =>
+        Promise.race([
+          promise,
+          new Promise((done) =>
+            stopped.aborted ? done(null) : stopped.addEventListener("abort", done)
+          ),
+        ])
+      )
+      .catch(() => undefined);
+  }
+  const current = run;
+  if (signal?.aborted) return current.promise;
+  current.waiters++;
+  signal?.addEventListener(
+    "abort",
+    () => {
+      if (--current.waiters === 0) current.stop.abort();
+    },
+    { once: true }
+  );
+  return current.promise;
 }
 
-async function count(env: ScanEnv, dir: string, rules: RuleInEffect[]): Promise<Usage> {
+/** Throws once a count has to stop, before it changes anything else. */
+function checkStopped(signal: AbortSignal): void {
+  if (!signal.aborted) return;
+  throw new CountStopped(
+    signal.reason instanceof DOMException && signal.reason.name === "TimeoutError"
+      ? "Counting tool calls took too long and stopped; what was read is kept, so the next count continues."
+      : "The count was no longer wanted."
+  );
+}
+
+async function count(
+  env: ScanEnv,
+  dir: string,
+  rules: RuleInEffect[],
+  signal: AbortSignal
+): Promise<Usage> {
+  checkStopped(signal);
   const checkouts = await worktrees(dir);
   // $HOME may end in a slash or be a link, while git prints the resolved path.
   const homes = new Set([
@@ -107,12 +170,15 @@ async function count(env: ScanEnv, dir: string, rules: RuleInEffect[]): Promise<
       for (const [file, session] of files) {
         if (taken.has(file)) continue;
         // A subagent's session decides; one whose session file is gone goes by its own start.
-        const start = (await transcript(session))?.startCwd ?? (await transcript(file))?.startCwd;
+        const start =
+          (await transcript(session, signal))?.startCwd ??
+          (await transcript(file, signal))?.startCwd;
         if (start ? !isWithin(folder, start) : name !== own) continue;
         taken.add(file);
-        calls.push(...((await transcript(file))?.calls ?? []));
+        calls.push(...((await transcript(file, signal))?.calls ?? []));
         if (file === session) sessions++;
       }
+      checkStopped(signal);
       for (const path of transcripts.keys())
         if (path.startsWith(store + sep) && !files.has(path)) transcripts.delete(path);
     }
@@ -140,10 +206,14 @@ async function transcriptsIn(store: string): Promise<Map<string, string>> {
   return files;
 }
 
-/** One transcript, read up to its end; one that cannot be read keeps what was read before. */
-async function transcript(file: string): Promise<Transcript | null> {
+/**
+ * One transcript, read up to its end; one that cannot be read keeps what was read before, and one
+ * whose count stops keeps the whole lines read so far.
+ */
+async function transcript(file: string, signal: AbortSignal): Promise<Transcript | null> {
   if (await leadsToSecret(file)) return null;
   const info = await stat(file).catch(() => null);
+  checkStopped(signal);
   if (!info?.isFile()) return null;
   let known = transcripts.get(file);
   if (!known || info.size < known.offset) {
@@ -152,17 +222,23 @@ async function transcript(file: string): Promise<Transcript | null> {
   }
   if (known.size === info.size && known.mtimeMs === info.mtimeMs) return known;
   try {
-    await readFrom(file, known, info.size);
+    await readFrom(file, known, info.size, signal);
     known.size = info.size;
     known.mtimeMs = info.mtimeMs;
-  } catch {
+  } catch (error) {
+    if (error instanceof CountStopped) throw error;
     // Gone or unreadable since the stat: keep what was counted; the offset still marks it.
   }
   return known;
 }
 
 /** Reads whole lines from the offset up to `size`; a line still being written is read next time. */
-async function readFrom(file: string, known: Transcript, size: number): Promise<void> {
+async function readFrom(
+  file: string,
+  known: Transcript,
+  size: number,
+  signal: AbortSignal
+): Promise<void> {
   const handle = await open(file, "r");
   try {
     let carried = Buffer.alloc(0);
@@ -170,6 +246,8 @@ async function readFrom(file: string, known: Transcript, size: number): Promise<
     while (position < size) {
       const chunk = Buffer.alloc(Math.min(CHUNK, size - position));
       const { bytesRead } = await handle.read(chunk, 0, chunk.length, position);
+      // Checked before the cache changes: a later count may already be reading this file.
+      checkStopped(signal);
       if (bytesRead === 0) break;
       position += bytesRead;
       const data = Buffer.concat([carried, chunk.subarray(0, bytesRead)]);

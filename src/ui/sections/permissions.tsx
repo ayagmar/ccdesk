@@ -250,7 +250,8 @@ export const permissions = defineSection<R>({
 /** How many of the calls counted here a rule covers. */
 function CoveredCalls({ rule, usage }: { rule: Rule; usage: Usage | null | undefined }) {
   if (usage === undefined) return <span className="muted">counting…</span>;
-  if (usage === null) return <span className="muted">ccdesk could not read the transcripts</span>;
+  if (usage === null)
+    return <span className="muted">ccdesk could not finish counting the transcripts</span>;
   const matches = usage.matches[rule.rule];
   if (matches === undefined) return <span className="muted">counting…</span>;
   if (matches === null)

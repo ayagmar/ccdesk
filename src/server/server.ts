@@ -13,7 +13,7 @@ import { openInEditor } from "./open.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isRecord } from "./scan/files.ts";
 import { scanDirectory, scanOverview } from "./scan/index.ts";
-import { readUsage } from "./scan/usage.ts";
+import { CountStopped, readUsage } from "./scan/usage.ts";
 import { testPath } from "./scan/path-test.ts";
 import {
   previewPermissionEdit,
@@ -119,20 +119,21 @@ async function handle(
     const { path } = stringFields(body, ["path"]);
     const rules = (body as Record<string, unknown>).rules;
     if (!Array.isArray(rules)) return send(res, 400, { error: "rules must be a list" });
-    return send(
-      res,
-      200,
-      await readUsage(
-        env,
-        path,
-        rules.map((r) => {
-          const { list, rule } = stringFields(r, ["list", "rule"]);
-          if (!LISTS.includes(list as PermissionList))
-            throw new RequestError(400, "a rule needs a list: allow, ask or deny");
-          return { list: list as PermissionList, rule };
-        })
-      )
-    );
+    const inEffect = rules.map((r) => {
+      const { list, rule } = stringFields(r, ["list", "rule"]);
+      if (!LISTS.includes(list as PermissionList))
+        throw new RequestError(400, "a rule needs a list: allow, ask or deny");
+      return { list: list as PermissionList, rule };
+    });
+    // The count stops when the page goes away or asks for another directory.
+    const stop = new AbortController();
+    res.once("close", () => stop.abort());
+    try {
+      return send(res, 200, await readUsage(env, path, inEffect, { signal: stop.signal }));
+    } catch (error) {
+      if (error instanceof CountStopped) return send(res, 503, { error: error.message });
+      throw error;
+    }
   }
   if (req.method === "POST" && url.pathname === "/api/memory/preview") {
     const { action, path } = await fields(req, ["action", "path"]);
