@@ -19,7 +19,9 @@ export interface Fixture {
 
 /** A disposable machine: a home directory with ~/.claude, a managed dir and a projects folder. */
 export function makeFixture(): Fixture {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "ccdesk-fixture-")));
+  // The native realpath also expands Windows 8.3 names (C:\Users\RUNNER~1), so fixture paths match
+  // the ones git and realpath report.
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "ccdesk-fixture-")));
   const home = join(root, "home");
   mkdirSync(join(home, ".claude"), { recursive: true });
   const env: ScanEnv = {
