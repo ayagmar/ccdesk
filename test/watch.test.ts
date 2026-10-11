@@ -43,13 +43,17 @@ test("a change between two polls is reported to the next poll", async () => {
 
 test("work in Claude Code's worktrees or unrelated files does not count as a config change", async () => {
   const f = makeFixture();
-  f.write("app/.claude/worktrees/feature/x.ts", "a");
+  f.write("app/.claude/worktrees/feature/CLAUDE.md", "a");
   f.write("app/notes.txt", "a");
   const watcher = watcherFor(f);
+  // macOS can report changes made just before a watch starts, such as the files above; wait
+  // until those have settled so only the edits below are judged.
+  const signal = new AbortController().signal;
+  await watcher.wait(f.at("app"), Number.MAX_SAFE_INTEGER, signal, 1000);
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 800);
+  const waiting = watcher.wait(f.at("app"), Date.now(), signal, 800);
   setTimeout(() => {
-    f.write("app/.claude/worktrees/feature/x.ts", "b");
+    f.write("app/.claude/worktrees/feature/CLAUDE.md", "b");
     f.write("app/notes.txt", "b");
   }, 100);
 
