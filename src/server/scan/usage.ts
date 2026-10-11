@@ -1,0 +1,469 @@
+import { open, realpath, stat } from "node:fs/promises";
+import { join, resolve, sep } from "node:path";
+import {
+  type Approval,
+  type PermissionList,
+  type ToolUsage,
+  type Usage,
+} from "../../shared/types.ts";
+import { type ScanEnv } from "./env.ts";
+import { isDir, isRecord, isWithin, leadsToSecret, listDir, wildcard, worktrees } from "./files.ts";
+import { storeDirName } from "./memory.ts";
+import { namesTool, parseRule } from "./tools.ts";
+
+/** One tool call, reduced to what counting and rule matching need. Never sent to the browser. */
+interface Call {
+  tool: string;
+  at: string;
+  /** Bash and Monitor: the command, for matching Bash rules. */
+  command?: string;
+  /** WebFetch: the host, for matching domain rules. */
+  host?: string;
+  /** Set when Claude Code asked you: true when you allowed the call. */
+  byYou?: boolean;
+}
+
+interface Transcript {
+  size: number;
+  mtimeMs: number;
+  /**
+   * Bytes read so far. Claude Code only appends to a transcript, so a later read starts here; one
+   * that shrank is read again from the start, and one rewritten in place is not noticed.
+   */
+  offset: number;
+  calls: Call[];
+  byId: Map<string, Call>;
+  /** The folder the session started in: the first one its transcript records. */
+  startCwd?: string;
+}
+
+/** A rule in effect here, as the scan found it. */
+export interface RuleInEffect {
+  list: PermissionList;
+  rule: string;
+}
+
+/**
+ * Transcripts already counted, by path, so reopening a directory reads only what was added. It
+ * keeps the commands of every directory opened since ccdesk started, in memory only.
+ */
+const transcripts = new Map<string, Transcript>();
+
+/** A transcript is read in parts this size, so one huge file never becomes one huge string. */
+const CHUNK = 8 * 1024 * 1024;
+
+let queue: Promise<unknown> = Promise.resolve();
+/** Requests waiting their turn, so a burst of the same request runs once. */
+const waiting = new Map<string, Promise<Usage>>();
+
+/**
+ * Counts the tool calls in the sessions started in `dir`, or anywhere in its repository and its
+ * worktrees, since rules at a repository's root apply there too (docs: permissions#permission-system).
+ * Subagents are included. It also counts the calls you approved or refused by hand, which Claude
+ * Code records on each call's result as `permissionDecision` (not documented; older transcripts
+ * lack it), and how many calls each rule covers. Requests run one at a time, since they share the cache.
+ */
+export function readUsage(env: ScanEnv, dir: string, rules: RuleInEffect[]): Promise<Usage> {
+  const key = JSON.stringify([env.claudeDir, resolve(dir), rules]);
+  const queued = waiting.get(key);
+  if (queued) return queued;
+  const run = queue.then(() => {
+    waiting.delete(key);
+    return count(env, resolve(dir), rules);
+  });
+  waiting.set(key, run);
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+async function count(env: ScanEnv, dir: string, rules: RuleInEffect[]): Promise<Usage> {
+  const checkouts = await worktrees(dir);
+  // $HOME may end in a slash or be a link, while git prints the resolved path.
+  const homes = new Set([
+    resolve(env.home),
+    await realpath(env.home).catch(() => resolve(env.home)),
+  ]);
+  const isHome = (folder: string) => homes.has(resolve(folder));
+  // A home directory kept in git (dotfiles) is not a project: its folders are separate projects.
+  const repository = checkouts.length > 0 && !isHome(checkouts[0] ?? "");
+  const folders = repository ? checkouts : [dir];
+  const projects = join(env.claudeDir, "projects");
+  const storeNames = await listDir(projects);
+  const taken = new Set<string>();
+  const calls: Call[] = [];
+  let sessions = 0;
+  for (const folder of folders) {
+    const own = storeDirName(folder);
+    // Sessions started in a subfolder or a nested worktree have their own store, named with the
+    // folder's as a prefix; the prefix also matches siblings such as app-old, so each session is
+    // kept by the folder it started in. A home directory would pull in every store, so only its
+    // own is read.
+    const stores = storeNames.filter(
+      (name) => name === own || (!isHome(folder) && name.startsWith(`${own}-`))
+    );
+    for (const name of stores) {
+      const store = join(projects, name);
+      const files = await transcriptsIn(store);
+      for (const [file, session] of files) {
+        if (taken.has(file)) continue;
+        // A subagent's session decides; one whose session file is gone goes by its own start.
+        const start = (await transcript(session))?.startCwd ?? (await transcript(file))?.startCwd;
+        if (start ? !isWithin(folder, start) : name !== own) continue;
+        taken.add(file);
+        calls.push(...((await transcript(file))?.calls ?? []));
+        if (file === session) sessions++;
+      }
+      for (const path of transcripts.keys())
+        if (path.startsWith(store + sep) && !files.has(path)) transcripts.delete(path);
+    }
+  }
+  return {
+    sessions,
+    repository,
+    since: calls.reduce<string | null>((min, c) => (min === null || c.at < min ? c.at : min), null),
+    tools: toolUsage(calls),
+    approvals: approvals(calls, rules),
+    matches: Object.fromEntries(rules.map((r) => [r.rule, matchCount(r, calls)])),
+  };
+}
+
+/** A store's transcripts, each with the session it belongs to: itself, or a subagent's session. */
+async function transcriptsIn(store: string): Promise<Map<string, string>> {
+  const files = new Map<string, string>();
+  for (const name of await listDir(store)) {
+    if (name.endsWith(".jsonl")) files.set(join(store, name), join(store, name));
+    else if (await isDir(join(store, name, "subagents")))
+      for (const sub of await listDir(join(store, name, "subagents")))
+        if (sub.endsWith(".jsonl"))
+          files.set(join(store, name, "subagents", sub), join(store, `${name}.jsonl`));
+  }
+  return files;
+}
+
+/** One transcript, read up to its end; one that cannot be read keeps what was read before. */
+async function transcript(file: string): Promise<Transcript | null> {
+  if (await leadsToSecret(file)) return null;
+  const info = await stat(file).catch(() => null);
+  if (!info?.isFile()) return null;
+  let known = transcripts.get(file);
+  if (!known || info.size < known.offset) {
+    known = { size: 0, mtimeMs: 0, offset: 0, calls: [], byId: new Map() };
+    transcripts.set(file, known);
+  }
+  if (known.size === info.size && known.mtimeMs === info.mtimeMs) return known;
+  try {
+    await readFrom(file, known, info.size);
+    known.size = info.size;
+    known.mtimeMs = info.mtimeMs;
+  } catch {
+    // Gone or unreadable since the stat: keep what was counted; the offset still marks it.
+  }
+  return known;
+}
+
+/** Reads whole lines from the offset up to `size`; a line still being written is read next time. */
+async function readFrom(file: string, known: Transcript, size: number): Promise<void> {
+  const handle = await open(file, "r");
+  try {
+    let carried = Buffer.alloc(0);
+    let position = known.offset;
+    while (position < size) {
+      const chunk = Buffer.alloc(Math.min(CHUNK, size - position));
+      const { bytesRead } = await handle.read(chunk, 0, chunk.length, position);
+      if (bytesRead === 0) break;
+      position += bytesRead;
+      const data = Buffer.concat([carried, chunk.subarray(0, bytesRead)]);
+      const end = data.lastIndexOf(0x0a) + 1;
+      for (const line of data.subarray(0, end).toString("utf8").split("\n")) read(line, known);
+      known.offset += end;
+      carried = data.subarray(end);
+    }
+  } finally {
+    await handle.close();
+  }
+}
+
+/** Takes the tool calls from an assistant line and your answers from a tool result line. */
+function read(line: string, transcript: Transcript): void {
+  const hasCall = line.includes('"tool_use"');
+  const hasDecision = line.includes('"permissionDecision"');
+  const hasStart = !transcript.startCwd && line.includes('"cwd"');
+  if (!hasCall && !hasDecision && !hasStart) return;
+  let record: unknown;
+  try {
+    record = JSON.parse(line);
+  } catch {
+    return;
+  }
+  if (!isRecord(record)) return;
+  if (!transcript.startCwd && typeof record.cwd === "string") transcript.startCwd = record.cwd;
+  if (!isRecord(record.message)) return;
+  const content = record.message.content;
+  if (!Array.isArray(content)) return;
+  const at = typeof record.timestamp === "string" ? record.timestamp : "";
+  if (record.type === "assistant") {
+    for (const block of content) {
+      if (!isRecord(block) || block.type !== "tool_use") continue;
+      if (typeof block.id !== "string" || typeof block.name !== "string") continue;
+      const call = callOf(block.name, isRecord(block.input) ? block.input : {}, at);
+      transcript.calls.push(call);
+      transcript.byId.set(block.id, call);
+    }
+    return;
+  }
+  const decision = record.permissionDecision;
+  if (record.type !== "user" || !isRecord(decision)) return;
+  if (typeof decision.source !== "string" || !decision.source.startsWith("user")) return;
+  for (const block of content) {
+    if (!isRecord(block) || block.type !== "tool_result") continue;
+    const call = typeof block.tool_use_id === "string" && transcript.byId.get(block.tool_use_id);
+    if (call) call.byYou = decision.decision === "accept";
+  }
+}
+
+function callOf(tool: string, input: Record<string, unknown>, at: string): Call {
+  const call: Call = { tool, at };
+  if ((tool === "Bash" || tool === "Monitor") && typeof input.command === "string")
+    call.command = input.command;
+  if (tool === "WebFetch" && typeof input.url === "string") {
+    try {
+      call.host = new URL(input.url).hostname.replace(/\.$/, "");
+    } catch {
+      // Not a URL: no domain rule can match it.
+    }
+  }
+  return call;
+}
+
+function toolUsage(calls: Call[]): ToolUsage[] {
+  const byTool = new Map<string, ToolUsage>();
+  for (const c of calls) {
+    const usage = byTool.get(c.tool) ?? { tool: c.tool, calls: 0, approved: 0, refused: 0 };
+    usage.calls++;
+    if (c.byYou === true) usage.approved++;
+    if (c.byYou === false) usage.refused++;
+    byTool.set(c.tool, usage);
+  }
+  return [...byTool.values()].sort((a, b) => b.calls - a.calls);
+}
+
+/**
+ * Calls you allowed by hand, grouped by the allow rule that would cover them. A rule is left out
+ * when it would also cover a call you refused, or when rules in effect already decide every call
+ * behind it: allowing it then changes nothing.
+ */
+function approvals(calls: Call[], rules: RuleInEffect[]): Approval[] {
+  const matchers = rules.flatMap((r) => matcherFor(r) ?? []);
+  const groups = new Map<string, Call[]>();
+  for (const c of calls) {
+    if (c.byYou !== true) continue;
+    const rule = ruleFor(c);
+    if (rule) groups.set(rule, [...(groups.get(rule) ?? []), c]);
+  }
+  const refused = calls.filter((c) => c.byYou === false);
+  const out: Approval[] = [];
+  for (const [rule, approved] of groups) {
+    if (rules.some((r) => r.rule === rule)) continue;
+    const covers = matcherFor({ list: "allow", rule });
+    if (covers && refused.some(covers)) continue;
+    if (approved.every((c) => matchers.some((m) => m(c)))) continue;
+    const last = approved.reduce((max, c) => (c.at > max ? c.at : max), "");
+    out.push({ rule, approved: approved.length, last });
+  }
+  return out.sort((a, b) => b.approved - a.approved);
+}
+
+/**
+ * Programs a prefix rule may name on their own: read-only commands with no flag that runs a
+ * command or writes a file (docs: permissions#read-only-commands). A rule for any other program
+ * could allow far more than you approved, as `sed`'s `e` command or `make --eval` do, so ccdesk
+ * suggests none.
+ */
+const SAFE_PROGRAMS = new Set(
+  "ls cat head tail wc grep diff cmp comm cut tr jq stat du df pwd echo printf date whoami uname which basename dirname realpath readlink nproc".split(
+    " "
+  )
+);
+
+/**
+ * Programs with subcommands, and the subcommands a rule may name, one or two words each: those
+ * whose flags neither run another command nor write a file you did not name
+ * (docs: permissions#wildcard-patterns). The exceptions are the script runners `test`, `run`,
+ * `build` and `lint`, and `git commit`, whose hooks may run scripts from package.json: they run
+ * the project's own code, and npm and pnpm config flags such as `--node-options` can make them
+ * run any code. A rule for them is the one Claude Code's own prompt offers, `npm test *`
+ * (docs: permissions#permission-system), and no wider.
+ *
+ * Left out on purpose: `git stash show`, `git blame` and `git log` write anywhere with
+ * `--output`; `git grep -O` and `git fetch --upload-pack` run a command; the rest of `gh repo`
+ * reaches delete, visibility and deploy keys; `bun build --compile --outfile` writes an
+ * executable; `npm audit fix` installs; every pnpm command loads a pnpmfile, which
+ * `--config.pnpmfile` can point at any script; podman takes `--runtime` after the subcommand;
+ * `go test -exec`, `cargo --config`, kubeconfig exec plugins, `pip --python` and installs run
+ * whatever they are given.
+ */
+const SUBCOMMANDS: Record<string, string[]> = {
+  git: "status add commit switch restore tag branch rev-parse describe ls-files".split(" "),
+  npm: "test run ls outdated view".split(" "),
+  pnpm: "test run build lint".split(" "),
+  yarn: "test run build lint".split(" "),
+  bun: ["test"],
+  gh: [
+    "status",
+    "pr view",
+    "pr list",
+    "pr diff",
+    "pr checks",
+    "issue view",
+    "issue list",
+    "repo view",
+  ],
+  docker: "ps images logs inspect".split(" "),
+  systemctl: ["status"],
+};
+
+/** Path rules for these need a path ccdesk should not guess. */
+const PATH_TOOLS = new Set(["Read", "Edit", "Write", "NotebookEdit", "Glob", "Grep", "LSP"]);
+
+/**
+ * The allow rule that would have covered a call, in the form Claude Code's "don't ask again"
+ * writes: a Bash program on the allowlists above, with its subcommand where it has them, a fetch's
+ * domain, or the tool. None for compound commands, other programs and subcommands, a leading
+ * variable assignment (an allow rule does not match past most of them, docs:
+ * permissions#process-wrappers) and file tools. A rule takes no other words from a command, so
+ * arguments never leave the server.
+ */
+function ruleFor(call: Call): string | null {
+  if (call.tool === "Bash") {
+    if (call.command === undefined || /[`$<>(){}]/.test(call.command)) return null;
+    if (/^\s*\w+=/.test(call.command)) return null;
+    const parts = subcommands(call.command);
+    if (parts.length !== 1) return null;
+    const [program, ...rest] = (parts[0] ?? "").split(/\s+/);
+    if (!program) return null;
+    if (SAFE_PROGRAMS.has(program)) return `Bash(${program} *)`;
+    const sub = SUBCOMMANDS[program]?.find((words) =>
+      words.split(" ").every((word, i) => rest[i] === word)
+    );
+    return sub ? `Bash(${program} ${sub} *)` : null;
+  }
+  if (call.tool === "WebFetch") return call.host ? `WebFetch(domain:${call.host})` : null;
+  if (PATH_TOOLS.has(call.tool) || call.tool === "PowerShell" || call.tool === "Monitor")
+    return null;
+  return call.tool;
+}
+
+const SEPARATORS = /&&|\|\||\|&|[;|&\n]/;
+/** docs: permissions#process-wrappers */
+const WRAPPERS = new Set([
+  "timeout",
+  "time",
+  "nice",
+  "nohup",
+  "stdbuf",
+  "command",
+  "builtin",
+  "noglob",
+]);
+const KEYWORDS = new Set(["if", "then", "else", "elif", "do", "while", "until", "!"]);
+
+/** A command's parts as Claude Code splits them for allow rules: at shell operators, wrappers stripped. */
+function subcommands(command: string): string[] {
+  return command
+    .split(SEPARATORS)
+    .map((part) => withoutWrappers(part.trim()))
+    .filter(Boolean);
+}
+
+/**
+ * Every command a rule might see in a call: the whole text, its parts, and commands nested in a
+ * subshell, a substitution or a loop body, which deny and ask rules also reach (docs:
+ * permissions#compound-commands), each also without its redirections, which Claude Code checks
+ * apart from the rule (docs: permissions#redirections). Generous on purpose, so a rule counted as
+ * covering no call really covered none.
+ */
+function everyCommandIn(command: string): string[] {
+  const variants = [command, withoutRedirections(command)];
+  return [
+    ...new Set(
+      variants.flatMap((text) => {
+        const parts = text
+          .replace(/\$\(|[`(){}]/g, "\n")
+          .split(SEPARATORS)
+          .map((part) => {
+            const words = part.trim().split(/\s+/);
+            while (KEYWORDS.has(words[0] ?? "")) words.shift();
+            return withoutWrappers(words.join(" "));
+          });
+        return [withoutWrappers(text.trim()), ...parts];
+      })
+    ),
+  ].filter(Boolean);
+}
+
+/** `2>&1`, `> out.txt`, `&>> log`, `< in`: removed with their target, before `&` is taken for a separator. */
+function withoutRedirections(command: string): string {
+  return command.replace(/\s*(?:\d*>>?\|?|&>>?|\d*<)&?\s*(?:'[^']*'|"[^"]*"|[^\s;&|]*)/g, "");
+}
+
+function withoutWrappers(command: string): string {
+  const words = command.split(/\s+/);
+  for (;;) {
+    const first = words[0] ?? "";
+    if (/^\w+=/.test(first)) words.shift();
+    else if (first === "xargs" && words.length > 1 && !(words[1] ?? "").startsWith("-"))
+      words.shift();
+    else if (
+      WRAPPERS.has(first) &&
+      words.length > 1 &&
+      !(first === "command" && words[1] === "-v")
+    ) {
+      words.shift();
+      while (/^(-\S+|\d+(\.\d+)?[smhd]?)$/.test(words[0] ?? "")) words.shift();
+    } else break;
+  }
+  return words.join(" ");
+}
+
+/** How many calls a rule covers, or null for kinds ccdesk does not match (paths, parameters, PowerShell). */
+function matchCount(rule: RuleInEffect, calls: Call[]): number | null {
+  const matches = matcherFor(rule);
+  return matches ? calls.filter(matches).length : null;
+}
+
+/** Whether a rule covers a call, erring towards yes; null for kinds ccdesk does not match. */
+function matcherFor({ list, rule }: RuleInEffect): ((call: Call) => boolean) | null {
+  const { tool, specifier } = parseRule(rule);
+  if (specifier === null) {
+    if (tool.startsWith("mcp__") && tool.split("__").length === 2)
+      return (c) => c.tool.startsWith(`${tool}__`);
+    // Monitor runs commands under the Bash rules (docs: tools-reference#configure-tools-with-permission-rules-and-hooks).
+    return (c) =>
+      namesTool(list, tool, c.tool) || (c.tool === "Monitor" && namesTool(list, tool, "Bash"));
+  }
+  if (tool === "Bash") {
+    const pattern = bashPattern(specifier);
+    if (pattern === null) return null;
+    return (c) => c.command !== undefined && everyCommandIn(c.command).some(pattern);
+  }
+  if (tool === "WebFetch" && specifier.startsWith("domain:")) {
+    const host = wildcard(specifier.slice(7).replace(/\.$/, ""), "i");
+    return (c) => c.host !== undefined && host.test(c.host);
+  }
+  return null;
+}
+
+/** A Bash rule's command pattern (docs: permissions#wildcard-patterns); null for a parameter rule. */
+function bashPattern(specifier: string): ((command: string) => boolean) | null {
+  let pattern = specifier;
+  if (pattern.endsWith(":*") && !pattern.slice(0, -2).includes("*"))
+    pattern = `${pattern.slice(0, -2)} *`;
+  else if (/^[A-Za-z_]+:/.test(pattern)) return null;
+  const star = pattern.indexOf("*");
+  if (pattern.endsWith(" *") && star === pattern.length - 1) {
+    const prefix = pattern.slice(0, -2);
+    return (command) => command === prefix || command.startsWith(`${prefix} `);
+  }
+  const regex = wildcard(pattern, "s");
+  return (command) => regex.test(command);
+}
