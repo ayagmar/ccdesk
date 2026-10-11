@@ -8,6 +8,7 @@ import { Icon } from "./Icon.tsx";
 const WHAT: Record<BackupKind, string> = {
   settings: "Settings changed",
   mcp: "MCP servers changed",
+  agent: "Agent changed",
   "memory-index": "MEMORY.md changed",
   "memory-delete": "Memory deleted",
   "memory-restore": "Memory restored",

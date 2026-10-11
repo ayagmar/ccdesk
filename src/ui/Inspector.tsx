@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { AgentEditor } from "./AgentEditor.tsx";
 import { Bullet } from "./Bullet.tsx";
 import { HookEditor } from "./HookEditor.tsx";
 import { Icon } from "./Icon.tsx";
@@ -21,6 +22,7 @@ const TITLES: Record<Adding, string> = {
   permission: "Add a permission rule",
   hook: "Add a hook",
   mcp: "Add an MCP server",
+  agent: "Create an agent",
 };
 
 /** The panel beside the tables: the selected row's file, why it applies, and what can change. */
@@ -56,6 +58,9 @@ export function Inspector({ row, adding, actions, onClose }: Props) {
           )}
           {adding === "permission" && (
             <PermissionEditor view={actions.view} rule={null} onSaved={actions.onSaved} />
+          )}
+          {adding === "agent" && (
+            <AgentEditor view={actions.view} agent={null} onSaved={actions.onSaved} />
           )}
           {adding === "mcp" && (
             <McpEditor view={actions.view} server={null} onSaved={actions.onSaved} />

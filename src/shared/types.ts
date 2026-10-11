@@ -133,7 +133,13 @@ export interface EffectiveSetting {
   note?: string;
 }
 
-export type BackupKind = "settings" | "mcp" | "memory-index" | "memory-delete" | "memory-restore";
+export type BackupKind =
+  | "settings"
+  | "mcp"
+  | "agent"
+  | "memory-index"
+  | "memory-delete"
+  | "memory-restore";
 
 /** One change ccdesk made, from its backup folder. */
 export interface BackupSummary {
@@ -539,6 +545,17 @@ export interface SettingsEditPreview {
    * instead, with secrets hidden. Such a change is not backed up or listed in Recent changes.
    */
   commands?: string[];
+}
+
+/** One subagent file change: a new agent, a changed one, or one deleted. */
+export interface AgentEdit {
+  dir: string;
+  /** An agent the scan shows here; absent when creating one. */
+  path?: string;
+  /** Where a new agent goes, and its file name without .md. */
+  create?: { scope: "user" | "project"; file: string };
+  /** The whole file; null deletes the agent. */
+  text: string | null;
 }
 
 /**

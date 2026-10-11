@@ -1,6 +1,8 @@
 import { type Entry } from "../../shared/types.ts";
+import { AgentEditor } from "../AgentEditor.tsx";
 import { Bullet } from "../Bullet.tsx";
 import { ago, tilde } from "../format.ts";
+import { Icon } from "../Icon.tsx";
 import { Contents, Field, LinkMark, NameButton, PathValue, stripFrontmatter } from "./kit.tsx";
 import { defineSection, type EntryKind, type RowOf } from "./types.ts";
 
@@ -108,7 +110,12 @@ export const extensions = defineSection<R>({
     row.kind === "plugin" ? `plugin ${row.item.id}` : `${row.kind} ${row.item.id ?? row.item.name}`,
   heading: (row) => (row.kind === "plugin" ? row.item.id : (row.item.id ?? row.item.name)),
   facet: { label: "Filter by kind", of: (row) => row.kind, order: KINDS },
-  Details: ({ row }) => {
+  Head: ({ actions }) => (
+    <button type="button" className="head-action" onClick={() => actions.onAdd("agent")}>
+      <Icon name="plus" /> Create agent
+    </button>
+  ),
+  Details: ({ row, actions }) => {
     if (row.kind === "plugin") {
       const p = row.item;
       return (
@@ -154,7 +161,14 @@ export const extensions = defineSection<R>({
           {e.model && <Field label="Model">{e.model}</Field>}
           {e.plugin && <Field label="Plugin">{e.plugin}</Field>}
         </dl>
-        <Contents text={stripFrontmatter(e.text)} />
+        {row.kind === "agent" && (e.scope === "user" || e.scope === "project") ? (
+          <>
+            <h3 className="sub-title">Change this agent</h3>
+            <AgentEditor key={row.id} view={actions.view} agent={e} onSaved={actions.onSaved} />
+          </>
+        ) : (
+          <Contents text={stripFrontmatter(e.text)} />
+        )}
       </>
     );
   },

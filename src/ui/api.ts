@@ -6,6 +6,7 @@ import {
   type MemoryChangePreview,
   type Overview,
   type PathTest,
+  type AgentEdit,
   type HookEdit,
   type McpEdit,
   type PermissionEdit,
@@ -100,6 +101,10 @@ export const api = {
     request<SettingsEditPreview>("/api/permissions/preview", { method: "POST", body: edit }),
   savePermission: (edit: PermissionEdit, revision: string) =>
     request<Change>("/api/permissions/save", { method: "POST", body: { ...edit, revision } }),
+  previewAgent: (edit: AgentEdit) =>
+    request<SettingsEditPreview>("/api/agents/preview", { method: "POST", body: edit }),
+  saveAgent: (edit: AgentEdit, revision: string) =>
+    request<Change>("/api/agents/save", { method: "POST", body: { ...edit, revision } }),
   previewMcp: (edit: McpEdit) =>
     request<SettingsEditPreview>("/api/mcp/preview", { method: "POST", body: edit }),
   /** A project server change comes back as a Change; one made through `claude mcp` cannot be undone. */

@@ -54,7 +54,7 @@ export type SectionId = Row["section"];
 export type RowOf<S extends SectionId> = Extract<Row, { section: S }>;
 
 /** What the inspector's add form adds. */
-export type Adding = "setting" | "permission" | "hook" | "mcp";
+export type Adding = "setting" | "permission" | "hook" | "mcp" | "agent";
 
 /** What the page can do for a section: change files, open other directories. */
 export interface Actions {

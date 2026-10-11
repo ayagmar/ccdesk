@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import HOOK_EVENTS from "../shared/hook-events.json" with { type: "json" };
 import {
+  type AgentEdit,
   type HookEdit,
   type McpEdit,
   type PermissionEdit,
@@ -11,6 +12,7 @@ import {
   type SettingsEdit,
 } from "../shared/types.ts";
 import { listBackups, previewRestore, restoreBackup } from "./backups.ts";
+import { previewAgentEdit, saveAgentEdit } from "./agent-edit.ts";
 import { previewMcpEdit, type RunClaude, runClaude, saveMcpEdit } from "./mcp-edit.ts";
 import { changeMemory, isMemoryAction, previewMemoryChange } from "./mutations.ts";
 import { openInEditor } from "./open.ts";
@@ -194,6 +196,16 @@ async function handle(
     const { revision } = stringFields(body, ["revision"]);
     return answer(res, () => saveHookEdit(env, edit, revision));
   }
+  if (req.method === "POST" && url.pathname === "/api/agents/preview") {
+    const edit = agentEditFrom(await readBody(req));
+    return answer(res, () => previewAgentEdit(env, edit));
+  }
+  if (req.method === "POST" && url.pathname === "/api/agents/save") {
+    const body = await readBody(req);
+    const edit = agentEditFrom(body);
+    const { revision } = stringFields(body, ["revision"]);
+    return answer(res, () => saveAgentEdit(env, edit, revision));
+  }
   if (req.method === "POST" && url.pathname === "/api/mcp/preview") {
     const edit = mcpEditFrom(await readBody(req));
     return answer(res, () => previewMcpEdit(env, edit, options.runClaude ?? runClaude));
@@ -309,6 +321,23 @@ function hookEditFrom(body: unknown): HookEdit {
     edit.add = { event, ...(matcher ? { matcher } : {}), definition };
   }
   if (!edit.remove && !edit.add) throw new RequestError(400, "remove or add is required");
+  return edit;
+}
+
+function agentEditFrom(body: unknown): AgentEdit {
+  const { dir } = stringFields(body, ["dir"]);
+  const { path, create, text } = body as Record<string, unknown>;
+  if (text !== null && typeof text !== "string")
+    throw new RequestError(400, "text must be the agent file, or null to delete it");
+  const edit: AgentEdit = { dir, text };
+  if (typeof path === "string") edit.path = path;
+  else if (create !== undefined) {
+    const { scope, file } = stringFields(create, ["scope", "file"]);
+    if (scope !== "user" && scope !== "project")
+      throw new RequestError(400, "a new agent goes in user or project scope");
+    if (text === null) throw new RequestError(400, "a new agent needs its text");
+    edit.create = { scope, file };
+  } else throw new RequestError(400, "path or create is required");
   return edit;
 }
 

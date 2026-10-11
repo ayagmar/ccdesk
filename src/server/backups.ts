@@ -25,7 +25,14 @@ import {
   writeAtomic,
 } from "./write.ts";
 
-const KINDS = new Set(["settings", "mcp", "memory-index", "memory-delete", "memory-restore"]);
+const KINDS = new Set([
+  "settings",
+  "mcp",
+  "agent",
+  "memory-index",
+  "memory-delete",
+  "memory-restore",
+]);
 
 function strings(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === "string");
@@ -90,6 +97,16 @@ function isSettingsFile(env: ScanEnv, path: string): boolean {
   );
 }
 
+/** A `.md` file in your agents folder or a project's `.claude/agents`, or a subfolder of one. */
+function isAgentFile(env: ScanEnv, path: string): boolean {
+  if (!path.endsWith(".md")) return false;
+  if (isWithin(join(env.claudeDir, "agents"), path)) return true;
+  const parts = path.split(/[/\\]/);
+  return parts.some(
+    (part, i) => part === ".claude" && parts[i + 1] === "agents" && i + 2 < parts.length
+  );
+}
+
 /**
  * Every value ccdesk shows hidden and never changes in a settings file: env and headers objects,
  * and URLs with a user, password or query.
@@ -146,9 +163,11 @@ async function planRestore(env: ScanEnv, id: string): Promise<Plan> {
     throw new RefusedError("This backup does not point at a settings file.");
   if (manifest.kind === "mcp" && basename(target) !== ".mcp.json")
     throw new RefusedError("This backup does not point at a .mcp.json.");
+  if (manifest.kind === "agent" && !isAgentFile(env, target))
+    throw new RefusedError("This backup does not point at a subagent file.");
   if (manifest.kind === "memory-index" && basename(target) !== "MEMORY.md")
     throw new RefusedError("This backup does not point at a MEMORY.md.");
-  if (manifest.kind !== "settings" && manifest.kind !== "mcp") {
+  if (manifest.kind !== "settings" && manifest.kind !== "mcp" && manifest.kind !== "agent") {
     const store = await assertMemoryDir(env, dirname(target));
     // The same confinement as any other MEMORY.md change: a link out of the folder is refused.
     target =

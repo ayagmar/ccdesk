@@ -32,6 +32,7 @@
   "settings-reference#permissions-defaultmode": "d3ac547219f91d4d",
   "skills#override-skill-visibility-from-settings": "889f344b6cdd7268",
   "sub-agents#choose-the-subagent-scope": "a4991f236c26b1a8",
+  "sub-agents#supported-frontmatter-fields": "42f3a453fcfd0bed",
   "tools-reference#configure-tools-with-permission-rules-and-hooks": "7d4f07f8310d3bf6",
   "tools-reference#endconversation-tool-behavior": "dcf0fcd72dd58459"
 }

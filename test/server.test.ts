@@ -1276,3 +1276,72 @@ test("a replaced server goes back as it was when claude refuses the new one", as
     ]
   );
 });
+
+/** Reviews an agent change, then saves it with the reviewed revision, as the page does. */
+async function saveAgent(edit: Record<string, unknown>) {
+  const preview = await call("/api/agents/preview", { method: "POST", body: edit });
+  if (preview.status !== 200) return preview;
+  const { revision, errors } = preview.json as Preview;
+  if (errors.length > 0) return preview;
+  return call("/api/agents/save", { method: "POST", body: { ...edit, revision } });
+}
+
+const agentText = (name: string, prompt: string) =>
+  `---\nname: ${name}\ndescription: Reviews diffs\n---\n\n${prompt}\n`;
+
+test("a new agent goes in the project's agents folder, and a deleted one can be restored", async () => {
+  const dir = fixture.at("work/agents");
+  fixture.write("work/agents/README.md", "x");
+  const created = await saveAgent({
+    dir,
+    create: { scope: "project", file: "reviewer" },
+    text: agentText("reviewer", "Be strict."),
+  });
+  assert.equal(created.status, 200);
+  const path = join(dir, ".claude", "agents", "reviewer.md");
+  assert.equal(readFileSync(path, "utf8"), agentText("reviewer", "Be strict."));
+
+  const edited = await saveAgent({ dir, path, text: agentText("reviewer", "Be kind.") });
+  assert.equal(edited.status, 200);
+  const deleted = await saveAgent({ dir, path, text: null });
+  assert.equal(deleted.status, 200);
+  assert.equal(existsSync(path), false);
+
+  const { id } = deleted.json as Change;
+  const preview = (await call("/api/backups/preview", { method: "POST", body: { id } }))
+    .json as RestorePreview;
+  const restored = await call("/api/backups/restore", {
+    method: "POST",
+    body: { id, revision: preview.revision },
+  });
+  assert.equal(restored.status, 200);
+  assert.equal(readFileSync(path, "utf8"), agentText("reviewer", "Be kind."));
+});
+
+test("an agent file Claude Code would skip is not saved", async () => {
+  const dir = fixture.at("work/agents-invalid");
+  for (const text of [
+    "---\ndescription: no name\n---\nx\n",
+    "---\nname: plain\n---\nno description\n",
+    agentText("my-plugin:reviewer", "a plugin-scoped name"),
+  ]) {
+    const res = await saveAgent({ dir, create: { scope: "user", file: "bad" }, text });
+    assert.ok((res.json as Preview).errors.length > 0, text);
+  }
+  assert.equal(existsSync(join(fixture.env.claudeDir, "agents", "bad.md")), false);
+});
+
+test("only agents shown here can be changed, and a new one cannot leave its agents folder", async () => {
+  const dir = fixture.at("work/agents-confined");
+  const other = fixture.write("work/elsewhere/notes.md", "keep me\n");
+
+  const outside = await saveAgent({ dir, path: other, text: agentText("x", "y") });
+  assert.equal(outside.status, 409);
+  const escaping = await saveAgent({
+    dir,
+    create: { scope: "user", file: "../../work/elsewhere/notes" },
+    text: agentText("x", "y"),
+  });
+  assert.equal(escaping.status, 409);
+  assert.equal(readFileSync(other, "utf8"), "keep me\n");
+});

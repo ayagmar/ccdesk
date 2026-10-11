@@ -1,0 +1,110 @@
+import { join, resolve } from "node:path";
+import { type AgentEdit, type Change, type SettingsEditPreview } from "../shared/types.ts";
+import { type ScanEnv } from "./scan/env.ts";
+import { gitRoot, parseFrontmatter, revisionOf, shownText, stringField } from "./scan/files.ts";
+import { scanDirectory } from "./scan/index.ts";
+import {
+  RefusedError,
+  readIfExists,
+  recordChange,
+  removeExactly,
+  serially,
+  StaleError,
+  writeAtomic,
+} from "./write.ts";
+
+/** What Claude Code requires of a subagent file (docs: sub-agents#supported-frontmatter-fields). */
+function agentProblems(text: string): string[] {
+  const { data } = parseFrontmatter(text);
+  const name = stringField(data, "name");
+  const problems: string[] = [];
+  if (!name) problems.push("The frontmatter needs a name.");
+  else if (name.length > 256 || name.includes(":") || name.startsWith("-"))
+    problems.push("A name has at most 256 characters, no ':' and does not start with '-'.");
+  if (!stringField(data, "description"))
+    problems.push("The frontmatter needs a description: when Claude should use this agent.");
+  return problems;
+}
+
+/** The file an edit changes: an agent the scan shows here, or a new one in your or the project's folder. */
+async function targetOf(env: ScanEnv, edit: AgentEdit): Promise<string> {
+  const dir = resolve(edit.dir);
+  if (edit.path !== undefined) {
+    const agent = (await scanDirectory(env, dir)).inventory.agents.find(
+      (a) => a.path === edit.path
+    );
+    if (!agent) throw new RefusedError("That agent is no longer here; review it again.");
+    if (agent.scope !== "user" && agent.scope !== "project")
+      throw new RefusedError(
+        agent.scope === "plugin"
+          ? "This agent comes with its plugin; change it in the plugin."
+          : "Managed agents are set by your organisation."
+      );
+    return agent.path;
+  }
+  if (!edit.create)
+    throw new RefusedError("An agent edit needs the agent or where a new one goes.");
+  const { scope, file } = edit.create;
+  if (!/^[\w][\w.-]*$/.test(file))
+    throw new RefusedError("A file name has letters, digits, '.', '-' or '_', and no folders.");
+  const folder =
+    scope === "user"
+      ? join(env.claudeDir, "agents")
+      : join((await gitRoot(dir)) ?? dir, ".claude", "agents");
+  return join(folder, `${file}.md`);
+}
+
+interface Planned {
+  path: string;
+  raw: string | null;
+  preview: SettingsEditPreview;
+}
+
+async function plan(env: ScanEnv, edit: AgentEdit): Promise<Planned> {
+  const path = await targetOf(env, edit);
+  const raw = await readIfExists(env, path);
+  if (!edit.path && raw !== null)
+    throw new RefusedError(`${path} already exists; open that agent to change it.`);
+  const errors = edit.text === null ? [] : agentProblems(edit.text);
+  const before = shownText(raw);
+  return {
+    path,
+    raw,
+    preview: {
+      path,
+      before,
+      after: errors.length > 0 ? (before ?? "") : (edit.text ?? ""),
+      revision: revisionOf(raw),
+      reformats: false,
+      errors,
+    },
+  };
+}
+
+export async function previewAgentEdit(
+  env: ScanEnv,
+  edit: AgentEdit
+): Promise<SettingsEditPreview> {
+  return (await plan(env, edit)).preview;
+}
+
+/** Writes or deletes an agent file, backed up first, only while it is as reviewed. */
+export function saveAgentEdit(
+  env: ScanEnv,
+  edit: AgentEdit,
+  expectedRevision: string
+): Promise<Change> {
+  return serially(async () => {
+    const { path, raw, preview } = await plan(env, edit);
+    if (preview.errors.length > 0) throw new RefusedError(preview.errors.join(" "));
+    if (preview.revision !== expectedRevision)
+      throw new RefusedError("The agent changed since you reviewed this; review it again.");
+    const { text } = edit;
+    return recordChange(env, { kind: "agent", target: path, before: raw }, async () => {
+      if (text !== null) await writeAtomic(env, path, text, expectedRevision);
+      else if (!(await removeExactly(path, expectedRevision)))
+        throw new StaleError(`${path} changed while ccdesk deleted it; nothing was deleted.`);
+      return { target: path, revision: revisionOf(text) };
+    });
+  });
+}
