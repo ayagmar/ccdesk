@@ -339,13 +339,19 @@ export async function visibilityOf(
   const inside = paths.filter((p) => p !== root && isWithin(root, p));
   for (const p of paths) if (!inside.includes(p)) result.set(p, "no-git");
   if (inside.length === 0) return result;
+  const rels = new Map(inside.map((p) => [p, relative(root, p).replaceAll("\\", "/")]));
   const tracked = await gitLines(root, ["ls-files", "--full-name", "-z", "--", ...inside], "\0");
-  // check-ignore accepts -z only with --stdin, so its output is split by line.
-  const ignored = await gitLines(root, ["check-ignore", "--no-index", "--", ...inside], "\n");
-  for (const p of inside) {
-    const rel = relative(root, p).replaceAll("\\", "/");
+  // check-ignore echoes the paths it matched, and on Windows an absolute path does not come back
+  // as written, so it gets relative ones. It accepts -z only with --stdin, so its output is split
+  // by line.
+  const ignored = await gitLines(
+    root,
+    ["check-ignore", "--no-index", "--", ...rels.values()],
+    "\n"
+  );
+  for (const [p, rel] of rels) {
     if (tracked.has(rel)) result.set(p, "tracked");
-    else if (ignored.has(p) || ignored.has(rel)) result.set(p, "ignored");
+    else if (ignored.has(rel)) result.set(p, "ignored");
     else result.set(p, "untracked");
   }
   return result;
