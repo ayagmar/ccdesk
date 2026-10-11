@@ -168,6 +168,11 @@ export interface BackupManifest {
 }
 
 export const MANIFEST = "ccdesk-backup.json";
+
+/** Takes a change out of Recent changes, for one whose effect was undone again right away. */
+export function forgetChange(env: ScanEnv, id: string): Promise<void> {
+  return rm(join(backupRoot(env), id), { recursive: true, force: true });
+}
 /** The copy of the target inside a backup folder. */
 export const SNAPSHOT = "before";
 

@@ -9,6 +9,7 @@ const WHAT: Record<BackupKind, string> = {
   settings: "Settings changed",
   "memory-index": "MEMORY.md changed",
   "memory-delete": "Memory deleted",
+  "memory-restore": "Memory restored",
 };
 
 /** Changes grouped under the day they were made, newest first, as they come from the server. */
@@ -114,7 +115,9 @@ export function ChangesPage({ onRestored }: { onRestored: (text: string) => void
                 </div>
                 {open === b.id && b.created && (
                   <p className="muted small review">
-                    ccdesk created this file, so there is no earlier version to put back.
+                    {b.kind === "memory-restore"
+                      ? "This put a deleted memory back. To undo it, delete the memory again."
+                      : "ccdesk created this file, so there is no earlier version to put back."}
                   </p>
                 )}
                 {open === b.id && !b.created && (
@@ -162,6 +165,8 @@ function Restore({ id, onDone }: { id: string; onDone: (text: string) => void })
     );
   if (!preview) return <p className="muted small">Reading the backup…</p>;
   const same = preview.before === preview.after && !preview.indexLines;
+  // A delete that stopped halfway after Claude rewrote the memory: only MEMORY.md changes.
+  const onlyIndex = preview.before === preview.after && preview.indexLines;
   return (
     <section className="review" aria-label="Review restore">
       {preview.blocked ? (
@@ -170,12 +175,21 @@ function Restore({ id, onDone }: { id: string; onDone: (text: string) => void })
         <p className="muted small">The file already matches this backup.</p>
       ) : (
         <>
-          <p className="muted small">
-            {preview.before === null
-              ? "The file does not exist now; restoring creates it."
-              : "Lines marked − are in the file now; lines marked + come back from the backup."}
-          </p>
-          <DiffView before={preview.before ?? ""} after={preview.after} />
+          {onlyIndex ? (
+            <p className="muted small">
+              The delete stopped halfway and Claude has rewritten this memory since, so the memory
+              stays as it is now.
+            </p>
+          ) : (
+            <>
+              <p className="muted small">
+                {preview.before === null
+                  ? "The file does not exist now; restoring creates it."
+                  : "Lines marked − are in the file now; lines marked + come back from the backup."}
+              </p>
+              <DiffView before={preview.before ?? ""} after={preview.after} />
+            </>
+          )}
           {preview.indexLines && (
             <p className="muted small">
               MEMORY.md gets {preview.indexLines.length === 1 ? "this line" : "these lines"} back:{" "}

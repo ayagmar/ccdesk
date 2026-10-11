@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, lstatSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { type AddressInfo } from "node:net";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
@@ -30,6 +30,7 @@ interface RestorePreview {
   after: string;
   revision: string;
   blocked?: string;
+  indexLines?: string[];
 }
 let fixture: Fixture;
 let server: ReturnType<typeof createCcdeskServer>;
@@ -539,6 +540,55 @@ test("a deleted memory can be restored from recent changes, but not over a new f
   assert.equal(restored.status, 200);
   assert.match(readFileSync(path, "utf8"), /old-note/);
   assert.match(readFileSync(`${store}/MEMORY.md`, "utf8"), /old-note\.md/);
+});
+
+test("a memory put back from recent changes is listed as a change of its own", async () => {
+  const store = memoryDirFor(fixture, fixture.at("work/recalled"));
+  const path = fixture.write(`${store}/note.md`, memoryFile("note", "project", "d", "b"));
+  fixture.write(`${store}/MEMORY.md`, "- [note](note.md) — d\n");
+  const deleted = (await deleteMemory(path)).json as Change;
+
+  assert.equal((await undo(deleted)).status, 200);
+  const restore = (await backups()).find((b) => b.kind === "memory-restore" && b.target === path);
+  assert.ok(restore, "the re-created memory is in recent changes");
+  assert.equal(restore.created, true);
+  const preview = (await call("/api/backups/preview", { method: "POST", body: { id: restore.id } }))
+    .json as RestorePreview;
+  assert.match(preview.blocked ?? "", /delete the memory again/);
+});
+
+test("a delete that stopped halfway after Claude rewrote the memory can still put its MEMORY.md line back", async () => {
+  const store = memoryDirFor(fixture, fixture.at("work/halfway"));
+  const path = fixture.write(`${store}/note.md`, memoryFile("note", "project", "d", "b"));
+  const line = "- [note](note.md) — d";
+  fixture.write(`${store}/MEMORY.md`, `- [Other](other.md) — o\n${line}\n`);
+  const { id } = (await deleteMemory(path)).json as Change;
+  // As the delete leaves things when Claude rewrites the memory while ccdesk removes it, and also
+  // rewrites MEMORY.md, so the line cannot be put back: the memory stays and the record is partial.
+  const rewritten = memoryFile("note", "project", "d", "rewritten by Claude");
+  fixture.write(path, rewritten);
+  fixture.write(`${store}/MEMORY.md`, "- [Other](other.md) — o\n- [New](new.md) — n\n");
+  const manifest = join(fixture.env.claudeDir, "backups", "ccdesk", id, "ccdesk-backup.json");
+  writeFileSync(
+    manifest,
+    JSON.stringify({ ...JSON.parse(readFileSync(manifest, "utf8")), after: "partial" })
+  );
+
+  const preview = (await call("/api/backups/preview", { method: "POST", body: { id } }))
+    .json as RestorePreview;
+  assert.equal(preview.blocked, undefined);
+  assert.deepEqual(preview.indexLines, [line]);
+  assert.equal(preview.before, preview.after, "the memory itself is not changed");
+  const restored = await call("/api/backups/restore", {
+    method: "POST",
+    body: { id, revision: preview.revision },
+  });
+  assert.equal(restored.status, 200);
+  assert.equal(readFileSync(path, "utf8"), rewritten);
+  assert.equal(
+    readFileSync(`${store}/MEMORY.md`, "utf8"),
+    `- [Other](other.md) — o\n- [New](new.md) — n\n${line}\n`
+  );
 });
 
 test("a backup id cannot reach outside the backup folder", async () => {

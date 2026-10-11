@@ -133,7 +133,7 @@ export interface EffectiveSetting {
   note?: string;
 }
 
-export type BackupKind = "settings" | "memory-index" | "memory-delete";
+export type BackupKind = "settings" | "memory-index" | "memory-delete" | "memory-restore";
 
 /** One change ccdesk made, from its backup folder. */
 export interface BackupSummary {

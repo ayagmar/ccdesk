@@ -14,6 +14,7 @@ import {
 import {
   type BackupManifest,
   backupRoot,
+  forgetChange,
   MANIFEST,
   RefusedError,
   readIfExists,
@@ -24,7 +25,7 @@ import {
   writeAtomic,
 } from "./write.ts";
 
-const KINDS = new Set(["settings", "memory-index", "memory-delete"]);
+const KINDS = new Set(["settings", "memory-index", "memory-delete", "memory-restore"]);
 
 function strings(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === "string");
@@ -152,7 +153,7 @@ async function planRestore(env: ScanEnv, id: string): Promise<Plan> {
       manifest.kind === "memory-index" ? await indexPathIn(store) : join(store, basename(target));
     // A deleted memory comes back only as a topic file, as ccdesk deletes only those.
     if (
-      manifest.kind === "memory-delete" &&
+      manifest.kind !== "memory-index" &&
       (!target.endsWith(".md") || basename(target) === "MEMORY.md")
     )
       throw new RefusedError("This backup does not point at a memory file.");
@@ -188,9 +189,27 @@ function planRevision({ current, index }: Plan): string {
   return index ? revisionOfBoth(current, index.text) : revisionOf(current);
 }
 
-function blockedReason({ manifest, current, saved }: Plan): string | undefined {
+/**
+ * A delete that stopped halfway, after Claude rewrote the memory: the memory was never removed, so
+ * only the MEMORY.md lines the delete took out come back, and the memory stays as it is now.
+ */
+function onlyIndexLines({ manifest, current, saved, index }: Plan): boolean {
+  return (
+    manifest.kind === "memory-delete" &&
+    manifest.after === "partial" &&
+    current !== null &&
+    current !== saved &&
+    (index?.missing.length ?? 0) > 0
+  );
+}
+
+function blockedReason(plan: Plan): string | undefined {
+  const { manifest, current, saved } = plan;
+  if (saved === null && manifest.kind === "memory-restore")
+    return "This put a deleted memory back. To undo it, delete the memory again.";
   if (saved === null)
     return "ccdesk created this file, so there is no earlier version to put back. Change it in place instead.";
+  if (onlyIndexLines(plan)) return undefined;
   if (manifest.kind === "settings" && hiddenValues(current) !== hiddenValues(saved))
     return "Hidden values in this file (env, headers or a URL's key) changed since the backup. ccdesk does not show or change those, so restore this one by hand.";
   // A retry after a restore that wrote the memory but not MEMORY.md finds the memory already back.
@@ -204,7 +223,7 @@ export async function previewRestore(env: ScanEnv, id: string): Promise<RestoreP
   const { manifest, current, saved, index } = plan;
   const shown = manifest.kind === "settings" ? shownSettings : shownText;
   const before = shown(current);
-  const after = shown(saved) ?? "";
+  const after = (onlyIndexLines(plan) ? before : shown(saved)) ?? "";
   const blocked = blockedReason(plan);
   return {
     id,
@@ -240,9 +259,15 @@ export function restoreBackup(
       return { target };
     }
     // A memory and its MEMORY.md lines come back together: when the index cannot be written, the
-    // memory just put back is removed again, so a refused restore leaves both as they were.
-    const created = current === null;
-    if (created) await writeAtomic(env, target, saved, revisionOf(null));
+    // memory just put back is removed again, with its record, so a refused restore leaves both as
+    // they were.
+    const created =
+      current === null
+        ? await recordChange(env, { kind: "memory-restore", target, before: null }, async () => {
+            await writeAtomic(env, target, saved, revisionOf(null));
+            return { revision: revisionOf(saved) };
+          })
+        : null;
     try {
       if (index && index.missing.length > 0) {
         const lines = (index.text ?? "").split("\n");
@@ -258,7 +283,8 @@ export function restoreBackup(
         );
       }
     } catch (error) {
-      if (created) await removeExactly(target, revisionOf(saved));
+      if (created && (await removeExactly(target, revisionOf(saved))))
+        await forgetChange(env, created.id);
       throw error;
     }
     return { target };
