@@ -22,7 +22,7 @@
   },
   "type": "module",
   "bin": {
-    "ccdesk": "./dist/server/cli.js"
+    "ccdesk": "dist/server/cli.js"
   },
   "files": [
     "dist/",
