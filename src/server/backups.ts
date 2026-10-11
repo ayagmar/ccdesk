@@ -25,7 +25,7 @@ import {
   writeAtomic,
 } from "./write.ts";
 
-const KINDS = new Set(["settings", "memory-index", "memory-delete", "memory-restore"]);
+const KINDS = new Set(["settings", "mcp", "memory-index", "memory-delete", "memory-restore"]);
 
 function strings(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === "string");
@@ -144,9 +144,11 @@ async function planRestore(env: ScanEnv, id: string): Promise<Plan> {
   let target = manifest.target;
   if (manifest.kind === "settings" && !isSettingsFile(env, target))
     throw new RefusedError("This backup does not point at a settings file.");
+  if (manifest.kind === "mcp" && basename(target) !== ".mcp.json")
+    throw new RefusedError("This backup does not point at a .mcp.json.");
   if (manifest.kind === "memory-index" && basename(target) !== "MEMORY.md")
     throw new RefusedError("This backup does not point at a MEMORY.md.");
-  if (manifest.kind !== "settings") {
+  if (manifest.kind !== "settings" && manifest.kind !== "mcp") {
     const store = await assertMemoryDir(env, dirname(target));
     // The same confinement as any other MEMORY.md change: a link out of the folder is refused.
     target =
@@ -210,7 +212,10 @@ function blockedReason(plan: Plan): string | undefined {
   if (saved === null)
     return "ccdesk created this file, so there is no earlier version to put back. Change it in place instead.";
   if (onlyIndexLines(plan)) return undefined;
-  if (manifest.kind === "settings" && hiddenValues(current) !== hiddenValues(saved))
+  if (
+    (manifest.kind === "settings" || manifest.kind === "mcp") &&
+    hiddenValues(current) !== hiddenValues(saved)
+  )
     return "Hidden values in this file (env, headers or a URL's key) changed since the backup. ccdesk does not show or change those, so restore this one by hand.";
   // A retry after a restore that wrote the memory but not MEMORY.md finds the memory already back.
   if (manifest.kind === "memory-delete" && current !== null && current !== saved)
@@ -221,7 +226,7 @@ function blockedReason(plan: Plan): string | undefined {
 export async function previewRestore(env: ScanEnv, id: string): Promise<RestorePreview> {
   const plan = await planRestore(env, id);
   const { manifest, current, saved, index } = plan;
-  const shown = manifest.kind === "settings" ? shownSettings : shownText;
+  const shown = manifest.kind === "settings" || manifest.kind === "mcp" ? shownSettings : shownText;
   const before = shown(current);
   const after = (onlyIndexLines(plan) ? before : shown(saved)) ?? "";
   const blocked = blockedReason(plan);

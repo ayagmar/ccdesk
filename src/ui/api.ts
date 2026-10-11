@@ -7,6 +7,7 @@ import {
   type Overview,
   type PathTest,
   type HookEdit,
+  type McpEdit,
   type PermissionEdit,
   type PermissionList,
   type RestorePreview,
@@ -99,6 +100,14 @@ export const api = {
     request<SettingsEditPreview>("/api/permissions/preview", { method: "POST", body: edit }),
   savePermission: (edit: PermissionEdit, revision: string) =>
     request<Change>("/api/permissions/save", { method: "POST", body: { ...edit, revision } }),
+  previewMcp: (edit: McpEdit) =>
+    request<SettingsEditPreview>("/api/mcp/preview", { method: "POST", body: edit }),
+  /** A project server change comes back as a Change; one made through `claude mcp` cannot be undone. */
+  saveMcp: (edit: McpEdit, revision: string) =>
+    request<Change | { target: string }>("/api/mcp/save", {
+      method: "POST",
+      body: { ...edit, revision },
+    }).then((saved) => ("id" in saved ? saved : null)),
   previewHook: (edit: HookEdit) =>
     request<SettingsEditPreview>("/api/hooks/preview", { method: "POST", body: edit }),
   saveHook: (edit: HookEdit, revision: string) =>

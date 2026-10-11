@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { revisionOf } from "../src/server/scan/files.ts";
 import { createCcdeskServer } from "../src/server/server.ts";
+import { RefusedError } from "../src/server/write.ts";
 import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
 const TOKEN = "test-token";
@@ -36,6 +37,9 @@ let fixture: Fixture;
 let server: ReturnType<typeof createCcdeskServer>;
 let base: string;
 const opened: string[] = [];
+/** The claude commands ccdesk ran; a command named in failing fails once. */
+const claudeRuns: Array<{ args: string[]; cwd: string }> = [];
+const failing = new Set<string>();
 
 before(async () => {
   fixture = makeFixture();
@@ -47,6 +51,12 @@ before(async () => {
     openFile: async (path) => {
       opened.push(path);
       return "fake-editor";
+    },
+    runClaude: async (args, cwd) => {
+      claudeRuns.push({ args, cwd });
+      // As the real runner reports a failed command.
+      if (failing.delete(args[1] ?? "")) throw new RefusedError(`claude ${args[1]} failed`);
+      return "";
     },
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -1088,5 +1098,181 @@ test("changing the matcher of a hook alone in its group keeps the group where it
   assert.deepEqual(
     hooks.PreToolUse.map((g: { matcher: string }) => g.matcher),
     ["Bash|Monitor", "Edit"]
+  );
+});
+
+/** Reviews an MCP server change, then saves it with the reviewed revision, as the page does. */
+async function saveMcp(edit: Record<string, unknown>) {
+  const preview = await call("/api/mcp/preview", { method: "POST", body: edit });
+  if (preview.status !== 200) return preview;
+  const { revision } = preview.json as Preview;
+  return call("/api/mcp/save", { method: "POST", body: { ...edit, revision } });
+}
+
+interface ScannedServer {
+  name: string;
+  scope: string;
+  definition: unknown;
+}
+
+async function serversIn(dir: string): Promise<ScannedServer[]> {
+  const view = await call(`/api/directory?path=${encodeURIComponent(dir)}`);
+  return (view.json as { inventory: { mcpServers: ScannedServer[] } }).inventory.mcpServers;
+}
+
+test("a project server is added to .mcp.json, replaced in place, and the change can be undone", async () => {
+  const dir = fixture.at("work/mcp-project");
+  const file = fixture.json("work/mcp-project/.mcp.json", {
+    mcpServers: { docs: { command: "docs-mcp" }, files: { command: "files-mcp" } },
+  });
+
+  const added = await saveMcp({
+    dir,
+    scope: "project",
+    add: { name: "sentry", definition: { type: "http", url: "https://mcp.sentry.dev/mcp" } },
+  });
+  assert.equal(added.status, 200);
+  const docs = (await serversIn(dir)).find((s) => s.name === "docs");
+  assert.ok(docs);
+  const replaced = await saveMcp({
+    dir,
+    scope: "project",
+    remove: { name: "docs", definition: docs.definition },
+    add: { name: "docs", definition: { command: "docs-mcp", args: ["--fast"] } },
+  });
+  assert.equal(replaced.status, 200);
+  assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).mcpServers, {
+    docs: { command: "docs-mcp", args: ["--fast"] },
+    files: { command: "files-mcp" },
+    sentry: { type: "http", url: "https://mcp.sentry.dev/mcp" },
+  });
+
+  assert.equal((await undo(replaced.json as Change)).status, 200);
+  assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).mcpServers.docs, { command: "docs-mcp" });
+});
+
+test("a server that cannot start is not saved, and no name is taken twice", async () => {
+  const dir = fixture.at("work/mcp-invalid");
+  fixture.json("work/mcp-invalid/.mcp.json", { mcpServers: { docs: { command: "docs-mcp" } } });
+
+  const noType = await call("/api/mcp/preview", {
+    method: "POST",
+    body: { dir, scope: "project", add: { name: "api", definition: { url: "https://x.example" } } },
+  });
+  assert.match((noType.json as Preview).errors.join(), /needs a "type"/);
+  const taken = await saveMcp({
+    dir,
+    scope: "project",
+    add: { name: "docs", definition: { command: "other" } },
+  });
+  assert.equal(taken.status, 409);
+});
+
+test("a server with hidden env values is not rewritten, but can be removed", async () => {
+  const dir = fixture.at("work/mcp-secret");
+  const file = fixture.json("work/mcp-secret/.mcp.json", {
+    mcpServers: {
+      db: { command: "db-mcp", env: { DB_PASSWORD: "s3cret" } },
+      keep: { command: "k" },
+    },
+  });
+  const db = (await serversIn(dir)).find((s) => s.name === "db");
+  assert.ok(db);
+  assert.doesNotMatch(JSON.stringify(db.definition), /s3cret/);
+
+  const rewritten = await saveMcp({
+    dir,
+    scope: "project",
+    remove: { name: "db", definition: db.definition },
+    add: { name: "db", definition: db.definition },
+  });
+  assert.equal(rewritten.status, 409);
+  assert.match(readFileSync(file, "utf8"), /s3cret/, "the password is never replaced by its mask");
+
+  const removed = await saveMcp({
+    dir,
+    scope: "project",
+    remove: { name: "db", definition: db.definition },
+  });
+  assert.equal(removed.status, 200);
+  assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).mcpServers, { keep: { command: "k" } });
+});
+
+test("user and local servers are changed through claude mcp, never by writing ~/.claude.json", async () => {
+  const dir = fixture.at("work/mcp-local");
+  fixture.write("work/mcp-local/README.md", "x");
+  fixture.write(
+    fixture.env.claudeJson,
+    JSON.stringify({
+      mcpServers: { notes: { command: "notes-mcp" } },
+      projects: { [dir]: { mcpServers: { db: { command: "db-mcp" } } } },
+    })
+  );
+  const before = readFileSync(fixture.env.claudeJson, "utf8");
+  claudeRuns.length = 0;
+
+  const replaced = await saveMcp({
+    dir,
+    scope: "local",
+    remove: { name: "db", definition: { command: "db-mcp" } },
+    add: { name: "db", definition: { command: "db-mcp", args: ["--ro"] } },
+  });
+  assert.equal(replaced.status, 200);
+  assert.equal(
+    (replaced.json as Partial<Change>).id,
+    undefined,
+    "a change made through claude mcp has no undo in ccdesk"
+  );
+  const added = await saveMcp({
+    dir,
+    scope: "user",
+    add: { name: "web", definition: { type: "http", url: "https://web.example/mcp" } },
+  });
+  assert.equal(added.status, 200);
+
+  assert.deepEqual(claudeRuns, [
+    { args: ["mcp", "remove", "db", "--scope", "local"], cwd: dir },
+    {
+      args: ["mcp", "add-json", "db", '{"command":"db-mcp","args":["--ro"]}', "--scope", "local"],
+      cwd: dir,
+    },
+    {
+      args: [
+        "mcp",
+        "add-json",
+        "web",
+        '{"type":"http","url":"https://web.example/mcp"}',
+        "--scope",
+        "user",
+      ],
+      cwd: fixture.env.home,
+    },
+  ]);
+  assert.equal(readFileSync(fixture.env.claudeJson, "utf8"), before);
+});
+
+test("a replaced server goes back as it was when claude refuses the new one", async () => {
+  const dir = fixture.at("work/mcp-rollback");
+  fixture.write(
+    fixture.env.claudeJson,
+    JSON.stringify({ mcpServers: { notes: { command: "notes-mcp" } } })
+  );
+  claudeRuns.length = 0;
+  failing.add("add-json");
+
+  const refused = await saveMcp({
+    dir,
+    scope: "user",
+    remove: { name: "notes", definition: { command: "notes-mcp" } },
+    add: { name: "notes", definition: { command: "notes-mcp", args: ["--v2"] } },
+  });
+  assert.equal(refused.status, 409);
+  assert.deepEqual(
+    claudeRuns.map((r) => r.args.slice(0, 4)),
+    [
+      ["mcp", "remove", "notes", "--scope"],
+      ["mcp", "add-json", "notes", '{"command":"notes-mcp","args":["--v2"]}'],
+      ["mcp", "add-json", "notes", '{"command":"notes-mcp"}'],
+    ]
   );
 });

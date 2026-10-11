@@ -8,7 +8,8 @@ import { Review, type Saved } from "./SettingEditor.tsx";
  */
 export function useReviewedChange<E>(
   preview: (edit: E) => Promise<SettingsEditPreview>,
-  save: (edit: E, revision: string) => Promise<Change>,
+  /** Resolves with null for a change that cannot be undone from ccdesk. */
+  save: (edit: E, revision: string) => Promise<Change | null>,
   onSaved: (saved: Saved) => void
 ) {
   const [review, setReview] = useState<{

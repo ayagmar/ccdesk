@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Bullet } from "./Bullet.tsx";
 import { HookEditor } from "./HookEditor.tsx";
 import { Icon } from "./Icon.tsx";
+import { McpEditor } from "./McpEditor.tsx";
 import { PermissionEditor } from "./PermissionEditor.tsx";
 import { SettingEditor } from "./SettingEditor.tsx";
 import { SECTIONS, sectionOf } from "./sections/index.ts";
@@ -19,6 +20,7 @@ const TITLES: Record<Adding, string> = {
   setting: "Add a setting",
   permission: "Add a permission rule",
   hook: "Add a hook",
+  mcp: "Add an MCP server",
 };
 
 /** The panel beside the tables: the selected row's file, why it applies, and what can change. */
@@ -54,6 +56,9 @@ export function Inspector({ row, adding, actions, onClose }: Props) {
           )}
           {adding === "permission" && (
             <PermissionEditor view={actions.view} rule={null} onSaved={actions.onSaved} />
+          )}
+          {adding === "mcp" && (
+            <McpEditor view={actions.view} server={null} onSaved={actions.onSaved} />
           )}
           {adding === "hook" && (
             <HookEditor view={actions.view} hook={null} onSaved={actions.onSaved} />

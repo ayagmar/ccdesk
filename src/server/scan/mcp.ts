@@ -1,7 +1,15 @@
 import { join } from "node:path";
 import { type McpServer, type Plugin, type SettingsLayer, type Trust } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isRecord, readJsonObject, shownUrl, stringField, stringsIn, wildcard } from "./files.ts";
+import {
+  isRecord,
+  readJsonObject,
+  redactSecrets,
+  shownUrl,
+  stringField,
+  stringsIn,
+  wildcard,
+} from "./files.ts";
 import { manifestConfigs } from "./plugins.ts";
 import { readManagedSettings } from "./settings.ts";
 
@@ -38,6 +46,7 @@ function define(
         target: url ? shownUrl(url) : (command?.join(" ") ?? ""),
         sourcePath,
         status: "active",
+        definition: redactSecrets(c),
       };
       if (!type && url) {
         server.status = "invalid";

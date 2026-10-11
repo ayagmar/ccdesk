@@ -1,6 +1,8 @@
 import { type McpStatus } from "../../shared/types.ts";
 import { Bullet } from "../Bullet.tsx";
 import { tildeAll } from "../format.ts";
+import { Icon } from "../Icon.tsx";
+import { McpEditor } from "../McpEditor.tsx";
 import { Field, NameButton, PathValue } from "./kit.tsx";
 import { defineSection, type RowOf } from "./types.ts";
 
@@ -63,7 +65,12 @@ export const mcp = defineSection<R>({
     of: (row) => STATUS[row.item.status],
     order: Object.values(STATUS),
   },
-  Details: ({ row }) => {
+  Head: ({ actions }) => (
+    <button type="button" className="head-action" onClick={() => actions.onAdd("mcp")}>
+      <Icon name="plus" /> Add server
+    </button>
+  ),
+  Details: ({ row, actions }) => {
     const m = row.item;
     return (
       <>
@@ -83,6 +90,8 @@ export const mcp = defineSection<R>({
           </Field>
         </dl>
         <p className="muted small">Environment variables and headers are hidden.</p>
+        <h3 className="sub-title">Change this server</h3>
+        <McpEditor key={row.id} view={actions.view} server={m} onSaved={actions.onSaved} />
       </>
     );
   },

@@ -133,7 +133,7 @@ export interface EffectiveSetting {
   note?: string;
 }
 
-export type BackupKind = "settings" | "memory-index" | "memory-delete" | "memory-restore";
+export type BackupKind = "settings" | "mcp" | "memory-index" | "memory-delete" | "memory-restore";
 
 /** One change ccdesk made, from its backup folder. */
 export interface BackupSummary {
@@ -250,6 +250,8 @@ export interface McpServer {
   plugin?: string;
   /** Why the server is not started, in plain words. */
   note?: string;
+  /** The server as written, with env, header and URL secrets hidden. */
+  definition: unknown;
 }
 
 export interface Plugin {
@@ -532,4 +534,21 @@ export interface SettingsEditPreview {
   reformats: boolean;
   /** Schema errors; when present nothing can be saved. */
   errors: string[];
+  /**
+   * For a file ccdesk does not write itself (~/.claude.json): the Claude Code commands it runs
+   * instead, with secrets hidden. Such a change is not backed up or listed in Recent changes.
+   */
+  commands?: string[];
+}
+
+/**
+ * One MCP server change. Project servers are changed in .mcp.json; user and local ones through
+ * `claude mcp`. With both, the server is replaced, keeping its place in .mcp.json.
+ */
+export interface McpEdit {
+  dir: string;
+  scope: "user" | "local" | "project";
+  /** The server to take out, as the scan showed it; refused when it changed since. */
+  remove?: { name: string; definition: unknown };
+  add?: { name: string; definition: unknown };
 }

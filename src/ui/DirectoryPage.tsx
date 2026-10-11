@@ -144,7 +144,7 @@ export function DirectoryPage({
     ({ change, message, select }: Saved) => {
       setAdding(null);
       if (select !== undefined) setSelected(select);
-      onToast({ text: message, undo: () => undo(change) });
+      onToast({ text: message, ...(change ? { undo: () => undo(change) } : {}) });
       reload();
     },
     [onToast, reload, undo]

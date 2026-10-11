@@ -23,7 +23,8 @@ import { documentedValues } from "./settingsCatalog.ts";
 
 /** A saved edit: the change to undo, what to tell you, and the row to show afterwards. */
 export interface Saved {
-  change: Change;
+  /** null for a change ccdesk made through Claude Code's own commands, which it cannot undo. */
+  change: Change | null;
   message: string;
   select?: string | null;
 }
@@ -419,6 +420,20 @@ export function Review({
       ) : (
         <DiffView before={preview.before ?? ""} after={preview.after} />
       )}
+      {!blocked && preview.commands && (
+        <div className="muted small">
+          <p>
+            ccdesk does not write this file itself; Claude Code rewrites it all the time. Saving
+            runs Claude Code's own command instead (values hidden here):
+          </p>
+          {preview.commands.map((c) => (
+            <p key={c} className="mono wrap">
+              {c}
+            </p>
+          ))}
+          <p>This change is not listed in Recent changes, so undo it the same way.</p>
+        </div>
+      )}
       <div className="editor-buttons">
         {!blocked && (
           <button type="button" className="primary" disabled={busy} onClick={onSave}>
@@ -429,7 +444,7 @@ export function Review({
           {blocked ? "Back" : "Cancel"}
         </button>
       </div>
-      {!blocked && preview.before !== null && (
+      {!blocked && !preview.commands && preview.before !== null && (
         <p className="muted small">
           {preview.reformats
             ? "ccdesk writes the whole file with 2-space indentation, as Claude Code does. "

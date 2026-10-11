@@ -4,12 +4,14 @@ import { extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import HOOK_EVENTS from "../shared/hook-events.json" with { type: "json" };
 import {
   type HookEdit,
+  type McpEdit,
   type PermissionEdit,
   type PermissionList,
   type Scope,
   type SettingsEdit,
 } from "../shared/types.ts";
 import { listBackups, previewRestore, restoreBackup } from "./backups.ts";
+import { previewMcpEdit, type RunClaude, runClaude, saveMcpEdit } from "./mcp-edit.ts";
 import { changeMemory, isMemoryAction, previewMemoryChange } from "./mutations.ts";
 import { openInEditor } from "./open.ts";
 import { type ScanEnv } from "./scan/env.ts";
@@ -37,6 +39,8 @@ interface ServerOptions {
   uiDir: string | null;
   /** Opens a file in the user's editor; replaced in tests so nothing is launched. */
   openFile?: (path: string) => Promise<string>;
+  /** Runs `claude`, for MCP servers in ~/.claude.json; replaced in tests so nothing changes. */
+  runClaude?: RunClaude;
 }
 
 const MIME: Record<string, string> = {
@@ -190,6 +194,16 @@ async function handle(
     const { revision } = stringFields(body, ["revision"]);
     return answer(res, () => saveHookEdit(env, edit, revision));
   }
+  if (req.method === "POST" && url.pathname === "/api/mcp/preview") {
+    const edit = mcpEditFrom(await readBody(req));
+    return answer(res, () => previewMcpEdit(env, edit, options.runClaude ?? runClaude));
+  }
+  if (req.method === "POST" && url.pathname === "/api/mcp/save") {
+    const body = await readBody(req);
+    const edit = mcpEditFrom(body);
+    const { revision } = stringFields(body, ["revision"]);
+    return answer(res, () => saveMcpEdit(env, edit, revision, options.runClaude ?? runClaude));
+  }
   if (req.method === "GET" && url.pathname === "/api/watch") {
     const dir = url.searchParams.get("dir");
     const since = Number(url.searchParams.get("since") ?? "0");
@@ -293,6 +307,26 @@ function hookEditFrom(body: unknown): HookEdit {
       throw new RequestError(400, "matcher must be text");
     if (!isRecord(definition)) throw new RequestError(400, "a hook must be a JSON object");
     edit.add = { event, ...(matcher ? { matcher } : {}), definition };
+  }
+  if (!edit.remove && !edit.add) throw new RequestError(400, "remove or add is required");
+  return edit;
+}
+
+function mcpEditFrom(body: unknown): McpEdit {
+  const { dir, scope } = stringFields(body, ["dir", "scope"]);
+  if (scope !== "user" && scope !== "local" && scope !== "project")
+    throw new RequestError(400, "scope must be user, local or project");
+  const { remove, add } = body as Record<string, unknown>;
+  const edit: McpEdit = { dir, scope };
+  if (remove !== undefined) {
+    const { name } = stringFields(remove, ["name"]);
+    edit.remove = { name, definition: (remove as Record<string, unknown>).definition };
+  }
+  if (add !== undefined) {
+    const { name } = stringFields(add, ["name"]);
+    const { definition } = add as Record<string, unknown>;
+    if (!isRecord(definition)) throw new RequestError(400, "a server must be a JSON object");
+    edit.add = { name, definition };
   }
   if (!edit.remove && !edit.add) throw new RequestError(400, "remove or add is required");
   return edit;
