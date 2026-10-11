@@ -1,6 +1,6 @@
 {
   "name": "ccdesk",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "See and manage everything that shapes Claude Code on your machine: instructions, settings, hooks, MCP servers, agents, skills and memory",
   "keywords": [
     "claude-code",
