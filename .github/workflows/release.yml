@@ -5,11 +5,8 @@ name: Release
 #   creates the GitHub release; then `npm publish` runs via npm trusted publishing
 #   (OIDC; provenance is added automatically for public repos). No long-lived npm token is needed.
 #
-# One-time setup per package (npmjs.com → package → Settings → Trusted publishing):
-#   GitHub Actions · user: ayagmar · repo: <this repo> · workflow: release.yml · allow `npm publish`.
-# Trusted publishing can only be configured once the package exists on npm. For the very
-# first publish, run this workflow with `bootstrap: true` and an `NPM_TOKEN` repo secret
-# (granular, publish-only, short expiry), then configure trusted publishing and delete the secret.
+# One-time setup (npmjs.com → package → Settings → Trusted publishing, or from the CLI):
+#   npm trust github ccdesk --repo ayagmar/ccdesk --file release.yml --allow-publish
 
 on:
   workflow_dispatch:
@@ -25,10 +22,6 @@ on:
         default: false
       publish_only:
         description: Skip release-it and only publish the version already tagged at HEAD (recovery)
-        type: boolean
-        default: false
-      bootstrap:
-        description: First publish only — authenticate with the NPM_TOKEN secret instead of OIDC
         type: boolean
         default: false
 
@@ -112,17 +105,6 @@ jobs:
               exit 1
             fi
           fi
-
-      - name: Use bootstrap token
-        if: inputs.bootstrap && inputs.dry_run == false
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "::error::bootstrap requires an NPM_TOKEN repository secret"
-            exit 1
-          fi
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
 
       - name: Publish to npm
         run: |
