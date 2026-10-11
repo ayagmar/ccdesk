@@ -1,0 +1,208 @@
+{
+  "$comment": "From the settings index at https://code.claude.com/docs/en/settings-reference.md",
+  "limited": {
+    "allowAllClaudeAiMcps": [
+      "managed"
+    ],
+    "allowClaudeInChromeWithManagedMcp": [
+      "managed"
+    ],
+    "allowedChannelPlugins": [
+      "managed"
+    ],
+    "allowedProviders": [
+      "managed"
+    ],
+    "allowManagedHooksOnly": [
+      "managed"
+    ],
+    "allowManagedMcpServersOnly": [
+      "managed"
+    ],
+    "allowManagedPermissionRulesOnly": [
+      "managed"
+    ],
+    "askUserQuestionTimeout": [
+      "managed",
+      "user"
+    ],
+    "appendPlugins": [
+      "managed",
+      "user"
+    ],
+    "autoConnectIde": [],
+    "autoContinueAtUsageLimit": [
+      "managed",
+      "user"
+    ],
+    "autoInstallIdeExtension": [],
+    "autoMode": [
+      "managed",
+      "user"
+    ],
+    "availableModelsMatch": [
+      "managed"
+    ],
+    "bashEditDiffEnabled": [
+      "managed",
+      "user"
+    ],
+    "blockedMarketplaces": [
+      "managed"
+    ],
+    "browserExternalPageTools": [
+      "managed"
+    ],
+    "channelsEnabled": [
+      "managed"
+    ],
+    "claudeInChromeDefaultEnabled": [],
+    "claudeMd": [
+      "managed"
+    ],
+    "copyFullResponse": [],
+    "copyOnSelect": [],
+    "defaultToAgentsView": [],
+    "deniedModels": [
+      "managed"
+    ],
+    "desktopSessionCleanupPeriodDays": [
+      "managed",
+      "user"
+    ],
+    "dialogExpiry": [
+      "managed",
+      "user"
+    ],
+    "diffTool": [],
+    "disableBrowserExternalNavigation": [
+      "managed"
+    ],
+    "disableCommandPluginSources": [
+      "managed"
+    ],
+    "disableDesktopLocalSessions": [
+      "managed"
+    ],
+    "disableMobileSimulatorTools": [
+      "managed"
+    ],
+    "disableSideloadFlags": [
+      "managed"
+    ],
+    "externalEditorContext": [],
+    "feedbackDrafts": [
+      "managed",
+      "user"
+    ],
+    "footerLinksRegexes": [
+      "managed",
+      "user"
+    ],
+    "forceLoginGatewayUrl": [
+      "managed",
+      "user"
+    ],
+    "forceRemoteSettingsRefresh": [
+      "managed"
+    ],
+    "gatewayInternalNetworks": [
+      "managed"
+    ],
+    "leftArrowOpensAgents": [],
+    "managedMcpServers": [
+      "managed"
+    ],
+    "managedSourcesBehavior": [
+      "managed"
+    ],
+    "modelPicker": [
+      "managed",
+      "user"
+    ],
+    "modelPricing": [
+      "managed"
+    ],
+    "parentSettingsBehavior": [
+      "managed"
+    ],
+    "permissionExplainerEnabled": [],
+    "pluginConfigs": [
+      "managed",
+      "user"
+    ],
+    "pluginSuggestionMarketplaces": [
+      "managed"
+    ],
+    "pluginTrustMessage": [
+      "managed"
+    ],
+    "policyHelper": [
+      "managed"
+    ],
+    "prependPlugins": [
+      "managed",
+      "user"
+    ],
+    "processWrapper": [
+      "managed",
+      "user"
+    ],
+    "prStatusFooterEnabled": [],
+    "requiredMaximumVersion": [
+      "managed"
+    ],
+    "requiredMinimumVersion": [
+      "managed"
+    ],
+    "skipAutoPermissionPrompt": [
+      "managed",
+      "user"
+    ],
+    "skipDangerousModePermissionPrompt": [
+      "managed",
+      "user",
+      "local"
+    ],
+    "spellcheck": [
+      "managed",
+      "user"
+    ],
+    "sshConfigs": [
+      "managed",
+      "user"
+    ],
+    "sshHostAllowlist": [
+      "managed"
+    ],
+    "strictKnownMarketplaces": [
+      "managed"
+    ],
+    "strictPluginOnlyCustomization": [
+      "managed"
+    ],
+    "syncClaudeAiPlugins": [
+      "managed",
+      "user",
+      "local"
+    ],
+    "syncClaudeAiSkills": [
+      "managed",
+      "user",
+      "local"
+    ],
+    "teammateDefaultModel": [],
+    "useAutoModeDuringPlan": [
+      "managed",
+      "user",
+      "local"
+    ],
+    "vimInsertModeRemaps": [
+      "managed",
+      "user"
+    ],
+    "wslInheritsWindowsSettings": [
+      "managed"
+    ]
+  }
+}

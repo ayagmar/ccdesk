@@ -1,0 +1,235 @@
+{
+  "$comment": "From the tool table at https://code.claude.com/docs/en/tools-reference.md",
+  "tools": [
+    {
+      "name": "Agent",
+      "description": "Spawns a subagent with its own context window to handle a task. With agent teams enabled, a call that carries a `name` can launch a teammate instead.",
+      "asks": false
+    },
+    {
+      "name": "Artifact",
+      "description": "Publishes an HTML or Markdown file as an artifact: a private, interactive page on claude.ai. You can share it with a public link, or inside your organization on Team and Enterprise plans, where public sharing requires an Owner to enable it. Requires a Pro, Max, Team, or Enterprise plan and `/login` authentication",
+      "asks": true
+    },
+    {
+      "name": "AskUserQuestion",
+      "description": "Asks multiple-choice questions to gather requirements or clarify ambiguity. Questions stay open until you answer them by default.",
+      "asks": false
+    },
+    {
+      "name": "Bash",
+      "description": "Executes shell commands in your environment.",
+      "asks": true
+    },
+    {
+      "name": "CronCreate",
+      "description": "Schedules a recurring or one-shot prompt within the current session. Tasks are session-scoped and restored on `--resume` or `--continue` if unexpired.",
+      "asks": false
+    },
+    {
+      "name": "CronDelete",
+      "description": "Cancels a scheduled task by ID",
+      "asks": false
+    },
+    {
+      "name": "CronList",
+      "description": "Lists all scheduled tasks in the session",
+      "asks": false
+    },
+    {
+      "name": "Edit",
+      "description": "Makes targeted edits to specific files.",
+      "asks": true
+    },
+    {
+      "name": "EndConversation",
+      "description": "Ends the session, in rare cases of sustained abusive input or when you ask Claude to demonstrate the tool. Requires Claude Code v2.1.213 or later.",
+      "asks": false
+    },
+    {
+      "name": "EnterPlanMode",
+      "description": "Switches to plan mode to design an approach before coding",
+      "asks": false
+    },
+    {
+      "name": "EnterWorktree",
+      "description": "Creates an isolated git worktree and switches into it. Pass a `path` to switch into an existing worktree instead of creating a new one. On first entry the target may be a worktree of the current repository or, in a multi-repo workspace, of a repository nested inside it. Before v2.1.203, a nested repository's worktree was rejected. A `path` outside `.claude/worktrees/` prompts for your approval before entering, since it moves the session's working directory and write access to that location. New-worktree creation and paths under `.claude/worktrees/` don't prompt. Before v2.1.206, Claude entered paths outside `.claude/worktrees/` without a prompt. From within a worktree session, or from a subagent with a pinned working directory such as `isolation: worktree`, only the `path` form is available and the target must be under `.claude/worktrees/` of the session's repository",
+      "asks": true
+    },
+    {
+      "name": "ExitPlanMode",
+      "description": "Presents a plan for approval and exits plan mode",
+      "asks": true
+    },
+    {
+      "name": "ExitWorktree",
+      "description": "Exits a worktree session and returns to the original directory. Not available to subagents that already run in their own working directory, such as with `isolation: worktree`",
+      "asks": false
+    },
+    {
+      "name": "Glob",
+      "description": "Finds files based on pattern matching. Absent by default on macOS, Linux, and WSL.",
+      "asks": false
+    },
+    {
+      "name": "Grep",
+      "description": "Searches for patterns in file contents. Absent by default on macOS, Linux, and WSL.",
+      "asks": false
+    },
+    {
+      "name": "ListAgents",
+      "description": "Lists the agents Claude can message with `SendMessage`: subagents in the session, agent team teammates, your other local Claude Code sessions, and, while this session is connected to Remote Control, your cloud sessions and your Remote Control sessions on other machines. Backs the `/list-agents` command. Requires Claude Code v2.1.224 or later, and appears only in sessions where cross-session messaging is enabled. Teammate rows and the first line showing this session's own name require v2.1.239 or later",
+      "asks": false
+    },
+    {
+      "name": "ListMcpResourcesTool",
+      "description": "Lists resources exposed by connected MCP servers, leaving out MCP Apps UI resources, which are pages for a host application to render",
+      "asks": false
+    },
+    {
+      "name": "LSP",
+      "description": "Code intelligence via language servers: jump to definitions, find references, report type errors and warnings.",
+      "asks": false
+    },
+    {
+      "name": "Monitor",
+      "description": "Runs a command in the background and feeds each output line back to Claude, so it can react to log entries, file changes, or polled status mid-conversation. Can also open a WebSocket and treat each incoming message as an event.",
+      "asks": true
+    },
+    {
+      "name": "NotebookEdit",
+      "description": "Modifies Jupyter notebook cells.",
+      "asks": true
+    },
+    {
+      "name": "PowerShell",
+      "description": "Executes PowerShell commands natively.",
+      "asks": true
+    },
+    {
+      "name": "PushNotification",
+      "description": "Sends a desktop notification, and a phone push when Remote Control is connected, so a long-running task or scheduled task can reach you when you step away. Push delivery runs through Anthropic-hosted infrastructure, which is not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
+      "asks": false
+    },
+    {
+      "name": "Read",
+      "description": "Reads the contents of files.",
+      "asks": false
+    },
+    {
+      "name": "ReadMcpResourceTool",
+      "description": "Reads a specific MCP resource by URI",
+      "asks": false
+    },
+    {
+      "name": "RemoteTrigger",
+      "description": "Creates, updates, runs, and lists Routines on claude.ai. Backs the `/schedule` command. The `RemoteTrigger` input reference documents every action and the organization policies that remove the tool. Routines live on claude.ai and require a Pro, Max, Team, or Enterprise plan, so this tool is not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
+      "asks": false
+    },
+    {
+      "name": "ReportFindings",
+      "description": "Reports code-review findings as a structured list, with a file, summary, and failure scenario per finding, so Claude Code can render them instead of printing them as text. Claude calls it when active code-review instructions tell it to. A finding can also carry an optional `category` slug, such as `correctness` or `test-coverage`, shown next to the file location in the rendered list",
+      "asks": false
+    },
+    {
+      "name": "ScheduleWakeup",
+      "description": "Reschedules the next iteration of a self-paced `/loop`. Claude calls this at the end of each iteration to pick when the next one runs, between one minute and one hour out; you don't call it directly. To end the loop instead, Claude calls it with `stop: true`, which cancels the pending wakeup. The `stop` field requires Claude Code v2.1.202 or later. The pending wakeup appears in `session_crons` in Stop hook input",
+      "asks": false
+    },
+    {
+      "name": "SendFeedback",
+      "description": "Drafts a feedback report about Claude Code, covering a product problem or Claude's own behavior in the session, and queues it on your machine for you to review. Claude Code sends nothing until you choose to send the draft. Requires Claude Code v2.1.238 or later",
+      "asks": false
+    },
+    {
+      "name": "SendMessage",
+      "description": "Sends a message to another agent: an agent team teammate, a subagent it resumes by agent ID or name, or one of your other Claude Code sessions, on this machine or beyond it. Messaging other sessions requires Claude Code v2.1.224 or later. Cross-session messaging covers which sessions Claude can reach, what a message looks like when it arrives, and how Claude gets a notice when another session goes idle. Claude can include an optional `summary` input, typically 5-10 words, that Claude Code shows as a one-line preview. When Claude omits it on a plain-text message, Claude Code uses the first line of the message as the summary. Claude Code truncates a summary longer than 200 characters with an ellipsis",
+      "asks": false
+    },
+    {
+      "name": "SendUserFile",
+      "description": "Sends files from the session to you with an optional caption, so a generated report, diagram, screenshot, or built artifact reaches your device instead of only being mentioned in the transcript. The optional `display` input controls presentation: `render` opens the file inline in the client, `attach` shows a download card only, and when unset the client decides by file type. Available when a Remote Control client is connected or in a cloud session. Delivery runs through Anthropic-hosted infrastructure, so the tool is not available on Amazon Bedrock, Google Cloud's Agent Platform, or Microsoft Foundry",
+      "asks": false
+    },
+    {
+      "name": "ShareOnboardingGuide",
+      "description": "Uploads `ONBOARDING.md` and returns a share link teammates can open in Claude Code. Called from `/team-onboarding` after the guide is written. Available to claude.ai subscribers on Pro, Max, Team, and Enterprise plans",
+      "asks": true
+    },
+    {
+      "name": "Skill",
+      "description": "Executes a skill within the main conversation",
+      "asks": true
+    },
+    {
+      "name": "SubagentHandback",
+      "description": "Delivers a subagent's final report to whichever conversation receives that subagent's result. Provided only in auto mode, to subagents that the Agent tool runs locally other than forks, and available in the terminal CLI, IDE extensions, cloud sessions, and the Agent SDK; the classifier reviews the report before it's delivered. Requires Claude Code v2.1.271 or later",
+      "asks": false
+    },
+    {
+      "name": "TaskCreate",
+      "description": "Creates a new task in the task list. Provided by default only on the models listed under Task tool availability, and on other models when you opt in",
+      "asks": false
+    },
+    {
+      "name": "TaskGet",
+      "description": "Retrieves full details for a specific task. Provided by default only on the models listed under Task tool availability, and on other models when you opt in",
+      "asks": false
+    },
+    {
+      "name": "TaskList",
+      "description": "Lists all tasks with their current status. Provided by default only on the models listed under Task tool availability, and on other models when you opt in",
+      "asks": false
+    },
+    {
+      "name": "TaskOutput",
+      "description": "Retrieves output from a background task. Deprecated in favor of `Read` on the task's output file path. When no task matches the ID, the error lists the running background agents by ID and description. Before v2.1.203, the error named only the missing ID",
+      "asks": false
+    },
+    {
+      "name": "TaskStop",
+      "description": "Stops a running background task by ID. It also accepts an agent-team teammate or a named background agent by agent ID or name. When no task matches the ID, the error lists the running background agents by ID and description, including agents that another agent spawned. Before v2.1.203, the error listed running teammates and named agents but not background agents another agent spawned, so those couldn't be identified or stopped from the main conversation",
+      "asks": false
+    },
+    {
+      "name": "TaskUpdate",
+      "description": "Updates task status, dependencies, details, or deletes tasks. Provided by default only on the models listed under Task tool availability, and on other models when you opt in",
+      "asks": false
+    },
+    {
+      "name": "TodoWrite",
+      "description": "Manages the session task checklist. Disabled by default in favor of `TaskCreate`, `TaskGet`, `TaskList`, and `TaskUpdate`. Set `CLAUDE_CODE_ENABLE_TASKS=0` to re-enable it in sessions that have the task-tracking tools",
+      "asks": false
+    },
+    {
+      "name": "ToolSearch",
+      "description": "Searches for and loads deferred tools when tool search is enabled",
+      "asks": false
+    },
+    {
+      "name": "WaitForMcpServers",
+      "description": "Waits for one or more MCP servers that are still connecting in the background, so a request can use their tools without restarting the session. Claude calls it when a needed server isn't connected yet. Only appears when tool search is disabled, since `ToolSearch` handles the wait when it's enabled",
+      "asks": false
+    },
+    {
+      "name": "WebFetch",
+      "description": "Fetches content from a specified URL.",
+      "asks": true
+    },
+    {
+      "name": "WebSearch",
+      "description": "Performs web searches.",
+      "asks": true
+    },
+    {
+      "name": "Workflow",
+      "description": "Runs a dynamic workflow: a script that orchestrates many subagents in the background and returns one consolidated result",
+      "asks": true
+    },
+    {
+      "name": "Write",
+      "description": "Creates or overwrites files.",
+      "asks": true
+    }
+  ]
+}
