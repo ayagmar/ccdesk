@@ -554,7 +554,8 @@ test("a deleted memory can be restored from recent changes, but not over a new f
 
 test("a memory put back from recent changes is listed as a change of its own", async () => {
   const store = memoryDirFor(fixture, fixture.at("work/recalled"));
-  const path = fixture.write(`${store}/note.md`, memoryFile("note", "project", "d", "b"));
+  // Built with the platform separator, as the change Recent changes records is.
+  const path = fixture.write(join(store, "note.md"), memoryFile("note", "project", "d", "b"));
   fixture.write(`${store}/MEMORY.md`, "- [note](note.md) — d\n");
   const deleted = (await deleteMemory(path)).json as Change;
 
