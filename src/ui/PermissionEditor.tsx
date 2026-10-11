@@ -6,13 +6,13 @@ import {
   type PermissionEdit,
   type PermissionList,
   type Scope,
-  type SettingsEditPreview,
 } from "../shared/types.ts";
 import { api } from "./api.ts";
 import { Bullet } from "./Bullet.tsx";
 import { tilde } from "./format.ts";
 import { lineName } from "./lines.ts";
-import { Review, type Saved } from "./SettingEditor.tsx";
+import { type Saved } from "./SettingEditor.tsx";
+import { useReviewedChange } from "./useReviewedChange.tsx";
 
 const LISTS: PermissionList[] = ["allow", "ask", "deny"];
 
@@ -25,74 +25,24 @@ interface Props {
   onSaved: (saved: Saved) => void;
 }
 
-/**
- * One permission rule change to a settings file: reviewed as a diff first, then saved only while
- * the file is still as reviewed.
- */
+/** One permission rule change to a settings file, reviewed as a diff before it is saved. */
 export function usePermissionChange(view: DirectoryView, onSaved: (saved: Saved) => void) {
-  const [review, setReview] = useState<{
-    edit: PermissionEdit;
-    preview: SettingsEditPreview;
-    message: string;
-  } | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const start = async (
+  const change = useReviewedChange<PermissionEdit>(
+    api.previewPermission,
+    api.savePermission,
+    onSaved
+  );
+  const start = (
     file: string,
     remove: PermissionEdit["remove"] | undefined,
     add: PermissionEdit["add"] | undefined,
     message: string
-  ) => {
-    setProblem(null);
-    const edit: PermissionEdit = {
-      dir: view.path,
-      file,
-      ...(remove ? { remove } : {}),
-      ...(add ? { add } : {}),
-    };
-    setBusy(true);
-    try {
-      setReview({ edit, preview: await api.previewPermission(edit), message });
-    } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const save = async () => {
-    if (!review) return false;
-    setBusy(true);
-    try {
-      const change = await api.savePermission(review.edit, review.preview.revision);
-      onSaved({ change, message: review.message });
-      setReview(null);
-      return true;
-    } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  };
-  const shown = (
-    <>
-      {problem && (
-        <p className="flag bad" role="alert">
-          {problem}
-        </p>
-      )}
-      {review && (
-        <Review
-          preview={review.preview}
-          busy={busy}
-          onSave={() => void save()}
-          onCancel={() => setReview(null)}
-        />
-      )}
-    </>
-  );
-  return { start, save, busy, reviewing: review !== null, cancel: () => setReview(null), shown };
+  ) =>
+    change.start(
+      { dir: view.path, file, ...(remove ? { remove } : {}), ...(add ? { add } : {}) },
+      message
+    );
+  return { ...change, start };
 }
 
 /** The settings file of one scope in this directory, which a new rule goes into. */
