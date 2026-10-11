@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { join } from "node:path";
 import { test } from "node:test";
 import { scanDirectory } from "../src/server/scan/index.ts";
 import { type ContextBlock } from "../src/shared/types.ts";
@@ -25,7 +26,7 @@ test("what Claude sees at start leaves out path rules and reads only the loaded 
     [
       ["import", f.at("app/docs/style.md")],
       ["instruction", f.at("app/CLAUDE.md")],
-      ["memory-index", `${memoryDirFor(f, f.at("app"))}/MEMORY.md`],
+      ["memory-index", join(memoryDirFor(f, f.at("app")), "MEMORY.md")],
     ]
   );
   assert.equal(blocks[0]?.text, "Two spaces.\n");
