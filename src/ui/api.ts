@@ -1,0 +1,121 @@
+import {
+  type BackupSummary,
+  type Change,
+  type DirectoryView,
+  type MemoryAction,
+  type MemoryChangePreview,
+  type Overview,
+  type PathTest,
+  type PermissionEdit,
+  type PermissionList,
+  type RestorePreview,
+  type SettingsEdit,
+  type SettingsEditPreview,
+  type Usage,
+} from "../shared/types.ts";
+
+const TOKEN_KEY = "ccdesk-token";
+
+/** The CLI puts the session token in the URL fragment; keep it for this tab and clean the address bar. */
+function token(): string {
+  const match = /token=([\w-]+)/.exec(location.hash);
+  if (match?.[1]) {
+    try {
+      sessionStorage.setItem(TOKEN_KEY, match[1]);
+    } catch {
+      // Storage blocked: the token still works for this page load.
+    }
+    history.replaceState(null, "", location.pathname + location.search);
+    return match[1];
+  }
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) ?? (import.meta.env.DEV ? "dev" : "");
+  } catch {
+    return import.meta.env.DEV ? "dev" : "";
+  }
+}
+
+const sessionToken = token();
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+  }
+}
+
+async function request<T>(
+  path: string,
+  init?: { method: string; body: unknown },
+  signal?: AbortSignal
+): Promise<T> {
+  const response = await fetch(path, {
+    ...(signal ? { signal } : {}),
+    method: init?.method ?? "GET",
+    headers: {
+      "x-ccdesk-token": sessionToken,
+      ...(init ? { "content-type": "application/json" } : {}),
+    },
+    ...(init ? { body: JSON.stringify(init.body) } : {}),
+  });
+  const body: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message =
+      typeof body === "object" && body && "error" in body
+        ? String(body.error)
+        : response.statusText;
+    throw new ApiError(message, response.status);
+  }
+  return body as T;
+}
+
+export const api = {
+  overview: () => request<Overview>("/api/overview"),
+  directory: (path: string) =>
+    request<DirectoryView>(`/api/directory?path=${encodeURIComponent(path)}`),
+  /** How Claude used tools in the sessions started in `path`, and how many calls each rule covers. */
+  usage: (path: string, rules: Array<{ list: PermissionList; rule: string }>) =>
+    request<Usage>("/api/usage", { method: "POST", body: { path, rules } }),
+  /** What a memory action would change; `path` is the memory, or MEMORY.md for remove-dead. */
+  previewMemory: (action: MemoryAction, path: string) =>
+    request<MemoryChangePreview>("/api/memory/preview", { method: "POST", body: { action, path } }),
+  /** Makes the reviewed memory action, only while what it was worked out from is unchanged. */
+  changeMemory: (action: MemoryAction, path: string, revision: string) =>
+    request<Change>("/api/memory/change", { method: "POST", body: { action, path, revision } }),
+  open: (path: string) =>
+    request<{ editor: string }>("/api/open", { method: "POST", body: { path } }),
+  previewSettings: (edit: SettingsEdit) =>
+    request<SettingsEditPreview>("/api/settings/preview", { method: "POST", body: edit }),
+  /** Saves exactly the reviewed edit, and only while the file still has the reviewed revision. */
+  saveSettings: (edit: SettingsEdit, revision: string) =>
+    request<Change>("/api/settings/save", { method: "POST", body: { ...edit, revision } }),
+  previewPermission: (edit: PermissionEdit) =>
+    request<SettingsEditPreview>("/api/permissions/preview", { method: "POST", body: edit }),
+  savePermission: (edit: PermissionEdit, revision: string) =>
+    request<Change>("/api/permissions/save", { method: "POST", body: { ...edit, revision } }),
+  /** Waits up to 25 seconds for a config file that affects `dir` to change after `since`. */
+  watch: (dir: string, since: number, signal: AbortSignal) =>
+    request<{ changed: boolean; at: number }>(
+      `/api/watch?dir=${encodeURIComponent(dir)}&since=${since}`,
+      undefined,
+      signal
+    ),
+  pathTest: (dir: string, file: string) =>
+    request<PathTest>(
+      `/api/path-test?dir=${encodeURIComponent(dir)}&file=${encodeURIComponent(file)}`
+    ),
+  backups: (before?: string) =>
+    request<{ changes: BackupSummary[]; more: boolean }>(
+      `/api/backups?limit=50${before ? `&before=${encodeURIComponent(before)}` : ""}`
+    ),
+  previewRestore: (id: string) =>
+    request<RestorePreview>("/api/backups/preview", { method: "POST", body: { id } }),
+  /** Restores a backup while the file still has the reviewed (or just-changed) revision. */
+  restore: (id: string, revision: string) =>
+    request<{ target: string }>("/api/backups/restore", {
+      method: "POST",
+      body: { id, revision },
+    }),
+};
