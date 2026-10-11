@@ -1,0 +1,207 @@
+import { stat } from "node:fs/promises";
+import { Ajv, type ValidateFunction } from "ajv";
+import { allowedScopes, ignoredReason } from "../shared/scopes.ts";
+import schema from "../shared/settings.schema.json" with { type: "json" };
+import {
+  type Change,
+  type PermissionEdit,
+  type Scope,
+  type SettingsEdit,
+  type SettingsEditPreview,
+} from "../shared/types.ts";
+import { type ScanEnv } from "./scan/env.ts";
+import { isRecord, jsonSyntaxError, redactSecrets, revisionOf } from "./scan/files.ts";
+import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
+import { RefusedError, readIfExists, recordChange, serially, writeAtomic } from "./write.ts";
+
+const properties: Record<string, object> = schema.definitions.ClaudeCodeSettings.properties;
+const ajv = new Ajv({ allErrors: true, strict: false });
+const validators = new Map<string, ValidateFunction>();
+
+function validatorFor(key: string): ValidateFunction | null {
+  if (!Object.hasOwn(properties, key)) return null;
+  let validate = validators.get(key);
+  if (!validate) {
+    validate = ajv.compile(properties[key] as object);
+    validators.set(key, validate);
+  }
+  return validate;
+}
+
+interface PlannedEdit {
+  path: string;
+  scope: Scope;
+  raw: string | null;
+  /** The text ccdesk would write; null when the value failed validation. */
+  next: string | null;
+  preview: SettingsEditPreview;
+}
+
+function shown(data: Record<string, unknown>): string {
+  return `${JSON.stringify(redactSecrets(data), null, 2)}\n`;
+}
+
+function hasHiddenValues(value: unknown): boolean {
+  return JSON.stringify(redactSecrets(value)) !== JSON.stringify(value);
+}
+
+async function editableFile(
+  env: ScanEnv,
+  dir: string,
+  pick: (file: SettingsFile) => boolean,
+  missing = "That is not a settings file Claude Code reads here."
+): Promise<SettingsFile> {
+  const file = (await settingsFiles(env, dir)).find(pick);
+  if (!file) throw new RefusedError(missing);
+  if (file.scope === "managed")
+    throw new RefusedError("Managed settings are set by your organisation.");
+  if (file.scope !== "user" && !(await stat(dir).catch(() => null))?.isDirectory())
+    throw new RefusedError(`${dir} is not a directory on this machine.`);
+  return file;
+}
+
+async function readSettings(
+  env: ScanEnv,
+  path: string
+): Promise<{ raw: string | null; data: Record<string, unknown> }> {
+  const raw = await readIfExists(env, path);
+  if (raw === null || raw.trim() === "") return { raw, data: {} };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new RefusedError(`${path} is ${jsonSyntaxError(error)}; fix it by hand first.`);
+  }
+  if (!isRecord(parsed)) throw new RefusedError(`${path} does not hold a JSON object.`);
+  return { raw, data: parsed };
+}
+
+/** Works out the file change that sets or removes one key, refusing what ccdesk cannot do safely. */
+async function planKey(
+  env: ScanEnv,
+  file: SettingsFile,
+  key: string,
+  value: (data: Record<string, unknown>) => unknown
+): Promise<PlannedEdit> {
+  if (!allowedScopes(key).includes(file.scope))
+    throw new RefusedError(`${ignoredReason(key)}, so a ${file.scope} value would do nothing.`);
+  const validate = validatorFor(key);
+  if (!validate)
+    throw new RefusedError(`${key} is not in Claude Code's settings schema (${schema.$comment}).`);
+
+  const { path } = file;
+  const { raw, data } = await readSettings(env, path);
+  const nextValue = value(data);
+  // ccdesk never shows env or header values, so it must not write them either.
+  if (hasHiddenValues({ [key]: data[key] }) || hasHiddenValues({ [key]: nextValue }))
+    throw new RefusedError(`${key} holds hidden values; edit it in the file instead.`);
+
+  const before = raw === null ? null : shown(data);
+  // The diff is rendered from the parsed file, so a file in another layout is reported as
+  // reformatted instead of diffing its raw text.
+  const reformats =
+    raw !== null && raw.trim() !== "" && raw !== `${JSON.stringify(data, null, 2)}\n`;
+  const base = { path, before, revision: revisionOf(raw), reformats };
+  const next = { ...data };
+  if (nextValue === undefined) {
+    delete next[key];
+  } else if (!validate(nextValue)) {
+    const errors = (validate.errors ?? []).map(
+      (e) => `${key}${e.instancePath.replaceAll("/", ".")} ${e.message ?? "is invalid"}`
+    );
+    return {
+      path,
+      scope: file.scope,
+      raw,
+      next: null,
+      preview: { ...base, after: before ?? "", errors },
+    };
+  } else {
+    next[key] = nextValue;
+  }
+  return {
+    path,
+    scope: file.scope,
+    raw,
+    next: `${JSON.stringify(next, null, 2)}\n`,
+    preview: { ...base, after: shown(next), errors: [] },
+  };
+}
+
+async function planSettingsEdit(env: ScanEnv, edit: SettingsEdit): Promise<PlannedEdit> {
+  const file = await editableFile(
+    env,
+    edit.dir,
+    (f) => f.scope === edit.scope && !f.legacy,
+    edit.scope === "project"
+      ? "In your home directory this file is your user settings; edit it as User."
+      : undefined
+  );
+  return planKey(env, file, edit.key, () => edit.value);
+}
+
+/** One rule taken out of its list and/or added to another, applied to the file as it is on disk. */
+async function planPermissionEdit(env: ScanEnv, edit: PermissionEdit): Promise<PlannedEdit> {
+  const file = await editableFile(env, edit.dir, (f) => f.path === edit.file);
+  return planKey(env, file, "permissions", (data) => {
+    const permissions = isRecord(data.permissions) ? { ...data.permissions } : {};
+    const { remove, add } = edit;
+    if (remove) {
+      const list = Array.isArray(permissions[remove.list])
+        ? (permissions[remove.list] as unknown[])
+        : [];
+      if (!list.includes(remove.rule))
+        throw new RefusedError(`${remove.rule} is no longer in ${remove.list} in this file.`);
+      const kept = list.filter((r) => r !== remove.rule);
+      if (kept.length > 0) permissions[remove.list] = kept;
+      else delete permissions[remove.list];
+    }
+    if (add) {
+      const list = Array.isArray(permissions[add.list]) ? (permissions[add.list] as unknown[]) : [];
+      if (!list.includes(add.rule)) permissions[add.list] = [...list, add.rule];
+    }
+    return Object.keys(permissions).length > 0 ? permissions : undefined;
+  });
+}
+
+/** Writes a planned edit, but only if the file is still the revision the preview was made from. */
+async function commit(env: ScanEnv, plan: PlannedEdit, expectedRevision: string): Promise<Change> {
+  if (plan.next === null) throw new RefusedError(plan.preview.errors.join("; "));
+  if (plan.preview.revision !== expectedRevision)
+    throw new RefusedError("The file changed since you reviewed this edit; review it again.");
+  const next = plan.next;
+  return recordChange(env, { kind: "settings", target: plan.path, before: plan.raw }, async () => {
+    await writeAtomic(env, plan.path, next, expectedRevision);
+    return { target: plan.path, revision: revisionOf(next) };
+  });
+}
+
+export async function previewSettingsEdit(
+  env: ScanEnv,
+  edit: SettingsEdit
+): Promise<SettingsEditPreview> {
+  return (await planSettingsEdit(env, edit)).preview;
+}
+
+export function saveSettingsEdit(
+  env: ScanEnv,
+  edit: SettingsEdit,
+  expectedRevision: string
+): Promise<Change> {
+  return serially(async () => commit(env, await planSettingsEdit(env, edit), expectedRevision));
+}
+
+export async function previewPermissionEdit(
+  env: ScanEnv,
+  edit: PermissionEdit
+): Promise<SettingsEditPreview> {
+  return (await planPermissionEdit(env, edit)).preview;
+}
+
+export function savePermissionEdit(
+  env: ScanEnv,
+  edit: PermissionEdit,
+  expectedRevision: string
+): Promise<Change> {
+  return serially(async () => commit(env, await planPermissionEdit(env, edit), expectedRevision));
+}
