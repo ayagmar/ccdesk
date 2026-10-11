@@ -1,0 +1,82 @@
+{
+  "name": "ccdesk",
+  "version": "0.0.0",
+  "description": "See and manage everything that shapes Claude Code on your machine: instructions, settings, hooks, MCP servers, agents, skills and memory",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "config",
+    "settings",
+    "memory",
+    "agents-md",
+    "claude-md"
+  ],
+  "license": "MIT",
+  "author": "ayagmar",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ayagmar/ccdesk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ayagmar/ccdesk/issues"
+  },
+  "type": "module",
+  "bin": {
+    "ccdesk": "./dist/server/cli.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "node --import=tsx src/server/cli.ts --dev",
+    "dev:ui": "vite",
+    "schema": "node --import=tsx scripts/generate-settings-schema.ts",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome lint --error-on-warnings .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "test": "node --import=tsx --import=./test/helpers/hermetic-environment.mjs --test ./test/*.test.ts",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test && pnpm run build",
+    "prepublishOnly": "pnpm run build",
+    "release:dry": "release-it --ci --dry-run",
+    "scopes": "node --import=tsx scripts/generate-settings-scopes.ts",
+    "tools": "node --import=tsx scripts/generate-builtin-tools.ts",
+    "docs:fingerprints": "node --import=tsx scripts/fingerprint-docs.ts"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "packageManager": "pnpm@12.9.1",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.296",
+    "@biomejs/biome": "2.5.15",
+    "@fontsource-variable/hanken-grotesk": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@release-it/conventional-changelog": "12.0.2",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-markdown": "10.1.0",
+    "release-it": "21.1.1",
+    "remark-gfm": "4.0.1",
+    "ts-json-schema-generator": "2.9.0",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}
