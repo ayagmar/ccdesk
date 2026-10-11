@@ -897,3 +897,196 @@ test("credentials that are themselves a link are never read through another link
   assert.equal(view.status, 200);
   assert.doesNotMatch(JSON.stringify(view.json), /oauth-secret/);
 });
+
+interface ScannedHook {
+  event: string;
+  matcher?: string;
+  command: string;
+  sourcePath: string;
+  at: { group: number; index: number };
+  definition: unknown;
+}
+
+async function hooksIn(dir: string): Promise<ScannedHook[]> {
+  const view = await call(`/api/directory?path=${encodeURIComponent(dir)}`);
+  return (view.json as { inventory: { hooks: ScannedHook[] } }).inventory.hooks;
+}
+
+/** Reviews a hook change, then saves it with the reviewed revision, as the page does. */
+async function saveHook(edit: Record<string, unknown>) {
+  const preview = await call("/api/hooks/preview", { method: "POST", body: edit });
+  if (preview.status !== 200) return preview;
+  const { revision } = preview.json as Preview;
+  return call("/api/hooks/save", { method: "POST", body: { ...edit, revision } });
+}
+
+const command = (text: string) => ({ type: "command", command: text });
+
+test("a new hook joins the group with its matcher, or starts one", async () => {
+  const dir = fixture.at("work/hooks-add");
+  const file = fixture.json("work/hooks-add/.claude/settings.json", {
+    model: "opus",
+    hooks: { PreToolUse: [{ matcher: "Bash", hooks: [command("lint")] }] },
+  });
+
+  for (const [matcher, text] of [
+    ["Bash", "audit"],
+    ["Edit", "fmt"],
+  ] as const) {
+    const saved = await saveHook({
+      dir,
+      file,
+      add: { event: "PreToolUse", matcher, definition: command(text) },
+    });
+    assert.equal(saved.status, 200);
+  }
+  assert.equal(
+    (await saveHook({ dir, file, add: { event: "Stop", definition: command("bell") } })).status,
+    200
+  );
+
+  assert.deepEqual(JSON.parse(readFileSync(file, "utf8")), {
+    model: "opus",
+    hooks: {
+      PreToolUse: [
+        { matcher: "Bash", hooks: [command("lint"), command("audit")] },
+        { matcher: "Edit", hooks: [command("fmt")] },
+      ],
+      Stop: [{ hooks: [command("bell")] }],
+    },
+  });
+});
+
+test("an edited hook stays in place, and one moved to another matcher leaves no empty group", async () => {
+  const dir = fixture.at("work/hooks-edit");
+  const file = fixture.json("work/hooks-edit/.claude/settings.json", {
+    hooks: {
+      PreToolUse: [
+        { matcher: "Bash", hooks: [command("one"), command("two")] },
+        { matcher: "Edit", hooks: [command("three")] },
+      ],
+    },
+  });
+  const find = async (text: string) => {
+    const hook = (await hooksIn(dir)).find((h) => h.sourcePath === file && h.command === text);
+    assert.ok(hook, text);
+    return { event: hook.event, at: hook.at, definition: hook.definition };
+  };
+
+  const edited = await saveHook({
+    dir,
+    file,
+    remove: await find("one"),
+    add: { event: "PreToolUse", matcher: "Bash", definition: { ...command("one"), timeout: 5 } },
+  });
+  assert.equal(edited.status, 200);
+  const moved = await saveHook({
+    dir,
+    file,
+    remove: await find("three"),
+    add: { event: "PreToolUse", matcher: "Bash", definition: command("three") },
+  });
+  assert.equal(moved.status, 200);
+
+  assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).hooks, {
+    PreToolUse: [
+      {
+        matcher: "Bash",
+        hooks: [{ ...command("one"), timeout: 5 }, command("two"), command("three")],
+      },
+    ],
+  });
+  const removed = await saveHook({ dir, file, remove: await find("two") });
+  assert.equal(removed.status, 200);
+  assert.equal(JSON.parse(readFileSync(file, "utf8")).hooks.PreToolUse[0].hooks.length, 2);
+});
+
+test("a hook that changed in the file since the scan is not removed", async () => {
+  const dir = fixture.at("work/hooks-stale");
+  const file = fixture.json("work/hooks-stale/.claude/settings.json", {
+    hooks: { Stop: [{ hooks: [command("bell")] }] },
+  });
+  const [hook] = await hooksIn(dir);
+  assert.ok(hook);
+  fixture.json("work/hooks-stale/.claude/settings.json", {
+    hooks: { Stop: [{ hooks: [command("rm -rf build")] }] },
+  });
+
+  const res = await saveHook({
+    dir,
+    file,
+    remove: { event: hook.event, at: hook.at, definition: hook.definition },
+  });
+  assert.equal(res.status, 409);
+  assert.match(readFileSync(file, "utf8"), /rm -rf build/);
+});
+
+test("a hook Claude Code's schema rejects, or an unknown event, is not saved", async () => {
+  const dir = fixture.at("work/hooks-invalid");
+  const file = fixture.json("work/hooks-invalid/.claude/settings.json", {});
+
+  const preview = await call("/api/hooks/preview", {
+    method: "POST",
+    body: { dir, file, add: { event: "Stop", definition: { type: "command" } } },
+  });
+  assert.equal(preview.status, 200);
+  assert.ok((preview.json as Preview).errors.length > 0, "a command hook needs its command");
+  const unknown = await call("/api/hooks/preview", {
+    method: "POST",
+    body: { dir, file, add: { event: "BeforeLunch", definition: command("x") } },
+  });
+  assert.equal(unknown.status, 400);
+  assert.equal(readFileSync(file, "utf8"), "{}");
+});
+
+test("hooks are not changed in a file whose hooks send hidden header values", async () => {
+  const dir = fixture.at("work/hooks-headers");
+  const file = fixture.json("work/hooks-headers/.claude/settings.json", {
+    hooks: {
+      Stop: [
+        {
+          hooks: [
+            {
+              type: "http",
+              url: "https://hooks.example/stop",
+              headers: { Authorization: "s3cret" },
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  const res = await saveHook({ dir, file, add: { event: "Stop", definition: command("bell") } });
+  assert.equal(res.status, 409);
+  assert.match(readFileSync(file, "utf8"), /s3cret/);
+});
+
+test("changing the matcher of a hook alone in its group keeps the group where it is", async () => {
+  const dir = fixture.at("work/hooks-matcher");
+  const file = fixture.json("work/hooks-matcher/.claude/settings.json", {
+    hooks: {
+      PreToolUse: [
+        { matcher: "Bash", hooks: [command("lint")] },
+        { matcher: "Edit", hooks: [command("fmt")] },
+      ],
+      Stop: [{ hooks: [command("bell")] }],
+    },
+  });
+  const [hook] = await hooksIn(dir);
+  assert.equal(hook?.command, "lint");
+
+  const saved = await saveHook({
+    dir,
+    file,
+    remove: { event: hook.event, at: hook.at, definition: hook.definition },
+    add: { event: "PreToolUse", matcher: "Bash|Monitor", definition: command("lint") },
+  });
+  assert.equal(saved.status, 200);
+  const { hooks } = JSON.parse(readFileSync(file, "utf8"));
+  assert.deepEqual(Object.keys(hooks), ["PreToolUse", "Stop"]);
+  assert.deepEqual(
+    hooks.PreToolUse.map((g: { matcher: string }) => g.matcher),
+    ["Bash|Monitor", "Edit"]
+  );
+});

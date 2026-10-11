@@ -225,6 +225,10 @@ export interface Hook {
   /** False when disableAllHooks or allowManagedHooksOnly turns it off. */
   active: boolean;
   note?: string;
+  /** Where it is in its file: the matcher group under `event`, and the hook within the group. */
+  at: { group: number; index: number };
+  /** The hook as written, with header values hidden. */
+  definition: unknown;
 }
 
 export type McpStatus =
@@ -494,6 +498,26 @@ export interface PermissionEdit {
   file: string;
   remove?: { list: PermissionList; rule: string };
   add?: { list: PermissionList; rule: string };
+}
+
+/** A hook as a HookEdit writes it: the matcher group it goes in, and the hook itself. */
+export interface HookPlacement {
+  event: string;
+  /** Empty or absent for a group without a matcher, which matches everything. */
+  matcher?: string;
+  definition: unknown;
+}
+
+/**
+ * One hook change to a settings file. With both, the hook is replaced in place when it stays in
+ * the same event and matcher, and moved otherwise.
+ */
+export interface HookEdit {
+  dir: string;
+  file: string;
+  /** The hook to take out, as the scan showed it; refused when the file no longer has it there. */
+  remove?: { event: string; at: { group: number; index: number }; definition: unknown };
+  add?: HookPlacement;
 }
 
 export interface SettingsEditPreview {

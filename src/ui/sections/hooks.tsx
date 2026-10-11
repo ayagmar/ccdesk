@@ -1,5 +1,7 @@
 import { Bullet } from "../Bullet.tsx";
 import { tildeAll } from "../format.ts";
+import { HookEditor } from "../HookEditor.tsx";
+import { Icon } from "../Icon.tsx";
 import { Field, NameButton, PathValue } from "./kit.tsx";
 import { defineSection, type RowOf } from "./types.ts";
 
@@ -57,7 +59,12 @@ export const hooks = defineSection<R>({
   label: (row) => `${row.item.event} hook: ${row.item.command}`,
   heading: (row) => `${row.item.event} hook`,
   facet: { label: "Filter hooks by event", of: (row) => row.item.event },
-  Details: ({ row }) => {
+  Head: ({ actions }) => (
+    <button type="button" className="head-action" onClick={() => actions.onAdd("hook")}>
+      <Icon name="plus" /> Add hook
+    </button>
+  ),
+  Details: ({ row, actions }) => {
     const h = row.item;
     return (
       <>
@@ -76,6 +83,8 @@ export const hooks = defineSection<R>({
           </Field>
           {h.plugin && <Field label="Plugin">{h.plugin}</Field>}
         </dl>
+        <h3 className="sub-title">Change this hook</h3>
+        <HookEditor key={row.id} view={actions.view} hook={h} onSaved={actions.onSaved} />
       </>
     );
   },

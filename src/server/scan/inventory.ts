@@ -18,6 +18,7 @@ import {
   listDir,
   parseFrontmatter,
   readJsonObject,
+  redactSecrets,
   readTextFile,
   resolvedPath,
   stringField,
@@ -378,9 +379,9 @@ function hooksFrom(config: unknown, source: Source, sourcePath: string, plugin?:
   const out: Hook[] = [];
   for (const [event, groups] of Object.entries(config)) {
     if (!Array.isArray(groups)) continue;
-    for (const group of groups) {
+    for (const [g, group] of groups.entries()) {
       if (!isRecord(group) || !Array.isArray(group.hooks)) continue;
-      for (const h of group.hooks) {
+      for (const [index, h] of group.hooks.entries()) {
         if (!isRecord(h)) continue;
         const entry: Hook = {
           event,
@@ -389,6 +390,8 @@ function hooksFrom(config: unknown, source: Source, sourcePath: string, plugin?:
           source,
           sourcePath,
           active: true,
+          at: { group: g, index },
+          definition: redactSecrets(h),
         };
         const matcher = stringField(group, "matcher");
         if (matcher) entry.matcher = matcher;

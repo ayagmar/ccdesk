@@ -6,6 +6,7 @@ import {
   type MemoryChangePreview,
   type Overview,
   type PathTest,
+  type HookEdit,
   type PermissionEdit,
   type PermissionList,
   type RestorePreview,
@@ -98,6 +99,10 @@ export const api = {
     request<SettingsEditPreview>("/api/permissions/preview", { method: "POST", body: edit }),
   savePermission: (edit: PermissionEdit, revision: string) =>
     request<Change>("/api/permissions/save", { method: "POST", body: { ...edit, revision } }),
+  previewHook: (edit: HookEdit) =>
+    request<SettingsEditPreview>("/api/hooks/preview", { method: "POST", body: edit }),
+  saveHook: (edit: HookEdit, revision: string) =>
+    request<Change>("/api/hooks/save", { method: "POST", body: { ...edit, revision } }),
   /** Waits up to 25 seconds for a config file that affects `dir` to change after `since`. */
   watch: (dir: string, since: number, signal: AbortSignal) =>
     request<{ changed: boolean; at: number }>(

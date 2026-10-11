@@ -102,7 +102,7 @@ pnpm install
 pnpm dev        # API on 127.0.0.1:4319
 pnpm dev:ui     # UI with hot reload on 127.0.0.1:4320
 pnpm check      # typecheck, lint, format, tests, build
-pnpm schema     # regenerate src/shared/settings.schema.json
+pnpm schema     # regenerate src/shared/settings.schema.json and hook-events.json
 pnpm scopes     # regenerate src/shared/settings-scopes.json from the settings reference
 pnpm tools      # regenerate src/shared/builtin-tools.json from the tools reference
 pnpm docs:fingerprints  # fingerprint the docs sections the code cites; prints the ones that changed

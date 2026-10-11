@@ -9,7 +9,7 @@ import { groupRows, isFiltered, PAGE } from "./list.ts";
 import { RouteStrip, SharingStrip } from "./RouteStrip.tsx";
 import { type Saved } from "./SettingEditor.tsx";
 import { SECTIONS } from "./sections/index.ts";
-import { type Actions, type Row, type SectionId } from "./sections/types.ts";
+import { type Actions, type Adding, type Row, type SectionId } from "./sections/types.ts";
 import { Timetable } from "./Timetable.tsx";
 import { type ToastMessage } from "./Toast.tsx";
 import { type ListState, NO_LIST_STATE, readListState, replaceListState } from "./url.ts";
@@ -51,7 +51,7 @@ export function DirectoryPage({
   onOpenPalette,
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
-  const [adding, setAdding] = useState<"setting" | "permission" | null>(null);
+  const [adding, setAdding] = useState<Adding | null>(null);
   /** Show what Claude reads at session start instead of the tables. */
   const [seeing, setSeeing] = useState(false);
   const [list, setList] = useState<ListState>(readListState);

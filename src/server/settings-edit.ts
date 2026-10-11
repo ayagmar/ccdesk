@@ -4,6 +4,7 @@ import { allowedScopes, ignoredReason } from "../shared/scopes.ts";
 import schema from "../shared/settings.schema.json" with { type: "json" };
 import {
   type Change,
+  type HookEdit,
   type PermissionEdit,
   type Scope,
   type SettingsEdit,
@@ -164,6 +165,61 @@ async function planPermissionEdit(env: ScanEnv, edit: PermissionEdit): Promise<P
   });
 }
 
+/** The matcher a group is written with; a missing or empty one matches everything. */
+function matcherOf(group: unknown): string {
+  return isRecord(group) && typeof group.matcher === "string" ? group.matcher : "";
+}
+
+/** One hook taken out, replaced or added, applied to the file as it is on disk. */
+async function planHookEdit(env: ScanEnv, edit: HookEdit): Promise<PlannedEdit> {
+  const file = await editableFile(env, edit.dir, (f) => f.path === edit.file);
+  return planKey(env, file, "hooks", (data) => {
+    const hooks: Record<string, unknown> = isRecord(data.hooks) ? structuredClone(data.hooks) : {};
+    const groupsOf = (event: string): unknown[] => {
+      const groups = hooks[event];
+      return Array.isArray(groups) ? groups : [];
+    };
+    const { remove, add } = edit;
+    if (remove) {
+      const groups = groupsOf(remove.event);
+      const group = groups[remove.at.group];
+      const list = isRecord(group) && Array.isArray(group.hooks) ? group.hooks : null;
+      const hook = list?.[remove.at.index];
+      if (!list || JSON.stringify(redactSecrets(hook)) !== JSON.stringify(remove.definition))
+        throw new RefusedError(
+          "This hook changed in the file since ccdesk read it; review it again."
+        );
+      const matcher = add?.matcher ?? "";
+      // A hook alone in its group keeps the group when only its matcher changes, unless another
+      // group already has that matcher.
+      const inPlace =
+        add?.event === remove.event &&
+        (matcher === matcherOf(group) ||
+          (list.length === 1 && !groups.some((g) => g !== group && matcherOf(g) === matcher)));
+      if (add && inPlace && isRecord(group)) {
+        list[remove.at.index] = add.definition;
+        if (matcher) group.matcher = matcher;
+        else delete group.matcher;
+        return hooks;
+      }
+      list.splice(remove.at.index, 1);
+      if (list.length === 0) groups.splice(remove.at.group, 1);
+      if (groups.length === 0 && add?.event !== remove.event) delete hooks[remove.event];
+    }
+    if (add) {
+      const groups = groupsOf(add.event);
+      const matcher = add.matcher ?? "";
+      const group = groups.find(
+        (g) => matcherOf(g) === matcher && isRecord(g) && Array.isArray(g.hooks)
+      );
+      if (isRecord(group) && Array.isArray(group.hooks)) group.hooks.push(add.definition);
+      else groups.push({ ...(matcher ? { matcher } : {}), hooks: [add.definition] });
+      hooks[add.event] = groups;
+    }
+    return Object.keys(hooks).length > 0 ? hooks : undefined;
+  });
+}
+
 /** Writes a planned edit, but only if the file is still the revision the preview was made from. */
 async function commit(env: ScanEnv, plan: PlannedEdit, expectedRevision: string): Promise<Change> {
   if (plan.next === null) throw new RefusedError(plan.preview.errors.join("; "));
@@ -204,4 +260,16 @@ export function savePermissionEdit(
   expectedRevision: string
 ): Promise<Change> {
   return serially(async () => commit(env, await planPermissionEdit(env, edit), expectedRevision));
+}
+
+export async function previewHookEdit(env: ScanEnv, edit: HookEdit): Promise<SettingsEditPreview> {
+  return (await planHookEdit(env, edit)).preview;
+}
+
+export function saveHookEdit(
+  env: ScanEnv,
+  edit: HookEdit,
+  expectedRevision: string
+): Promise<Change> {
+  return serially(async () => commit(env, await planHookEdit(env, edit), expectedRevision));
 }

@@ -1,18 +1,25 @@
 import { useEffect, useRef } from "react";
 import { Bullet } from "./Bullet.tsx";
+import { HookEditor } from "./HookEditor.tsx";
 import { Icon } from "./Icon.tsx";
 import { PermissionEditor } from "./PermissionEditor.tsx";
 import { SettingEditor } from "./SettingEditor.tsx";
 import { SECTIONS, sectionOf } from "./sections/index.ts";
-import { type Actions, type Row } from "./sections/types.ts";
+import { type Actions, type Adding, type Row } from "./sections/types.ts";
 
 interface Props {
   row: Row | null;
-  /** Show a form that adds a setting or a permission rule instead of a row. */
-  adding: "setting" | "permission" | null;
+  /** Show the form that adds this instead of a row. */
+  adding: Adding | null;
   actions: Actions;
   onClose: () => void;
 }
+
+const TITLES: Record<Adding, string> = {
+  setting: "Add a setting",
+  permission: "Add a permission rule",
+  hook: "Add a hook",
+};
 
 /** The panel beside the tables: the selected row's file, why it applies, and what can change. */
 export function Inspector({ row, adding, actions, onClose }: Props) {
@@ -24,7 +31,7 @@ export function Inspector({ row, adding, actions, onClose }: Props) {
   }, [shownId]);
 
   if (adding) {
-    const title = adding === "setting" ? "Add a setting" : "Add a permission rule";
+    const title = TITLES[adding];
     return (
       <aside className="inspector" aria-label={title}>
         <header className="insp-head">
@@ -37,15 +44,19 @@ export function Inspector({ row, adding, actions, onClose }: Props) {
           </button>
         </header>
         <div className="insp-body">
-          {adding === "setting" ? (
+          {adding === "setting" && (
             <SettingEditor
               view={actions.view}
               settingKey={null}
               defaultScope="user"
               onSaved={actions.onSaved}
             />
-          ) : (
+          )}
+          {adding === "permission" && (
             <PermissionEditor view={actions.view} rule={null} onSaved={actions.onSaved} />
+          )}
+          {adding === "hook" && (
+            <HookEditor view={actions.view} hook={null} onSaved={actions.onSaved} />
           )}
         </div>
       </aside>

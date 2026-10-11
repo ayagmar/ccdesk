@@ -53,6 +53,9 @@ export type Row =
 export type SectionId = Row["section"];
 export type RowOf<S extends SectionId> = Extract<Row, { section: S }>;
 
+/** What the inspector's add form adds. */
+export type Adding = "setting" | "permission" | "hook";
+
 /** What the page can do for a section: change files, open other directories. */
 export interface Actions {
   view: DirectoryView;
@@ -60,7 +63,7 @@ export interface Actions {
   /** Memory names saved in other directories too. */
   sharedNames: Set<string>;
   onOpenDirectory: (path: string) => void;
-  onAdd: (what: "setting" | "permission") => void;
+  onAdd: (what: Adding) => void;
   onSaved: (saved: Saved) => void;
   /** Runs one change and reports it; `select` is the row to show afterwards, null for none. */
   onChange: (run: () => Promise<Change>, message: string, select?: string | null) => Promise<void>;

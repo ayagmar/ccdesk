@@ -1,6 +1,8 @@
 // Regenerates src/shared/settings.schema.json from the Settings type that
-// @anthropic-ai/claude-agent-sdk ships (itself generated from Claude Code's settings schema).
+// @anthropic-ai/claude-agent-sdk ships (itself generated from Claude Code's settings schema), and
+// src/shared/hook-events.json from the hook events it exports.
 import { readFileSync, writeFileSync } from "node:fs";
+import { HOOK_EVENTS } from "@anthropic-ai/claude-agent-sdk";
 import { fileURLToPath } from "node:url";
 import { createGenerator } from "ts-json-schema-generator";
 
@@ -23,3 +25,7 @@ writeFileSync(
   `${JSON.stringify({ ...schema, $comment: `claude-agent-sdk ${sdkVersion}` }, null, 2)}\n`
 );
 console.log(`Wrote ${fileURLToPath(out)} from claude-agent-sdk ${sdkVersion}`);
+
+const events = new URL("../src/shared/hook-events.json", import.meta.url);
+writeFileSync(events, `${JSON.stringify(HOOK_EVENTS, null, 2)}\n`);
+console.log(`Wrote ${fileURLToPath(events)} from claude-agent-sdk ${sdkVersion}`);

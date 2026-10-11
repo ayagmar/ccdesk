@@ -93,7 +93,7 @@ jobs:
             fi
           } > "$RUNNER_TEMP/pr-body.md"
           git switch -c "$branch"
-          git add package.json pnpm-lock.yaml src/shared/settings.schema.json src/shared/settings-scopes.json src/shared/settings-catalog.json src/shared/builtin-tools.json scripts/docs-fingerprints.json
+          git add package.json pnpm-lock.yaml src/shared/settings.schema.json src/shared/hook-events.json src/shared/settings-scopes.json src/shared/settings-catalog.json src/shared/builtin-tools.json scripts/docs-fingerprints.json
           git commit -m "chore: update Claude Code data (claude-agent-sdk $LATEST)"
           git push origin "$branch"
           gh pr create --base master --head "$branch" \

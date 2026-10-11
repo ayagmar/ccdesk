@@ -1,7 +1,9 @@
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
+import HOOK_EVENTS from "../shared/hook-events.json" with { type: "json" };
 import {
+  type HookEdit,
   type PermissionEdit,
   type PermissionList,
   type Scope,
@@ -16,8 +18,10 @@ import { scanDirectory, scanOverview } from "./scan/index.ts";
 import { CountStopped, readUsage } from "./scan/usage.ts";
 import { testPath } from "./scan/path-test.ts";
 import {
+  previewHookEdit,
   previewPermissionEdit,
   previewSettingsEdit,
+  saveHookEdit,
   savePermissionEdit,
   saveSettingsEdit,
 } from "./settings-edit.ts";
@@ -176,6 +180,16 @@ async function handle(
     const { revision } = stringFields(body, ["revision"]);
     return answer(res, () => savePermissionEdit(env, edit, revision));
   }
+  if (req.method === "POST" && url.pathname === "/api/hooks/preview") {
+    const edit = hookEditFrom(await readBody(req));
+    return answer(res, () => previewHookEdit(env, edit));
+  }
+  if (req.method === "POST" && url.pathname === "/api/hooks/save") {
+    const body = await readBody(req);
+    const edit = hookEditFrom(body);
+    const { revision } = stringFields(body, ["revision"]);
+    return answer(res, () => saveHookEdit(env, edit, revision));
+  }
   if (req.method === "GET" && url.pathname === "/api/watch") {
     const dir = url.searchParams.get("dir");
     const since = Number(url.searchParams.get("since") ?? "0");
@@ -254,6 +268,33 @@ function permissionEditFrom(body: unknown): PermissionEdit {
   if (removed) edit.remove = removed;
   if (added) edit.add = added;
   if (!removed && !added) throw new RequestError(400, "remove or add is required");
+  return edit;
+}
+
+function hookEditFrom(body: unknown): HookEdit {
+  const { dir, file } = stringFields(body, ["dir", "file"]);
+  const { remove, add } = body as Record<string, unknown>;
+  const edit: HookEdit = { dir, file };
+  if (remove !== undefined) {
+    const { event } = stringFields(remove, ["event"]);
+    const { at, definition } = remove as Record<string, unknown>;
+    const index = (n: unknown) => (Number.isInteger(n) && (n as number) >= 0 ? (n as number) : -1);
+    const group = isRecord(at) ? index(at.group) : -1;
+    const hook = isRecord(at) ? index(at.index) : -1;
+    if (group < 0 || hook < 0) throw new RequestError(400, "remove needs the hook's place");
+    edit.remove = { event, at: { group, index: hook }, definition };
+  }
+  if (add !== undefined) {
+    const { event } = stringFields(add, ["event"]);
+    if (!HOOK_EVENTS.includes(event))
+      throw new RequestError(400, `${event} is not a hook event Claude Code knows`);
+    const { matcher, definition } = add as Record<string, unknown>;
+    if (matcher !== undefined && typeof matcher !== "string")
+      throw new RequestError(400, "matcher must be text");
+    if (!isRecord(definition)) throw new RequestError(400, "a hook must be a JSON object");
+    edit.add = { event, ...(matcher ? { matcher } : {}), definition };
+  }
+  if (!edit.remove && !edit.add) throw new RequestError(400, "remove or add is required");
   return edit;
 }
 
