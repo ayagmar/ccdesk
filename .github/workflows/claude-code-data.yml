@@ -1,0 +1,101 @@
+name: Claude Code data
+
+# Claude Code's settings schema ships as the Settings type in @anthropic-ai/claude-agent-sdk,
+# which is published with every Claude Code release; which file each setting is read from and
+# the built-in tools come from the docs. This opens a PR when any of them changed.
+# PRs opened with GITHUB_TOKEN do not trigger CI by themselves; close and reopen the PR,
+# or push to it, to run CI.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: claude-code-data
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.21.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Compare SDK versions
+        id: sdk
+        run: |
+          current=$(node -p 'require("./node_modules/@anthropic-ai/claude-agent-sdk/package.json").version')
+          latest=$(npm view @anthropic-ai/claude-agent-sdk version)
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "claude-agent-sdk: pinned $current, latest $latest"
+
+      - name: Regenerate
+        id: regenerate
+        env:
+          CURRENT: ${{ steps.sdk.outputs.current }}
+          LATEST: ${{ steps.sdk.outputs.latest }}
+        run: |
+          if [ "$CURRENT" != "$LATEST" ]; then pnpm add -D "@anthropic-ai/claude-agent-sdk@$LATEST"; fi
+          pnpm run schema
+          pnpm run scopes
+          pnpm run tools
+          # Sections of the docs the code follows by hand; any change needs a person to check the code.
+          pnpm -s run docs:fingerprints > "$RUNNER_TEMP/docs-changes.md"
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat
+          fi
+
+      - name: Check
+        if: steps.regenerate.outputs.changed == 'true'
+        run: pnpm run check
+
+      - name: Open pull request
+        if: steps.regenerate.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST: ${{ steps.sdk.outputs.latest }}
+        run: |
+          # Named after the content, so an unchanged regeneration does not open a second PR.
+          hash=$(git diff | sha256sum | cut -c1-8)
+          branch="chore/claude-code-data-$LATEST-$hash"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "Branch $branch already exists"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          {
+            echo "Regenerated the settings schema from @anthropic-ai/claude-agent-sdk $LATEST, and the setting scopes, settings catalog and built-in tools from the Claude Code docs. \`pnpm run check\` passed in the workflow."
+            if [ -s "$RUNNER_TEMP/docs-changes.md" ]; then
+              echo
+              echo "## Docs sections the code follows by hand changed"
+              echo
+              echo "Check that the code citing each one still matches before merging:"
+              echo
+              cat "$RUNNER_TEMP/docs-changes.md"
+            fi
+          } > "$RUNNER_TEMP/pr-body.md"
+          git switch -c "$branch"
+          git add package.json pnpm-lock.yaml src/shared/settings.schema.json src/shared/settings-scopes.json src/shared/settings-catalog.json src/shared/builtin-tools.json scripts/docs-fingerprints.json
+          git commit -m "chore: update Claude Code data (claude-agent-sdk $LATEST)"
+          git push origin "$branch"
+          gh pr create --base master --head "$branch" \
+            --title "chore: update Claude Code data (claude-agent-sdk $LATEST)" \
+            --body-file "$RUNNER_TEMP/pr-body.md"
