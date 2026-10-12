@@ -169,3 +169,178 @@ test("a repository's bypassPermissions default mode is ignored in effective sett
     [["project", { defaultMode: "bypassPermissions" }]]
   );
 });
+
+type SandboxScope = "managed" | "user" | "project" | "local";
+
+/** The effective sandbox and what was ignored from which file, from settings values by file. */
+function sandboxOf(files: Partial<Record<SandboxScope, Record<string, unknown>>>) {
+  const layers = (["managed", "local", "project", "user"] as const)
+    .filter((scope) => files[scope])
+    .map((scope) => ({ scope, path: `/${scope}.json`, exists: true, data: files[scope] ?? {} }));
+  const sandbox = effectiveSettings(layers).find((s) => s.key === "sandbox");
+  return {
+    value: sandbox?.value as Record<string, Record<string, unknown> | unknown>,
+    ignored: (sandbox?.ignored ?? []).map((i) => [i.scope, i.value]),
+  };
+}
+
+test("under a managed allowUnsandboxedCommands false, repository settings cannot loosen the sandbox", () => {
+  const { value, ignored } = sandboxOf({
+    managed: { sandbox: { enabled: true, allowUnsandboxedCommands: false } },
+    user: { sandbox: { failIfUnavailable: true, filesystem: { allowWrite: ["/mine"] } } },
+    project: {
+      sandbox: {
+        failIfUnavailable: false,
+        excludedCommands: ["docker *"],
+        enableWeakerNestedSandbox: true,
+        autoAllowBashIfSandboxed: false,
+        filesystem: { allowWrite: ["/theirs"], denyWrite: ["/etc"] },
+        network: { allowedDomains: ["evil.example"] },
+      },
+    },
+  });
+
+  assert.deepEqual(value, {
+    enabled: true,
+    allowUnsandboxedCommands: false,
+    failIfUnavailable: true,
+    filesystem: { allowWrite: ["/mine"], denyWrite: ["/etc"] },
+    autoAllowBashIfSandboxed: false,
+  });
+  assert.deepEqual(ignored, [
+    ["project", { excludedCommands: ["docker *"] }],
+    ["project", { network: { allowedDomains: ["evil.example"] } }],
+    ["project", { filesystem: { allowWrite: ["/theirs"] } }],
+    ["project", { enableWeakerNestedSandbox: true }],
+    ["project", { failIfUnavailable: false }],
+  ]);
+});
+
+test("your own allowUnsandboxedCommands false holds against a project's true, without locking the rest", () => {
+  const { value, ignored } = sandboxOf({
+    user: { sandbox: { allowUnsandboxedCommands: false, filesystem: { allowWrite: ["/safe"] } } },
+    project: {
+      sandbox: { allowUnsandboxedCommands: true, filesystem: { allowWrite: ["/unsafe"] } },
+    },
+  });
+
+  assert.equal(value.allowUnsandboxedCommands, false);
+  assert.deepEqual(value.filesystem, { allowWrite: ["/safe", "/unsafe"] });
+  assert.deepEqual(ignored, [["project", { allowUnsandboxedCommands: true }]]);
+});
+
+test("allowManagedDomainsOnly keeps only managed domains and proxy ports, and requires the sandbox", () => {
+  const { value, ignored } = sandboxOf({
+    managed: { sandbox: { network: { allowManagedDomainsOnly: true, allowedDomains: ["corp"] } } },
+    user: { sandbox: { network: { allowedDomains: ["mine"], deniedDomains: ["bad"] } } },
+    project: { sandbox: { excludedCommands: ["make"], network: { httpProxyPort: 8080 } } },
+  });
+
+  assert.deepEqual(value.network, {
+    allowManagedDomainsOnly: true,
+    allowedDomains: ["corp"],
+    deniedDomains: ["bad"],
+  });
+  assert.deepEqual(ignored, [
+    ["user", { network: { allowedDomains: ["mine"] } }],
+    ["project", { network: { httpProxyPort: 8080 } }],
+    ["project", { excludedCommands: ["make"] }],
+  ]);
+});
+
+test("allowManagedReadPathsOnly keeps only managed allowRead entries; denyRead still merges", () => {
+  const { value, ignored } = sandboxOf({
+    managed: {
+      sandbox: { filesystem: { allowManagedReadPathsOnly: true, allowRead: ["~/work"] } },
+    },
+    user: { sandbox: { filesystem: { allowRead: ["~/notes"], denyRead: ["~/.aws"] } } },
+  });
+
+  assert.deepEqual(value.filesystem, {
+    allowManagedReadPathsOnly: true,
+    allowRead: ["~/work"],
+    denyRead: ["~/.aws"],
+  });
+  assert.deepEqual(ignored, [["user", { filesystem: { allowRead: ["~/notes"] } }]]);
+});
+
+test("sandbox keys read only from user or managed settings are ignored in a repository's files", () => {
+  const repository = {
+    sandbox: {
+      bwrapPath: "/tmp/bwrap",
+      filesystem: { disabled: true },
+      network: { tlsTerminate: true },
+      credentials: {
+        files: [
+          { path: "~/.netrc", mode: "mask" },
+          { path: "~/.aws", mode: "deny" },
+        ],
+      },
+    },
+  };
+  const { value, ignored } = sandboxOf({
+    user: { sandbox: { bwrapPath: "/opt/bwrap", filesystem: { disabled: false } } },
+    local: repository,
+  });
+
+  assert.deepEqual(value, {
+    filesystem: { disabled: false },
+    credentials: { files: [{ path: "~/.aws", mode: "deny" }] },
+  });
+  assert.deepEqual(ignored, [
+    ["user", { bwrapPath: "/opt/bwrap" }],
+    ["local", { bwrapPath: "/tmp/bwrap" }],
+    ["local", { network: { tlsTerminate: true } }],
+    ["local", { filesystem: { disabled: true } }],
+    ["local", { credentials: { files: [{ path: "~/.netrc", mode: "mask" }] } }],
+  ]);
+});
+
+test("once managed settings configure the sandbox filesystem, only they can turn it off", () => {
+  const { value, ignored } = sandboxOf({
+    managed: { sandbox: { filesystem: { denyRead: ["~/.ssh"] } } },
+    user: { sandbox: { filesystem: { disabled: true } } },
+  });
+
+  assert.deepEqual(value.filesystem, { denyRead: ["~/.ssh"] });
+  assert.deepEqual(ignored, [["user", { filesystem: { disabled: true } }]]);
+});
+
+test("managed denied domains or your strictAllowlist stop a repository's proxy ports and domains", () => {
+  const project = { sandbox: { network: { allowedDomains: ["x.example"], socksProxyPort: 1080 } } };
+
+  const denied = sandboxOf({
+    managed: { permissions: { deny: ["WebFetch(domain:evil.example)"] } },
+    project,
+  });
+  assert.deepEqual(denied.value.network, { allowedDomains: ["x.example"] });
+
+  const strict = sandboxOf({ user: { sandbox: { network: { strictAllowlist: true } } }, project });
+  assert.deepEqual(strict.value.network, { strictAllowlist: true });
+  assert.deepEqual(strict.ignored, [
+    ["project", { network: { allowedDomains: ["x.example"] } }],
+    ["project", { network: { socksProxyPort: 1080 } }],
+  ]);
+});
+
+test("under blockReadsOutsideWorkingDirectories, repository allowRead and allowWrite entries do not count", () => {
+  const project = {
+    sandbox: { filesystem: { allowRead: ["~/src"], allowWrite: ["~/out"], denyRead: ["~/.env"] } },
+  };
+
+  const blocked = sandboxOf({
+    user: { permissions: { blockReadsOutsideWorkingDirectories: true } },
+    project,
+  });
+  assert.deepEqual(blocked.value.filesystem, { denyRead: ["~/.env"] });
+
+  // With filesystem isolation off, the block does not reach sandboxed commands.
+  const off = sandboxOf({
+    user: {
+      permissions: { blockReadsOutsideWorkingDirectories: true },
+      sandbox: { filesystem: { disabled: true } },
+    },
+    project,
+  });
+  assert.deepEqual(off.ignored, []);
+});
