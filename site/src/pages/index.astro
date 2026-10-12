@@ -1,59 +1,99 @@
 ---
+import { type ImageMetadata } from "astro";
 import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
 import CommandCopy from "../components/CommandCopy.astro";
 import Screenshot from "../components/Screenshot.astro";
 
 const base = import.meta.env.BASE_URL;
 
+// The crops are taken at twice the CSS size, so each shows at half its width in pixels.
+const crops = import.meta.glob<{ default: ImageMetadata }>(
+  "../assets/screenshots/answer-*-light.webp",
+  { eager: true }
+);
+const cropWidth = (id: string) => {
+  const crop = crops[`../assets/screenshots/answer-${id}-light.webp`];
+  if (!crop) throw new Error(`No screenshot answer-${id}-light.webp; run pnpm screenshots`);
+  return crop.default.width / 2;
+};
+
 // Questions people open ccdesk with; the key is the one that jumps to the section that answers.
+// Each opens to a crop of the rows that answer it (`pnpm screenshots` makes answer-<id>-*.webp).
 const QUESTIONS = [
   {
+    id: "ask-push",
     question: "Why does Claude ask me before every git push here?",
     answer: "The ask rule, and the settings file it is in",
+    shows: "The Bash(git push *) ask rule from user settings, among the other permission rules",
     key: "3",
     page: "permissions/",
+    title: "Permissions",
   },
   {
+    id: "model",
     question: "Which model does this repository use, and who set it?",
     answer: "The value that wins, and the ones it beats",
+    shows:
+      "The model setting: sonnet from project settings, with user settings' opus struck through",
     key: "2",
     page: "settings/",
+    title: "Settings",
   },
   {
+    id: "agents-md",
     question: "Is my AGENTS.md loaded at all?",
     answer: "Loaded, on match or skipped, with the reason",
+    shows: "AGENTS.md marked skipped, because CLAUDE.md already imports it",
     key: "1",
     page: "instructions/",
+    title: "Instructions",
   },
   {
+    id: "context",
     question: "How much context does my config take before I type anything?",
     answer: "Each part in load order, with estimated tokens",
+    shows:
+      "What Claude sees: about 401 tokens from 9 parts, listed in load order with lines and tokens",
     key: "",
     page: "what-claude-sees/",
+    title: "What Claude sees",
   },
   {
+    id: "unused-allow",
     question: "Which allow rules have I stopped needing?",
     answer: "Rules that covered no call in this project's sessions",
+    shows: "Allow rules flagged covered no call here",
     key: "3",
     page: "permissions/",
+    title: "Permissions",
   },
   {
+    id: "suggested",
     question: "What do I keep approving by hand?",
     answer: "Suggested allow rules, with how often you said yes",
+    shows: "Suggested rules such as Bash(gh pr view *), which you allowed 2 times",
     key: "3",
     page: "permissions/#suggested-rules",
+    title: "Suggested rules",
   },
   {
+    id: "mcp-waiting",
     question: "Which project MCP servers still wait for approval?",
     answer: "Each server's status, scope and target",
+    shows:
+      "The sentry server from .mcp.json marked needs approval, beside servers that are configured",
     key: "7",
     page: "mcp-servers/",
+    title: "MCP servers",
   },
   {
+    id: "shared-memory",
     question: "Did Claude save the same memory in two projects?",
     answer: "Memories found under more than one directory",
+    shows: "The review-style memory, saved in acme-api and acme-web and drifted apart",
     key: "5",
     page: "memory/",
+    title: "Memory",
   },
 ];
 ---
@@ -73,8 +113,8 @@ const QUESTIONS = [
     <section aria-labelledby="questions">
       <h2 id="questions">Questions it answers</h2>
       <p class="section-lede">
-        Each answer is a row on the directory page, and each row names its source file. Numbers are
-        the keys that jump to that section.
+        Each answer is a row on the directory page, and each row names its source file. Open a
+        question to see its row. Numbers are the keys that jump to that section.
       </p>
       <table class="timetable">
         <thead>
@@ -87,13 +127,40 @@ const QUESTIONS = [
         <tbody>
           {
             QUESTIONS.map((q) => (
-              <tr>
-                <td>
-                  <a href={`${base}${q.page}`}>{q.question}</a>
-                </td>
-                <td class="answer">{q.answer}</td>
-                <td class="key-col">{q.key ? <kbd>{q.key}</kbd> : <span class="view">view</span>}</td>
-              </tr>
+              <Fragment>
+                <tr class="question">
+                  <td>
+                    <button
+                      type="button"
+                      class="ask"
+                      aria-expanded="false"
+                      aria-controls={`answer-${q.id}`}
+                    >
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                        <path d="M6 3.5 10.5 8 6 12.5" />
+                      </svg>
+                      {q.question}
+                    </button>
+                  </td>
+                  <td class="answer">{q.answer}</td>
+                  <td class="key-col">
+                    {q.key ? <kbd>{q.key}</kbd> : <span class="view">view</span>}
+                  </td>
+                </tr>
+                <tr class="reveal" id={`answer-${q.id}`} hidden>
+                  <td colspan="3">
+                    <div class="reveal-body">
+                      <Screenshot
+                        name={`answer-${q.id}`}
+                        alt={q.shows}
+                        width={cropWidth(q.id)}
+                        sizes={`min(${cropWidth(q.id)}px, 100vw)`}
+                      />
+                      <a href={`${base}${q.page}`}>Read more in {q.title}</a>
+                    </div>
+                  </td>
+                </tr>
+              </Fragment>
             ))
           }
         </tbody>
@@ -219,19 +286,105 @@ const QUESTIONS = [
     vertical-align: middle;
   }
 
-  .timetable tbody tr:hover {
+  .timetable .question:hover,
+  .timetable .question:has([aria-expanded="true"]) {
     background: var(--sunk);
   }
 
-  .timetable a {
+  .ask {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    padding: 0;
+    border: 0;
+    background: none;
     color: var(--ink);
+    font: inherit;
     font-weight: 600;
-    text-decoration: none;
+    text-align: left;
+    cursor: pointer;
   }
 
-  .timetable a:hover {
+  .ask::before {
+    position: absolute;
+    inset: 0;
+    content: "";
+  }
+
+  .question {
+    position: relative;
+  }
+
+  .ask:hover {
     text-decoration: underline;
     text-underline-offset: 0.2em;
+  }
+
+  .ask svg {
+    flex: none;
+    align-self: center;
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .ask[aria-expanded="true"] svg {
+    transform: rotate(90deg);
+  }
+
+  .timetable .reveal > td {
+    height: auto;
+    padding: 0.25rem 0.5rem 1.25rem 1.875rem;
+    background: var(--sunk);
+  }
+
+  .reveal-body {
+    display: grid;
+    gap: 0.75rem;
+    justify-items: start;
+  }
+
+  .reveal-body :global(.shot) {
+    width: 100%;
+    margin: 0;
+  }
+
+  .reveal-body > a {
+    color: var(--ink);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-underline-offset: 0.2em;
+  }
+
+  .reveal-body.opening {
+    animation: unroll 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes unroll {
+    from {
+      clip-path: inset(0 0 100% 0);
+      opacity: 0;
+      translate: 0 -0.5rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ask svg {
+      transition: none;
+    }
+
+    .reveal-body.opening {
+      animation: fade 150ms linear;
+    }
+
+    @keyframes fade {
+      from {
+        opacity: 0;
+      }
+    }
   }
 
   .answer {
@@ -370,5 +523,40 @@ const QUESTIONS = [
       align-self: center;
       padding-left: 0.75rem;
     }
+
+    .timetable .answer {
+      padding-left: 1.375rem;
+    }
+
+    .timetable .reveal {
+      display: block;
+      padding: 0 0.5rem 1rem;
+      background: var(--sunk);
+    }
+
+    .timetable .reveal[hidden] {
+      display: none;
+    }
+
+    .timetable .reveal > td {
+      display: block;
+      padding: 0;
+    }
   }
 </style>
+
+<script>
+  // Each question opens the row below it, which holds the crop that answers it.
+  for (const button of document.querySelectorAll<HTMLButtonElement>(".timetable .ask")) {
+    const row = document.getElementById(button.getAttribute("aria-controls") ?? "");
+    if (!row) continue;
+    button.addEventListener("click", () => {
+      const open = button.getAttribute("aria-expanded") !== "true";
+      button.setAttribute("aria-expanded", String(open));
+      row.hidden = !open;
+      const body = row.querySelector(".reveal-body");
+      body?.classList.remove("opening");
+      if (open) body?.classList.add("opening");
+    });
+  }
+</script>
