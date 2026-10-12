@@ -4,6 +4,8 @@ import { tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
 import { SECTIONS } from "./sections/index.ts";
 
+const DOCS = "https://ayagmar.github.io/ccdesk/";
+
 export type TextSize = "smaller" | "default" | "larger";
 
 const TEXT_SIZES: Array<{ size: TextSize; label: string }> = [
@@ -66,8 +68,10 @@ export function Rail({
   return (
     <nav className="rail" aria-label="Directories">
       <div className="brand">
-        <img src="/logo.png" width="26" height="26" alt="" />
-        <span>ccdesk</span>
+        <a className="brand-link" href={DOCS} target="_blank" rel="noreferrer" title="ccdesk docs">
+          <img src="/logo.png" width="26" height="26" alt="" />
+          <span>ccdesk</span>
+        </a>
         <fieldset className="segmented small text-size" aria-label="Text size">
           {TEXT_SIZES.map(({ size, label }) => (
             <button
