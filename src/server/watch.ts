@@ -61,11 +61,14 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
   return out.filter((t) => !isNetworkPath(t.path));
 }
 
-/** Files a scan read that the fixed list does not cover: a custom memory folder, imports. */
+/**
+ * Files a scan read that the fixed list does not cover: a custom memory folder, imports. A missing
+ * import is watched too, so creating it shows up; only in a folder that exists, as watching needs one.
+ */
 export function dependencies(view: DirectoryView): Target[] {
   const files = view.instructions.flatMap((i) => [
     i.realPath ?? i.path,
-    ...i.imports.filter((r) => r.exists).map((r) => r.resolved),
+    ...i.imports.map((r) => r.resolved),
   ]);
   const byFolder = new Map<string, Set<string>>();
   for (const file of files) {

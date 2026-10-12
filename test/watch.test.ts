@@ -27,6 +27,19 @@ test("editing a project's CLAUDE.md wakes a page waiting for changes", async () 
   assert.equal((await waiting).changed, true);
 });
 
+test("creating a file CLAUDE.md imports but that was missing wakes a page waiting for changes", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "@docs/new.md\n");
+  f.write("app/docs/README.md", "Not imported.\n");
+  const watcher = watcherFor(f);
+  await watcher.scan(f.at("app"));
+
+  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  setTimeout(() => f.write("app/docs/new.md", "Now here.\n"), 100);
+
+  assert.equal((await waiting).changed, true);
+});
+
 test("a change between two polls is reported to the next poll", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "one\n");
