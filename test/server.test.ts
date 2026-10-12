@@ -1399,6 +1399,18 @@ test("a new agent goes in the project's agents folder, and a deleted one can be 
   assert.equal(readFileSync(path, "utf8"), agentText("reviewer", "Be kind."));
 });
 
+test("a new agent's file name may be typed with .md, and gets only one", async () => {
+  const dir = fixture.at("work/agents-md");
+  fixture.write("work/agents-md/README.md", "x");
+  const created = await saveAgent({
+    dir,
+    create: { scope: "project", file: "linter.md" },
+    text: agentText("linter", "Check style."),
+  });
+  assert.equal(created.status, 200);
+  assert.ok(existsSync(join(dir, ".claude", "agents", "linter.md")));
+});
+
 test("an agent file Claude Code would skip is not saved", async () => {
   const dir = fixture.at("work/agents-invalid");
   for (const text of [

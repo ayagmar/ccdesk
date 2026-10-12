@@ -44,7 +44,9 @@ async function targetOf(env: ScanEnv, edit: AgentEdit): Promise<string> {
   }
   if (!edit.create)
     throw new RefusedError("An agent edit needs the agent or where a new one goes.");
-  const { scope, file } = edit.create;
+  const { scope } = edit.create;
+  // The folder gives the .md; a name typed with it would otherwise end in .md.md.
+  const file = edit.create.file.replace(/\.md$/i, "");
   if (!/^[\w][\w.-]*$/.test(file))
     throw new RefusedError("A file name has letters, digits, '.', '-' or '_', and no folders.");
   const folder =

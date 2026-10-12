@@ -52,7 +52,7 @@ export function AgentEditor({ view, agent, onSaved }: Props) {
             onChange={(e) => {
               setFile(e.target.value);
               // The name in the template follows the file name until you edit the text.
-              if (!touched) setText(template(e.target.value.trim()));
+              if (!touched) setText(template(e.target.value.trim().replace(/\.md$/i, "")));
               change.cancel();
             }}
           />
