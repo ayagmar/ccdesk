@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { mkdirSync } from "node:fs";
 import { after, test } from "node:test";
 import { scanDirectory } from "../src/server/scan/index.ts";
 import { testPath } from "../src/server/scan/path-test.ts";
@@ -38,6 +39,25 @@ test("creating a file CLAUDE.md imports but that was missing wakes a page waitin
   setTimeout(() => f.write("app/docs/new.md", "Now here.\n"), 100);
 
   assert.equal((await waiting).changed, true);
+});
+
+test("creating the missing folder of an import, then the file, wakes a page each time", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "@docs/new-folder/new.md\n");
+  f.write("app/docs/README.md", "Not imported.\n");
+  const watcher = watcherFor(f);
+  await watcher.scan(f.at("app"));
+  const signal = new AbortController().signal;
+
+  const folder = watcher.wait(f.at("app"), Date.now(), signal, 5000);
+  setTimeout(() => mkdirSync(f.at("app/docs/new-folder")), 100);
+  const first = await folder;
+  assert.equal(first.changed, true);
+
+  // No scan in between: the watchers move into the new folder on their own.
+  const file = watcher.wait(f.at("app"), first.at, signal, 5000);
+  setTimeout(() => f.write("app/docs/new-folder/new.md", "Now here.\n"), 100);
+  assert.equal((await file).changed, true);
 });
 
 test("closing the watcher answers a page still waiting, instead of keeping it until the timeout", async () => {

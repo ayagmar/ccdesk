@@ -63,7 +63,7 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
 
 /**
  * Files a scan read that the fixed list does not cover: a custom memory folder, imports. A missing
- * import is watched too, so creating it shows up; only in a folder that exists, as watching needs one.
+ * import is watched too, so creating it shows up, even when its folder is missing as well.
  */
 export function dependencies(view: DirectoryView): Target[] {
   const files = view.instructions.flatMap((i) => [
@@ -80,6 +80,21 @@ export function dependencies(view: DirectoryView): Target[] {
     ...[...byFolder].map(([path, names]) => ({ path, recursive: false, names: [...names] })),
     ...(view.memory ? [{ path: view.memory.dir, recursive: false }] : []),
   ];
+}
+
+/**
+ * `target`, or when it does not exist yet, the nearest folder above it that does, watched for the
+ * next missing name only. Watching needs a folder that exists, and the watchers are rebuilt after
+ * every change, so each folder that appears moves the watch one level closer.
+ */
+async function existing(target: Target): Promise<Target> {
+  if (isNetworkPath(target.path) || (await stat(target.path).catch(() => null))) return target;
+  for (let missing = target.path; dirname(missing) !== missing; missing = dirname(missing)) {
+    const parent = dirname(missing);
+    if (await stat(parent).catch(() => null))
+      return { path: parent, recursive: false, names: [basename(missing)] };
+  }
+  return target;
 }
 
 interface Subscription {
@@ -227,7 +242,8 @@ export class Watcher {
 
   /** (Re)creates the watchers, so a folder created since, such as a new .claude, is watched. */
   private async rewatch(dir: string, subscription: Subscription): Promise<void> {
-    const list = await targets(this.env, dir, subscription.extra);
+    const extra = await Promise.all(subscription.extra.map(existing));
+    const list = await targets(this.env, dir, extra);
     for (const w of subscription.watchers) w.close();
     subscription.watchers = [];
     if (this.subscriptions.get(dir) !== subscription) return;
