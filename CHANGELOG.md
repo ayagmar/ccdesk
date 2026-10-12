@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.1](https://github.com/ayagmar/ccdesk/compare/v0.2.0...v0.2.1) (2026-10-12)
+
+### Features
+
+* **ui:** add a text size control and raise the default sizes ([1a9fe82](https://github.com/ayagmar/ccdesk/commit/1a9fe82b35cc4743936b7bf3c7a6d4244c86779a)), references [#root](https://github.com/ayagmar/ccdesk/issues/root)
+* **ui:** open the docs from the ccdesk logo ([834986a](https://github.com/ayagmar/ccdesk/commit/834986a40df7801e6b4cf12588fd69f65411458a))
+
+### Bug Fixes
+
+* **ui:** keep the section links on one row with the larger text ([f349f19](https://github.com/ayagmar/ccdesk/commit/f349f19c5e81ba3c498ff9f0751f4e3d5d99ade1))
+
 ## [0.2.0](https://github.com/ayagmar/ccdesk/compare/v0.1.0...v0.2.0) (2026-10-12)
 
 ### Features
