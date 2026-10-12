@@ -40,6 +40,7 @@ interface RestorePreview {
   before: string | null;
   after: string;
   revision: string;
+  removes?: boolean;
   blocked?: string;
   indexLines?: string[];
 }
@@ -633,19 +634,54 @@ test("a backup id cannot reach outside the backup folder", async () => {
   assert.equal(res.status, 409);
 });
 
-test("a setting saved into a new file is listed as created, with nothing earlier to restore", async () => {
+/** Reviews a restore, then makes it with the reviewed revision, as Recent changes does. */
+async function restoreReviewed(id: string) {
+  const preview = (await call("/api/backups/preview", { method: "POST", body: { id } }))
+    .json as RestorePreview;
+  const res = await call("/api/backups/restore", {
+    method: "POST",
+    body: { id, revision: preview.revision },
+  });
+  return { preview, res };
+}
+
+test("undoing a save that created a file removes it, and the removal can be undone too", async () => {
   const dir = fixture.at("work/fresh");
   fixture.write("work/fresh/README.md", "x");
+  const file = join(dir, ".claude", "settings.json");
 
   const saved = await saveSetting({ dir, scope: "project", key: "model", value: "opus" });
   const { id, created } = saved.json as Change;
-
-  // The save says so too, so the page offers no undo that the restore would refuse.
+  const text = readFileSync(file, "utf8");
   assert.equal(created, true);
   assert.equal((await backups()).find((b) => b.id === id)?.created, true);
-  const preview = (await call("/api/backups/preview", { method: "POST", body: { id } }))
-    .json as RestorePreview;
-  assert.ok(preview.blocked);
+
+  const removal = await restoreReviewed(id);
+  assert.equal(removal.preview.removes, true);
+  assert.equal(removal.preview.after, "");
+  assert.equal(removal.res.status, 200);
+  assert.equal(existsSync(file), false);
+
+  const record = (await backups()).find((b) => b.target === file && b.id !== id);
+  assert.ok(record, "the removal is in recent changes");
+  assert.equal(record.created, false);
+  assert.equal((await restoreReviewed(record.id)).res.status, 200);
+  assert.equal(readFileSync(file, "utf8"), text);
+});
+
+test("a file ccdesk created is not removed once something else changed it", async () => {
+  const dir = fixture.at("work/fresh-edited");
+  fixture.write("work/fresh-edited/README.md", "x");
+  const file = join(dir, ".claude", "settings.json");
+  const { id } = (await saveSetting({ dir, scope: "project", key: "model", value: "opus" }))
+    .json as Change;
+  writeFileSync(file, '{ "model": "opus", "effortLevel": "high" }\n');
+
+  const { preview, res } = await restoreReviewed(id);
+
+  assert.match(preview.blocked ?? "", /changed after ccdesk created it/);
+  assert.equal(res.status, 409);
+  assert.equal(readFileSync(file, "utf8"), '{ "model": "opus", "effortLevel": "high" }\n');
 });
 
 test("a permission rule is moved in the file it is in, and a rule that is gone is not", async () => {

@@ -21,6 +21,7 @@ import {
   recordChange,
   removeExactly,
   SNAPSHOT,
+  StaleError,
   serially,
   writeAtomic,
 } from "./write.ts";
@@ -147,6 +148,8 @@ interface Plan {
   current: string | null;
   /** The text the backup holds; null for a file ccdesk created, which has no earlier version. */
   saved: string | null;
+  /** Whether the target is a link now; a file ccdesk created never is. */
+  linked: boolean;
   /** For a deleted memory: MEMORY.md now, and the lines the restore puts back. */
   index?: { path: string; text: string | null; missing: string[] };
 }
@@ -193,6 +196,7 @@ async function planRestore(env: ScanEnv, id: string): Promise<Plan> {
     manifest: { ...manifest, target },
     current: await readIfExists(env, target),
     saved,
+    linked: (await lstat(target).catch(() => null))?.isSymbolicLink() ?? false,
   };
   if (manifest.kind === "memory-delete") {
     const path = await indexPathIn(dirname(target));
@@ -228,14 +232,22 @@ function blockedReason(plan: Plan): string | undefined {
   const { manifest, current, saved } = plan;
   if (saved === null && manifest.kind === "memory-restore")
     return "This put a deleted memory back. To undo it, delete the memory again.";
-  if (saved === null)
-    return "ccdesk created this file, so there is no earlier version to put back. Change it in place instead.";
+  // Undoing a change that created its file removes the file, but only the one ccdesk wrote.
+  if (saved === null) {
+    if (manifest.after === "pending" || manifest.after === "partial")
+      return "This change stopped halfway, so ccdesk cannot tell what it wrote. Remove the file by hand if you need to.";
+    if (current === null) return "The file ccdesk created is gone already.";
+    if (plan.linked || revisionOf(current) !== manifest.after)
+      return "The file changed after ccdesk created it, so ccdesk does not remove it. Change it in place instead.";
+    return undefined;
+  }
   if (onlyIndexLines(plan)) return undefined;
   // A file broken since the backup has no values ccdesk could keep; the backup is the way out of it,
   // and the broken file is itself backed up before the restore replaces it.
   const now = hiddenValues(current);
   if (
     (manifest.kind === "settings" || manifest.kind === "mcp") &&
+    current !== null &&
     now !== null &&
     now !== hiddenValues(saved)
   )
@@ -260,6 +272,7 @@ export async function previewRestore(env: ScanEnv, id: string): Promise<RestoreP
     before,
     after,
     revision: planRevision(plan),
+    ...(saved === null ? { removes: true } : {}),
     ...(blocked ? { blocked } : {}),
     ...(index && index.missing.length > 0
       ? { indexLines: index.missing.map((line) => shownText(line) ?? line) }
@@ -267,7 +280,10 @@ export async function previewRestore(env: ScanEnv, id: string): Promise<RestoreP
   };
 }
 
-/** Puts a backed-up file back, if the file is still as it was when the restore was reviewed. */
+/**
+ * Puts a backed-up file back, or removes a file ccdesk created, if the file is still as it was
+ * when the restore was reviewed. A removed file is backed up first, so it can be put back too.
+ */
 export function restoreBackup(
   env: ScanEnv,
   id: string,
@@ -277,10 +293,20 @@ export function restoreBackup(
     const plan = await planRestore(env, id);
     const { manifest, current, saved, index } = plan;
     const blocked = blockedReason(plan);
-    if (blocked || saved === null) throw new RefusedError(blocked);
+    if (blocked) throw new RefusedError(blocked);
     if (planRevision(plan) !== expectedRevision)
       throw new RefusedError("The file changed since you reviewed this restore; review it again.");
     const { target } = manifest;
+    if (saved === null) {
+      await recordChange(env, { kind: manifest.kind, target, before: current }, async () => {
+        if (!(await removeExactly(target, revisionOf(current))))
+          throw new StaleError(
+            `${target} changed while ccdesk was removing it; nothing was removed. Review it again.`
+          );
+        return { revision: revisionOf(null) };
+      });
+      return { target };
+    }
     if (manifest.kind !== "memory-delete") {
       await recordChange(env, { kind: manifest.kind, target, before: current }, async () => {
         await writeAtomic(env, target, saved, revisionOf(current));

@@ -115,14 +115,12 @@ export function ChangesPage({ onRestored }: { onRestored: (text: string) => void
                     <Icon name="undo" /> {open === b.id ? "Close" : "Review restore"}
                   </button>
                 </div>
-                {open === b.id && b.created && (
+                {open === b.id && b.kind === "memory-restore" && (
                   <p className="muted small review">
-                    {b.kind === "memory-restore"
-                      ? "This put a deleted memory back. To undo it, delete the memory again."
-                      : "ccdesk created this file, so there is no earlier version to put back."}
+                    This put a deleted memory back. To undo it, delete the memory again.
                   </p>
                 )}
-                {open === b.id && !b.created && (
+                {open === b.id && b.kind !== "memory-restore" && (
                   <Restore
                     id={b.id}
                     onDone={(text) => {
@@ -185,9 +183,11 @@ function Restore({ id, onDone }: { id: string; onDone: (text: string) => void })
           ) : (
             <>
               <p className="muted small">
-                {preview.before === null
-                  ? "The file does not exist now; restoring creates it."
-                  : "Lines marked − are in the file now; lines marked + come back from the backup."}
+                {preview.removes
+                  ? "ccdesk created this file, so undoing the change removes it. The file is backed up first, so you can put it back from here."
+                  : preview.before === null
+                    ? "The file does not exist now; restoring creates it."
+                    : "Lines marked − are in the file now; lines marked + come back from the backup."}
               </p>
               <DiffView before={preview.before ?? ""} after={preview.after} />
             </>
@@ -206,7 +206,8 @@ function Restore({ id, onDone }: { id: string; onDone: (text: string) => void })
               onClick={() => {
                 setBusy(true);
                 api.restore(id, preview.revision).then(
-                  ({ target }) => onDone(`Restored ${tilde(target)}`),
+                  ({ target }) =>
+                    onDone(`${preview.removes ? "Removed" : "Restored"} ${tilde(target)}`),
                   (error: unknown) => {
                     setBusy(false);
                     fail(error);
@@ -214,7 +215,13 @@ function Restore({ id, onDone }: { id: string; onDone: (text: string) => void })
                 );
               }}
             >
-              {busy ? "Restoring…" : "Restore this version"}
+              {busy
+                ? preview.removes
+                  ? "Removing…"
+                  : "Restoring…"
+                : preview.removes
+                  ? "Remove this file"
+                  : "Restore this version"}
             </button>
           </div>
         </>

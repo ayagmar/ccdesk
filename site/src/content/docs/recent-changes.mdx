@@ -20,7 +20,7 @@ Changes that go through `claude mcp`, for user and local MCP servers, are not ba
 
 ## Undo
 
-After a save or a delete, a toast at the bottom of the page offers **Undo** for 12 seconds. Undo is the same as restoring that change from Recent changes. A change that created its file has no earlier version, so it offers no Undo; delete or edit the file instead.
+After a save or a delete, a toast at the bottom of the page offers **Undo** for 12 seconds. Undo is the same as restoring that change from Recent changes. Undoing a change that created its file removes the file.
 
 ## Restoring
 
@@ -28,10 +28,12 @@ Press **Review restore** on a change to see the diff from the file as it is now 
 
 Restoring a deleted memory also puts its line back in `MEMORY.md`.
 
+A change that created its file has no earlier version, so its review shows the file going away and the button reads **Remove this file**. ccdesk removes it only while it is exactly what ccdesk wrote, and backs it up first, so the removal shows up here as a change you can restore.
+
 A restore is refused when:
 
 - the file changed after you reviewed the restore;
-- ccdesk created the file in that change, so there is no earlier version;
+- ccdesk created the file in that change, and the file was edited since, replaced by a link or is already gone, or the change stopped halfway;
 - it would bring back different hidden values (under `env`, `headers`, in a `url` or in an MCP server's `args`) than the file has now, because ccdesk never writes values it does not show;
 - a memory with the same file name exists again;
 - the backup is missing or was changed after it was made.

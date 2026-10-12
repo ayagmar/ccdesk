@@ -131,7 +131,8 @@ export function DirectoryPage({
     async (change: Change) => {
       try {
         await api.restore(change.id, change.revision);
-        onToast({ text: `Put ${change.target.split(/[/\\]/).pop()} back` });
+        const name = change.target.split(/[/\\]/).pop();
+        onToast({ text: change.created ? `Removed ${name}` : `Put ${name} back` });
       } catch (error) {
         onToast({ text: `Could not undo: ${errorText(error)}. Recent changes keeps the backup.` });
       }
@@ -144,11 +145,7 @@ export function DirectoryPage({
     ({ change, message, select }: Saved) => {
       setAdding(null);
       if (select !== undefined) setSelected(select);
-      // A change that created its file has no earlier version to put back.
-      onToast({
-        text: message,
-        ...(change && !change.created ? { undo: () => undo(change) } : {}),
-      });
+      onToast({ text: message, ...(change ? { undo: () => undo(change) } : {}) });
       reload();
     },
     [onToast, reload, undo]

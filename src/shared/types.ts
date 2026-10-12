@@ -150,7 +150,7 @@ export interface BackupSummary {
   /** The file that was changed (for a deleted memory: the memory file). */
   target: string;
   createdAt: string;
-  /** The change created the file, so there is no earlier version to restore. */
+  /** The change created the file, so restoring it removes the file. */
   created: boolean;
   /** The change was interrupted or failed halfway; the backup still holds the earlier text. */
   incomplete?: boolean;
@@ -188,10 +188,12 @@ export interface RestorePreview {
   target: string;
   /** The file now; null when it does not exist. Settings are shown with secrets hidden. */
   before: string | null;
-  /** The file as the backup holds it. */
+  /** The file as the backup holds it; empty when the restore removes the file. */
   after: string;
   /** Fingerprint of the file now (and of MEMORY.md, for a deleted memory); restoring requires it unchanged. */
   revision: string;
+  /** The change created the file, so restoring removes it. */
+  removes?: boolean;
   /** Why this backup cannot be restored right now. */
   blocked?: string;
   /** For a deleted memory: the lines put back into MEMORY.md. */
