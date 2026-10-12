@@ -42,7 +42,8 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
   const memoryKey = (await mainWorktreeRoot(dir)) ?? dir;
   const out: Target[] = [
     ...claude(env.claudeDir),
-    { path: join(env.claudeDir, "plugins"), recursive: false },
+    // Only the install list: Windows reports a write deep in a plugin as a change to `cache`.
+    { path: join(env.claudeDir, "plugins"), recursive: false, names: ["installed_plugins.json"] },
     { path: join(env.claudeDir, "projects", storeDirName(memoryKey), "memory"), recursive: false },
     { path: env.managedDir, recursive: false },
     { path: join(env.managedDir, "managed-settings.d"), recursive: false },
