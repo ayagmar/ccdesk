@@ -60,6 +60,9 @@ export async function testPath(env: ScanEnv, dir: string, file: string): Promise
 
   // Folders below the start directory load their own instructions, rules and skills on demand.
   const mode = view.agentsMdMode;
+  const startSkills = new Set(
+    view.inventory.skills.filter((s) => s.scope !== "plugin").map((s) => s.name)
+  );
   const between: string[] = [];
   for (let d = dirname(target); d !== cwd && isWithin(cwd, d); d = dirname(d)) between.unshift(d);
   for (const folder of between) {
@@ -96,11 +99,13 @@ export async function testPath(env: ScanEnv, dir: string, file: string): Promise
       if (skill.listed === false) continue;
       const glob = skill.paths && firstMatch(skill.paths, slashed(relative(folder, target)));
       if (skill.paths && !glob) continue;
+      // A nested skill whose folder name another skill has is called by its folder as well, as
+      // apps/web:deploy (docs: skills#how-a-skill-gets-its-command-name).
       matches.push({
         kind: "skill",
         path: skill.path,
         scope: "project",
-        name: skill.name,
+        name: startSkills.has(name) ? `${slashed(relative(cwd, folder))}:${name}` : skill.name,
         ...(glob ? { glob } : {}),
       });
     }
@@ -111,7 +116,13 @@ export async function testPath(env: ScanEnv, dir: string, file: string): Promise
     if (!skill.paths || skill.listed === false || skill.shadowedBy) continue;
     const glob = firstMatch(skill.paths, slashed(relative(projectRoot, target)));
     if (glob)
-      matches.push({ kind: "skill", path: skill.path, scope: skill.scope, glob, name: skill.name });
+      matches.push({
+        kind: "skill",
+        path: skill.path,
+        scope: skill.scope,
+        glob,
+        name: skill.id ?? skill.name,
+      });
   }
 
   return { file: target, inside: true, exists: await isFile(target), matches };

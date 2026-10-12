@@ -94,6 +94,7 @@ test("disableAllHooks outside managed settings stops every hook except managed o
   });
   f.json("etc/claude-code/managed-settings.json", hook("audit"));
   f.json("home/.claude/settings.json", { ...hook("notify"), disableAllHooks: true });
+  f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
   f.write("app/README.md", "x");
 
   const view = await scanDirectory(f.env, f.at("app"));
@@ -165,6 +166,25 @@ test(".mcp.json servers wait for approval, and a server defined twice uses the c
   });
   const trusted = await scanDirectory(f.env, f.at("app"));
   assert.equal(status(trusted)["project:db"], "active");
+});
+
+test("answering the .mcp.json prompt with use all servers starts every server from it", async () => {
+  const f = makeFixture();
+  f.json("app/.mcp.json", {
+    mcpServers: { docs: { command: "docs-mcp" }, db: { command: "db-mcp" } },
+  });
+  f.json("home/.claude.json", {
+    projects: {
+      [f.at("app")]: { hasTrustDialogAccepted: true, enableAllProjectMcpServers: true },
+    },
+  });
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    view.inventory.mcpServers.map((s) => s.status),
+    ["active", "active"]
+  );
 });
 
 test("project allow rules wait for the trust dialog; deny rules apply at once", async () => {
@@ -302,10 +322,58 @@ test("a project's disableAllHooks false overrides a user true", async () => {
     hooks: { Stop: [{ hooks: [{ type: "command", command: "notify" }] }] },
   });
   f.json("app/.claude/settings.json", { disableAllHooks: false });
+  f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
 
   const view = await scanDirectory(f.env, f.at("app"));
 
   assert.equal(view.inventory.hooks[0]?.active, true);
+});
+
+test("an interactive session holds back every settings file's hooks until the folder or a parent is trusted", async () => {
+  const f = makeFixture();
+  const bashHook = (command: string) => ({
+    hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command }] }] },
+  });
+  f.json("etc/claude-code/managed-settings.json", bashHook("audit"));
+  f.json("home/.claude/settings.json", bashHook("mine"));
+  f.json("work/app/.claude/settings.json", bashHook("theirs"));
+  const bashHooks = (view: View) => view.tools.find((t) => t.name === "Bash")?.hooks;
+
+  const untrusted = await scanDirectory(f.env, f.at("work/app"));
+  assert.deepEqual(
+    untrusted.inventory.hooks.map((h) => [h.command, h.active]),
+    [
+      ["audit", false],
+      ["theirs", false],
+      ["mine", false],
+    ]
+  );
+  assert.match(untrusted.inventory.hooks[2]?.note ?? "", /trust dialog/);
+  assert.equal(bashHooks(untrusted), 0);
+
+  f.json("home/.claude.json", { projects: { [f.at("work")]: { hasTrustDialogAccepted: true } } });
+  const underTrustedParent = await scanDirectory(f.env, f.at("work/app"));
+  assert.ok(underTrustedParent.inventory.hooks.every((h) => h.active));
+  assert.equal(bashHooks(underTrustedParent), 3);
+});
+
+test("in a subdirectory of a repository, local servers come from the repository root's entry only", async () => {
+  const f = makeFixture();
+  f.write("repo/apps/web/README.md", "x");
+  f.git("repo", "init", "-q");
+  const local = (name: string) => ({ mcpServers: { [name]: { command: name } } });
+  const localNames = async () =>
+    (await scanDirectory(f.env, f.at("repo/apps/web"))).inventory.mcpServers
+      .filter((s) => s.scope === "local")
+      .map((s) => s.name);
+
+  f.json("home/.claude.json", { projects: { [f.at("repo/apps/web")]: local("web-db") } });
+  assert.deepEqual(await localNames(), []);
+
+  f.json("home/.claude.json", {
+    projects: { [f.at("repo")]: local("root-db"), [f.at("repo/apps/web")]: local("web-db") },
+  });
+  assert.deepEqual(await localNames(), ["root-db"]);
 });
 
 test("MCP policy: denied servers are blocked, an allowlist blocks the rest, managed-mcp.json takes over", async () => {

@@ -13,6 +13,14 @@ async function manifest(env: ScanEnv, plugin: Plugin): Promise<Record<string, un
   return result.ok ? result.data : {};
 }
 
+/**
+ * The prefix of a plugin's skills, commands and agents: the manifest's name, which wins over the
+ * name the plugin is enabled under (docs: plugins-reference#name, #metadata-precedence).
+ */
+export async function pluginNamespace(env: ScanEnv, plugin: Plugin): Promise<string> {
+  return stringField(await manifest(env, plugin), "name") || (plugin.id.split("@")[0] ?? plugin.id);
+}
+
 /** Installed plugins that apply in `projectDir`, with whether each is enabled and by which file. */
 export async function readPlugins(
   env: ScanEnv,

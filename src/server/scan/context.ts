@@ -51,9 +51,10 @@ const BUILT_IN_STYLES = ["default", "explanatory", "learning"];
 function skillListing(skills: Entry[]): string {
   return skills
     .map((s) => {
-      if (s.override === "name-only") return `- ${s.name}`;
+      const name = s.id ?? s.name;
+      if (s.override === "name-only") return `- ${name}`;
       const text = [s.description, s.whenToUse].filter(Boolean).join(" ");
-      return `- ${s.name}: ${text.slice(0, SKILL_DESCRIPTION_CAP)}`;
+      return `- ${name}: ${text.slice(0, SKILL_DESCRIPTION_CAP)}`;
     })
     .join("\n");
 }

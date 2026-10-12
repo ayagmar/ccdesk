@@ -187,6 +187,12 @@ export function DirectoryPage({
             {view.gitRoot && view.gitRoot !== view.path && (
               <span className="flag">inside {tilde(view.gitRoot)}</span>
             )}
+            <span
+              className="flag"
+              title="ccdesk shows what an interactive claude session loads here. claude -p and the SDK never show the trust dialog: they run settings-file hooks and connect .mcp.json servers without asking."
+            >
+              interactive session
+            </span>
             {trust.sessionOnly ? (
               <span
                 className="flag"
@@ -198,7 +204,7 @@ export function DirectoryPage({
               !trust.trusted && (
                 <span
                   className="flag warn"
-                  title={`Until you accept Claude Code's trust dialog for ${tilde(trust.root)}, its allow rules, extra folders and .mcp.json approvals wait.${trust.inheritedFrom ? ` You trusted ${tilde(trust.inheritedFrom)}, which covers some of this but not those grants.` : ""}`}
+                  title={`Until you accept Claude Code's trust dialog for ${tilde(trust.root)}, ${trust.inheritedFrom ? `its allow rules, extra folders and .mcp.json approvals wait. You trusted ${tilde(trust.inheritedFrom)}, which covers hooks but not those grants.` : "hooks from every settings file, its allow rules, extra folders and .mcp.json approvals wait."}`}
                 >
                   not trusted yet
                 </span>

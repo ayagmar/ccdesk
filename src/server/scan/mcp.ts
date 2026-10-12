@@ -218,8 +218,11 @@ interface Input {
 export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<McpServer[]> {
   const { env, projectDir, layers, claudeJson, trust } = input;
   const projects = isRecord(claudeJson?.projects) ? claudeJson.projects : {};
-  const entry = [trust.root, projectDir].map((key) => projects[key]).find(isRecord);
-  const project: Record<string, unknown> = entry ?? {};
+  // Local servers live in the entry under the trust key, even from a subdirectory: claude mcp add
+  // --scope local writes there and claude mcp list reads only that entry, ignoring one for the
+  // subdirectory (observed with v2.1.296; the docs do not say).
+  const entry = projects[trust.root];
+  const project: Record<string, unknown> = isRecord(entry) ? entry : {};
 
   const managed = layers.find((l) => l.scope === "managed");
   // Checked as written: the layer has header values hidden, which would hide a ${VAR} in one.
@@ -266,7 +269,11 @@ export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<M
       trust.trusted ||
       (l.scope === "local" && isConfigHome(env, projectDir))
   );
-  const approveAll = approvalLayers.some((l) => l.data?.enableAllProjectMcpServers === true);
+  // Your answers to the .mcp.json prompt sit in the project entry: claude mcp list counts an
+  // enableAllProjectMcpServers there, and claude mcp reset-project-choices clears it (v2.1.296).
+  const approveAll =
+    approvalLayers.some((l) => l.data?.enableAllProjectMcpServers === true) ||
+    project.enableAllProjectMcpServers === true;
   const approved = new Set([
     ...approvalLayers.flatMap((l) => stringsIn(l.data?.enabledMcpjsonServers)),
     ...stringsIn(project.enabledMcpjsonServers),

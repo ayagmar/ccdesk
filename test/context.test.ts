@@ -167,6 +167,44 @@ test("skillOverrides hide a skill or command from Claude's listing, or list it b
   );
 });
 
+test("the skill listing names plugin skills and commands with their plugin, and leaves out a command a skill replaces", async () => {
+  const f = makeFixture();
+  const skill = (name: string | null, description: string) =>
+    `---\n${name ? `name: ${name}\n` : ""}description: ${description}\n---\n`;
+  const install = (name: string) => [
+    { scope: "user", installPath: f.at(`plugins/${name}`), version: "1.0.0" },
+  ];
+  f.json("home/.claude/plugins/installed_plugins.json", {
+    plugins: { "tools@market": install("tools"), "solo@market": install("solo") },
+  });
+  // Components take the manifest's name, not the name the plugin is enabled under.
+  f.json("plugins/tools/.claude-plugin/plugin.json", { name: "kit" });
+  f.write("plugins/tools/skills/review/SKILL.md", skill(null, "Plugin review"));
+  f.write("plugins/tools/skills/other/SKILL.md", skill("kit:fancy", "Already prefixed"));
+  f.write("plugins/tools/commands/lint.md", "---\ndescription: Plugin lint\n---\n");
+  f.json("plugins/solo/.claude-plugin/plugin.json", { name: "solo" });
+  f.write("plugins/solo/SKILL.md", skill(null, "The only skill"));
+  f.write("home/.claude/skills/review/SKILL.md", skill("review", "My review"));
+  f.write("home/.claude/commands/review.md", "---\ndescription: Old review command\n---\n");
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    view.context
+      .find((b) => b.kind === "skills")
+      ?.text?.split("\n")
+      .sort(),
+    [
+      "- kit:fancy: Already prefixed",
+      "- kit:lint: Plugin lint",
+      "- kit:review: Plugin review",
+      "- review: My review",
+      "- solo:solo: The only skill",
+    ]
+  );
+});
+
 test("an output style is found in the managed folder and in the repository root above the start directory", async () => {
   const f = makeFixture();
   f.write("repo/app/README.md", "x");

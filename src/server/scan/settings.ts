@@ -4,6 +4,7 @@ import { allowedScopes, EVERY_FILE, ignoredReason } from "../../shared/scopes.ts
 import { type EffectiveSetting, type Scope, type SettingsLayer } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
 import { isRecord, listDir, mainWorktreeRoot, readJsonObject, redactSecrets } from "./files.ts";
+import { type Dropped, sandboxFilter } from "./sandbox.ts";
 
 /** Lowest precedence first, so later layers override earlier ones. */
 const PRECEDENCE: Scope[] = ["user", "project", "local", "managed"];
@@ -62,13 +63,15 @@ export function ignoredModeReason(scope: Scope, mode: unknown): string | undefin
 function withoutIgnoredFields(
   key: string,
   scope: Scope,
-  value: unknown
-): { value: unknown; dropped?: { value: unknown; reason: string } } {
-  if (key !== "permissions" || !isRecord(value)) return { value };
+  value: unknown,
+  filterSandbox: ReturnType<typeof sandboxFilter>
+): { value: unknown; dropped: Dropped[] } {
+  if (key === "sandbox") return filterSandbox(scope, value);
+  if (key !== "permissions" || !isRecord(value)) return { value, dropped: [] };
   const reason = ignoredModeReason(scope, value.defaultMode);
-  if (!reason) return { value };
+  if (!reason) return { value, dropped: [] };
   const { defaultMode, ...rest } = value;
-  return { value: rest, dropped: { value: { defaultMode }, reason } };
+  return { value: rest, dropped: [{ value: { defaultMode }, reason }] };
 }
 
 type Valued = { scope: Scope; value: unknown };
@@ -236,6 +239,9 @@ export function effectiveSettings(layers: SettingsLayer[]): EffectiveSetting[] {
     byScope.set(layer.scope, higher ? mergeSettings(layer.data, higher) : layer.data);
   }
   const keys = new Set([...byScope.values()].flatMap((data) => Object.keys(data)));
+  const filterSandbox = sandboxFilter((key, scope) =>
+    allowedScopes(key).includes(scope) ? byScope.get(scope)?.[key] : undefined
+  );
   const out: EffectiveSetting[] = [];
   for (const key of [...keys].sort()) {
     const allowed = allowedScopes(key);
@@ -260,8 +266,8 @@ export function effectiveSettings(layers: SettingsLayer[]): EffectiveSetting[] {
       continue;
     }
     const values = defined.map((scope) => {
-      const { value, dropped } = withoutIgnoredFields(key, scope, valueIn(scope));
-      if (dropped) ignored.push({ scope, ...dropped });
+      const { value, dropped } = withoutIgnoredFields(key, scope, valueIn(scope), filterSandbox);
+      for (const d of dropped) ignored.push({ scope, ...d });
       return { scope, value };
     });
     const top = values[values.length - 1];

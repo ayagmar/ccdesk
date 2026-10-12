@@ -21,7 +21,7 @@ From highest precedence to lowest:
 - For most keys the highest file wins. Lower values are listed in **Overrides**, struck through, with their own bullets.
 - Lists merge across files, and objects merge key by key. Those rows say **merged** and show every file's bullet.
 - Some keys are read only from certain files. Claude Code's settings reference says which, and a value in any other file is marked **ignored**, with the reason in the inspector.
-- A few keys follow their own rule, which the inspector names: for some security switches the strictest value wins even from a lower file, `availableModels` from managed settings replaces every other file's list, and a project or local `defaultMode` of `auto` or `bypassPermissions` is ignored.
+- A few keys follow their own rule, which the inspector names: for some security switches the strictest value wins even from a lower file, `availableModels` from managed settings replaces every other file's list, a project or local `defaultMode` of `auto` or `bypassPermissions` is ignored, and so are the `sandbox` fields Claude Code does not take from a file: a repository's settings that loosen a sandbox managed settings require, values a managed-only lock such as `allowManagedDomainsOnly` covers, and nested keys read only from user or managed settings. ccdesk does not check the locks that depend on which paths are denied.
 
 Values under `env` and `headers` show as `•••`. See [Safety and privacy](../safety-and-privacy/).
 

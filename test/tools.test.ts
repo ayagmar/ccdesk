@@ -6,6 +6,7 @@ import { makeFixture } from "./helpers/fixture.ts";
 async function toolsFor(settings: Record<string, unknown>) {
   const f = makeFixture();
   f.json("home/.claude/settings.json", settings);
+  f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
   f.write("app/README.md", "x");
   const view = await scanDirectory(f.env, f.at("app"));
   return Object.fromEntries(view.tools.map((t) => [t.name, t]));
