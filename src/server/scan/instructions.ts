@@ -224,7 +224,9 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
     if (file.scope !== "project" && file.scope !== "local") continue;
     if (file.kind === "rule" && file.realPath && !isWithin(ctx.realCwd, file.realPath)) {
       if (!ctx.approved) skip(file, `${waiting}; this rule links outside it`);
-      else if (file.paths) skip(file, "Links outside this project, so its paths field is not used");
+      // docs: memory#share-rules-across-projects-with-symlinks
+      else if (file.paths)
+        skip(file, "Links outside this project, and such a rule loads only without a paths field");
     }
   }
   addChecks(out);
