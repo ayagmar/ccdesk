@@ -2417,7 +2417,8 @@ pre.diff span {
 
 .change-row {
   display: grid;
-  grid-template-columns: 11rem minmax(0, 1fr) 6rem auto;
+  /* Each change is its own grid, so every column has a fixed width to line the rows up. */
+  grid-template-columns: 11rem minmax(0, 1fr) 6rem 9rem;
   grid-template-areas: "what file when action";
   gap: 6px 12px;
   align-items: baseline;
@@ -2446,7 +2447,7 @@ pre.diff span {
 
 .change-row .head-action {
   grid-area: action;
-  justify-self: start;
+  justify-self: end;
   margin-left: 0;
 }
 
@@ -2457,6 +2458,10 @@ pre.diff span {
       "what when"
       "file file"
       "action action";
+  }
+
+  .change-row .head-action {
+    justify-self: start;
   }
 }
 
