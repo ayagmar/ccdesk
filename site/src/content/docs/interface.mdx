@@ -48,7 +48,7 @@ Every table can be filtered with the box at the top, narrowed with the chips bes
 
 ## The inspector
 
-Click a row to open it in the inspector on the right: why it is or is not in force, the file it comes from (with copy and open buttons), the file's contents, and the controls to change it. On windows narrower than 1180 pixels the inspector slides in over the page instead.
+Click a row to open it in the inspector on the right: why it is or is not in force, the file it comes from (with copy and open buttons), the file's contents, and the controls to change it. Until you pick a row, the tables take the full width. On windows narrower than 1180 pixels the inspector slides in over the page instead.
 
 The open button starts your editor. ccdesk uses `$CCDESK_EDITOR` when it is set. Otherwise it tries `$VISUAL` and `$EDITOR` if they name a graphical editor, then the first of `code`, `cursor`, `zed`, `codium`, `subl`, `kate`, `gnome-text-editor` and `gedit` found on your `PATH`, and finally your system's default app. Terminal editors such as `vim` are skipped, because a background server has no terminal to run them in.
 
@@ -63,7 +63,7 @@ The open button starts your editor. ccdesk uses `$CCDESK_EDITOR` when it is set.
 
 ## Keyboard shortcuts
 
-On a directory page:
+On a directory page (the rail lists these at the bottom on wide windows):
 
 | Key | Action |
 | --- | --- |

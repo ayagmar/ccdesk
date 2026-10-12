@@ -6,7 +6,7 @@ import { Icon } from "./Icon.tsx";
 import { McpEditor } from "./McpEditor.tsx";
 import { PermissionEditor } from "./PermissionEditor.tsx";
 import { SettingEditor } from "./SettingEditor.tsx";
-import { SECTIONS, sectionOf } from "./sections/index.ts";
+import { sectionOf } from "./sections/index.ts";
 import { type Actions, type Adding, type Row } from "./sections/types.ts";
 
 interface Props {
@@ -72,17 +72,7 @@ export function Inspector({ row, adding, actions, onClose }: Props) {
       </aside>
     );
   }
-  if (!row) {
-    return (
-      <aside className="inspector empty" aria-label="Details">
-        <p>Select a row to see the file behind it.</p>
-        <p className="muted">
-          <kbd>j</kbd> <kbd>k</kbd> move · <kbd>1</kbd>–<kbd>{SECTIONS.length}</kbd> sections ·{" "}
-          <kbd>/</kbd> filter · <kbd>Ctrl</kbd> <kbd>K</kbd> jump anywhere
-        </p>
-      </aside>
-    );
-  }
+  if (!row) return null;
   const section = sectionOf(row.section);
   const { Details } = section;
   return (

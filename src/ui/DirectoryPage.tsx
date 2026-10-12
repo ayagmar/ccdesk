@@ -179,11 +179,13 @@ export function DirectoryPage({
 
   const { trust } = view;
   return (
-    <div className="workspace">
+    <div className={`workspace${selectedRow || adding ? "" : " no-details"}`}>
       <div className="work-main">
         <header className="dir-head">
           <div className="dir-title">
-            <h1 className="mono">{tilde(view.path)}</h1>
+            <h1 className="mono" title={tilde(view.path)}>
+              {tilde(view.path)}
+            </h1>
             {!view.exists && <span className="flag bad">folder no longer exists</span>}
             {view.gitRoot && view.gitRoot !== view.path && (
               <span className="flag">inside {tilde(view.gitRoot)}</span>
@@ -231,8 +233,13 @@ export function DirectoryPage({
               />
               <kbd>/</kbd>
             </label>
-            <button type="button" className="palette-button" onClick={onOpenPalette}>
-              Jump to <kbd>Ctrl K</kbd>
+            <button
+              type="button"
+              className="palette-button"
+              aria-label="Jump to"
+              onClick={onOpenPalette}
+            >
+              <span className="palette-label">Jump to</span> <kbd>Ctrl K</kbd>
             </button>
           </div>
           <nav className={`section-index${seeing ? " hidden" : ""}`} aria-label="Sections">

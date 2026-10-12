@@ -212,6 +212,11 @@ kbd {
   min-height: 0;
 }
 
+/* Until a row is selected, the tables get the inspector's room. */
+.workspace.no-details {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .work-main {
   overflow-y: auto;
   padding: 0 28px 64px;
@@ -484,6 +489,17 @@ input::placeholder {
 
 .filter {
   width: 240px;
+}
+
+/* The directory name comes first, so the tools beside it shrink. */
+@container (max-width: 960px) {
+  .filter {
+    width: 140px;
+  }
+
+  .palette-label {
+    display: none;
+  }
 }
 
 .palette-button {
@@ -1076,19 +1092,6 @@ input::placeholder {
   background: var(--panel);
   overflow-y: auto;
   min-width: 0;
-}
-
-.inspector.empty {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 32px;
-  gap: 4px;
-  color: var(--ink-2);
-}
-
-.inspector.empty p {
-  margin: 0;
 }
 
 .insp-head {
@@ -1833,7 +1836,7 @@ button:disabled {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .inspector:not(.empty) {
+  .inspector {
     position: fixed;
     top: 0;
     right: 0;
@@ -1843,7 +1846,8 @@ button:disabled {
     box-shadow: -16px 0 40px -16px rgb(0 0 0 / 0.35);
   }
 
-  .inspector.empty {
+  /* Keyboard hints are for a full keyboard and a wide window. */
+  .rail-keys {
     display: none;
   }
 }
@@ -2028,7 +2032,8 @@ button:disabled {
 
 .field input:not([type="checkbox"]),
 .field select,
-.field textarea {
+.field textarea,
+.path-form input {
   width: 100%;
   border: 1px solid var(--rule);
   border-radius: 6px;
@@ -2039,7 +2044,8 @@ button:disabled {
 }
 
 .field input:not([type="checkbox"]),
-.field select {
+.field select,
+.path-form input {
   height: 32px;
 }
 
@@ -2050,7 +2056,8 @@ button:disabled {
 
 .field input:focus,
 .field select:focus,
-.field textarea:focus {
+.field textarea:focus,
+.path-form input:focus {
   outline: 2px solid var(--focus);
   outline-offset: -1px;
 }
@@ -2076,7 +2083,8 @@ button:disabled {
   flex-wrap: wrap;
 }
 
-.editor-buttons button {
+.editor-buttons button,
+.path-form button {
   height: 30px;
   padding: 0 12px;
   border-radius: 6px;
@@ -2085,7 +2093,8 @@ button:disabled {
   font-size: 13px;
 }
 
-.editor-buttons button:hover {
+.editor-buttons button:hover,
+.path-form button:hover {
   border-color: var(--ink-2);
 }
 
@@ -2267,6 +2276,16 @@ pre.diff span {
 .rail-empty {
   margin: 2px 8px;
   font-size: 13px;
+  color: var(--muted);
+}
+
+.rail-keys {
+  list-style: none;
+  margin: auto 8px 0;
+  padding: 24px 0 0;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
   color: var(--muted);
 }
 

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { type Overview, type ProjectSummary } from "../shared/types.ts";
 import { tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
+import { SECTIONS } from "./sections/index.ts";
 
 interface Props {
   overview: Overview | null;
@@ -116,6 +117,22 @@ export function Rail({
           </button>
           {showEphemeral && <ul className="rail-list">{ephemeral.map(item)}</ul>}
         </>
+      )}
+      {typeof current === "string" && (
+        <ul className="rail-keys" aria-label="Keyboard shortcuts">
+          <li>
+            <kbd>j</kbd> <kbd>k</kbd> rows
+          </li>
+          <li>
+            <kbd>1</kbd>–<kbd>{SECTIONS.length}</kbd> sections
+          </li>
+          <li>
+            <kbd>/</kbd> filter
+          </li>
+          <li>
+            <kbd>Ctrl</kbd> <kbd>K</kbd> jump anywhere
+          </li>
+        </ul>
       )}
     </nav>
   );
