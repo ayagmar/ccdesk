@@ -76,19 +76,158 @@ class RequestError extends Error {
 
 export function createCcdeskServer(options: ServerOptions): Server {
   const watcher = new Watcher(options.env);
+  const table = routes(options, watcher);
   const server = createServer((req, res) => {
-    handle(options, watcher, server, req, res).catch((error: unknown) => {
-      if (error instanceof RequestError) return send(res, error.status, { error: error.message });
-      send(res, 500, { error: error instanceof Error ? error.message : String(error) });
+    handle(options, table, server, req, res).catch((error: unknown) => {
+      const [status, message] = failure(error);
+      send(res, status, { error: message });
     });
   });
   server.on("close", () => watcher.close());
   return server;
 }
 
+/** The status and message an API request that failed is answered with. */
+function failure(error: unknown): [number, string] {
+  if (error instanceof RequestError) return [error.status, error.message];
+  // A change ccdesk refuses on purpose.
+  if (error instanceof RefusedError) return [409, error.message];
+  if (error instanceof CountStopped) return [503, error.message];
+  return [500, error instanceof Error ? error.message : String(error)];
+}
+
+interface Request {
+  url: URL;
+  /** A POST's JSON body, already read and parsed. */
+  body: unknown;
+  res: ServerResponse;
+}
+
+interface Route {
+  method: "GET" | "POST";
+  path: string;
+  /** What the request is answered with, as JSON with status 200. */
+  action: (request: Request) => Promise<unknown>;
+}
+
+/** The query parameter `name`; a missing one is a 400. */
+function param(url: URL, name: string, message = `${name} is required`): string {
+  const value = url.searchParams.get(name);
+  if (!value) throw new RequestError(400, message);
+  return value;
+}
+
+/** Aborts when the page goes away or asks for something else. */
+function stopOnClose(res: ServerResponse): AbortSignal {
+  const stop = new AbortController();
+  res.once("close", () => stop.abort());
+  return stop.signal;
+}
+
+function routes(options: ServerOptions, watcher: Watcher): Route[] {
+  const { env, launchDir } = options;
+  const run = options.runClaude ?? runClaude;
+  const revision = (body: unknown) => stringFields(body, ["revision"]).revision;
+  const get = (path: string, action: Route["action"]): Route => ({ method: "GET", path, action });
+  const post = (path: string, action: Route["action"]): Route => ({ method: "POST", path, action });
+  return [
+    get("/api/overview", () => scanOverview(env, launchDir)),
+    get("/api/directory", ({ url }) => watcher.scan(param(url, "path"))),
+    post("/api/usage", ({ body, res }) => {
+      const { path } = stringFields(body, ["path"]);
+      const rules = (body as Record<string, unknown>).rules;
+      if (!Array.isArray(rules)) throw new RequestError(400, "rules must be a list");
+      const inEffect = rules.map((r) => {
+        const { list, rule } = stringFields(r, ["list", "rule"]);
+        if (!PERMISSION_LISTS.includes(list as PermissionList))
+          throw new RequestError(400, "a rule needs a list: allow, ask or deny");
+        return { list: list as PermissionList, rule };
+      });
+      return readUsage(env, path, inEffect, { signal: stopOnClose(res) });
+    }),
+    post("/api/memory/preview", async ({ body }) => {
+      const { action, path } = stringFields(body, ["action", "path"]);
+      if (!isMemoryAction(action)) throw new RequestError(400, "unknown memory action");
+      return previewMemoryChange(env, action, path);
+    }),
+    post("/api/memory/change", async ({ body }) => {
+      const { action, path, revision } = stringFields(body, ["action", "path", "revision"]);
+      if (!isMemoryAction(action)) throw new RequestError(400, "unknown memory action");
+      return changeMemory(env, action, path, revision);
+    }),
+    post("/api/open", async ({ body }) => {
+      const { path } = stringFields(body, ["path"]);
+      if (!isAbsolute(path)) throw new RequestError(400, "an absolute path is required");
+      const info = await stat(path).catch(() => null);
+      if (!info?.isFile() && !info?.isDirectory())
+        throw new RefusedError("That file or folder no longer exists.");
+      if (await isCredentials(env, path))
+        throw new RefusedError("ccdesk does not open credentials.");
+      return { editor: await (options.openFile ?? openInEditor)(path) };
+    }),
+    post("/api/settings/preview", async ({ body }) =>
+      previewSettingsEdit(env, settingsEditFrom(body))
+    ),
+    post("/api/settings/save", async ({ body }) =>
+      saveSettingsEdit(env, settingsEditFrom(body), revision(body))
+    ),
+    post("/api/permissions/preview", async ({ body }) =>
+      previewPermissionEdit(env, permissionEditFrom(body))
+    ),
+    post("/api/permissions/save", async ({ body }) =>
+      savePermissionEdit(env, permissionEditFrom(body), revision(body))
+    ),
+    post("/api/hooks/preview", async ({ body }) => previewHookEdit(env, hookEditFrom(body))),
+    post("/api/hooks/save", async ({ body }) =>
+      saveHookEdit(env, hookEditFrom(body), revision(body))
+    ),
+    post("/api/agents/preview", async ({ body }) => previewAgentEdit(env, agentEditFrom(body))),
+    post("/api/agents/save", async ({ body }) =>
+      saveAgentEdit(env, agentEditFrom(body), revision(body))
+    ),
+    post("/api/mcp/preview", async ({ body }) => previewMcpEdit(env, mcpEditFrom(body), run)),
+    post("/api/mcp/save", async ({ body }) =>
+      saveMcpEdit(env, mcpEditFrom(body), revision(body), run)
+    ),
+    get("/api/watch", async ({ url, res }) => {
+      const dir = url.searchParams.get("dir");
+      const since = Number(url.searchParams.get("since") ?? "0");
+      if (!dir || !isAbsolute(dir) || !Number.isInteger(since))
+        throw new RequestError(400, "dir is required");
+      return watcher.wait(resolve(dir), since, stopOnClose(res));
+    }),
+    get("/api/path-test", async ({ url }) => {
+      const dir = url.searchParams.get("dir");
+      const file = url.searchParams.get("file");
+      if (!dir || !isAbsolute(dir) || !file)
+        throw new RequestError(400, "dir and file are required");
+      return testPath(env, dir, file, (cwd) => watcher.view(cwd));
+    }),
+    get("/api/backups", async ({ url }) => {
+      const before = url.searchParams.get("before") ?? undefined;
+      const limit = Number(url.searchParams.get("limit") ?? "50");
+      if (!Number.isInteger(limit) || limit < 1 || limit > 200)
+        throw new RequestError(400, "limit must be 1 to 200");
+      return listBackups(env, { ...(before ? { before } : {}), limit });
+    }),
+    post("/api/backups/preview", async ({ body }) =>
+      previewRestore(env, stringFields(body, ["id"]).id)
+    ),
+    post("/api/backups/restore", async ({ body }) => {
+      const { id, revision } = stringFields(body, ["id", "revision"]);
+      return restoreBackup(env, id, revision);
+    }),
+  ];
+}
+
+/**
+ * Every request passes the same checks before its route runs: the Host header, then for the API
+ * the token, the Origin of anything but a GET, and a POST's body. Failures are answered by
+ * `failure`.
+ */
 async function handle(
   options: ServerOptions,
-  watcher: Watcher,
+  table: Route[],
   server: Server,
   req: IncomingMessage,
   res: ServerResponse
@@ -114,140 +253,10 @@ async function handle(
     return send(res, 403, { error: "Cross-origin request refused" });
   }
 
-  const { env, launchDir } = options;
-  if (req.method === "GET" && url.pathname === "/api/overview") {
-    return send(res, 200, await scanOverview(env, launchDir));
-  }
-  if (req.method === "GET" && url.pathname === "/api/directory") {
-    const path = url.searchParams.get("path");
-    if (!path) return send(res, 400, { error: "path is required" });
-    return send(res, 200, await watcher.scan(path));
-  }
-  if (req.method === "POST" && url.pathname === "/api/usage") {
-    const body = await readBody(req);
-    const { path } = stringFields(body, ["path"]);
-    const rules = (body as Record<string, unknown>).rules;
-    if (!Array.isArray(rules)) return send(res, 400, { error: "rules must be a list" });
-    const inEffect = rules.map((r) => {
-      const { list, rule } = stringFields(r, ["list", "rule"]);
-      if (!PERMISSION_LISTS.includes(list as PermissionList))
-        throw new RequestError(400, "a rule needs a list: allow, ask or deny");
-      return { list: list as PermissionList, rule };
-    });
-    // The count stops when the page goes away or asks for another directory.
-    const stop = new AbortController();
-    res.once("close", () => stop.abort());
-    try {
-      return send(res, 200, await readUsage(env, path, inEffect, { signal: stop.signal }));
-    } catch (error) {
-      if (error instanceof CountStopped) return send(res, 503, { error: error.message });
-      throw error;
-    }
-  }
-  if (req.method === "POST" && url.pathname === "/api/memory/preview") {
-    const { action, path } = await fields(req, ["action", "path"]);
-    if (!isMemoryAction(action)) return send(res, 400, { error: "unknown memory action" });
-    return answer(res, () => previewMemoryChange(env, action, path));
-  }
-  if (req.method === "POST" && url.pathname === "/api/memory/change") {
-    const { action, path, revision } = await fields(req, ["action", "path", "revision"]);
-    if (!isMemoryAction(action)) return send(res, 400, { error: "unknown memory action" });
-    return answer(res, () => changeMemory(env, action, path, revision));
-  }
-  if (req.method === "POST" && url.pathname === "/api/open") {
-    const { path } = await fields(req, ["path"]);
-    if (!isAbsolute(path)) return send(res, 400, { error: "an absolute path is required" });
-    const info = await stat(path).catch(() => null);
-    if (!info?.isFile() && !info?.isDirectory())
-      return send(res, 409, { error: "That file or folder no longer exists." });
-    if (await isCredentials(env, path))
-      return send(res, 409, { error: "ccdesk does not open credentials." });
-    const open = options.openFile ?? openInEditor;
-    return answer(res, async () => ({ editor: await open(path) }));
-  }
-  if (req.method === "POST" && url.pathname === "/api/settings/preview") {
-    const edit = settingsEditFrom(await readBody(req));
-    return answer(res, () => previewSettingsEdit(env, edit));
-  }
-  if (req.method === "POST" && url.pathname === "/api/settings/save") {
-    const body = await readBody(req);
-    const edit = settingsEditFrom(body);
-    const { revision } = stringFields(body, ["revision"]);
-    return answer(res, () => saveSettingsEdit(env, edit, revision));
-  }
-  if (req.method === "POST" && url.pathname === "/api/permissions/preview") {
-    const edit = permissionEditFrom(await readBody(req));
-    return answer(res, () => previewPermissionEdit(env, edit));
-  }
-  if (req.method === "POST" && url.pathname === "/api/permissions/save") {
-    const body = await readBody(req);
-    const edit = permissionEditFrom(body);
-    const { revision } = stringFields(body, ["revision"]);
-    return answer(res, () => savePermissionEdit(env, edit, revision));
-  }
-  if (req.method === "POST" && url.pathname === "/api/hooks/preview") {
-    const edit = hookEditFrom(await readBody(req));
-    return answer(res, () => previewHookEdit(env, edit));
-  }
-  if (req.method === "POST" && url.pathname === "/api/hooks/save") {
-    const body = await readBody(req);
-    const edit = hookEditFrom(body);
-    const { revision } = stringFields(body, ["revision"]);
-    return answer(res, () => saveHookEdit(env, edit, revision));
-  }
-  if (req.method === "POST" && url.pathname === "/api/agents/preview") {
-    const edit = agentEditFrom(await readBody(req));
-    return answer(res, () => previewAgentEdit(env, edit));
-  }
-  if (req.method === "POST" && url.pathname === "/api/agents/save") {
-    const body = await readBody(req);
-    const edit = agentEditFrom(body);
-    const { revision } = stringFields(body, ["revision"]);
-    return answer(res, () => saveAgentEdit(env, edit, revision));
-  }
-  if (req.method === "POST" && url.pathname === "/api/mcp/preview") {
-    const edit = mcpEditFrom(await readBody(req));
-    return answer(res, () => previewMcpEdit(env, edit, options.runClaude ?? runClaude));
-  }
-  if (req.method === "POST" && url.pathname === "/api/mcp/save") {
-    const body = await readBody(req);
-    const edit = mcpEditFrom(body);
-    const { revision } = stringFields(body, ["revision"]);
-    return answer(res, () => saveMcpEdit(env, edit, revision, options.runClaude ?? runClaude));
-  }
-  if (req.method === "GET" && url.pathname === "/api/watch") {
-    const dir = url.searchParams.get("dir");
-    const since = Number(url.searchParams.get("since") ?? "0");
-    if (!dir || !isAbsolute(dir) || !Number.isInteger(since))
-      return send(res, 400, { error: "dir is required" });
-    // Stop waiting when the page goes away or asks for another directory.
-    const stop = new AbortController();
-    res.once("close", () => stop.abort());
-    return send(res, 200, await watcher.wait(resolve(dir), since, stop.signal));
-  }
-  if (req.method === "GET" && url.pathname === "/api/path-test") {
-    const dir = url.searchParams.get("dir");
-    const file = url.searchParams.get("file");
-    if (!dir || !isAbsolute(dir) || !file)
-      return send(res, 400, { error: "dir and file are required" });
-    return answer(res, () => testPath(env, dir, file, (cwd) => watcher.view(cwd)));
-  }
-  if (req.method === "GET" && url.pathname === "/api/backups") {
-    const before = url.searchParams.get("before") ?? undefined;
-    const limit = Number(url.searchParams.get("limit") ?? "50");
-    if (!Number.isInteger(limit) || limit < 1 || limit > 200)
-      return send(res, 400, { error: "limit must be 1 to 200" });
-    return send(res, 200, await listBackups(env, { ...(before ? { before } : {}), limit }));
-  }
-  if (req.method === "POST" && url.pathname === "/api/backups/preview") {
-    const { id } = await fields(req, ["id"]);
-    return answer(res, () => previewRestore(env, id));
-  }
-  if (req.method === "POST" && url.pathname === "/api/backups/restore") {
-    const { id, revision } = await fields(req, ["id", "revision"]);
-    return answer(res, () => restoreBackup(env, id, revision));
-  }
-  return send(res, 404, { error: "Not found" });
+  const route = table.find((r) => r.method === req.method && r.path === url.pathname);
+  if (!route) return send(res, 404, { error: "Not found" });
+  const body = route.method === "POST" ? await readBody(req) : undefined;
+  return send(res, 200, await route.action({ url, body, res }));
 }
 
 /** The named string fields of a JSON body; anything else is a 400. */
@@ -258,13 +267,6 @@ function stringFields<K extends string>(body: unknown, names: K[]): Record<K, st
       `${names.join(", ")} ${names.length === 1 ? "is" : "are"} required`
     );
   return body as Record<K, string>;
-}
-
-async function fields<K extends string>(
-  req: IncomingMessage,
-  names: K[]
-): Promise<Record<K, string>> {
-  return stringFields(await readBody(req), names);
 }
 
 function settingsEditFrom(body: unknown): SettingsEdit {
@@ -355,15 +357,6 @@ function mcpEditFrom(body: unknown): McpEdit {
   }
   if (!edit.remove && !edit.add) throw new RequestError(400, "remove or add is required");
   return edit;
-}
-
-async function answer(res: ServerResponse, action: () => Promise<unknown>) {
-  try {
-    send(res, 200, await action());
-  } catch (error) {
-    if (error instanceof RefusedError) return send(res, 409, { error: error.message });
-    throw error;
-  }
 }
 
 const MAX_BODY = 64 * 1024;
