@@ -8,6 +8,7 @@ import {
   MAX_TEXT_BYTES,
   parseFrontmatter,
   readTextFile,
+  resolvedPath,
   stringsIn,
   toStringList,
   walkMarkdown,
@@ -65,6 +66,8 @@ export async function testPath(
     if (glob) matches.push({ kind: "rule", path: rule.path, scope: rule.scope, glob });
   }
 
+  const realCwd = await resolvedPath(cwd);
+  const approved = view.trust.externalImports === "approved";
   // Folders below the start directory load their own instructions, rules and skills on demand.
   const mode = view.agentsMdMode;
   const startSkills = new Set(
@@ -94,7 +97,13 @@ export async function testPath(
     for (const path of await walkMarkdown(join(folder, ".claude", "rules"))) {
       const text = await readTextFile(env, path);
       if (!text || text.bytes > MAX_TEXT_BYTES || excluded(path)) continue;
+      // As at startup: excluded by its target's path too, and a rule linked from outside the
+      // project waits for your approval, then loads only without paths
+      // (docs: memory#share-rules-across-projects-with-symlinks).
+      const real = await resolvedPath(path);
+      if (excluded(real)) continue;
       const globs = toStringList(parseFrontmatter(text.text).data.paths);
+      if (!isWithin(realCwd, real) && (!approved || globs.length > 0)) continue;
       const glob =
         globs.length === 0 ? undefined : firstMatch(globs, slashed(relative(folder, target)));
       if (globs.length === 0 || glob)

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { basename } from "node:path";
 import { test } from "node:test";
 import { testPath } from "../src/server/scan/path-test.ts";
 import { makeFixture } from "./helpers/fixture.ts";
@@ -76,6 +77,22 @@ test("a folder whose name starts with two dots is inside the start directory", a
 
   assert.equal((await testPath(f.env, f.at("app"), "..cache/x.ts")).inside, true);
   assert.equal((await testPath(f.env, f.at("app"), "../x.ts")).inside, false);
+});
+
+test("a subfolder's rules linked from outside the project load as they would at startup", async () => {
+  const f = makeFixture();
+  f.write("shared-rules/style.md", "Early returns.\n");
+  f.write("shared-rules/api.md", '---\npaths: ["**/*.ts"]\n---\nValidate.\n');
+  f.link("app/sub/.claude/rules/shared", f.at("shared-rules"));
+  const loaded = async () =>
+    (await testPath(f.env, f.at("app"), "sub/x.ts")).matches.map((m) => basename(m.path));
+
+  assert.deepEqual(await loaded(), []);
+  f.json("home/.claude.json", {
+    projects: { [f.at("app")]: { hasClaudeMdExternalIncludesApproved: true } },
+  });
+  // Once approved, only the linked rules without a paths field load.
+  assert.deepEqual(await loaded(), ["style.md"]);
 });
 
 test("an excluded rule and a skill Claude cannot invoke itself do not load for matching files", async () => {
