@@ -97,12 +97,14 @@ More in [Reading the interface](https://ayagmar.github.io/ccdesk/interface/).
 ```
 npx ccdesk [options]
 
-  --port <n>   Port to listen on (default: a free port)
-  --no-open    Print the URL instead of opening a browser
-  -h, --help   Show this help
+  --port <n>            Port to listen on (default: a free port)
+  --no-open             Print the URL instead of opening a browser
+  --config-dir <path>   Claude folder to read, as CLAUDE_CONFIG_DIR sets it for Claude Code
+                        (wins over $CLAUDE_CONFIG_DIR)
+  -h, --help            Show this help
 ```
 
-ccdesk reads `~/.claude` and `~/.claude.json`, or `$CLAUDE_CONFIG_DIR` when it is set, as Claude Code does. Edits made in another editor or by Claude show up within a second. Requires Node.js 22.19 or newer. See [Platform notes](https://ayagmar.github.io/ccdesk/platforms/) for Windows, macOS and WSL.
+ccdesk reads `~/.claude` and `~/.claude.json`, or `$CLAUDE_CONFIG_DIR` when it is set, as Claude Code does. To look at another profile without exporting the variable, pass `--config-dir <path>`. Edits made in another editor or by Claude show up within a second. Requires Node.js 22.19 or newer. See [Platform notes](https://ayagmar.github.io/ccdesk/platforms/) for Windows, macOS and WSL.
 
 ## Privacy and safety
 

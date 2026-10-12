@@ -1,10 +1,10 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 /** Every location ccdesk reads, resolved once so tests can point it at a sandbox. */
 export interface ScanEnv {
   home: string;
-  /** `~/.claude`, or `CLAUDE_CONFIG_DIR` when set. */
+  /** `~/.claude`, or `--config-dir` or `CLAUDE_CONFIG_DIR` when set. */
   claudeDir: string;
   /** Claude Code's own state file: OAuth, trust decisions, user MCP servers. Read-only for ccdesk. */
   claudeJson: string;
@@ -17,9 +17,11 @@ export interface ScanEnv {
   projectDirName?: string | undefined;
 }
 
-export function scanEnvFromProcess(): ScanEnv {
+/** `configDirFlag`, from `--config-dir`, stands in for CLAUDE_CONFIG_DIR and wins over it. */
+export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
   const home = homedir();
-  const configDir = process.env.CLAUDE_CONFIG_DIR;
+  const configDir =
+    configDirFlag !== undefined ? resolve(configDirFlag) : process.env.CLAUDE_CONFIG_DIR;
   return {
     home,
     claudeDir: configDir ?? join(home, ".claude"),

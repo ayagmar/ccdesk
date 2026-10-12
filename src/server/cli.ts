@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { scanEnvFromProcess } from "./scan/env.ts";
@@ -11,11 +12,14 @@ const HELP = `ccdesk: see and change what Claude Code loads on this machine
 Usage: npx ccdesk [options]
 
 Options:
-  --port <n>   Port to listen on (default: a free port)
-  --no-open    Print the URL instead of opening a browser
-  -h, --help   Show this help
+  --port <n>            Port to listen on (default: a free port)
+  --no-open             Print the URL instead of opening a browser
+  --config-dir <path>   Claude folder to read, as CLAUDE_CONFIG_DIR sets it for Claude Code
+                        (wins over $CLAUDE_CONFIG_DIR)
+  -h, --help            Show this help
 
-ccdesk reads ~/.claude (or $CLAUDE_CONFIG_DIR) and opens on the directory you run it from.
+ccdesk reads ~/.claude (or --config-dir, or $CLAUDE_CONFIG_DIR) and opens on the directory you
+run it from.
 It listens on 127.0.0.1 only.`;
 
 const DEV_PORT = 4319;
@@ -26,6 +30,7 @@ function options() {
     return parseArgs({
       options: {
         port: { type: "string" },
+        "config-dir": { type: "string" },
         open: { type: "boolean", default: true },
         dev: { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
@@ -52,9 +57,15 @@ function main() {
     process.exitCode = 2;
     return;
   }
+  const configDir = values["config-dir"];
+  if (configDir !== undefined && !statSync(configDir, { throwIfNoEntry: false })?.isDirectory()) {
+    console.error(`ccdesk: --config-dir ${configDir} is not a folder`);
+    process.exitCode = 2;
+    return;
+  }
   const token = dev ? DEV_TOKEN : randomBytes(18).toString("base64url");
   const server = createCcdeskServer({
-    env: scanEnvFromProcess(),
+    env: scanEnvFromProcess(configDir),
     launchDir: process.cwd(),
     token,
     uiDir: dev ? null : fileURLToPath(new URL("../ui", import.meta.url)),
