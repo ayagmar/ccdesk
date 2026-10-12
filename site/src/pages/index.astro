@@ -166,10 +166,10 @@ const QUESTIONS = [
 </StarlightPage>
 
 <style>
-  /* The splash page uses the full width the screenshots need. */
-  :global(.sl-container:has(.landing)),
-  :global(.sl-container:has(.lead)) {
-    max-width: 76rem;
+  /* The splash page uses the full width the screenshots need. Starlight sizes the content column
+     and lines the header's search up with it from this one variable. */
+  :global(:root:has(.landing)) {
+    --sl-content-width: 76rem;
   }
 
   .landing {
