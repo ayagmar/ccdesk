@@ -76,13 +76,13 @@ export async function testPath(
   const between: string[] = [];
   for (let d = dirname(target); d !== cwd && isWithin(cwd, d); d = dirname(d)) between.unshift(d);
   for (const folder of between) {
+    /** Whether the file is there; an excluded one or one over the limit is there but not loaded. */
     const nested = async (name: string, scope: PathMatch["scope"]) => {
       const path = join(folder, name);
-      if (excluded(path)) return false;
-      // Claude Code skips an instruction file over the limit, as it does at startup.
       const file = await readTextFile(env, path);
-      if (!file || file.bytes > MAX_TEXT_BYTES) return false;
-      matches.push({ kind: "nested", path, scope });
+      if (!file) return false;
+      if (!excluded(path) && file.bytes <= MAX_TEXT_BYTES)
+        matches.push({ kind: "nested", path, scope });
       return true;
     };
     // managed-only leaves out files at launch, but a subfolder's CLAUDE.md and rules still load

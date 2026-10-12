@@ -34,6 +34,8 @@ test("a subfolder's instruction file or rule over 4 MiB does not load, one at th
   const f = makeFixture();
   const limit = 4 * 1024 * 1024;
   f.write("app/src/CLAUDE.md", "x".repeat(limit + 1));
+  // The CLAUDE.md is still there, so AGENTS.md does not load in its place.
+  f.write("app/src/AGENTS.md", "Agent rules.\n");
   f.write("app/src/.claude/rules/big.md", "x".repeat(limit + 1));
   f.write("app/src/api/CLAUDE.md", "x".repeat(limit));
 
