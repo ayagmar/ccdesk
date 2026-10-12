@@ -7,8 +7,8 @@
 
 [![npm](https://img.shields.io/npm/v/ccdesk?style=flat-square&color=141414)](https://www.npmjs.com/package/ccdesk)
 [![CI](https://img.shields.io/github/actions/workflow/status/ayagmar/ccdesk/ci.yml?branch=master&style=flat-square&label=ci)](https://github.com/ayagmar/ccdesk/actions/workflows/ci.yml)
-[![node](https://img.shields.io/node/v/ccdesk?style=flat-square&color=141414)](package.json)
-[![license](https://img.shields.io/github/license/ayagmar/ccdesk?style=flat-square&color=141414)](LICENSE)
+[![node](https://img.shields.io/node/v/ccdesk?style=flat-square&color=141414)](https://github.com/ayagmar/ccdesk/blob/master/package.json)
+[![license](https://img.shields.io/github/license/ayagmar/ccdesk?style=flat-square&color=141414)](https://github.com/ayagmar/ccdesk/blob/master/LICENSE)
 
 See and change everything Claude Code loads on your machine: instruction files, settings, permissions, hooks, MCP servers, subagents, skills, plugins and auto memory.
 

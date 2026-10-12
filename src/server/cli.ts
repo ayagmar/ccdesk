@@ -6,7 +6,7 @@ import { parseArgs } from "node:util";
 import { scanEnvFromProcess } from "./scan/env.ts";
 import { createCcdeskServer } from "./server.ts";
 
-const HELP = `ccdesk: see and manage what shapes Claude Code on this machine
+const HELP = `ccdesk: see and change what Claude Code loads on this machine
 
 Usage: npx ccdesk [options]
 

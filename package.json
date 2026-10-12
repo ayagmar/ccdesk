@@ -1,7 +1,7 @@
 {
   "name": "ccdesk",
   "version": "0.1.0",
-  "description": "See and manage everything that shapes Claude Code on your machine: instructions, settings, hooks, MCP servers, agents, skills and memory",
+  "description": "See and change everything Claude Code loads on your machine: instruction files, settings, permissions, hooks, MCP servers, subagents, skills, plugins and auto memory",
   "keywords": [
     "claude-code",
     "claude",
@@ -9,10 +9,16 @@
     "settings",
     "memory",
     "agents-md",
-    "claude-md"
+    "claude-md",
+    "mcp",
+    "hooks",
+    "permissions",
+    "skills",
+    "subagents"
   ],
   "license": "MIT",
   "author": "ayagmar",
+  "homepage": "https://ayagmar.github.io/ccdesk/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ayagmar/ccdesk.git"
