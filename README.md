@@ -73,6 +73,7 @@ Each piece lives in its own file, at one of six scopes: managed, user, project, 
 - Settings and hooks are checked against Claude Code's settings schema. Other keys in the file stay as they are.
 - The old file is backed up to `~/.claude/backups/ccdesk/` first. Undo is one click, and **Recent changes** can restore any earlier edit.
 - A settings file that is a symlink, such as one in a dotfiles repository, is written through and stays a link.
+- A file with other hard links is not saved: replacing it would split it from its other names. Edit it in your editor.
 - ccdesk never writes `~/.claude.json`. User and local MCP server changes go through Claude Code's own `claude mcp` command, so they need `claude` on your PATH.
 
 Details: [Recent changes, backups and undo](https://ayagmar.github.io/ccdesk/recent-changes/)

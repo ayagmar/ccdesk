@@ -719,6 +719,26 @@ test("a settings file that links to the credentials file is never written", asyn
   assert.equal(readFileSync(credentials, "utf8"), '{"token":"x"}');
 });
 
+test("a settings file with another hard link is not saved, so the two names keep one text", async () => {
+  const shared = fixture.json("dotfiles/settings.json", { model: "sonnet" });
+  const settings = fixture.at("work/hardlink-settings/.claude/settings.json");
+  fixture.write("work/hardlink-settings/.claude/.keep", "");
+  linkSync(shared, settings);
+  const before = readFileSync(shared, "utf8");
+
+  const res = await saveSetting({
+    dir: fixture.at("work/hardlink-settings"),
+    scope: "project",
+    key: "model",
+    value: "opus",
+  });
+
+  assert.equal(res.status, 409);
+  assert.match((res.json as { error: string }).error, /hard links/);
+  assert.equal(readFileSync(settings, "utf8"), before);
+  assert.equal(lstatSync(settings).ino, lstatSync(shared).ino);
+});
+
 test("a settings file that links to ~/.claude.json is never written", async () => {
   const state = fixture.json("home/.claude.json", { projects: {} });
   fixture.link("work/state-link/.claude/settings.json", state);

@@ -79,7 +79,8 @@ export async function readIfExists(env: ScanEnv, path: string): Promise<string |
  * written to a temporary file first and the revision is checked again just before the rename, so
  * an edit made elsewhere while ccdesk was saving is kept and the save refused. A symlink is written
  * through, so links into a dotfiles repository survive; the temporary file is new, unguessable and
- * created exclusively, so nothing planted beside the target can redirect the write.
+ * created exclusively, so nothing planted beside the target can redirect the write. A file with
+ * other hard links is refused, since the rename would leave them on the old text.
  */
 export async function writeAtomic(
   env: ScanEnv,
@@ -92,6 +93,10 @@ export async function writeAtomic(
     throw new RefusedError(STATE_FILE);
   await mkdir(dirname(file), { recursive: true });
   const existing = await lstat(file).catch(() => null);
+  if (existing && existing.nlink > 1)
+    throw new RefusedError(
+      `${path} has other hard links, and saving it would split it from its other names; edit it in your editor.`
+    );
   const temp = join(dirname(file), `.${basename(file)}.ccdesk-${randomBytes(6).toString("hex")}`);
   const handle = await open(temp, "wx", 0o600);
   try {
