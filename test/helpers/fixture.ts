@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
-import { type ScanEnv } from "../../src/server/scan/env.ts";
+import { type ScanEnv } from "../../src/core/scan/env.ts";
 import { storeDirName } from "../../src/shared/memory.ts";
 
 export interface Fixture {

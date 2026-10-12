@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { editorCommands, spawnPlan } from "../src/server/open.ts";
+import { editorCommands, spawnPlan } from "../src/core/open.ts";
 
 const none = () => false;
 

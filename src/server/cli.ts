@@ -4,8 +4,8 @@ import { statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createCore } from "../core/core.ts";
 import { type Command, HELP, parse, UsageError } from "./args.ts";
-import { openBrowser } from "./open.ts";
-import { scanEnvFromProcess } from "./scan/env.ts";
+import { openBrowser } from "../core/open.ts";
+import { scanEnvFromProcess } from "../core/scan/env.ts";
 import { type RunningServer, startServer } from "./start.ts";
 
 const DEV_TOKEN = "dev";

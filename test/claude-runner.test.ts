@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { chmodSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { listBackups, previewRestore } from "../src/server/backups.ts";
-import { claudeProgram, previewMcpEdit, runClaude, saveMcpEdit } from "../src/server/mcp-edit.ts";
-import { scanEnvFromProcess } from "../src/server/scan/env.ts";
+import { listBackups, previewRestore } from "../src/core/backups.ts";
+import { claudeProgram, previewMcpEdit, runClaude, saveMcpEdit } from "../src/core/mcp-edit.ts";
+import { scanEnvFromProcess } from "../src/core/scan/env.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
 // The fake claude is a shell script.

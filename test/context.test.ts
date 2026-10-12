@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { buildContext } from "../src/server/scan/context.ts";
-import { scanDirectory } from "../src/server/scan/index.ts";
+import { buildContext } from "../src/core/scan/context.ts";
+import { scanDirectory } from "../src/core/scan/index.ts";
 import { type ContextBlock } from "../src/shared/types.ts";
 import { makeFixture, memoryDirFor } from "./helpers/fixture.ts";
 

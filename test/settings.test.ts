@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { scanDirectory } from "../src/server/scan/index.ts";
-import { effectiveSettings } from "../src/server/scan/settings.ts";
+import { scanDirectory } from "../src/core/scan/index.ts";
+import { effectiveSettings } from "../src/core/scan/settings.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
 function setting(view: Awaited<ReturnType<typeof scanDirectory>>, key: string) {

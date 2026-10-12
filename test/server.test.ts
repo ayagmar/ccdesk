@@ -14,9 +14,9 @@ import { type AddressInfo } from "node:net";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { createCore } from "../src/core/index.ts";
-import { revisionOf } from "../src/server/scan/files.ts";
+import { revisionOf } from "../src/core/scan/files.ts";
 import { createCcdeskServer } from "../src/server/server.ts";
-import { RefusedError } from "../src/server/write.ts";
+import { RefusedError } from "../src/core/write.ts";
 import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
 const TOKEN = "test-token";

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { after, test } from "node:test";
-import { scanDirectory } from "../src/server/scan/index.ts";
-import { testPath } from "../src/server/scan/path-test.ts";
-import { Watcher } from "../src/server/watch.ts";
+import { scanDirectory } from "../src/core/scan/index.ts";
+import { testPath } from "../src/core/scan/path-test.ts";
+import { Watcher } from "../src/core/watch.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
 const watchers: Watcher[] = [];

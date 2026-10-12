@@ -1,13 +1,13 @@
-import { previewAgentEdit, saveAgentEdit } from "../server/agent-edit.ts";
-import { listBackups, previewRestore, restoreBackup } from "../server/backups.ts";
-import { claudeRunner, previewMcpEdit, type RunClaude, saveMcpEdit } from "../server/mcp-edit.ts";
-import { changeMemory, previewMemoryChange } from "../server/mutations.ts";
-import { openInEditor } from "../server/open.ts";
-import { compareSettings } from "../server/scan/compare.ts";
-import { type ScanEnv } from "../server/scan/env.ts";
-import { scanDirectory, scanOverview } from "../server/scan/index.ts";
-import { testPath } from "../server/scan/path-test.ts";
-import { usageCounter } from "../server/scan/usage.ts";
+import { previewAgentEdit, saveAgentEdit } from "./agent-edit.ts";
+import { listBackups, previewRestore, restoreBackup } from "./backups.ts";
+import { claudeRunner, previewMcpEdit, type RunClaude, saveMcpEdit } from "./mcp-edit.ts";
+import { changeMemory, previewMemoryChange } from "./mutations.ts";
+import { openInEditor } from "./open.ts";
+import { compareSettings } from "./scan/compare.ts";
+import { type ScanEnv } from "./scan/env.ts";
+import { scanDirectory, scanOverview } from "./scan/index.ts";
+import { testPath } from "./scan/path-test.ts";
+import { usageCounter } from "./scan/usage.ts";
 import {
   previewHookEdit,
   previewPermissionEdit,
@@ -15,8 +15,8 @@ import {
   saveHookEdit,
   savePermissionEdit,
   saveSettingsEdit,
-} from "../server/settings-edit.ts";
-import { changeQueue } from "../server/write.ts";
+} from "./settings-edit.ts";
+import { changeQueue } from "./write.ts";
 import {
   type AgentEdit,
   type HookEdit,

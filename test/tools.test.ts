@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { scanDirectory } from "../src/server/scan/index.ts";
+import { scanDirectory } from "../src/core/scan/index.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
 async function toolsFor(settings: Record<string, unknown>) {

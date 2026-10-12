@@ -8,22 +8,22 @@ export { type Core, type CoreOptions, createCore } from "./core.ts";
 
 // Environment: every function below takes the ScanEnv first. Called directly, they share one
 // change queue and one usage cache across the process; they stay for one release beside createCore.
-export { isConfigHome, type ScanEnv, scanEnvFromProcess } from "../server/scan/env.ts";
+export { isConfigHome, type ScanEnv, scanEnvFromProcess } from "./scan/env.ts";
 
 // Read.
-export { compareSettings } from "../server/scan/compare.ts";
-export { revisionOf, redactSecrets, shownText } from "../server/scan/files.ts";
-export { scanDirectory, scanOverview } from "../server/scan/index.ts";
-export { testPath } from "../server/scan/path-test.ts";
-export { CountStopped, readUsage } from "../server/scan/usage.ts";
-export { hasHiddenValues, shown } from "../server/secrets.ts";
-export { Watcher } from "../server/watch.ts";
+export { compareSettings } from "./scan/compare.ts";
+export { revisionOf, redactSecrets, shownText } from "./scan/files.ts";
+export { scanDirectory, scanOverview } from "./scan/index.ts";
+export { testPath } from "./scan/path-test.ts";
+export { CountStopped, readUsage } from "./scan/usage.ts";
+export { hasHiddenValues, shown } from "./secrets.ts";
+export { Watcher } from "./watch.ts";
 
 // Edits: the parse functions turn input from outside (JSON, arguments) into an edit, or throw
 // InvalidEditError. Preview returns a revision, save takes it back. Both refuse with RefusedError,
 // also when the file changed since the preview; StaleError, a RefusedError, means it changed while
 // ccdesk was writing it.
-export { previewAgentEdit, saveAgentEdit } from "../server/agent-edit.ts";
+export { previewAgentEdit, saveAgentEdit } from "./agent-edit.ts";
 export {
   claudeProgram,
   claudeRunner,
@@ -31,8 +31,8 @@ export {
   type RunClaude,
   runClaude,
   saveMcpEdit,
-} from "../server/mcp-edit.ts";
-export { changeMemory, isMemoryAction, previewMemoryChange } from "../server/mutations.ts";
+} from "./mcp-edit.ts";
+export { changeMemory, isMemoryAction, previewMemoryChange } from "./mutations.ts";
 export {
   InvalidEditError,
   parseAgentEdit,
@@ -40,7 +40,7 @@ export {
   parseMcpEdit,
   parsePermissionEdit,
   parseSettingsEdit,
-} from "../server/parse-edit.ts";
+} from "./parse-edit.ts";
 export {
   previewHookEdit,
   previewPermissionEdit,
@@ -48,17 +48,17 @@ export {
   saveHookEdit,
   savePermissionEdit,
   saveSettingsEdit,
-} from "../server/settings-edit.ts";
-export { RefusedError, StaleError } from "../server/write.ts";
+} from "./settings-edit.ts";
+export { RefusedError, StaleError } from "./write.ts";
 
 // History: every change ccdesk saves is a backup that can be restored by its id.
-export { listBackups, previewRestore, restoreBackup } from "../server/backups.ts";
+export { listBackups, previewRestore, restoreBackup } from "./backups.ts";
 
 // Host.
-export { openInEditor } from "../server/open.ts";
+export { openInEditor } from "./open.ts";
 
 // Claude Code's settings schema, settings catalog and hook events.
-export { REFERENCE } from "../server/reference.ts";
+export { REFERENCE } from "./reference.ts";
 
 // Types and constants shared with the web UI.
 export * from "../shared/compare.ts";
