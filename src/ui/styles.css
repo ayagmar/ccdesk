@@ -1956,6 +1956,27 @@ button:disabled {
     width: 64px;
   }
 
+  /* The key gets its own line, so both values keep the width they need. */
+  .tt-compare,
+  .tt-compare :is(thead, tbody) {
+    display: block;
+  }
+
+  .tt-compare tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tt-compare th:first-child {
+    display: none;
+  }
+
+  .tt-compare td:first-child {
+    grid-column: 1 / -1;
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
   .tt-instructions th:first-child,
   .tt-instructions td:first-child {
     display: none;
@@ -2388,6 +2409,44 @@ pre.diff span {
 
 .tt-settings.no-overrides :is(th, td):nth-child(4) {
   display: none;
+}
+
+/* ---------- compare settings ---------- */
+
+.head-action + .head-action {
+  margin-left: 0;
+}
+
+.tt-compare th:nth-child(1) {
+  width: 28%;
+}
+
+.tt-compare tbody tr {
+  cursor: default;
+}
+
+/* A value and the files it comes from, on two lines. */
+.tt-compare td {
+  height: auto;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  vertical-align: top;
+}
+
+.cmp-value,
+.cmp-from {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmp-from {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cmp-from > * + * {
+  margin-left: 8px;
 }
 
 /* ---------- recent changes ---------- */

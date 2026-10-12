@@ -34,6 +34,8 @@ interface Props {
   onOpenPalette: () => void;
   /** Describe an interactive session or claude -p and the SDK instead. */
   onProfile: (profile: SessionProfile) => void;
+  /** Asks for another directory to compare `dir` with. */
+  onCompare: (dir: string) => void;
 }
 
 function isTyping(target: EventTarget | null): boolean {
@@ -57,6 +59,7 @@ export function DirectoryPage({
   onOpenDirectory,
   onOpenPalette,
   onProfile,
+  onCompare,
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [adding, setAdding] = useState<Adding | null>(null);
@@ -168,6 +171,7 @@ export function DirectoryPage({
       overview,
       sharedNames: new Set(overview?.sharedMemories.map((s) => s.name) ?? []),
       onOpenDirectory,
+      onCompare: () => onCompare(view.path),
       onAdd: (what) => {
         setSelected(null);
         setAdding(what);
@@ -182,7 +186,7 @@ export function DirectoryPage({
         }
       },
     }),
-    [view, overview, onOpenDirectory, saved, onToast, reload]
+    [view, overview, onOpenDirectory, onCompare, saved, onToast, reload]
   );
 
   const { trust } = view;

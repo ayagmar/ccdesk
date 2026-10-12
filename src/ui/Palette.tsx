@@ -14,20 +14,32 @@ type Result =
 interface Props {
   overview: Overview | null;
   rows: Row[];
+  /** Set to pick a directory to compare this one's settings with, instead of jumping. */
+  compareFrom?: string | undefined;
   onClose: () => void;
   onOpenDirectory: (path: string | null) => void;
   onSelectRow: (id: string) => void;
   onOpenMemory: (projectPath: string, path: string) => void;
+  onCompare: (from: string, to: string) => void;
+}
+
+/** A path typed in full: absolute, or under the home folder with ~. */
+function typedPath(query: string, home: string | undefined): string | null {
+  const q = query.trim();
+  if (home && (q === "~" || q.startsWith("~/"))) return home + q.slice(1);
+  return q.startsWith("/") || /^[A-Za-z]:[\\/]/.test(q) ? q : null;
 }
 
 /** Jump to any directory, any row in the current one, or a memory saved for any directory. */
 export function Palette({
   overview,
   rows,
+  compareFrom,
   onClose,
   onOpenDirectory,
   onSelectRow,
   onOpenMemory,
+  onCompare,
 }: Props) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -40,8 +52,20 @@ export function Palette({
   const results = useMemo<Result[]>(() => {
     const q = query.trim().toLowerCase();
     const dirs: Result[] = (overview?.projects ?? [])
-      .filter((p) => !p.ephemeral && (!q || p.path.toLowerCase().includes(q)))
+      .filter(
+        (p) => !p.ephemeral && p.path !== compareFrom && (!q || p.path.toLowerCase().includes(q))
+      )
       .map((p) => ({ kind: "dir", key: `dir:${p.path}`, label: tilde(p.path), path: p.path }));
+    if (compareFrom !== undefined) {
+      const typed = typedPath(query, overview?.home);
+      const known = dirs.some((d) => d.kind === "dir" && d.path === typed);
+      return [
+        ...(typed && !known
+          ? [{ kind: "dir" as const, key: `typed:${typed}`, label: tilde(typed), path: typed }]
+          : []),
+        ...dirs,
+      ].slice(0, 40);
+    }
     const items: Result[] = rows
       .filter((r) => q && sectionOf(r.section).text(r).toLowerCase().includes(q))
       .map((r) => ({ kind: "row", key: r.id, label: sectionOf(r.section).label(r), row: r }));
@@ -61,11 +85,12 @@ export function Palette({
         path: m.path,
       }));
     return [...items, ...memories, ...dirs].slice(0, 40);
-  }, [query, overview, rows]);
+  }, [query, overview, rows, compareFrom]);
 
   const choose = (result: Result | undefined) => {
     if (!result) return;
-    if (result.kind === "dir") onOpenDirectory(result.path);
+    if (result.kind === "dir" && compareFrom !== undefined) onCompare(compareFrom, result.path);
+    else if (result.kind === "dir") onOpenDirectory(result.path);
     else if (result.kind === "memory") onOpenMemory(result.projectPath, result.path);
     else onSelectRow(result.row.id);
     onClose();
@@ -78,7 +103,7 @@ export function Palette({
         className="palette"
         role="dialog"
         aria-modal="true"
-        aria-label="Jump to"
+        aria-label={compareFrom === undefined ? "Jump to" : "Compare settings with"}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <label className="palette-input">
@@ -92,7 +117,11 @@ export function Palette({
               setQuery(e.target.value);
               setActive(0);
             }}
-            placeholder="Jump to a directory, file, setting or memory"
+            placeholder={
+              compareFrom === undefined
+                ? "Jump to a directory, file, setting or memory"
+                : "Compare settings with a directory, or type its path"
+            }
             aria-controls="palette-results"
             aria-activedescendant={results[active] ? `pal-${active}` : undefined}
             onKeyDown={(e) => {
@@ -116,7 +145,9 @@ export function Palette({
             <div className="palette-empty">
               {query.trim()
                 ? `Nothing matches “${query}”.`
-                : "Type to search directories, files, settings and memories."}
+                : compareFrom === undefined
+                  ? "Type to search directories, files, settings and memories."
+                  : "No other directories yet. Type a full path."}
             </div>
           )}
           {results.map((r, i) => (

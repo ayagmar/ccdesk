@@ -80,9 +80,14 @@ export const settings = defineSection<R>({
   label: (row) => `setting ${row.item.key}`,
   heading: (row) => row.item.key,
   Head: ({ actions }) => (
-    <button type="button" className="head-action" onClick={() => actions.onAdd("setting")}>
-      <Icon name="plus" /> Add setting
-    </button>
+    <>
+      <button type="button" className="head-action" onClick={actions.onCompare}>
+        Compare with…
+      </button>
+      <button type="button" className="head-action" onClick={() => actions.onAdd("setting")}>
+        <Icon name="plus" /> Add setting
+      </button>
+    </>
   ),
   Details: ({ row, actions }) => {
     const s = row.item;

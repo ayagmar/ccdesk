@@ -2,11 +2,15 @@ import { type SessionProfile } from "../shared/types.ts";
 import { LINES, type Line } from "./lines.ts";
 import { type SectionId } from "./sections/types.ts";
 
-/** Which page is open: a directory (undefined until the launch directory is known), all directories, or recent changes. */
+/**
+ * Which page is open: a directory (undefined until the launch directory is known), all
+ * directories, recent changes, or the settings of two directories compared.
+ */
 export type Page =
   | { kind: "directory"; dir: string | undefined; profile: SessionProfile }
   | { kind: "all" }
-  | { kind: "changes" };
+  | { kind: "changes" }
+  | { kind: "compare"; dir: string; other: string };
 
 export interface Sort {
   /** Index into the section's columns. */
@@ -32,9 +36,12 @@ export function readPage(): Page {
   const params = new URLSearchParams(location.search);
   if (params.has("changes")) return { kind: "changes" };
   if (params.has("all")) return { kind: "all" };
+  const dir = params.get("dir");
+  const other = params.get("compare");
+  if (dir && other) return { kind: "compare", dir, other };
   return {
     kind: "directory",
-    dir: params.get("dir") ?? undefined,
+    dir: dir ?? undefined,
     profile: params.get("profile") === "print" ? "print" : "interactive",
   };
 }
@@ -59,6 +66,7 @@ export function readListState(): ListState {
 function pageParams(page: Page): URLSearchParams {
   if (page.kind === "changes") return new URLSearchParams("changes");
   if (page.kind === "all") return new URLSearchParams("all");
+  if (page.kind === "compare") return new URLSearchParams({ dir: page.dir, compare: page.other });
   const params = new URLSearchParams(page.dir ? { dir: page.dir } : {});
   if (page.profile !== "interactive") params.set("profile", page.profile);
   return params;
