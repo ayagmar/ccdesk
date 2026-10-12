@@ -61,7 +61,13 @@ export const instructions = defineSection<R>({
   dimmed: (row) => row.item.status === "skipped",
   text: (row) => `${row.item.path} ${row.item.reason}`,
   label: (row) => tilde(row.item.path),
-  heading: (row) => row.item.path.split(/[/\\]/).slice(-2).join("/"),
+  // The file and its folder, or the whole ~ path when that is as short: ~/.claude/CLAUDE.md is
+  // your user file, while .claude/CLAUDE.md would read as the project's.
+  heading: (row) => {
+    const short = tilde(row.item.path);
+    const parts = short.split(/[/\\]/);
+    return parts.length <= 3 ? short : parts.slice(-2).join("/");
+  },
   facet: {
     label: "Filter instructions by status",
     of: (row) => STATUS[row.item.status],
