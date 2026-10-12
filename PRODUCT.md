@@ -10,6 +10,8 @@ web
 
 TypeScript end to end, published to npm and run with `npx ccdesk`. A small Node server bound to 127.0.0.1 serves a prebuilt React app built with Vite (no Next.js, so startup stays near-instant). Tooling mirrors the author's other packages: pnpm, Biome, TypeScript 7, `node --test`, release-it.
 
+The documentation site in `site/` is a separate workspace package built with Astro and Starlight and deployed to GitHub Pages. It is not part of the npm package.
+
 ## Users
 
 Claude Code power users: developers with many projects, memories, skills, subagents, hooks and MCP servers across several directories and agents (Claude Code, Codex, Pi). They open ccdesk to answer "what is Claude actually told here, and where does that come from?" and to fix it. They scan a lot of items quickly and prefer keyboard and density over hand-holding. Teams are a secondary audience: understanding what a repo shares through committed files versus what stays personal.

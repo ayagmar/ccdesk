@@ -1,0 +1,74 @@
+---
+title: Getting started
+description: Run ccdesk, what it reads and writes, and its command-line options.
+---
+
+import Screenshot from "../../components/Screenshot.astro";
+
+ccdesk needs Node.js 22.19 or newer. Run it from the directory you want to look at:
+
+```sh
+cd ~/code/my-project
+npx ccdesk
+```
+
+It starts a small server on `127.0.0.1`, opens your browser on the directory you ran it from, and prints the address:
+
+```
+ccdesk is running at http://127.0.0.1:41873/#token=…
+Press Ctrl+C to stop.
+```
+
+The part after `#token=` is a key generated for this run. The page needs it to talk to the server, so open the printed address rather than typing the host and port by hand. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal to stop ccdesk.
+
+<Screenshot
+  name="directory"
+  alt="ccdesk open on ~/code/acme-api: the route strip of scopes, the git sharing strip, the Instructions timetable and the Settings timetable, with ~/.claude/CLAUDE.md open in the inspector"
+  caption="A directory page. The setups in these screenshots are made up."
+  loading="eager"
+/>
+
+## Options
+
+```
+npx ccdesk [options]
+
+  --port <n>   Port to listen on (default: a free port)
+  --no-open    Print the URL instead of opening a browser
+  -h, --help   Show this help
+```
+
+With `--no-open`, copy the printed address into a browser yourself. If the port you ask for is taken, ccdesk says so and exits.
+
+## What it reads
+
+ccdesk reads the same files Claude Code reads for the directory it is started in:
+
+- your Claude folder, `~/.claude`, or `$CLAUDE_CONFIG_DIR` when that is set;
+- `~/.claude.json` (or `.claude.json` inside `$CLAUDE_CONFIG_DIR`), for folder trust, MCP servers and approvals;
+- the managed settings folder your organisation may install: `/etc/claude-code` on Linux, `/Library/Application Support/ClaudeCode` on macOS and `C:\Program Files\ClaudeCode` on Windows;
+- the directory you started in and every folder above it, for `CLAUDE.md`, `AGENTS.md`, `.claude/` and `.mcp.json`;
+- transcripts in `~/.claude/projects/`, but only to count tool calls and your answers to permission prompts. See [Tool usage counts](../tool-usage/).
+
+It never reads `~/.claude/.credentials.json`.
+
+## What it writes
+
+Nothing, until you review a change and press the button that saves it. Then ccdesk writes only the file the diff names: a settings file, a `.mcp.json`, a subagent file, a memory file or `MEMORY.md`. Before each write it copies the old file to `~/.claude/backups/ccdesk/`, and the change shows up in [Recent changes](../recent-changes/), where you can restore it.
+
+ccdesk never writes `~/.claude.json`. Claude Code rewrites that file during every session. User and local MCP servers live there, so ccdesk changes them by running Claude Code's own `claude mcp` commands. See [MCP servers](../mcp-servers/).
+
+## Live refresh
+
+ccdesk watches the config files for the open directory. When Claude Code or your editor changes one, the page updates within about a second. `~/.claude.json` is not watched, because Claude Code rewrites it so often; the page rereads it when you switch back to the ccdesk tab.
+
+## Other directories
+
+The page opens on the directory you started in. The rail on the left lists every other directory Claude Code has been used in, and **All directories** shows them in a table with session and memory counts. You do not need to restart ccdesk to look at another project: pick it in the rail or press <kbd>Ctrl</kbd>+<kbd>K</kbd> and type part of its path.
+
+<Screenshot
+  name="all-directories"
+  alt="All directories: a table of the directories Claude Code was used in, with sessions, memories and when each was last used"
+/>
+
+Next: [Reading the interface](../interface/).

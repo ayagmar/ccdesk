@@ -1,0 +1,63 @@
+---
+title: Settings
+description: The value Claude Code uses for each setting, the file it comes from, and how to change it safely.
+---
+
+import Screenshot from "../../components/Screenshot.astro";
+
+The Settings section lists every key set in any settings file that applies to the open directory, with the value Claude Code ends up using and the file it comes from.
+
+## Which files are read
+
+From highest precedence to lowest:
+
+1. **Managed**: `managed-settings.json` in your organisation's managed folder, plus every `.json` file in its `managed-settings.d/` folder, merged in alphabetical order.
+2. **Local**: `.claude/settings.local.json` at the root of the repository's main checkout, as Claude Code reads it. On Windows, outside git, or when the repository root is your home folder, it is the one in the open directory instead. An older local file left in the open directory is still read, below the root one.
+3. **Project**: `.claude/settings.json` in the open directory.
+4. **User**: `~/.claude/settings.json`, or `settings.json` in `$CLAUDE_CONFIG_DIR`.
+
+## How a value is decided
+
+- For most keys the highest file wins. Lower values are listed in **Overrides**, struck through, with their own bullets.
+- Lists merge across files, and objects merge key by key. Those rows say **merged** and show every file's bullet.
+- Some keys are read only from certain files. Claude Code's settings reference says which, and a value in any other file is marked **ignored**, with the reason in the inspector.
+- A few keys follow their own rule, which the inspector names: for some security switches the strictest value wins even from a lower file, `availableModels` from managed settings replaces every other file's list, and a project or local `defaultMode` of `auto` or `bypassPermissions` is ignored.
+
+Values under `env` and `headers` show as `•••`. See [Safety and privacy](../safety-and-privacy/).
+
+## Changing a setting
+
+Select a row to see every file that sets the key and the value Claude Code uses, then change it in the inspector:
+
+1. Pick the file to write: **User**, **Project** or **Local**. Files Claude Code does not read the key from are shown but cannot be picked. Managed settings cannot be changed from ccdesk.
+2. Enter the value. The field matches the setting's type in Claude Code's schema: a checkbox, a choice list, a number, text with the documented values one click away, one entry per line for lists of text, or JSON for everything else.
+3. Press **Review change** to see the diff of the file.
+4. Press **Save**.
+
+<Screenshot
+  name="review"
+  alt="The model setting in the inspector: every file that sets it, the value Claude Code uses, the file picker on Project, and the diff changing sonnet to opus"
+  width={480}
+/>
+
+To add a key that is not set yet, use **Add setting** at the top of the section and pick the key; it suggests keys from the schema with their descriptions. **Remove from this file** deletes the key from the chosen file.
+
+What happens on save:
+
+- The value is checked against Claude Code's settings schema. If it fails, the errors are shown and there is no Save button.
+- ccdesk writes exactly the reviewed change. If the file changed after you pressed **Review change**, it refuses and asks you to review again.
+- Other keys stay as they were. If the file was not formatted with two-space indentation, ccdesk says it will reformat the whole file.
+- The old file is copied to the backup folder first, and the change can be undone from the toast or from [Recent changes](../recent-changes/).
+- If the settings file is a link, for example into a dotfiles repository, ccdesk writes through it and the link stays a link.
+
+A key whose value holds hidden parts, such as a non-empty `env`, cannot be changed from ccdesk; edit it in the file. A settings file that is not valid JSON is listed at the top of the page with the line and column of the error, and ccdesk will not write to it until you fix it.
+
+## All settings
+
+The All settings section lists every key in Claude Code's settings reference, set or not, grouped by area. For each one it shows what the setting does, which files Claude Code reads it from, its documented values and default, and the value it has here. Select a key to read its documentation and, where ccdesk can write it, set it in the file you choose.
+
+Some keys cannot be set from here: keys Claude Code keeps in `~/.claude.json` (use `/config` in Claude Code), managed-only keys, nested fields such as `sandbox.network.allowedDomains` (edit the parent key), and the few documented keys that are not yet in the schema ccdesk ships with.
+
+## Where the schema comes from
+
+The schema is generated from the `Settings` type in [`@anthropic-ai/claude-agent-sdk`](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk), which is published with each Claude Code release. Which files each key is read from, and the descriptions in All settings, come from the [settings reference](https://code.claude.com/docs/en/settings-reference). A daily job regenerates both; see [Contributing](../contributing/#claude-code-data).

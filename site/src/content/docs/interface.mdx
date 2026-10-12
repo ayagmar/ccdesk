@@ -1,0 +1,97 @@
+---
+title: Reading the interface
+description: The route strip, the timetables, the inspector, filters, the command palette and keyboard shortcuts.
+---
+
+import Screenshot from "../../components/Screenshot.astro";
+
+A directory page answers one question: what is Claude told here, and where does each piece come from? Everything on it is laid out around Claude Code's load order.
+
+## The route strip
+
+The line across the top is the load order for this directory, one stop per scope:
+
+| Stop | Letter | What comes from it |
+| --- | --- | --- |
+| Managed | M | Files your organisation installs, such as `managed-settings.json` |
+| User | U | Your own `~/.claude` files, for every project |
+| Project | P | Files in the repository, such as `CLAUDE.md` and `.claude/settings.json` |
+| Local | L | Your personal files for this project, such as `CLAUDE.local.md` and `.claude/settings.local.json` |
+| Auto memory | A | Memory files Claude Code saved for this directory |
+| Plugin | X | Enabled plugins. This stop appears only when at least one plugin is enabled |
+
+Each stop lists what it contributes ("1 file · 8 settings · 2 hooks"). A stop that contributes nothing has a hollow bullet. Click a stop to show only the rows from that scope; click it again to show everything.
+
+Every row in the page starts with the same lettered bullet, so you can see where it came from before reading anything else. A hollow bullet on a row means the file is there but not in force: a skipped instruction file, an ignored setting, a value that a higher file beats.
+
+## The sharing strip
+
+If the directory is in a git repository, a strip under the route says which of the project's Claude files are tracked in git (everyone who clones gets them), not tracked yet, or git-ignored (only you have them).
+
+## Sections
+
+Below the strips, each kind of config has its own table. The numbers are the keys that jump to each one:
+
+1. [Instructions](../instructions/)
+2. [Settings](../settings/)
+3. [Permissions](../permissions/)
+4. Built-in tools, covered under [Permissions](../permissions/#built-in-tools)
+5. [Memory](../memory/)
+6. [Hooks](../hooks/)
+7. [MCP servers](../mcp-servers/)
+8. Agents, skills and plugins: [Subagents](../subagents/) and [Skills, commands, output styles and plugins](../skills-and-plugins/)
+9. [All settings](../settings/#all-settings)
+
+Every table can be filtered with the box at the top, narrowed with the chips beside its title, and sorted by clicking a column heading. Long tables show 50 rows at a time, with a button for the next 50. The filter text, the scope you picked on the route strip, sorting and chips are kept in the address, so a reload or a shared link opens the same view. Opening another directory starts it unfiltered.
+
+**Config** and **What Claude sees** at the top switch between these tables and the view of what loads into context. See [What Claude sees](../what-claude-sees/).
+
+## The inspector
+
+Click a row to open it in the inspector on the right: why it is or is not in force, the file it comes from (with copy and open buttons), the file's contents, and the controls to change it. On windows narrower than 1180 pixels the inspector slides in over the page instead.
+
+The open button starts your editor. ccdesk uses `$CCDESK_EDITOR` when it is set. Otherwise it tries `$VISUAL` and `$EDITOR` if they name a graphical editor, then the first of `code`, `cursor`, `zed`, `codium`, `subl`, `kate`, `gnome-text-editor` and `gedit` found on your `PATH`, and finally your system's default app. Terminal editors such as `vim` are skipped, because a background server has no terminal to run them in.
+
+## Jump to anything
+
+<kbd>Ctrl</kbd>+<kbd>K</kbd> (<kbd>⌘</kbd>+<kbd>K</kbd> on macOS) opens the command palette. Type to find a row on the current page (a file, a setting, a rule, a hook, a server), a memory saved for any directory, or a directory by its path.
+
+<Screenshot
+  name="palette"
+  alt="The command palette over a directory page, listing a rule file, a setting, a hook, an agent and a skill that match the query migrat"
+/>
+
+## Keyboard shortcuts
+
+On a directory page:
+
+| Key | Action |
+| --- | --- |
+| <kbd>j</kbd> / <kbd>k</kbd> | Next / previous row, across sections |
+| <kbd>1</kbd> to <kbd>9</kbd> | Jump to a section |
+| <kbd>/</kbd> | Focus the row filter |
+| <kbd>Esc</kbd> | Close the inspector or an add form; in the filter box, clear it |
+
+Everywhere:
+
+| Key | Action |
+| --- | --- |
+| <kbd>Ctrl</kbd>+<kbd>K</kbd> / <kbd>⌘</kbd>+<kbd>K</kbd> | Open or close the command palette |
+| <kbd>↑</kbd> / <kbd>↓</kbd>, <kbd>Enter</kbd> | Move through palette results and open one |
+| <kbd>Esc</kbd> | Close the palette |
+
+The single-key shortcuts do nothing while you are typing in a field. In What Claude sees, <kbd>j</kbd>, <kbd>k</kbd> and the number keys are off, and <kbd>/</kbd> switches back to Config first.
+
+## Light and dark
+
+ccdesk follows your system's light or dark setting. The sun button at the top of the rail switches theme, and ccdesk remembers your choice in that browser.
+
+## Narrow screens
+
+On a phone-sized window the rail moves above the page, the route strip turns vertical, and each table keeps the columns that say whether a row is loaded and who sees it. The inspector still shows everything else for the row you pick.
+
+<Screenshot
+  name="phone"
+  alt="ccdesk at phone width in the dark theme: the rail on top, then the directory title and a vertical route strip"
+  width={390}
+/>

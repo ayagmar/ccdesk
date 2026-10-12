@@ -1,0 +1,44 @@
+---
+title: Memory
+description: The auto memory Claude Code saved for a directory, the checks ccdesk runs on it, and how to delete a memory or fix MEMORY.md.
+---
+
+import Screenshot from "../../components/Screenshot.astro";
+
+Claude Code's auto memory is a folder of Markdown files per project, with a `MEMORY.md` index whose start loads into every session. The Memory section lists the memories for the open directory, with their type, description and when they changed.
+
+<Screenshot
+  name="memory"
+  alt="The Memory timetable with four memories, a not in index flag on one and an also elsewhere flag on another, and test-database open in the inspector"
+/>
+
+## Where memory lives
+
+By default the folder is `~/.claude/projects/<project path with every character other than letters and digits turned into ->/memory`. Every worktree and subfolder of a repository shares the main checkout's folder. ccdesk also follows:
+
+- `autoMemoryDirectory`, an absolute path or one starting with `~/`. Set in a project or local file, it takes effect only once you trust the folder. ccdesk shows a memory folder set this way but does not change it.
+- `CLAUDE_CODE_PROJECT_DIR_NAME`, when you use it with `CLAUDE_CONFIG_DIR`.
+
+Memory is off, and `MEMORY.md` drops out of [What Claude sees](../what-claude-sees/), when `CLAUDE_CODE_DISABLE_AUTO_MEMORY` is `1` or `true`, or when `autoMemoryEnabled` is `false` and that variable is not set. The section says so.
+
+## Types
+
+Memories are filtered by their `type` frontmatter: **user**, **feedback**, **project** or **reference**, each with its own mark. A memory without one of these types is listed as unknown.
+
+## Checks
+
+- **not in index**: the memory is not linked from `MEMORY.md`, so Claude only finds it by searching the folder.
+- **broken links**: a `[[link]]` in the memory names no memory in this folder.
+- **lines past … are not loaded**: `MEMORY.md` is longer than the 200 lines or 25 KiB that load at session start.
+- **index lines point at missing files**: `MEMORY.md` links to files that are gone.
+- **also elsewhere**: a memory with the same name is saved for another directory. The inspector lists the copies and says whether their text is the same.
+
+**All directories** has a table of every memory saved under more than one directory, and whether the copies match or have drifted apart.
+
+## Fixing the index
+
+A memory flagged **not in index** has a button to add its line to `MEMORY.md`. Lines that point at missing files have a button to remove them. Each shows the exact change to `MEMORY.md` first, and is refused if the memory or the index changed after you reviewed it.
+
+## Deleting a memory
+
+Select a memory and press **Delete memory…**. ccdesk shows the change to both files: the memory is deleted and its line is removed from `MEMORY.md`. If other memories link to it, the confirmation says how many will have a broken link. The memory is backed up first, and the toast's **Undo** or [Recent changes](../recent-changes/) puts back both the file and its index line.

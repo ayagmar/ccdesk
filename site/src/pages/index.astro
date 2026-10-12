@@ -1,0 +1,374 @@
+---
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import CommandCopy from "../components/CommandCopy.astro";
+import Screenshot from "../components/Screenshot.astro";
+
+const base = import.meta.env.BASE_URL;
+
+// Questions people open ccdesk with; the key is the one that jumps to the section that answers.
+const QUESTIONS = [
+  {
+    question: "Why does Claude ask me before every git push here?",
+    answer: "The ask rule, and the settings file it is in",
+    key: "3",
+    page: "permissions/",
+  },
+  {
+    question: "Which model does this repository use, and who set it?",
+    answer: "The value that wins, and the ones it beats",
+    key: "2",
+    page: "settings/",
+  },
+  {
+    question: "Is my AGENTS.md loaded at all?",
+    answer: "Loaded, on match or skipped, with the reason",
+    key: "1",
+    page: "instructions/",
+  },
+  {
+    question: "How much context does my config take before I type anything?",
+    answer: "Each part in load order, with estimated tokens",
+    key: "",
+    page: "what-claude-sees/",
+  },
+  {
+    question: "Which allow rules have I stopped needing?",
+    answer: "Rules that covered no call in this project's sessions",
+    key: "3",
+    page: "permissions/",
+  },
+  {
+    question: "What do I keep approving by hand?",
+    answer: "Suggested allow rules, with how often you said yes",
+    key: "3",
+    page: "permissions/#suggested-rules",
+  },
+  {
+    question: "Which project MCP servers still wait for approval?",
+    answer: "Each server's status, scope and target",
+    key: "7",
+    page: "mcp-servers/",
+  },
+  {
+    question: "Did Claude save the same memory in two projects?",
+    answer: "Memories found under more than one directory",
+    key: "5",
+    page: "memory/",
+  },
+];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "ccdesk: see and change what shapes Claude Code",
+    description:
+      "A local web app that shows every instruction file, setting, permission rule, hook, MCP server, subagent, skill and memory Claude Code loads in a directory, with the file each comes from, and lets you change them safely.",
+    template: "splash",
+    hero: { title: "ccdesk" },
+    editUrl: false,
+    pagefind: false,
+  }}
+>
+  <div class="landing">
+    <section aria-labelledby="questions">
+      <h2 id="questions">Questions it answers</h2>
+      <p class="section-lede">
+        Each answer is a row on the directory page, and each row names its source file. Numbers are
+        the keys that jump to that section.
+      </p>
+      <table class="timetable">
+        <thead>
+          <tr>
+            <th scope="col">You want to know</th>
+            <th scope="col">ccdesk shows</th>
+            <th scope="col" class="key-col">Key</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            QUESTIONS.map((q) => (
+              <tr>
+                <td>
+                  <a href={`${base}${q.page}`}>{q.question}</a>
+                </td>
+                <td class="answer">{q.answer}</td>
+                <td class="key-col">{q.key ? <kbd>{q.key}</kbd> : <span class="view">view</span>}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <section class="split" aria-labelledby="changes">
+      <div>
+        <h2 id="changes">Every change is a diff you review first</h2>
+        <ul class="facts-list">
+          <li>
+            Settings are checked against Claude Code's own settings schema, and can be written only
+            to files Claude Code reads that key from.
+          </li>
+          <li>
+            Save writes exactly the reviewed diff. If Claude Code or your editor changed the file
+            in the meantime, ccdesk asks you to review again.
+          </li>
+          <li>
+            The old file is backed up first. Undo is one click, and <a href={`${base}recent-changes/`}>Recent changes</a> keeps every edit
+            restorable.
+          </li>
+          <li>
+            Settings, permission rules, hooks, MCP servers, subagents and memory can be changed.
+            Instruction files open in your own editor.
+          </li>
+        </ul>
+      </div>
+      <Screenshot
+        name="review"
+        alt="The model setting open in the inspector, with the diff that changes it from sonnet to opus in the project's settings file"
+        width={480}
+      />
+    </section>
+
+    <section aria-labelledby="private">
+      <h2 id="private">It stays on your machine</h2>
+      <div class="columns">
+        <p>
+          The server listens on <code>127.0.0.1</code> only and needs a token made for each run.
+          ccdesk makes no network requests and sends no telemetry.
+        </p>
+        <p>
+          Values under <code>env</code> and <code>headers</code> show as <code>•••</code>, even in
+          diffs. <code>~/.claude/.credentials.json</code> is never read, and
+          <code>~/.claude.json</code> is never written.
+        </p>
+        <p>
+          Transcripts are read only to count tool calls and your answers to permission prompts.
+          Commands and file contents never reach the page.
+        </p>
+      </div>
+      <p><a href={`${base}safety-and-privacy/`}>Safety and privacy, in full</a></p>
+    </section>
+
+    <section class="last" aria-labelledby="try">
+      <h2 id="try">Try it on a project you use Claude Code in</h2>
+      <div class="actions">
+        <CommandCopy command="npx ccdesk" />
+        <a href={`${base}getting-started/`}>Getting started</a>
+        <a href={`${base}interface/`}>Reading the interface</a>
+        <a href={`${base}llms.txt`}>llms.txt</a>
+      </div>
+      <p class="note">
+        ccdesk is an independent open-source project under the MIT licence. It is not made or
+        endorsed by Anthropic.
+      </p>
+    </section>
+  </div>
+</StarlightPage>
+
+<style>
+  /* The splash page uses the full width the screenshots need. */
+  :global(.sl-container:has(.landing)),
+  :global(.sl-container:has(.lead)) {
+    max-width: 76rem;
+  }
+
+  .landing {
+    display: grid;
+    gap: 4.5rem;
+    padding-bottom: 3rem;
+  }
+
+  .landing h2 {
+    margin: 0;
+    padding-top: 0.75rem;
+    border-top: 2px solid var(--ink);
+    color: var(--ink);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+  }
+
+  .section-lede {
+    max-width: 64ch;
+    margin: 0.5rem 0 0;
+    color: var(--sl-color-gray-3);
+  }
+
+  .timetable {
+    display: table;
+    width: 100%;
+    margin-top: 1.25rem;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+  }
+
+  .timetable th {
+    padding: 0 0.5rem 0.375rem;
+    border-bottom: 1px solid var(--ink);
+    color: var(--muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .timetable td {
+    height: 2.75rem;
+    padding: 0.375rem 0.5rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: middle;
+  }
+
+  .timetable tbody tr:hover {
+    background: var(--sunk);
+  }
+
+  .timetable a {
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .timetable a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .answer {
+    color: var(--sl-color-gray-3);
+  }
+
+  .key-col {
+    width: 4rem;
+    text-align: right;
+  }
+
+  kbd {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 0.3rem;
+    border: 1px solid var(--rule);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: var(--panel);
+    color: var(--ink);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.75rem;
+  }
+
+  .view {
+    color: var(--muted);
+    font-size: 0.8125rem;
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 30rem);
+    gap: 3.5rem;
+    align-items: start;
+  }
+
+  .split :global(.shot) {
+    margin: 0;
+  }
+
+  .facts-list {
+    margin: 1.25rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .facts-list li {
+    margin: 0;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--rule);
+    line-height: 1.55;
+  }
+
+  .facts-list li:first-child {
+    padding-top: 0;
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem;
+    margin-top: 1.25rem;
+  }
+
+  .columns p {
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  section > p:last-child:not(.note) {
+    margin-top: 1.25rem;
+  }
+
+  section a:not(.primary) {
+    text-underline-offset: 0.2em;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.5rem;
+    margin-top: 1.25rem;
+  }
+
+  .actions a {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .note {
+    margin-top: 2rem;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+
+  @media (max-width: 64rem) {
+    .split,
+    .columns {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 40rem) {
+    .landing {
+      gap: 3.5rem;
+    }
+
+    .timetable thead {
+      display: none;
+    }
+
+    .timetable tr {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .timetable td {
+      height: auto;
+      padding: 0;
+      border: 0;
+    }
+
+    .timetable .answer {
+      grid-row: 2;
+      font-size: 0.875rem;
+    }
+
+    .timetable .key-col {
+      grid-row: 1 / span 2;
+      grid-column: 2;
+      align-self: center;
+      padding-left: 0.75rem;
+    }
+  }
+</style>

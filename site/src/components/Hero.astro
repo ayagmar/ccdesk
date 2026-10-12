@@ -1,0 +1,134 @@
+---
+// The landing page's first screen. Starlight renders Hero on pages with `hero` in their
+// frontmatter: the landing page and Starlight's own 404 page, which keeps the default.
+import Default from "@astrojs/starlight/components/Hero.astro";
+import CommandCopy from "./CommandCopy.astro";
+import RouteStrip from "./RouteStrip.astro";
+import Screenshot from "./Screenshot.astro";
+
+const base = import.meta.env.BASE_URL;
+const landing = Astro.locals.starlightRoute.id === "";
+---
+
+{!landing && <Default />}
+{landing && (
+<section class="lead">
+  <div class="intro">
+    <h1 id="_top">See what Claude Code is told in this directory, and where each piece comes from.</h1>
+    <p class="lede">
+      ccdesk opens in your browser on the directory you start it in. It lists every instruction
+      file, setting, permission rule, hook, MCP server, subagent, skill and memory that applies
+      there, in the order Claude Code loads them, and names the file each one comes from. When
+      something is wrong, you fix it there: every change is a diff you review first, with a backup
+      and an undo.
+    </p>
+    <div class="actions">
+      <CommandCopy command="npx ccdesk" />
+      <a class="primary" href={`${base}getting-started/`}>Get started</a>
+      <a href="https://github.com/ayagmar/ccdesk">Source on GitHub</a>
+    </div>
+    <p class="facts">Node.js 22.19 or newer · Linux, macOS and Windows · MIT licence</p>
+  </div>
+  <div class="strip">
+    <h2>The load order, stop by stop</h2>
+    <RouteStrip />
+  </div>
+</section>
+
+<Screenshot
+  name="directory"
+  alt="ccdesk on a project called acme-api: the route strip of scopes, which files git shares, the instruction files in load order and the settings with the file each value comes from"
+  caption="A directory page in ccdesk. The project, settings and memories in these screenshots are made up."
+  loading="eager"
+/>
+)}
+
+<style>
+  .lead {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 2.5rem 3.5rem;
+    align-items: end;
+    padding-block: 2.5rem 1rem;
+  }
+
+  h1 {
+    margin: 0;
+    max-width: 22ch;
+    color: var(--ink);
+    font-size: clamp(2rem, 1.2rem + 2.6vw, 3.25rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  .lede {
+    max-width: 62ch;
+    margin: 1.25rem 0 0;
+    color: var(--sl-color-gray-2);
+    font-size: 1.0625rem;
+    line-height: 1.6;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+    margin-top: 1.75rem;
+  }
+
+  .actions a {
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.3em;
+  }
+
+  .actions a:hover {
+    text-decoration-color: var(--ink);
+  }
+
+  .actions a.primary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.625rem;
+    padding: 0 1rem;
+    border-radius: 6px;
+    background: var(--ink);
+    color: var(--paper);
+    text-decoration: none;
+  }
+
+  .actions a.primary:hover {
+    background: var(--sl-color-gray-2);
+  }
+
+  .facts {
+    margin: 1rem 0 0;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+
+  .strip {
+    border-top: 2px solid var(--ink);
+    padding-top: 0.75rem;
+  }
+
+  .strip h2 {
+    margin: 0 0 0.75rem;
+    color: var(--ink);
+    font-size: 0.9375rem;
+    font-weight: 700;
+  }
+
+  @media (max-width: 64rem) {
+    .lead {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: start;
+    }
+  }
+</style>

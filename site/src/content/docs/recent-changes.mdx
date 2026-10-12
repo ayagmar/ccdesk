@@ -1,0 +1,39 @@
+---
+title: Recent changes, backups and undo
+description: Where ccdesk keeps backups, how undo and restore work, and when a restore is refused.
+---
+
+import Screenshot from "../../components/Screenshot.astro";
+
+Every file ccdesk writes is backed up first. **Recent changes**, in the rail, lists those changes newest first, and each one can be reviewed and restored.
+
+<Screenshot
+  name="changes"
+  alt="Recent changes listing a deleted memory and a changed settings file, with the restore review open showing cleanupPeriodDays going back from 90 to 60"
+/>
+
+## Backups
+
+Backups go to `~/.claude/backups/ccdesk/` (or `backups/ccdesk` in `$CLAUDE_CONFIG_DIR`). Each change gets a folder named after its time and kind, holding a copy of the file as it was and a small manifest that records which file changed and a fingerprint of its text before and after. On Linux and macOS the folders and files are readable only by you, because backups of settings can hold secrets. ccdesk never deletes backups; remove old folders yourself if they pile up.
+
+Changes that go through `claude mcp`, for user and local MCP servers, are not backed up by ccdesk and do not appear here.
+
+## Undo
+
+After a save or a delete, a toast at the bottom of the page offers **Undo** for 12 seconds. Undo is the same as restoring that change from Recent changes.
+
+## Restoring
+
+Press **Review restore** on a change to see the diff from the file as it is now to the version in the backup, then **Restore this version**. Before replacing the file, ccdesk backs up its current text, so a restore is itself a change you can undo.
+
+Restoring a deleted memory also puts its line back in `MEMORY.md`.
+
+A restore is refused when:
+
+- the file changed after you reviewed the restore;
+- ccdesk created the file in that change, so there is no earlier version;
+- it would bring back different hidden values (under `env`, `headers` or in a `url`) than the file has now, because ccdesk never writes values it does not show;
+- a memory with the same file name exists again;
+- the backup is missing or was changed after it was made.
+
+A change that failed partway is marked **incomplete**.

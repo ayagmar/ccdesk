@@ -1,0 +1,70 @@
+---
+title: Instructions
+description: Which CLAUDE.md, AGENTS.md and rule files load in a directory, in what order, and why a file is skipped.
+---
+
+import Screenshot from "../../components/Screenshot.astro";
+
+The Instructions section lists every instruction file that applies to the open directory, in the order Claude Code loads it.
+
+<Screenshot
+  name="directory"
+  alt="The Instructions timetable: six files numbered in load order with their scope bullet, status, reason, line count and git visibility"
+/>
+
+## Load order
+
+1. The managed `CLAUDE.md` in your organisation's managed folder, and the `claudeMd` key of managed settings.
+2. `~/.claude/CLAUDE.md`, then every `.md` file under `~/.claude/rules/`.
+3. For each folder from the top of the filesystem down to the open directory:
+   `CLAUDE.md`, `.claude/CLAUDE.md`, the `.md` files under `.claude/rules/`, `CLAUDE.local.md`, `AGENTS.md` and `.claude/AGENTS.md`.
+
+Rule folders are searched in subfolders too. Instruction files in folders below the open directory load only when Claude works with a file there; use [When Claude touches a file](../what-claude-sees/#when-claude-touches-a-file) to see them.
+
+## Status
+
+Each file has one of three statuses:
+
+- **loaded**: in context from the start of every session here.
+- **on match**: a rule with a `paths` field in its frontmatter. It loads only when Claude reads or edits a file that matches.
+- **skipped**: present, but Claude Code does not load it. The **Why** column says which rule applies.
+
+A file is skipped when:
+
+- it is an `AGENTS.md`, and a `CLAUDE.md` or `CLAUDE.local.md` exists in any folder from the top of the filesystem down to the open directory (`~/.claude/CLAUDE.md` does not count), or a `CLAUDE.md` already imports it or links to it;
+- your `claudeMdExcludes` setting matches its path;
+- it is larger than 4 MiB, which Claude Code does not load;
+- a plugin setting limits instruction files to `CLAUDE.md` only, or to managed files only;
+- it is a project or local rule that links to a file outside the project, and you have not approved imports from outside the project.
+
+## Imports
+
+A file can pull in others with `@path/to/file` lines. ccdesk follows them the way Claude Code does: outside code blocks and inline code, relative to the importing file, `~/` for your home folder, up to four levels deep. The inspector lists each file's imports and marks the ones that are missing, larger than 4 MiB, outside the project, or waiting for your approval.
+
+Imports from your user or managed files load without asking. Imports in project or local files that point outside the project wait until you accept Claude Code's prompt for external imports, which it records in `~/.claude.json`.
+
+## Who sees each file
+
+The **Visibility** column says who else gets the file:
+
+- **tracked in git**: everyone who clones the repository;
+- **untracked**: only you for now, until it is committed;
+- **git-ignored**: only you;
+- **only you**: a file in your own `~/.claude`;
+- **organisation**: a managed file.
+
+A file that is a link into `~/.agents` is marked, because other coding agents that read `~/.agents` share it.
+
+## Health checks
+
+ccdesk flags three things on instruction files that load, with a count after the file's name and the details in the inspector:
+
+- the file is longer than 200 lines, which the Claude Code docs suggest staying under;
+- a paragraph of 60 characters or more repeats one in an earlier file, so Claude reads it twice;
+- an `@import` points at a file that does not exist.
+
+Instruction files that exist but cannot be read, for example because of their permissions, are listed at the top of the page with settings and `.mcp.json` files that are not valid JSON.
+
+## Editing
+
+ccdesk does not edit instruction files. Use the open button in the inspector to change one in your editor; the page picks up the change within a second.

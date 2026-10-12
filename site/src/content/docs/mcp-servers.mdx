@@ -1,0 +1,50 @@
+---
+title: MCP servers
+description: Which MCP servers a session here starts, which wait for approval or are switched off, and how ccdesk changes them.
+---
+
+import Screenshot from "../../components/Screenshot.astro";
+
+The MCP servers section lists every MCP server defined for the open directory, with its scope, transport (stdio, http or sse), what it runs or connects to, and its status.
+
+<Screenshot
+  name="mcp"
+  alt="The MCP servers timetable with local, project and user servers, one project server waiting for approval, and the postgres server open in the inspector with its JSON and hidden environment value"
+/>
+
+## Where servers come from
+
+In the order Claude Code gives them precedence:
+
+1. Managed: `managed-mcp.json` in the managed folder, or `managedMcpServers` in managed settings. If `managed-mcp.json` exists, it is the only source.
+2. Local: your servers for this project, in `~/.claude.json`.
+3. Project: `.mcp.json` in the open directory, shared through the repository.
+4. User: your servers for every project, in `~/.claude.json`.
+5. Enabled plugins.
+
+When two scopes define a server with the same name, the first one wins and the others are marked **overridden**. A plugin server that points at the same command or URL as one above it is overridden the same way.
+
+## Status
+
+- **configured**: Claude Code starts it in sessions here. ccdesk does not connect to servers, so it cannot tell whether a server works.
+- **needs approval**: a project server you have not approved yet. Approvals come from `enableAllProjectMcpServers` or `enabledMcpjsonServers` in your settings, or from answering Claude Code's prompt. Approvals in project and local files count only once you trust the folder.
+- **rejected**: listed in `disabledMcpjsonServers`.
+- **turned off**: switched off for this project in Claude Code.
+- **blocked**: excluded by `deniedMcpServers` or `allowedMcpServers` in your settings.
+- **overridden**: another scope defines a server with this name first (see above).
+- **invalid**: Claude Code cannot use the definition as written, for example a `url` without a `type`, which Claude Code reads as a stdio server.
+
+Values under `env` and `headers`, and the user name, password and query string of a `url`, are shown as `•••`.
+
+## Changing servers
+
+**Add server** asks for a name, a scope and the server as JSON. Select a server to change or remove it. ccdesk checks that a stdio server has a `command` and that other servers have a `url`; Claude Code checks the rest when it starts the server.
+
+How the change is made depends on the scope:
+
+- **Project** servers live in `.mcp.json`. ccdesk writes the file itself, with the usual diff review, backup and undo, and the change appears in [Recent changes](../recent-changes/).
+- **User** and **local** servers live in `~/.claude.json`, which ccdesk never writes. Instead it runs Claude Code's own `claude mcp add-json` and `claude mcp remove` commands. The review shows the commands, with hidden values still hidden. These changes are not backed up by ccdesk and do not appear in Recent changes. They need `claude` on your `PATH`, and each command has 30 seconds to finish.
+
+Changing a user or local server removes it and adds it again. If adding fails, ccdesk puts the old definition back; if that fails too, the error message includes a command you can run to restore it.
+
+A server with hidden values (in `env`, `headers` or its `url`) can be removed but not changed, because ccdesk would have to write values it never shows. Change those in Claude Code or in the file. Plugin and managed servers are read-only.

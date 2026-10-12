@@ -1,0 +1,47 @@
+---
+title: What Claude sees
+description: What your config puts into context when a session starts, with sizes and estimated tokens, and what joins when Claude touches a file.
+---
+
+import Screenshot from "../../components/Screenshot.astro";
+
+**What Claude sees**, the switch beside **Config** at the top of a directory page, lists what your config adds to Claude's context when a session starts in this directory, in load order.
+
+<Screenshot
+  name="context"
+  alt="What Claude sees: a summary of about 401 tokens from 9 parts, a coloured bar of each part's share, and numbered rows from the system prompt to the MCP tool names"
+/>
+
+## What is listed
+
+1. Claude Code's own system prompt and built-in tools. Listed so the order is complete, but not counted.
+2. Your output style, if you picked a custom one. The built-in styles add nothing here.
+3. Each instruction file that loads, with its imports placed before it. Frontmatter and HTML comments are left out, because Claude Code strips them.
+4. The part of `MEMORY.md` that loads: the first 200 lines or 25 KiB, whichever ends first. Only when auto memory is on.
+5. The skill listing: the name and description of each skill and command Claude can pick by itself.
+6. Your subagents' descriptions.
+7. The tool names of your MCP servers. Listed but not counted, because ccdesk does not connect to the servers.
+
+Each row shows its line count, an estimated token count and a running total; click a row to read its text. The bar at the top shows each part's share in its scope colour. If the total passes 8,000 tokens, ccdesk points it out.
+
+## How tokens are estimated
+
+ccdesk divides each part's size in bytes by four. That is a rough figure for comparing parts and spotting a file that has grown too long, not a count from Claude's tokenizer.
+
+## What is not counted
+
+- Path rules (status **on match**). The summary says how many load later.
+- Skipped files.
+- Imports that wait for your approval, and imports larger than 4 MiB.
+- Imports of files outside the project, your Claude folder, `~/.agents` and the managed folder. ccdesk lists them and notes that Claude Code still loads them, but does not show their text.
+- Built-in subagents and output styles.
+
+## When Claude touches a file
+
+Under the list, type a path (relative to the open directory, or absolute) and press **Check**. ccdesk lists what joins the session once Claude reads or edits that file:
+
+- path rules whose `paths` match it;
+- skills whose `paths` match it;
+- the `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md` and rule files of the folders between the open directory and the file.
+
+The file does not have to exist. Paths outside the open directory get no results, because nothing from this directory's config applies there.

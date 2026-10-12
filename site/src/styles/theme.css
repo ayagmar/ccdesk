@@ -1,0 +1,247 @@
+/* ccdesk's two themes from DESIGN.md on Starlight's variables: the departure board (dark, Starlight's
+   base) and timetable paper (light). Scope-line colours are used only in route bullets. */
+
+:root {
+  --sl-font: "Hanken Grotesk Variable", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --sl-font-mono: "JetBrains Mono Variable", ui-monospace, Menlo, Consolas, monospace;
+
+  --sl-color-white: #ece8de;
+  --sl-color-gray-1: #ece8de;
+  --sl-color-gray-2: #c7c2b6;
+  --sl-color-gray-3: #938f84;
+  --sl-color-gray-4: #6a675e;
+  --sl-color-gray-5: #2c2b28;
+  --sl-color-gray-6: #1a1a18;
+  --sl-color-black: #131312;
+
+  --sl-color-accent-low: #33302a;
+  --sl-color-accent: #f2c14e;
+  --sl-color-accent-high: #f2c14e;
+  --sl-color-text-invert: #131312;
+  --sl-color-bg-nav: #131312;
+  --sl-color-bg-sidebar: #1a1a18;
+  --sl-color-bg-inline-code: #222220;
+  --sl-color-hairline-light: #2c2b28;
+  --sl-color-hairline: #2c2b28;
+  --sl-color-hairline-shade: #2c2b28;
+
+  --sl-color-orange-low: #2b2512;
+  --sl-color-orange: #f2c14e;
+  --sl-color-orange-high: #f6d58a;
+  --sl-color-red-low: #371b15;
+  --sl-color-red: #ff8a73;
+  --sl-color-red-high: #ffb3a3;
+  --sl-color-blue-low: #222220;
+  --sl-color-blue: #938f84;
+  --sl-color-blue-high: #ece8de;
+  --sl-color-green-low: #16261d;
+  --sl-color-green: #6fcf97;
+  --sl-color-green-high: #a9e5c2;
+  --sl-color-purple-low: #222220;
+  --sl-color-purple: #938f84;
+  --sl-color-purple-high: #ece8de;
+
+  --ink: #ece8de;
+  --paper: #131312;
+  --panel: #1a1a18;
+  --sunk: #222220;
+  --rule: #2c2b28;
+  --muted: #938f84;
+  --selection: #33302a;
+  --selection-ink: #fff6e0;
+  --focus: #f2c14e;
+
+  --line-managed: #ff7a3d;
+  --line-user: #4aa8e8;
+  --line-project: #2fbf8f;
+  --line-local: #f2b233;
+  --line-memory: #e391bd;
+  --line-plugin: #8d95a5;
+  --on-managed: #131312;
+  --on-user: #131312;
+  --on-project: #131312;
+  --on-local: #131312;
+  --on-memory: #131312;
+  --on-plugin: #131312;
+
+  --sl-text-h1: 2rem;
+  --sl-text-h2: 1.375rem;
+  --sl-text-h3: 1.125rem;
+  --sl-text-h4: 1rem;
+  --sl-text-h5: 1rem;
+  --sl-line-height: 1.65;
+  --sl-line-height-headings: 1.3;
+  --sl-content-width: 46rem;
+
+  font-feature-settings: "tnum";
+}
+
+:root[data-theme="light"] {
+  --sl-color-white: #141414;
+  --sl-color-gray-1: #141414;
+  --sl-color-gray-2: #2a2a27;
+  --sl-color-gray-3: #4a4a45;
+  --sl-color-gray-4: #6b6a63;
+  --sl-color-gray-5: #dcdad1;
+  --sl-color-gray-6: #f1f0ea;
+  --sl-color-gray-7: #f4f3ec;
+  --sl-color-black: #fbfbf7;
+
+  --sl-color-accent-low: #fff3c4;
+  --sl-color-accent: #0072b2;
+  --sl-color-accent-high: #005a8c;
+  --sl-color-text-accent: #005a8c;
+  --sl-color-text-invert: #fbfbf7;
+  --sl-color-bg-nav: #fbfbf7;
+  --sl-color-bg-sidebar: #ffffff;
+  --sl-color-bg-inline-code: #f1f0ea;
+  --sl-color-hairline-light: #dcdad1;
+  --sl-color-hairline: #dcdad1;
+  --sl-color-hairline-shade: #dcdad1;
+
+  --sl-color-orange-low: #fff1d6;
+  --sl-color-orange: #8a5a00;
+  --sl-color-orange-high: #6b4600;
+  --sl-color-red-low: #fde7e0;
+  --sl-color-red: #a3361c;
+  --sl-color-red-high: #7f2a16;
+  --sl-color-blue-low: #f1f0ea;
+  --sl-color-blue: #6b6a63;
+  --sl-color-blue-high: #141414;
+  --sl-color-green-low: #e3f1e9;
+  --sl-color-green: #1d6b47;
+  --sl-color-green-high: #14502f;
+  --sl-color-purple-low: #f1f0ea;
+  --sl-color-purple: #6b6a63;
+  --sl-color-purple-high: #141414;
+
+  --ink: #141414;
+  --paper: #fbfbf7;
+  --panel: #ffffff;
+  --sunk: #f1f0ea;
+  --rule: #dcdad1;
+  --muted: #6b6a63;
+  --selection: #fff3c4;
+  --selection-ink: #141414;
+  --focus: #0072b2;
+
+  --line-managed: #b84f00;
+  --line-user: #0072b2;
+  --line-project: #007a5a;
+  --line-local: #e69f00;
+  --line-memory: #cc79a7;
+  --line-plugin: #5f5f5a;
+  --on-managed: #ffffff;
+  --on-user: #ffffff;
+  --on-project: #ffffff;
+  --on-local: #141414;
+  --on-memory: #141414;
+  --on-plugin: #ffffff;
+}
+
+::selection {
+  background: var(--selection);
+  color: var(--selection-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Headings stand on their rule, sentence case at natural tracking (DESIGN.md: Typography). */
+.sl-markdown-content :is(h1, h2, h3, h4) {
+  letter-spacing: -0.01em;
+  font-weight: 700;
+}
+
+/* Sections open with the 2px ink rule; Starlight wraps each heading with its anchor link. */
+.sl-markdown-content .sl-heading-wrapper.level-h2,
+.sl-markdown-content h2:not(.sl-heading-wrapper h2, .landing h2) {
+  border-top: 2px solid var(--ink);
+  padding-top: 0.75rem;
+  margin-top: 2.75rem;
+}
+
+.sl-markdown-content a {
+  text-underline-offset: 0.2em;
+}
+
+.sl-markdown-content code:not(pre code) {
+  border-radius: 4px;
+  padding: 0.05em 0.3em;
+}
+
+.sl-markdown-content table {
+  font-size: var(--sl-text-sm);
+}
+
+.sl-markdown-content :is(th, td) {
+  border-color: var(--rule);
+}
+
+.sl-markdown-content th {
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 2px solid var(--ink);
+}
+
+.sl-markdown-content kbd {
+  font-family: var(--__sl-font-mono);
+  font-size: 0.8em;
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 0.35em;
+  background: var(--panel);
+}
+
+h1#_top {
+  letter-spacing: -0.015em;
+}
+
+.site-title {
+  color: var(--ink);
+}
+
+/* The current page in the sidebar is inverted, like the app's rail. */
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  background-color: var(--ink);
+  color: var(--paper);
+  border-radius: 6px;
+}
+
+.sidebar-content .large {
+  font-size: var(--sl-text-sm);
+  color: var(--muted);
+}
+
+/* Screenshots: one per theme, framed by a hairline like a well in the app. */
+.shot {
+  margin-block: 1.5rem;
+}
+
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
+
+.shot figcaption {
+  font-size: var(--sl-text-xs);
+  color: var(--muted);
+  margin-top: 0.5rem;
+}
+
+:root[data-theme="light"] .shot .dark,
+:root:not([data-theme="light"]) .shot .light {
+  display: none;
+}
+
+.shot a {
+  display: block;
+}

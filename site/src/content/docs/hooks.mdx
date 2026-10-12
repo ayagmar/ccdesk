@@ -1,0 +1,36 @@
+---
+title: Hooks
+description: The hooks that run in a directory, which ones are switched off, and how to add, change or remove one.
+---
+
+import Screenshot from "../../components/Screenshot.astro";
+
+The Hooks section lists every hook that applies to the open directory: from your user, project, local and managed settings, and from enabled plugins. Each row shows the event, the matcher (**any** when it has none), and what it runs: a command, a prompt or a URL.
+
+<Screenshot
+  name="hooks"
+  alt="The Hooks timetable with a PreToolUse, a PostToolUse and a Notification hook, and the PreToolUse hook open in the inspector with its event, matcher and JSON"
+/>
+
+## Hooks that do not run
+
+A hook is marked off when:
+
+- managed settings set `disableAllHooks`;
+- `disableAllHooks` is true in the highest settings file that sets it, which turns off every hook except managed ones;
+- managed settings set `allowManagedHooksOnly`, which turns off every hook except managed ones and those of plugins enabled in managed settings.
+
+[Built-in tools](../permissions/#built-in-tools) lists, for each tool, the `PreToolUse` hooks whose matcher covers it.
+
+## Adding, changing and removing a hook
+
+**Add hook** writes a new hook to your user, project or local settings:
+
+1. Pick the event from Claude Code's list of hook events.
+2. Give a matcher if the event takes one.
+3. Write the hook itself as JSON, for example `{ "type": "command", "command": "pnpm lint" }`.
+4. Press **Review change**, check the diff of the settings file, and save.
+
+Select an existing hook to change it in place or remove it. Hooks are checked against Claude Code's settings schema and get the same diff review, backup and undo as [settings](../settings/#changing-a-setting). If the hook changed in the file after you opened it, ccdesk refuses and asks you to look again.
+
+Plugin and managed hooks are read-only. ccdesk also leaves a file's hooks for you to edit by hand when any hook in that file sends header values or calls a URL with a user name, password or query string, because those values are hidden from the page and ccdesk cannot write them back.

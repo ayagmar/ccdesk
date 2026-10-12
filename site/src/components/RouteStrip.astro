@@ -1,0 +1,311 @@
+---
+// The load order as the app draws it: one stop per scope on an ink line. Pressing a stop shows the
+// files that scope contributes, the way the app's strip filters the timetable to one scope.
+const STOPS = [
+  {
+    id: "managed",
+    letter: "M",
+    name: "Managed",
+    who: "Set by your organisation, for everyone on the machine",
+    files: ["managed-settings.json", "managed-settings.d/*.json", "CLAUDE.md", "managed-mcp.json"],
+  },
+  {
+    id: "user",
+    letter: "U",
+    name: "User",
+    who: "Yours, in every project",
+    files: [
+      "~/.claude/CLAUDE.md",
+      "~/.claude/settings.json",
+      "~/.claude/rules/",
+      "~/.claude/agents/",
+      "~/.claude/skills/",
+      "user MCP servers",
+    ],
+  },
+  {
+    id: "project",
+    letter: "P",
+    name: "Project",
+    who: "Committed, so everyone who clones gets it",
+    files: [
+      "CLAUDE.md",
+      "AGENTS.md",
+      ".claude/settings.json",
+      ".claude/rules/",
+      ".claude/agents/",
+      ".mcp.json",
+    ],
+  },
+  {
+    id: "local",
+    letter: "L",
+    name: "Local",
+    who: "Yours, in this project only",
+    files: ["CLAUDE.local.md", ".claude/settings.local.json", "local MCP servers"],
+  },
+  {
+    id: "memory",
+    letter: "A",
+    name: "Auto memory",
+    who: "Saved by Claude, per directory",
+    files: ["~/.claude/projects/…/memory/MEMORY.md", "one file per memory"],
+  },
+  {
+    id: "plugin",
+    letter: "X",
+    name: "Plugin",
+    who: "Added by plugins you enabled",
+    files: ["skills", "subagents", "commands", "hooks", "MCP servers"],
+  },
+];
+const first = "project";
+---
+
+<div class="route" data-route>
+  <ol class="stops" role="list">
+    {
+      STOPS.map((stop) => (
+        <li>
+          <button
+            type="button"
+            class={`stop line-${stop.id}`}
+            aria-pressed={stop.id === first ? "true" : "false"}
+            aria-controls={`stop-${stop.id}`}
+            data-stop={stop.id}
+          >
+            <span class="bullet" aria-hidden="true">
+              {stop.letter}
+            </span>
+            <span class="name">{stop.name}</span>
+          </button>
+        </li>
+      ))
+    }
+  </ol>
+  {
+    STOPS.map((stop) => (
+      <div class="detail" id={`stop-${stop.id}`} hidden={stop.id !== first}>
+        <p class="who">
+          <span class={`bullet small line-${stop.id}`} aria-hidden="true">
+            {stop.letter}
+          </span>
+          {stop.who}
+        </p>
+        <ul class="files" role="list">
+          {stop.files.map((file) => (
+            <li>{file}</li>
+          ))}
+        </ul>
+      </div>
+    ))
+  }
+</div>
+
+<script>
+  for (const route of document.querySelectorAll<HTMLElement>("[data-route]")) {
+    const stops = [...route.querySelectorAll<HTMLButtonElement>("[data-stop]")];
+    for (const stop of stops) {
+      stop.addEventListener("click", () => {
+        for (const other of stops) {
+          const on = other === stop;
+          other.setAttribute("aria-pressed", String(on));
+          const detail = route.querySelector<HTMLElement>(`#stop-${other.dataset.stop}`);
+          if (detail) detail.hidden = !on;
+        }
+      });
+    }
+  }
+</script>
+
+<style>
+  .route {
+    --node: 26px;
+  }
+
+  .stops {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* The line itself: from the first stop's centre to the last. */
+  .stops::before {
+    content: "";
+    position: absolute;
+    top: calc(0.5rem + var(--node) / 2 - 1.5px);
+    left: calc(100% / 12);
+    right: calc(100% / 12);
+    height: 3px;
+    background: var(--ink);
+    transform-origin: left center;
+    animation: draw 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* Above the line, so a bullet sits on it like a stop. */
+  .stops li {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+  }
+
+  .stop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.25rem 0.625rem;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .stop:hover {
+    background: var(--sunk);
+  }
+
+  .stop[aria-pressed="true"] {
+    background: var(--sunk);
+  }
+
+  .stop[aria-pressed="true"] .name {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.3em;
+  }
+
+  .stop[aria-pressed="true"] .bullet {
+    box-shadow:
+      0 0 0 2px var(--paper),
+      0 0 0 4px var(--ink);
+  }
+
+  .name {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    line-height: 1.3;
+    text-align: center;
+  }
+
+  .bullet {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: var(--node);
+    height: var(--node);
+    flex: none;
+    border-radius: 999px;
+    background: var(--bullet);
+    color: var(--bullet-ink);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    line-height: 1;
+    animation: arrive 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .stops li:nth-child(2) .bullet { animation-delay: 60ms; }
+  .stops li:nth-child(3) .bullet { animation-delay: 120ms; }
+  .stops li:nth-child(4) .bullet { animation-delay: 180ms; }
+  .stops li:nth-child(5) .bullet { animation-delay: 240ms; }
+  .stops li:nth-child(6) .bullet { animation-delay: 300ms; }
+
+  .bullet.small {
+    --node: 20px;
+    font-size: 0.6875rem;
+    animation: none;
+  }
+
+  .line-managed { --bullet: var(--line-managed); --bullet-ink: var(--on-managed); }
+  .line-user { --bullet: var(--line-user); --bullet-ink: var(--on-user); }
+  .line-project { --bullet: var(--line-project); --bullet-ink: var(--on-project); }
+  .line-local { --bullet: var(--line-local); --bullet-ink: var(--on-local); }
+  .line-memory { --bullet: var(--line-memory); --bullet-ink: var(--on-memory); }
+  .line-plugin { --bullet: var(--line-plugin); --bullet-ink: var(--on-plugin); }
+
+  .detail {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--rule);
+    min-height: 4.5rem;
+  }
+
+  .who {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.8125rem;
+    color: var(--sl-color-gray-3);
+  }
+
+  .files li {
+    margin: 0;
+  }
+
+  @keyframes draw {
+    from { transform: scaleX(0); }
+  }
+
+  @keyframes arrive {
+    from { transform: scale(0.6); opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stops::before,
+    .bullet {
+      animation: none;
+    }
+  }
+
+  /* Narrow screens: the line runs down the left, as in the app. */
+  @media (max-width: 40rem) {
+    .stops {
+      grid-template-columns: 1fr;
+    }
+
+    .stops::before {
+      top: calc(var(--node) / 2 + 0.5rem);
+      bottom: calc(var(--node) / 2 + 0.5rem);
+      left: calc(0.75rem + var(--node) / 2 - 1.5px);
+      right: auto;
+      width: 3px;
+      height: auto;
+      transform-origin: center top;
+      animation-name: draw-down;
+    }
+
+    .stop {
+      flex-direction: row;
+      gap: 0.75rem;
+      padding: 0.375rem 0.75rem;
+    }
+
+    .name {
+      text-align: left;
+    }
+  }
+
+  @keyframes draw-down {
+    from { transform: scaleY(0); }
+  }
+</style>
