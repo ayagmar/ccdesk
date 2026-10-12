@@ -269,12 +269,16 @@ export function effectiveSettings(layers: SettingsLayer[]): EffectiveSetting[] {
     const decided = strict && strictWinner(strict, values);
     if (strict && decided) {
       const { winner } = decided;
+      // Only files that may just tighten it set the key, and none tightens it past the default.
+      if (!winner)
+        for (const v of values)
+          ignored.push({ ...v, reason: "it is not stricter than Claude Code's default" });
       out.push({
         key,
         value: winner?.value,
         from: winner ? [winner.scope] : [],
         merged: false,
-        overridden: values.filter((v) => v !== winner).reverse(),
+        overridden: winner ? values.filter((v) => v !== winner).reverse() : [],
         ignored,
         note: strictNote(strict),
       });

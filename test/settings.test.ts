@@ -136,6 +136,24 @@ test("a restrictive value from a lower file beats a looser higher one, nested ke
   );
 });
 
+test("a project value that may only tighten a key, and does not, is ignored with the reason", () => {
+  const [remote] = effectiveSettings([
+    {
+      scope: "project",
+      path: "/project.json",
+      exists: true,
+      data: { remoteControlAtStartup: true },
+    },
+  ]);
+
+  assert.equal(remote?.value, undefined);
+  assert.deepEqual(remote?.from, []);
+  assert.deepEqual(
+    remote?.ignored.map((i) => [i.scope, i.value, i.reason]),
+    [["project", true, "it is not stricter than Claude Code's default"]]
+  );
+});
+
 test("a repository's bypassPermissions default mode is ignored in effective settings too", async () => {
   const f = makeFixture();
   f.json("home/.claude/settings.json", { permissions: { defaultMode: "default" } });
