@@ -73,6 +73,7 @@ Each piece lives in its own file, at one of six scopes: managed, user, project, 
 - Settings and hooks are checked against Claude Code's settings schema. Other keys in the file stay as they are.
 - The old file is backed up to `~/.claude/backups/ccdesk/` first. Undo is one click, and **Recent changes** can restore any earlier edit.
 - A settings file that is a symlink, such as one in a dotfiles repository, is written through and stays a link.
+- A file with other hard links is not saved: replacing it would split it from its other names. Edit it in your editor.
 - ccdesk never writes `~/.claude.json`. User and local MCP server changes go through Claude Code's own `claude mcp` command, so they need `claude` on your PATH.
 
 Details: [Recent changes, backups and undo](https://ayagmar.github.io/ccdesk/recent-changes/)
@@ -106,7 +107,7 @@ ccdesk reads `~/.claude` and `~/.claude.json`, or `$CLAUDE_CONFIG_DIR` when it i
 ## Privacy and safety
 
 - The server listens on `127.0.0.1` only, and every API call needs a token generated for that run. Nothing leaves your machine.
-- Values under `env` and `headers` are hidden everywhere in the UI, diffs included, and ccdesk refuses any edit that would change them.
+- Values under `env` and `headers`, and keys in an MCP server's `args` (after flags such as `--token` or `--api-key`, or starting like `sk-` or `ghp_`), are hidden everywhere in the UI, diffs included, and ccdesk refuses any edit that would change them.
 - ccdesk never reads `~/.claude/.credentials.json`.
 - From your transcripts, only counts and rule patterns (a command's program and subcommand, a fetch's domain) reach the page, never commands or file contents.
 - Backups are readable only by you on Linux and macOS.

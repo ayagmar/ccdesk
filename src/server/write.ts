@@ -14,7 +14,7 @@ import {
 import { basename, dirname, join } from "node:path";
 import { type BackupKind } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isSecretPath, leadsToSecret, revisionOf } from "./scan/files.ts";
+import { isCredentials, isSecretPath, revisionOf } from "./scan/files.ts";
 
 /** A change ccdesk refuses on purpose; the server answers 409 with the message. */
 export class RefusedError extends Error {}
@@ -44,16 +44,6 @@ export function backupRoot(env: ScanEnv): string {
 /** Where a path leads after links, or null when it does not exist. */
 function realOrNull(path: string): Promise<string | null> {
   return realpath(path).catch(() => null);
-}
-
-/**
- * Whether a path is Claude Code's credentials file: by name, through any link on the way, or by
- * ending at the same file as `<config>/.credentials.json`, so one kept under another name counts.
- */
-export async function isCredentials(env: ScanEnv, path: string): Promise<boolean> {
-  if (await leadsToSecret(path)) return true;
-  const real = await realOrNull(path);
-  return real !== null && real === (await realOrNull(join(env.claudeDir, ".credentials.json")));
 }
 
 /** The file a path leads to after links; a missing file keeps its own path. */
@@ -89,7 +79,8 @@ export async function readIfExists(env: ScanEnv, path: string): Promise<string |
  * written to a temporary file first and the revision is checked again just before the rename, so
  * an edit made elsewhere while ccdesk was saving is kept and the save refused. A symlink is written
  * through, so links into a dotfiles repository survive; the temporary file is new, unguessable and
- * created exclusively, so nothing planted beside the target can redirect the write.
+ * created exclusively, so nothing planted beside the target can redirect the write. A file with
+ * other hard links is refused, since the rename would leave them on the old text.
  */
 export async function writeAtomic(
   env: ScanEnv,
@@ -102,6 +93,10 @@ export async function writeAtomic(
     throw new RefusedError(STATE_FILE);
   await mkdir(dirname(file), { recursive: true });
   const existing = await lstat(file).catch(() => null);
+  if (existing && existing.nlink > 1)
+    throw new RefusedError(
+      `${path} has other hard links, and saving it would split it from its other names; edit it in your editor.`
+    );
   const temp = join(dirname(file), `.${basename(file)}.ccdesk-${randomBytes(6).toString("hex")}`);
   const handle = await open(temp, "wx", 0o600);
   try {

@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  lstatSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { type AddressInfo } from "node:net";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
@@ -711,6 +719,26 @@ test("a settings file that links to the credentials file is never written", asyn
   assert.equal(readFileSync(credentials, "utf8"), '{"token":"x"}');
 });
 
+test("a settings file with another hard link is not saved, so the two names keep one text", async () => {
+  const shared = fixture.json("dotfiles/settings.json", { model: "sonnet" });
+  const settings = fixture.at("work/hardlink-settings/.claude/settings.json");
+  fixture.write("work/hardlink-settings/.claude/.keep", "");
+  linkSync(shared, settings);
+  const before = readFileSync(shared, "utf8");
+
+  const res = await saveSetting({
+    dir: fixture.at("work/hardlink-settings"),
+    scope: "project",
+    key: "model",
+    value: "opus",
+  });
+
+  assert.equal(res.status, 409);
+  assert.match((res.json as { error: string }).error, /hard links/);
+  assert.equal(readFileSync(settings, "utf8"), before);
+  assert.equal(lstatSync(settings).ino, lstatSync(shared).ino);
+});
+
 test("a settings file that links to ~/.claude.json is never written", async () => {
   const state = fixture.json("home/.claude.json", { projects: {} });
   fixture.link("work/state-link/.claude/settings.json", state);
@@ -964,6 +992,38 @@ test("credentials that are themselves a link are never read through another link
   assert.doesNotMatch(JSON.stringify(view.json), /oauth-secret/);
 });
 
+test("credentials hard-linked under another name are never read, changed or removed", async () => {
+  const token = '{"accessToken":"hardlinked-secret"}';
+  rmSync(join(fixture.env.claudeDir, ".credentials.json"), { force: true });
+  const credentials = fixture.write("home/.claude/.credentials.json", token);
+  const claudeMd = fixture.at("work/hardlinked/CLAUDE.md");
+  const settings = fixture.at("work/hardlinked/.claude/settings.json");
+  const memory = join(memoryDirFor(fixture, fixture.at("work/hardlinked")), "notes.md");
+  fixture.write(join(memoryDirFor(fixture, fixture.at("work/hardlinked")), "MEMORY.md"), "");
+  fixture.write("work/hardlinked/.claude/.keep", "");
+  for (const path of [claudeMd, settings, memory]) linkSync(credentials, path);
+
+  const view = await call(
+    `/api/directory?path=${encodeURIComponent(fixture.at("work/hardlinked"))}`
+  );
+  const edit = { dir: fixture.at("work/hardlinked"), scope: "project", key: "model", value: "x" };
+  const save = await call("/api/settings/save", {
+    method: "POST",
+    body: { ...edit, revision: revisionOf(token) },
+  });
+  const removal = await call("/api/memory/change", {
+    method: "POST",
+    body: { action: "delete", path: memory, revision: revisionOf(token) },
+  });
+  const opening = await call("/api/open", { method: "POST", body: { path: claudeMd } });
+
+  assert.equal(view.status, 200);
+  assert.doesNotMatch(JSON.stringify(view.json), /hardlinked-secret/);
+  for (const res of [save, removal, opening]) assert.equal(res.status, 409);
+  for (const path of [credentials, claudeMd, settings, memory])
+    assert.equal(readFileSync(path, "utf8"), token);
+});
+
 interface ScannedHook {
   event: string;
   matcher?: string;
@@ -1181,6 +1241,7 @@ async function saveMcp(edit: Record<string, unknown>) {
 interface ScannedServer {
   name: string;
   scope: string;
+  target: string;
   definition: unknown;
 }
 
@@ -1265,6 +1326,45 @@ test("a server with hidden env values is not rewritten, but can be removed", asy
   });
   assert.equal(removed.status, 200);
   assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).mcpServers, { keep: { command: "k" } });
+});
+
+test("keys in a server's args are hidden, and such a server is not rewritten", async () => {
+  const dir = fixture.at("work/mcp-args");
+  const args = [
+    "-y",
+    "some-mcp",
+    "--api-key",
+    "plain-flag-secret",
+    "--token=equals-secret",
+    "ghp_prefixsecret123",
+    "--port",
+    "8080",
+  ];
+  const file = fixture.json("work/mcp-args/.mcp.json", {
+    mcpServers: { api: { command: "npx", args } },
+  });
+  const before = readFileSync(file, "utf8");
+
+  const view = await call(`/api/directory?path=${encodeURIComponent(dir)}`);
+  const api = (await serversIn(dir)).find((s) => s.name === "api");
+  assert.ok(api);
+  const rewritten = await saveMcp({
+    dir,
+    scope: "project",
+    remove: { name: "api", definition: api.definition },
+    add: { name: "api", definition: api.definition },
+  });
+  const userAdd = await call("/api/mcp/preview", {
+    method: "POST",
+    body: { dir, scope: "user", add: { name: "new", definition: { command: "npx", args } } },
+  });
+
+  assert.doesNotMatch(JSON.stringify(view.json), /secret/);
+  assert.equal(api.target, "npx -y some-mcp --api-key ••• --token=••• ••• --port 8080");
+  assert.equal(rewritten.status, 409);
+  assert.equal(readFileSync(file, "utf8"), before);
+  assert.equal(userAdd.status, 200);
+  assert.doesNotMatch(JSON.stringify(userAdd.json), /secret/);
 });
 
 test("user and local servers are changed through claude mcp, never by writing ~/.claude.json", async () => {

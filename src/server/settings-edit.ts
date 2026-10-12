@@ -99,7 +99,7 @@ async function planKey(
   const { path } = file;
   const { raw, data } = await readSettings(env, path);
   const nextValue = value(data);
-  // ccdesk never shows env or header values, so it must not write them either.
+  // ccdesk never shows hidden values, so it must not write them either.
   if (
     !checksHiddenValues &&
     (hasHiddenValues({ [key]: data[key] }) || hasHiddenValues({ [key]: nextValue }))

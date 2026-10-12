@@ -6,6 +6,7 @@ import {
   type MemoryType,
   type TextFile,
 } from "../../shared/types.ts";
+import { type ScanEnv } from "./env.ts";
 import {
   isDir,
   listDir,
@@ -28,16 +29,17 @@ export function storeDirName(projectPath: string): string {
 }
 
 export async function readMemoryStore(
+  env: ScanEnv,
   dir: string,
   projectPath: string | null
 ): Promise<MemoryStore | null> {
   if (!(await isDir(dir))) return null;
-  const indexFile = await readTextFile(join(dir, INDEX_FILE));
+  const indexFile = await readTextFile(env, join(dir, INDEX_FILE));
   const files = (await listDir(dir)).filter((f) => f.endsWith(".md") && f !== INDEX_FILE);
 
   const memories: Memory[] = [];
   for (const file of files) {
-    const text = await readTextFile(join(dir, file));
+    const text = await readTextFile(env, join(dir, file));
     if (!text) continue;
     const { data, body } = parseFrontmatter(text.text);
     const metadata =

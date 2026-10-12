@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { appendFileSync, closeSync, openSync } from "node:fs";
+import { appendFileSync, closeSync, openSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -351,6 +351,24 @@ test("a transcript that grows is counted again, including a line that was half w
   assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 1);
   appendFileSync(file, more.slice(40));
   assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 2);
+});
+
+test("once the cache holds too many calls, a directory counted earlier is read again", async () => {
+  const f = makeFixture();
+  const app = f.at("work", "app");
+  const other = f.at("work", "other");
+  const text = bash("pwd --here", "accept");
+  const file = f.write(join(storeOf(f, app), "one.jsonl"), text);
+  f.write(join(storeOf(f, other), "one.jsonl"), bash("ls", "accept"));
+  assert.deepEqual(await suggested(f, app), ["Bash(pwd *)"]);
+  await readUsage(f.env, other, [], { maxCachedCalls: 1 });
+
+  // Rewritten in place with the same size and time, which only a fresh read notices.
+  const { atime, mtime } = statSync(file);
+  writeFileSync(file, text.replace("pwd --here", "cat --here"));
+  utimesSync(file, atime, mtime);
+
+  assert.deepEqual(await suggested(f, app), ["Bash(cat *)"]);
 });
 
 test("counts asked for at the same time are each counted once", async () => {

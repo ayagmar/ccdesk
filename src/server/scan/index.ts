@@ -31,7 +31,7 @@ import { effectiveSettings, readSettingsLayers } from "./settings.ts";
 import { builtinTools } from "./tools.ts";
 
 async function readClaudeJson(env: ScanEnv): Promise<Record<string, unknown> | null> {
-  const result = await readJsonObject(env.claudeJson);
+  const result = await readJsonObject(env, env.claudeJson);
   return result.ok ? result.data : null;
 }
 
@@ -163,7 +163,7 @@ export async function scanDirectory(env: ScanEnv, dir: string): Promise<Director
         error: l.error,
         ...(l.blocksStart ? { blocksStart: true } : {}),
       });
-  const mcp = await readJsonObject(mcpJson);
+  const mcp = await readJsonObject(env, mcpJson);
   if (!mcp.ok && !mcp.missing) problems.push({ path: mcpJson, error: mcp.error });
 
   return {
@@ -253,7 +253,7 @@ async function readMemory(
   const customDir = typeof custom?.value === "string" ? expandHome(env, custom.value) : null;
   const storeName = env.projectDirName ?? storeDirName(key);
   const dir = customDir ?? join(env.claudeDir, "projects", storeName, "memory");
-  const store: MemoryStore = (await readMemoryStore(dir, key)) ?? {
+  const store: MemoryStore = (await readMemoryStore(env, dir, key)) ?? {
     dir,
     loaded: true,
     projectPath: key,

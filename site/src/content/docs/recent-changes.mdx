@@ -32,7 +32,7 @@ A restore is refused when:
 
 - the file changed after you reviewed the restore;
 - ccdesk created the file in that change, so there is no earlier version;
-- it would bring back different hidden values (under `env`, `headers` or in a `url`) than the file has now, because ccdesk never writes values it does not show;
+- it would bring back different hidden values (under `env`, `headers`, in a `url` or in an MCP server's `args`) than the file has now, because ccdesk never writes values it does not show;
 - a memory with the same file name exists again;
 - the backup is missing or was changed after it was made.
 

@@ -48,12 +48,14 @@ test(
         type: "http",
         url: "https://bot:hunter2@mcp.example.com/?key=abc123",
         headers: { Authorization: "Bearer tok-999" },
+        command: "npx",
+        args: ["--api-key", "arg-777", "--token=arg-888"],
       };
       await assert.rejects(
         runClaude(["mcp", "add-json", "--", "api", JSON.stringify(definition)], f.at()),
         (error: Error) => {
           assert.match(error.message, /invalid server/);
-          assert.doesNotMatch(error.message, /hunter2|abc123|tok-999/);
+          assert.doesNotMatch(error.message, /hunter2|abc123|tok-999|arg-777|arg-888/);
           return true;
         }
       );

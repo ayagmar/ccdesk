@@ -17,7 +17,7 @@ import { previewMcpEdit, type RunClaude, runClaude, saveMcpEdit } from "./mcp-ed
 import { changeMemory, isMemoryAction, previewMemoryChange } from "./mutations.ts";
 import { openInEditor } from "./open.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isRecord } from "./scan/files.ts";
+import { isCredentials, isRecord } from "./scan/files.ts";
 import { scanDirectory, scanOverview } from "./scan/index.ts";
 import { CountStopped, readUsage } from "./scan/usage.ts";
 import { testPath } from "./scan/path-test.ts";
@@ -30,7 +30,7 @@ import {
   saveSettingsEdit,
 } from "./settings-edit.ts";
 import { Watcher } from "./watch.ts";
-import { isCredentials, RefusedError } from "./write.ts";
+import { RefusedError } from "./write.ts";
 
 interface ServerOptions {
   env: ScanEnv;

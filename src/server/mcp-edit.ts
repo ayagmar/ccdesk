@@ -10,6 +10,7 @@ import {
   mainWorktreeRoot,
   redactSecrets,
   revisionOf,
+  shownArgs,
   shownUrl,
 } from "./scan/files.ts";
 import { serverProblems } from "./scan/mcp.ts";
@@ -50,7 +51,17 @@ export async function claudeProgram(
   return "claude";
 }
 
-/** The env and header values, and URL credentials, in a server definition passed to claude. */
+/** The user name, password and query of a URL that ccdesk hides. */
+function urlSecrets(text: string): string[] {
+  if (shownUrl(text) === text) return [];
+  const url = URL.parse(text);
+  return [url?.username, url?.password, url?.search.slice(1)].filter((p): p is string => !!p);
+}
+
+/**
+ * The env and header values, URL credentials and hidden args in a server definition passed to
+ * claude.
+ */
 function secretsIn(args: string[]): string[] {
   const found: string[] = [];
   const walk = (value: unknown) => {
@@ -59,11 +70,15 @@ function secretsIn(args: string[]): string[] {
     for (const [key, inner] of Object.entries(value)) {
       if ((key === "env" || key === "headers") && isRecord(inner))
         for (const v of Object.values(inner)) if (typeof v === "string" && v) found.push(v);
-      if (key === "url" && typeof inner === "string" && shownUrl(inner) !== inner) {
-        const url = URL.parse(inner);
-        found.push(
-          ...[url?.username, url?.password, url?.search.slice(1)].filter((p): p is string => !!p)
-        );
+      if (key === "url" && typeof inner === "string") found.push(...urlSecrets(inner));
+      if (key === "args" && "command" in value && Array.isArray(inner)) {
+        const shown = shownArgs(inner);
+        inner.forEach((arg, i) => {
+          if (typeof arg !== "string" || shown[i] === arg) return;
+          if (shown[i] === "•••") found.push(arg);
+          else if (String(shown[i]).endsWith("=•••")) found.push(arg.slice(arg.indexOf("=") + 1));
+          else found.push(...urlSecrets(arg));
+        });
       }
       walk(inner);
     }
@@ -139,10 +154,10 @@ function checked(servers: Record<string, unknown>, edit: McpEdit): void {
       JSON.stringify(redactSecrets(now)) !== JSON.stringify(remove.definition)
     )
       throw new RefusedError(`${remove.name} changed since ccdesk read it; review it again.`);
-    // ccdesk never shows env or header values, so it cannot write them back either.
+    // ccdesk never shows hidden values, so it cannot write them back either.
     if (add && hasHiddenValues(now))
       throw new RefusedError(
-        `${remove.name} has env or header values ccdesk does not show; edit it in the file, or remove it and add it again.`
+        `${remove.name} has values ccdesk does not show, in env, headers, its url or its args; edit it in the file, or remove it and add it again.`
       );
   }
   if (add) {
@@ -251,7 +266,7 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
       path: env.claudeJson,
       before,
       after: errors.length > 0 ? (before ?? "") : shown(edited(servers, edit)),
-      // Of the servers as stored, so a changed env or header value, which the page never sees,
+      // Of the servers as stored, so a changed hidden value, which the page never sees,
       // still makes a reviewed edit stale.
       revision: revisionOf(JSON.stringify(servers)),
       reformats: false,

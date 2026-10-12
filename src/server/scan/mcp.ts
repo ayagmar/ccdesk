@@ -58,15 +58,20 @@ function define(
       const command = stringField(c, "command")
         ? [stringField(c, "command"), ...stringsIn(c.args)]
         : null;
+      const definition = redactSecrets(c) as Record<string, unknown>;
       const server: McpServer = {
         name,
         scope,
         // An entry without a type is read as stdio, even one with a url (docs: mcp).
         transport: type || "stdio",
-        target: url ? shownUrl(url) : (command?.join(" ") ?? ""),
+        target: url
+          ? shownUrl(url)
+          : command
+            ? [command[0], ...stringsIn(definition.args)].join(" ")
+            : "",
         sourcePath,
         status: "active",
-        definition: redactSecrets(c),
+        definition,
       };
       const [problem] = serverProblems(c);
       if (problem) {
@@ -223,9 +228,9 @@ export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<M
   // Checked as written: the layer has header values hidden, which would hide a ${VAR} in one.
   const managedServers = (await readManagedSettings(env)).data?.managedMcpServers;
   const managedFile = join(env.managedDir, "managed-mcp.json");
-  const managedJson = await readJsonObject(managedFile);
+  const managedJson = await readJsonObject(env, managedFile);
   const mcpJson = join(projectDir, ".mcp.json");
-  const shared = await readJsonObject(mcpJson);
+  const shared = await readJsonObject(env, mcpJson);
   const defined: Defined[] = [
     ...(managedJson.ok ? define(managedJson.data.mcpServers, "managed", managedFile, true) : []),
     ...defineManaged(managedServers, managed?.path ?? ""),
@@ -235,14 +240,14 @@ export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<M
   ];
   for (const plugin of plugins) {
     const path = join(plugin.installPath, ".mcp.json");
-    const file = await readJsonObject(path);
+    const file = await readJsonObject(env, path);
     // A server name declared later in the same plugin replaces an earlier one.
     const own = new Map<string, Defined>();
     const add = (list: Defined[]) => {
       for (const d of list) own.set(d.server.name, d);
     };
     if (file.ok) add(define(file.data.mcpServers ?? file.data, "plugin", path));
-    for (const part of await manifestConfigs(plugin, "mcpServers"))
+    for (const part of await manifestConfigs(env, plugin, "mcpServers"))
       add(define(part.value, "plugin", part.path));
     for (const d of own.values()) d.server.plugin = plugin.id;
     defined.push(...own.values());
