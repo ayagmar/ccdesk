@@ -60,16 +60,21 @@ test("creating the missing folder of an import, then the file, wakes a page each
   assert.equal((await file).changed, true);
 });
 
-test("editing a file inside an installed plugin wakes a page waiting for changes", async () => {
+/** A watcher on `app`, with the plugin `alpha` installed at `plugin` and its manifest. */
+function pluginFixture(manifest: Record<string, unknown>) {
   const f = makeFixture();
   const plugin = "home/.claude/plugins/cache/market/alpha/1.0.0";
   f.json("home/.claude/plugins/installed_plugins.json", {
     plugins: { "alpha@market": [{ scope: "user", installPath: f.at(plugin), version: "1.0.0" }] },
   });
-  f.json(`${plugin}/.claude-plugin/plugin.json`, { name: "alpha" });
-  f.write(`${plugin}/agents/review.md`, "---\nname: review\ndescription: one\n---\n");
+  f.json(`${plugin}/.claude-plugin/plugin.json`, { name: "alpha", ...manifest });
   f.write("app/README.md", "x");
-  const watcher = watcherFor(f);
+  return { f, plugin, watcher: watcherFor(f) };
+}
+
+test("editing a file inside an installed plugin wakes a page waiting for changes", async () => {
+  const { f, plugin, watcher } = pluginFixture({});
+  f.write(`${plugin}/agents/review.md`, "---\nname: review\ndescription: one\n---\n");
   await watcher.scan(f.at("app"));
 
   const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
@@ -79,6 +84,39 @@ test("editing a file inside an installed plugin wakes a page waiting for changes
   );
 
   assert.equal((await waiting).changed, true);
+});
+
+test("editing an agent in a folder the plugin's manifest names wakes a page waiting for changes", async () => {
+  const { f, plugin, watcher } = pluginFixture({ agents: "./custom/" });
+  f.write(`${plugin}/custom/review.md`, "---\nname: review\ndescription: one\n---\n");
+  await watcher.scan(f.at("app"));
+
+  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  setTimeout(
+    () => f.write(`${plugin}/custom/review.md`, "---\nname: review\ndescription: two\n---\n"),
+    100
+  );
+
+  assert.equal((await waiting).changed, true);
+});
+
+test("files a plugin's MCP server writes in its own folder do not count as a config change", async () => {
+  const { f, plugin, watcher } = pluginFixture({});
+  f.json(`${plugin}/.mcp.json`, { mcpServers: { db: { command: "node", args: ["server.js"] } } });
+  f.write(`${plugin}/node_modules/dep/index.js`, "a");
+  f.write(`${plugin}/data/state.json`, "a");
+  await watcher.scan(f.at("app"));
+  // macOS can report changes made just before a watch starts; let those settle first.
+  const signal = new AbortController().signal;
+  await watcher.wait(f.at("app"), Number.MAX_SAFE_INTEGER, signal, 1000);
+
+  const waiting = watcher.wait(f.at("app"), Date.now(), signal, 800);
+  setTimeout(() => {
+    f.write(`${plugin}/node_modules/dep/index.js`, "b");
+    f.write(`${plugin}/data/state.json`, "b");
+  }, 100);
+
+  assert.equal((await waiting).changed, false);
 });
 
 test("closing the watcher answers a page still waiting, instead of keeping it until the timeout", async () => {

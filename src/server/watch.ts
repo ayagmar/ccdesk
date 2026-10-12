@@ -1,11 +1,12 @@
 import { type FSWatcher, watch } from "node:fs";
 import { stat } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { storeDirName } from "../shared/memory.ts";
-import { type DirectoryView, type SessionProfile } from "../shared/types.ts";
+import { type DirectoryView, type Plugin, type SessionProfile } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isNetworkPath, mainWorktreeRoot } from "./scan/files.ts";
+import { isDir, isFile, isNetworkPath, mainWorktreeRoot } from "./scan/files.ts";
 import { scanDirectory } from "./scan/index.ts";
+import { manifestCommandMap, manifestPaths } from "./scan/plugins.ts";
 
 /** How long one request waits for a change before answering "nothing changed". */
 const WAIT_MS = 25_000;
@@ -64,10 +65,9 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
 /**
  * Files a scan read that the fixed list does not cover: a custom memory folder, imports, installed
  * plugins. A missing import is watched too, so creating it shows up, even when its folder is missing
- * as well. Each plugin's own folder is watched, not ~/.claude/plugins as a whole, which also holds
- * marketplace checkouts and caches Claude Code rewrites.
+ * as well.
  */
-export function dependencies(view: DirectoryView): Target[] {
+export async function dependencies(env: ScanEnv, view: DirectoryView): Promise<Target[]> {
   const files = view.instructions.flatMap((i) => [
     i.realPath ?? i.path,
     ...i.imports.map((r) => r.resolved),
@@ -78,13 +78,54 @@ export function dependencies(view: DirectoryView): Target[] {
     names.add(basename(file));
     byFolder.set(dirname(file), names);
   }
+  const plugins = await Promise.all(view.inventory.plugins.map((p) => pluginTargets(env, view, p)));
   return [
     ...[...byFolder].map(([path, names]) => ({ path, recursive: false, names: [...names] })),
     ...(view.memory ? [{ path: view.memory.dir, recursive: false }] : []),
-    ...view.inventory.plugins
-      .filter((p) => p.installPath)
-      .map((p) => ({ path: p.installPath, recursive: true })),
+    ...plugins.flat(),
   ];
+}
+
+/** A plugin's folders the scan reads from, when they are not named in its manifest. */
+const PLUGIN_FOLDERS = ["agents", "skills", "commands", "output-styles", "hooks"];
+/** Manifest keys that name files or folders inside the plugin. */
+const PLUGIN_KEYS = ["agents", "skills", "commands", "outputStyles", "hooks", "mcpServers"];
+
+/**
+ * What the scan reads in a plugin: its manifest, .mcp.json, a skill at its root, its component
+ * folders and the paths its manifest names. Not the whole plugin, which can hold an MCP server's
+ * node_modules and files the server writes while it runs.
+ */
+async function pluginTargets(env: ScanEnv, view: DirectoryView, plugin: Plugin): Promise<Target[]> {
+  const root = plugin.installPath;
+  // A path from installed_plugins.json that is not absolute names no folder Claude Code would load.
+  if (!isAbsolute(root)) return [];
+  const named = await Promise.all(PLUGIN_KEYS.map((key) => manifestPaths(env, plugin, key)));
+  const commands = await manifestCommandMap(env, plugin);
+  // Without a skills folder, each folder at the root holding SKILL.md is a skill.
+  const rootSkills = view.inventory.skills
+    .filter((s) => s.plugin === plugin.id && s.folder && dirname(s.folder) === root)
+    .map((s) => s.folder as string);
+  const paths = [
+    ...PLUGIN_FOLDERS.map((name) => join(root, name)),
+    ...named.flatMap((list) => list ?? []),
+    ...commands.map((c) => c.path),
+    ...rootSkills,
+  ];
+  const out: Target[] = [
+    {
+      path: root,
+      recursive: false,
+      names: [".claude-plugin", ".mcp.json", "SKILL.md", ...PLUGIN_FOLDERS],
+    },
+    { path: join(root, ".claude-plugin"), recursive: false, names: ["plugin.json"] },
+  ];
+  for (const path of new Set(paths)) {
+    if (await isDir(path)) out.push({ path, recursive: true });
+    else if (await isFile(path))
+      out.push({ path: dirname(path), recursive: false, names: [basename(path)] });
+  }
+  return out;
 }
 
 /**
@@ -92,7 +133,7 @@ export function dependencies(view: DirectoryView): Target[] {
  * next missing name only. Watching needs a folder that exists, and the watchers are rebuilt after
  * every change, so each folder that appears moves the watch one level closer.
  */
-async function existing(target: Target): Promise<Target> {
+async function nearestWatchable(target: Target): Promise<Target> {
   if (isNetworkPath(target.path) || (await stat(target.path).catch(() => null))) return target;
   for (let missing = target.path; dirname(missing) !== missing; missing = dirname(missing)) {
     const parent = dirname(missing);
@@ -143,7 +184,7 @@ export class Watcher {
     const subscription = this.subscriptions.get(view.path);
     // Only a watched directory's view can be known to be current later.
     if (subscription) this.latest.set(view.path, { view, startedAt, stateFile });
-    const extra = dependencies(view);
+    const extra = await dependencies(this.env, view);
     this.scanned.set(view.path, extra);
     if (subscription && JSON.stringify(extra) !== JSON.stringify(subscription.extra)) {
       subscription.extra = extra;
@@ -247,7 +288,7 @@ export class Watcher {
 
   /** (Re)creates the watchers, so a folder created since, such as a new .claude, is watched. */
   private async rewatch(dir: string, subscription: Subscription): Promise<void> {
-    const extra = await Promise.all(subscription.extra.map(existing));
+    const extra = await Promise.all(subscription.extra.map(nearestWatchable));
     const list = await targets(this.env, dir, extra);
     for (const w of subscription.watchers) w.close();
     subscription.watchers = [];
