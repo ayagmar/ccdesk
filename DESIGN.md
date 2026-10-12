@@ -407,7 +407,7 @@ Editing happens inside the inspector. A segmented control picks the target layer
 - **Loading:** a 220×3px line with an ink segment travelling along it, the route line in motion.
 
 ### Docs Site
-The documentation site (`site/`, Astro Starlight) uses the same two themes, fonts and scope-line colours, mapped onto Starlight's variables in `site/src/styles/theme.css`. Like the app it starts on the system theme, with Starlight's switch to change it. Headings stand on the 2px ink rule and the current sidebar page is inverted like the rail. The landing page opens with a working route strip (press a stop to see the files that scope contributes) and real screenshots taken from a made-up setup in both themes. Murmeli's badge is the site logo and favicon.
+The documentation site (`site/`, Astro Starlight) uses the same two themes, fonts and scope-line colours, mapped onto Starlight's variables in `site/src/styles/theme.css`. Like the app it starts on the system theme, with Starlight's switch to change it. Headings stand on the 2px ink rule and the current sidebar page is inverted like the rail. The landing page opens with a working route strip (press a stop to see the files that scope contributes) and real screenshots taken from a made-up setup in both themes. Murmeli's badge is the site logo and favicon. Motion follows the app's rule: the hero screenshot is uncovered left to right as the route line draws, a stop's files board in turn when you switch stops, and a screenshot grows from its place into a full-window viewer and shrinks back on close. Under reduced motion these become fades.
 
 ## Do's and Don'ts
 
