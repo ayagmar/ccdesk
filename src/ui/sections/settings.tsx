@@ -87,7 +87,11 @@ export const settings = defineSection<R>({
   Details: ({ row, actions }) => {
     const s = row.item;
     const { view } = actions;
-    const layerOf = (scope: Scope) => view.settings.find((l) => l.scope === scope && !l.legacy);
+    // The file of a scope that sets this key, which for local may be an older file in this folder.
+    const layerOf = (scope: Scope) => {
+      const layers = view.settings.filter((l) => l.scope === scope);
+      return layers.find((l) => l.data?.[s.key] !== undefined) ?? layers.find((l) => !l.legacy);
+    };
     return (
       <>
         <p className={`verdict ${s.from.length === 0 ? "off" : "ok"}`}>
