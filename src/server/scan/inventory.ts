@@ -27,7 +27,13 @@ import {
 } from "./files.ts";
 import { ancestorsRootFirst } from "./instructions.ts";
 import { readMcpServers } from "./mcp.ts";
-import { manifestCommandMap, manifestConfigs, manifestPaths, readPlugins } from "./plugins.ts";
+import {
+  manifestCommandMap,
+  manifestConfigs,
+  manifestPaths,
+  pluginNamespace,
+  readPlugins,
+} from "./plugins.ts";
 import { effectiveSettings } from "./settings.ts";
 
 type Source = Scope | "plugin";
@@ -169,7 +175,15 @@ async function pluginEntries(plugin: Plugin) {
   const extraSkills = await manifestPaths(plugin, "skills");
   const skillDirs = [join(root, "skills"), ...(extraSkills ?? [])];
   const rootSkill = extraSkills === null && !(await isDir(join(root, "skills")));
-  const skills = rootSkill ? await readSkills(root, "plugin", plugin.id) : [];
+  const namespace = await pluginNamespace(plugin);
+  const skills: Entry[] = [];
+  if (rootSkill)
+    for (const skill of await readSkills(root, "plugin", plugin.id)) {
+      // Without a name, a root SKILL.md is named after the plugin (docs: skills#how-a-skill-gets-its-command-name).
+      if (skill.folder === root && !stringField(parseFrontmatter(skill.text).data, "name"))
+        skill.name = namespace;
+      skills.push(skill);
+    }
   for (const dir of skillDirs) skills.push(...(await readSkills(dir, "plugin", plugin.id)));
   const listed = async (key: string, folder: string, separator = "/") =>
     readPaths((await manifestPaths(plugin, key)) ?? [join(root, folder)], "plugin", {
@@ -197,6 +211,10 @@ async function pluginEntries(plugin: Plugin) {
             text: c.text,
           }
     );
+  // A plugin's skills and commands are called as plugin-name:name; a name that already has the
+  // prefix keeps it once (docs: skills#how-a-skill-gets-its-command-name).
+  for (const entry of [...skills, ...commands])
+    entry.id = entry.name.startsWith(`${namespace}:`) ? entry.name : `${namespace}:${entry.name}`;
   // A plugin subagent is named with the plugin and its subfolders (docs: sub-agents#choose-the-subagent-scope).
   const agents: Entry[] = [];
   for (const path of (await manifestPaths(plugin, "agents")) ?? [join(root, "agents")]) {
@@ -204,7 +222,7 @@ async function pluginEntries(plugin: Plugin) {
     for (const agent of await readPaths([path], "plugin", options)) {
       const subfolders = folder ? relative(folder, dirname(agent.path)).split(/[/\\]/) : [];
       const own = agent.name.split("/").at(-1) ?? agent.name;
-      agent.id = [plugin.id.split("@")[0], ...subfolders.filter(Boolean), own].join(":");
+      agent.id = [namespace, ...subfolders.filter(Boolean), own].join(":");
       agents.push(agent);
     }
   }
@@ -364,9 +382,13 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
 
   // A command file is a skill too: one with disable-model-invocation is not listed to Claude.
   const commands = await files("commands", ":");
-  for (const command of commands)
+  // A skill of the same name runs instead of it (docs: skills#resolve-skills-that-share-a-name).
+  for (const command of commands) {
     if (isTrue(parseFrontmatter(command.text).data["disable-model-invocation"]))
       command.listed = false;
+    const skill = winners.get(command.name);
+    if (skill) command.shadowedBy = skill.path;
+  }
   const overrides = effectiveSettings(layers).find((s) => s.key === "skillOverrides")?.value;
   applySkillOverrides([...skills, ...commands], overrides);
 

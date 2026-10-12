@@ -209,11 +209,14 @@ export interface Entry {
   listed?: boolean;
   /** The skillOverrides state set for this skill or command in settings, when not "on". */
   override?: "name-only" | "user-invocable-only" | "off";
-  /** A subagent whose name a higher-priority definition also uses: that definition's file. */
+  /** A subagent, skill or command whose name a definition Claude Code prefers also uses: that file. */
   shadowedBy?: string;
   /** Why Claude Code skips this subagent file, when its frontmatter falls short. */
   skipped?: string;
-  /** A plugin subagent's scoped name, with its plugin and subfolders, such as `my-plugin:review:security`. */
+  /**
+   * The name Claude Code calls it by when that is not `name`: a plugin's entries are prefixed with
+   * the plugin, as in `my-plugin:review` or the subagent `my-plugin:review:security`.
+   */
   id?: string;
   /** A skill's `when_to_use`, appended to its description in the listing. */
   whenToUse?: string;

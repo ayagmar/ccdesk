@@ -29,6 +29,22 @@ test("touching a file brings in matching path rules, skills and the CLAUDE.md fi
   );
 });
 
+test("a nested skill whose folder name another skill has is named with its directory", async () => {
+  const f = makeFixture();
+  const skill = (name: string) => `---\nname: ${name}\ndescription: Deploy ${name}\n---\n`;
+  f.write("repo/.claude/skills/deploy/SKILL.md", skill("deploy"));
+  f.write("repo/apps/web/.claude/skills/deploy/SKILL.md", skill("deploy"));
+  f.write("repo/apps/web/.claude/skills/lint/SKILL.md", skill("lint"));
+  f.git("repo", "init", "-q");
+
+  const result = await testPath(f.env, f.at("repo"), "apps/web/index.ts");
+
+  assert.deepEqual(
+    result.matches.filter((m) => m.kind === "skill").map((m) => m.name),
+    ["apps/web:deploy", "lint"]
+  );
+});
+
 test("a file outside the start directory gets nothing from it", async () => {
   const f = makeFixture();
   f.write("app/.claude/rules/all.md", '---\npaths: ["**/*"]\n---\nx\n');
