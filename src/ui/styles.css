@@ -1493,9 +1493,12 @@ button:disabled {
 
 /* ---------- toast, loading, problems ---------- */
 
-/* The live region stays in the page so screen readers hear each toast, but takes no space. */
+/* The live region stays in the page so screen readers hear each toast, but takes no space. Being
+   fixed, it is the layer the toast stacks in, so it carries the toast's z-index: without it the
+   sticky table heads paint over the toast. */
 .toast-region {
   position: fixed;
+  z-index: 30;
 }
 
 .toast {
