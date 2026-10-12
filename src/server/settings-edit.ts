@@ -189,6 +189,11 @@ async function planHookEdit(env: ScanEnv, edit: HookEdit): Promise<PlannedEdit> 
         return Array.isArray(groups) ? groups : [];
       };
       const { remove, add } = edit;
+      // Checked before any branch, so neither a new hook nor a replacement writes them.
+      if (add && hasHiddenValues(add.definition))
+        throw new RefusedError(
+          "ccdesk does not write header values it would then hide; add this hook in the file instead."
+        );
       if (remove) {
         const groups = groupsOf(remove.event);
         const group = groups[remove.at.group];
@@ -221,10 +226,6 @@ async function planHookEdit(env: ScanEnv, edit: HookEdit): Promise<PlannedEdit> 
         if (groups.length === 0 && add?.event !== remove.event) delete hooks[remove.event];
       }
       if (add) {
-        if (hasHiddenValues(add.definition))
-          throw new RefusedError(
-            "ccdesk does not write header values it would then hide; add this hook in the file instead."
-          );
         const groups = groupsOf(add.event);
         const matcher = add.matcher ?? "";
         const group = groups.find(

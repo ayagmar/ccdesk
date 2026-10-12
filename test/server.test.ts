@@ -1295,6 +1295,32 @@ test("a hook that sends hidden header values is never rewritten, but others in i
   assert.doesNotMatch(readFileSync(file, "utf8"), /•••/);
 });
 
+test("a hook is not replaced by one that sends header values ccdesk would hide", async () => {
+  const dir = fixture.at("work/hooks-replace-secret");
+  const file = fixture.json("work/hooks-replace-secret/.claude/settings.json", {
+    hooks: { Stop: [{ hooks: [command("bell")] }] },
+  });
+  const before = readFileSync(file, "utf8");
+  const [hook] = await hooksIn(dir);
+  assert.ok(hook);
+
+  const replaced = await saveHook({
+    dir,
+    file,
+    remove: { event: hook.event, at: hook.at, definition: hook.definition },
+    add: {
+      event: "Stop",
+      definition: {
+        type: "http",
+        url: "https://hooks.example/stop",
+        headers: { Authorization: "s3cret" },
+      },
+    },
+  });
+  assert.equal(replaced.status, 409);
+  assert.equal(readFileSync(file, "utf8"), before);
+});
+
 test("changing the matcher of a hook alone in its group keeps the group where it is", async () => {
   const dir = fixture.at("work/hooks-matcher");
   const file = fixture.json("work/hooks-matcher/.claude/settings.json", {
