@@ -43,7 +43,7 @@ Values under `env` and `headers`, and the user name, password and query string o
 How the change is made depends on the scope:
 
 - **Project** servers live in `.mcp.json`. ccdesk writes the file itself, with the usual diff review, backup and undo, and the change appears in [Recent changes](../recent-changes/).
-- **User** and **local** servers live in `~/.claude.json`, which ccdesk never writes. Instead it runs Claude Code's own `claude mcp add-json` and `claude mcp remove` commands. The review shows the commands, with hidden values still hidden. These changes are not backed up by ccdesk and do not appear in Recent changes. They need `claude` on your `PATH`, and each command has 30 seconds to finish.
+- **User** and **local** servers live in `~/.claude.json`, which ccdesk never writes. Instead it runs Claude Code's own `claude mcp add-json` and `claude mcp remove` commands. The review shows the commands, with hidden values still hidden. ccdesk cannot undo these changes, but [Recent changes](../recent-changes/) lists each one with the servers before and after, values hidden, and the `claude mcp` command that puts it back. They need `claude` on your `PATH`, and each command has 30 seconds to finish.
 
 Changing a user or local server removes it and adds it again. If adding fails, ccdesk puts the old definition back; if that fails too, the error message includes a command you can run to restore it.
 

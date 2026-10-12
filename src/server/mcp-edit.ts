@@ -14,7 +14,14 @@ import {
   shownUrl,
 } from "./scan/files.ts";
 import { serverProblems } from "./scan/mcp.ts";
-import { RefusedError, readIfExists, recordChange, serially, writeAtomic } from "./write.ts";
+import {
+  RefusedError,
+  readIfExists,
+  recordChange,
+  recordClaudeMcpChange,
+  serially,
+  writeAtomic,
+} from "./write.ts";
 
 /**
  * Runs `claude` with these arguments in `cwd` and resolves with its output. Replaced in tests, so
@@ -262,6 +269,23 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
   const addCommand = (name: string, definition: unknown) =>
     `claude mcp add-json --scope ${edit.scope} -- ${quoted(name)} ${quoted(JSON.stringify(definition))}`;
   const before = Object.keys(servers).length > 0 ? shown(servers) : null;
+  // Recent changes lists the edit with the servers it touched, values hidden as the page shows
+  // them, and the commands that put them back from the folder claude ran in.
+  const record = () => {
+    const names = [remove?.name, add?.name].filter((n) => n !== undefined);
+    const touched = (all: Record<string, unknown>) =>
+      Object.fromEntries(Object.entries(all).filter(([name]) => names.includes(name)));
+    const at = edit.scope === "local" ? `cd ${quoted(cwd)} && ` : "";
+    return recordClaudeMcpChange(env, {
+      target: env.claudeJson,
+      shownBefore: shown(touched(servers)),
+      shownAfter: shown(touched(edited(servers, edit))),
+      undoCommands: [
+        ...(add ? [`${at}claude mcp remove --scope ${edit.scope} -- ${quoted(add.name)}`] : []),
+        ...(remove ? [`${at}${addCommand(remove.name, redactSecrets(servers[remove.name]))}`] : []),
+      ],
+    });
+  };
   return {
     preview: {
       path: env.claudeJson,
@@ -280,7 +304,11 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
     },
     save: async () => {
       if (remove) await run(["mcp", "remove", "--scope", edit.scope, "--", remove.name], cwd);
-      if (!add) return { target: env.claudeJson };
+      // The change is made by then; a record that cannot be written only leaves it unlisted.
+      if (!add) {
+        await record().catch(() => undefined);
+        return { target: env.claudeJson };
+      }
       try {
         await run(addArgs(add.name, add.definition), cwd);
       } catch (error) {
@@ -297,6 +325,7 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
         });
         throw error;
       }
+      await record().catch(() => undefined);
       return { target: env.claudeJson };
     },
   };

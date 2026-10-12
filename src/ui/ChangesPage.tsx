@@ -12,6 +12,7 @@ const WHAT: Record<BackupKind, string> = {
   "memory-index": "MEMORY.md changed",
   "memory-delete": "Memory deleted",
   "memory-restore": "Memory restored",
+  "mcp-claude": "MCP servers changed through claude mcp",
 };
 
 /** Changes grouped under the day they were made, newest first, as they come from the server. */
@@ -112,7 +113,12 @@ export function ChangesPage({ onRestored }: { onRestored: (text: string) => void
                     aria-expanded={open === b.id}
                     onClick={() => setOpen(open === b.id ? null : b.id)}
                   >
-                    <Icon name="undo" /> {open === b.id ? "Close" : "Review restore"}
+                    <Icon name="undo" />{" "}
+                    {open === b.id
+                      ? "Close"
+                      : b.kind === "mcp-claude"
+                        ? "Show change"
+                        : "Review restore"}
                   </button>
                 </div>
                 {open === b.id && b.kind === "memory-restore" && (
@@ -164,6 +170,7 @@ function Restore({ id, onDone }: { id: string; onDone: (text: string) => void })
       </p>
     );
   if (!preview) return <p className="muted small">Reading the backup…</p>;
+  if (preview.undoCommands) return <ClaudeMcpChange preview={preview} />;
   const same = preview.before === preview.after && !preview.indexLines;
   // A delete that stopped halfway after Claude rewrote the memory: only MEMORY.md changes.
   const onlyIndex = preview.before === preview.after && preview.indexLines;
@@ -225,6 +232,28 @@ function Restore({ id, onDone }: { id: string; onDone: (text: string) => void })
             </button>
           </div>
         </>
+      )}
+    </section>
+  );
+}
+
+/** A change made through `claude mcp`: what it did, and the commands that put it back. */
+function ClaudeMcpChange({ preview }: { preview: RestorePreview }) {
+  const commands = preview.undoCommands ?? [];
+  return (
+    <section className="review" aria-label="Change made through claude mcp">
+      <p className="muted small">
+        The servers before and after this change, with secret values hidden:
+      </p>
+      <DiffView before={preview.before ?? ""} after={preview.after} />
+      <p className="flag warn">{preview.blocked}</p>
+      {commands.map((c) => (
+        <p key={c} className="mono wrap small">
+          {c}
+        </p>
+      ))}
+      {commands.some((c) => c.includes("•••")) && (
+        <p className="muted small">Replace each ••• with the real value before you run it.</p>
       )}
     </section>
   );

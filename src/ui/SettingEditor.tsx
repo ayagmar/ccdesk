@@ -449,7 +449,10 @@ export function Review({
               computer can see them while it runs.
             </p>
           )}
-          <p>This change is not listed in Recent changes, so undo it the same way.</p>
+          <p>
+            Recent changes lists this change and the command that puts it back, but ccdesk cannot
+            undo it for you.
+          </p>
         </div>
       )}
       <div className="editor-buttons">

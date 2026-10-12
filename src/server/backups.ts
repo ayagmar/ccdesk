@@ -21,6 +21,7 @@ import {
   readIfExists,
   recordChange,
   removeExactly,
+  SHOWN_AFTER,
   SNAPSHOT,
   StaleError,
   serially,
@@ -34,6 +35,7 @@ const KINDS = new Set([
   "memory-index",
   "memory-delete",
   "memory-restore",
+  "mcp-claude",
 ]);
 
 function strings(value: unknown): value is string[] {
@@ -60,7 +62,8 @@ async function readManifest(env: ScanEnv, id: string): Promise<BackupManifest | 
     typeof data.createdAt !== "string" ||
     typeof data.before !== "string" ||
     typeof data.after !== "string" ||
-    (data.removedIndexLines !== undefined && !strings(data.removedIndexLines))
+    (data.removedIndexLines !== undefined && !strings(data.removedIndexLines)) ||
+    (data.undoCommands !== undefined && !strings(data.undoCommands))
   )
     return null;
   return data as unknown as BackupManifest;
@@ -163,12 +166,49 @@ interface Plan {
   index?: { path: string; text: string | null; missing: string[] };
 }
 
-async function planRestore(env: ScanEnv, id: string): Promise<Plan> {
+/** A backup's manifest and its folder, which must be inside the backup folder. */
+async function backupAt(env: ScanEnv, id: string) {
   const manifest = await readManifest(env, id);
   if (!manifest) throw new RefusedError("That backup is gone or was not made by ccdesk.");
   const root = await realpath(backupRoot(env));
   const dir = await realpath(join(root, id));
   if (!isWithin(root, dir) || dir === root) throw new RefusedError("Not a ccdesk backup.");
+  return { manifest, dir };
+}
+
+const MADE_BY_CLAUDE =
+  "Claude Code made this change through claude mcp, so ccdesk cannot undo it. Run the commands below to put it back.";
+
+/**
+ * What a change made through `claude mcp` did, as ccdesk recorded it: the servers before and
+ * after, values hidden, and the commands that put them back.
+ */
+async function claudeMcpPreview(
+  id: string,
+  manifest: BackupManifest,
+  dir: string
+): Promise<RestorePreview> {
+  const read = async (name: string, revision: string) => {
+    const text = await readFile(join(dir, name), "utf8").catch(() => null);
+    if (text === null || revisionOf(text) !== revision)
+      throw new RefusedError("The record of this change is missing or was changed.");
+    return text;
+  };
+  return {
+    id,
+    kind: manifest.kind,
+    target: manifest.target,
+    before: await read(SNAPSHOT, manifest.before),
+    after: await read(SHOWN_AFTER, manifest.after),
+    revision: manifest.after,
+    blocked: MADE_BY_CLAUDE,
+    undoCommands: manifest.undoCommands ?? [],
+  };
+}
+
+async function planRestore(env: ScanEnv, id: string): Promise<Plan> {
+  const { manifest, dir } = await backupAt(env, id);
+  if (manifest.kind === "mcp-claude") throw new RefusedError(MADE_BY_CLAUDE);
 
   let target = manifest.target;
   if (manifest.kind === "settings" && !isSettingsFile(env, target))
@@ -268,6 +308,8 @@ function blockedReason(plan: Plan): string | undefined {
 }
 
 export async function previewRestore(env: ScanEnv, id: string): Promise<RestorePreview> {
+  const { manifest: recorded, dir } = await backupAt(env, id);
+  if (recorded.kind === "mcp-claude") return claudeMcpPreview(id, recorded, dir);
   const plan = await planRestore(env, id);
   const { manifest, current, saved, index } = plan;
   const shown = manifest.kind === "settings" || manifest.kind === "mcp" ? shownSettings : shownText;

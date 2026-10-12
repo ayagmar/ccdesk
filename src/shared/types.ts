@@ -141,7 +141,9 @@ export type BackupKind =
   | "agent"
   | "memory-index"
   | "memory-delete"
-  | "memory-restore";
+  | "memory-restore"
+  /** A user or local MCP server change made through `claude mcp`, which ccdesk cannot undo. */
+  | "mcp-claude";
 
 /** One change ccdesk made, from its backup folder. */
 export interface BackupSummary {
@@ -198,6 +200,11 @@ export interface RestorePreview {
   blocked?: string;
   /** For a deleted memory: the lines put back into MEMORY.md. */
   indexLines?: string[];
+  /**
+   * For a change made through `claude mcp`, which ccdesk cannot undo: the commands that put it
+   * back, values hidden. `before` and `after` are then the servers before and after the change.
+   */
+  undoCommands?: string[];
 }
 
 export interface Entry {

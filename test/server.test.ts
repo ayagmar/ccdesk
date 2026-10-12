@@ -5,6 +5,7 @@ import {
   existsSync,
   linkSync,
   lstatSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -43,6 +44,7 @@ interface RestorePreview {
   removes?: boolean;
   blocked?: string;
   indexLines?: string[];
+  undoCommands?: string[];
 }
 let fixture: Fixture;
 let server: ReturnType<typeof createCcdeskServer>;
@@ -1485,6 +1487,69 @@ test("user and local servers are changed through claude mcp, never by writing ~/
     },
   ]);
   assert.equal(readFileSync(fixture.env.claudeJson, "utf8"), before);
+});
+
+/** Every file in a backup folder, read as text. */
+function backupFiles(id: string): string {
+  const dir = join(fixture.env.claudeDir, "backups", "ccdesk", id);
+  return readdirSync(dir)
+    .map((name) => readFileSync(join(dir, name), "utf8"))
+    .join("\n");
+}
+
+test("claude mcp edits are listed in recent changes with values hidden, and are not undone by ccdesk", async () => {
+  const dir = fixture.at("work/mcp-recorded");
+  fixture.write("work/mcp-recorded/README.md", "x");
+  fixture.write(
+    fixture.env.claudeJson,
+    JSON.stringify({
+      mcpServers: { api: { command: "api-mcp", env: { TOKEN: "user-env-secret" } } },
+    })
+  );
+  const removed = await saveMcp({
+    dir,
+    scope: "user",
+    remove: { name: "api", definition: { command: "api-mcp", env: { TOKEN: "•••" } } },
+  });
+  const added = await saveMcp({
+    dir,
+    scope: "local",
+    add: {
+      name: "db",
+      definition: { command: "db-mcp", args: ["--token", "local-arg-secret"] },
+    },
+  });
+  assert.equal(removed.status, 200);
+  assert.equal(added.status, 200);
+
+  const recorded = (await backups()).filter((b) => b.kind === "mcp-claude").slice(0, 2);
+  assert.equal(recorded.length, 2);
+  const [addition, removal] = await Promise.all(
+    recorded.map(
+      async (b) =>
+        (await call("/api/backups/preview", { method: "POST", body: { id: b.id } }))
+          .json as RestorePreview
+    )
+  );
+  assert.ok(addition && removal);
+  assert.match(removal.before ?? "", /"api"[\s\S]*"TOKEN": "•••"/);
+  assert.equal(removal.after, "{}\n");
+  assert.deepEqual(removal.undoCommands, [
+    `claude mcp add-json --scope user -- 'api' '{"command":"api-mcp","env":{"TOKEN":"•••"}}'`,
+  ]);
+  assert.equal(addition.before, "{}\n");
+  assert.match(addition.after, /"db"[\s\S]*"•••"/);
+  assert.deepEqual(addition.undoCommands, [
+    `cd '${dir}' && claude mcp remove --scope local -- 'db'`,
+  ]);
+  for (const b of recorded) {
+    assert.doesNotMatch(backupFiles(b.id), /user-env-secret|local-arg-secret/);
+    const restore = await call("/api/backups/restore", {
+      method: "POST",
+      body: { id: b.id, revision: "any" },
+    });
+    assert.equal(restore.status, 409);
+  }
 });
 
 test("removing a user server is refused when its hidden values changed after the review", async () => {

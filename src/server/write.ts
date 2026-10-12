@@ -167,6 +167,8 @@ export interface BackupManifest {
   after: string;
   /** For a deleted memory: the MEMORY.md lines removed with it. */
   removedIndexLines?: string[];
+  /** For a change made through `claude mcp`: the commands that put it back, values hidden. */
+  undoCommands?: string[];
 }
 
 export const MANIFEST = "ccdesk-backup.json";
@@ -177,6 +179,48 @@ export function forgetChange(env: ScanEnv, id: string): Promise<void> {
 }
 /** The copy of the target inside a backup folder. */
 export const SNAPSHOT = "before";
+/** For a change made through `claude mcp`: the affected servers after it, values hidden. */
+export const SHOWN_AFTER = "after";
+
+/** A new, empty backup folder that only you can read, and its id. */
+async function newBackup(env: ScanEnv, kind: BackupKind) {
+  const createdAt = new Date().toISOString();
+  const id = `${createdAt.replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}-${kind}`;
+  const root = backupRoot(env);
+  const dir = join(root, id);
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  await chmod(root, 0o700);
+  return { createdAt, id, dir };
+}
+
+/**
+ * Lists a change Claude Code made through `claude mcp` in Recent changes. ccdesk cannot undo it,
+ * so it keeps only the affected servers before and after as the page shows them, secrets hidden,
+ * and the commands that would put them back; never a value the page does not show.
+ */
+export async function recordClaudeMcpChange(
+  env: ScanEnv,
+  record: { target: string; shownBefore: string; shownAfter: string; undoCommands: string[] }
+): Promise<void> {
+  const { createdAt, dir } = await newBackup(env, "mcp-claude");
+  const manifest: BackupManifest = {
+    kind: "mcp-claude",
+    target: record.target,
+    createdAt,
+    before: revisionOf(record.shownBefore),
+    after: revisionOf(record.shownAfter),
+    undoCommands: record.undoCommands,
+  };
+  try {
+    await writeFile(join(dir, SNAPSHOT), record.shownBefore, { mode: 0o600 });
+    await writeFile(join(dir, SHOWN_AFTER), record.shownAfter, { mode: 0o600 });
+    // Written last, so a folder without it is never listed.
+    await writeFile(join(dir, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
+  } catch (error) {
+    await rm(dir, { recursive: true, force: true });
+    throw error;
+  }
+}
 
 /**
  * Makes a change and records it in Recent changes. The file's previous text and a manifest are put
@@ -197,12 +241,7 @@ export async function recordChange<T extends { revision: string }>(
   },
   change: () => Promise<T>
 ): Promise<T & { id: string; created: boolean }> {
-  const createdAt = new Date().toISOString();
-  const id = `${createdAt.replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}-${record.kind}`;
-  const root = backupRoot(env);
-  const dir = join(root, id);
-  await mkdir(dir, { recursive: true, mode: 0o700 });
-  await chmod(root, 0o700);
+  const { createdAt, id, dir } = await newBackup(env, record.kind);
   const manifest: BackupManifest = {
     kind: record.kind,
     target: record.target,
