@@ -10,6 +10,7 @@ import {
   mainWorktreeRoot,
   redactSecrets,
   revisionOf,
+  shownUrl,
 } from "./scan/files.ts";
 import { RefusedError, readIfExists, recordChange, serially, writeAtomic } from "./write.ts";
 
@@ -48,6 +49,37 @@ export async function claudeProgram(
   return "claude";
 }
 
+/** The env and header values, and URL credentials, in a server definition passed to claude. */
+function secretsIn(args: string[]): string[] {
+  const found: string[] = [];
+  const walk = (value: unknown) => {
+    if (Array.isArray(value)) value.forEach(walk);
+    if (!isRecord(value)) return;
+    for (const [key, inner] of Object.entries(value)) {
+      if ((key === "env" || key === "headers") && isRecord(inner))
+        for (const v of Object.values(inner)) if (typeof v === "string" && v) found.push(v);
+      if (key === "url" && typeof inner === "string" && shownUrl(inner) !== inner) {
+        const url = URL.parse(inner);
+        found.push(
+          ...[url?.username, url?.password, url?.search.slice(1)].filter((p): p is string => !!p)
+        );
+      }
+      walk(inner);
+    }
+  };
+  // add-json takes the definition as one JSON argument.
+  for (const arg of args) {
+    if (!arg.startsWith("{")) continue;
+    try {
+      walk(JSON.parse(arg));
+    } catch {
+      // Not JSON after all, so it holds no definition.
+    }
+  }
+  // Longest first, so a value that contains another is hidden whole.
+  return found.sort((a, b) => b.length - a.length);
+}
+
 export const runClaude: RunClaude = async (args, cwd) => {
   const program = await claudeProgram();
   return new Promise((done, fail) => {
@@ -60,8 +92,13 @@ export const runClaude: RunClaude = async (args, cwd) => {
         );
       // Node's own message repeats the command, with the server's env and header values in it.
       if (error) {
+        // claude's own message may quote the definition it was given.
+        const said = secretsIn(args).reduce(
+          (text, secret) => text.replaceAll(secret, "•••"),
+          stderr
+        );
         const reason =
-          stderr.trim() ||
+          said.trim() ||
           (error.killed ? "it took longer than 30 seconds" : `it exited with code ${error.code}`);
         return fail(new RefusedError(`claude ${args[1]} failed: ${reason}`));
       }

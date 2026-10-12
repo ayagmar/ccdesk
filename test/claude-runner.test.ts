@@ -35,6 +35,34 @@ test(
   }
 );
 
+test(
+  "claude's own error message is passed on with the server's secrets hidden",
+  notOnWindows,
+  async () => {
+    const f = makeFixture();
+    chmodSync(f.write("bin/claude", '#!/bin/sh\necho "invalid server: $*" >&2\nexit 1\n'), 0o755);
+    const path = process.env.PATH;
+    process.env.PATH = f.at("bin");
+    try {
+      const definition = {
+        type: "http",
+        url: "https://bot:hunter2@mcp.example.com/?key=abc123",
+        headers: { Authorization: "Bearer tok-999" },
+      };
+      await assert.rejects(
+        runClaude(["mcp", "add-json", "--", "api", JSON.stringify(definition)], f.at()),
+        (error: Error) => {
+          assert.match(error.message, /invalid server/);
+          assert.doesNotMatch(error.message, /hunter2|abc123|tok-999/);
+          return true;
+        }
+      );
+    } finally {
+      process.env.PATH = path;
+    }
+  }
+);
+
 test("on Windows, an npm install of Claude Code runs the claude.exe its claude.cmd starts", async () => {
   const f = makeFixture();
   const npm = f.at("npm");
