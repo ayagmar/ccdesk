@@ -1,7 +1,9 @@
 import { join } from "node:path";
 import {
+  type McpApproval,
   type McpServer,
   type Plugin,
+  type Scope,
   type SessionProfile,
   type SettingsLayer,
   type Trust,
@@ -270,25 +272,35 @@ export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<M
   const disabledHere = stringsIn(project.disabledMcpServers);
   // A cloned repository cannot approve its own servers: project and local approvals count once the
   // folder is trusted, local ones in your configuration home right away (docs: mcp#project-server-approvals-and-workspace-trust).
-  const approvalLayers = layers.filter(
-    (l) =>
-      (l.scope !== "project" && l.scope !== "local") ||
-      trust.trusted ||
-      (l.scope === "local" && isConfigHome(env, projectDir))
-  );
+  // A disabledMcpjsonServers entry in any file rejects the server.
+  const approvalCounts = (scope: Scope) =>
+    (scope !== "project" && scope !== "local") ||
+    trust.trusted ||
+    (scope === "local" && isConfigHome(env, projectDir));
   // Your answers to the .mcp.json prompt sit in the project entry: claude mcp list counts an
   // enableAllProjectMcpServers there, and claude mcp reset-project-choices clears it (v2.1.296).
-  const approveAll =
-    approvalLayers.some((l) => l.data?.enableAllProjectMcpServers === true) ||
-    project.enableAllProjectMcpServers === true;
-  const approved = new Set([
-    ...approvalLayers.flatMap((l) => stringsIn(l.data?.enabledMcpjsonServers)),
-    ...stringsIn(project.enabledMcpjsonServers),
-  ]);
-  const rejected = new Set([
-    ...layers.flatMap((l) => stringsIn(l.data?.disabledMcpjsonServers)),
-    ...stringsIn(project.disabledMcpjsonServers),
-  ]);
+  const sources: Array<{
+    source: McpApproval["source"];
+    path: string;
+    data: Record<string, unknown>;
+  }> = [
+    ...layers.flatMap((l) => (l.data ? [{ source: l.scope, path: l.path, data: l.data }] : [])),
+    { source: "claude-json", path: env.claudeJson, data: project },
+  ];
+  const answersFor = (name: string): McpApproval[] =>
+    sources.flatMap(({ source, path, data }) => {
+      const counts = source === "claude-json" || approvalCounts(source);
+      const out: McpApproval[] = [];
+      if (data.enableAllProjectMcpServers === true)
+        out.push({ key: "enableAllProjectMcpServers", source, path, counts });
+      if (stringsIn(data.enabledMcpjsonServers).includes(name))
+        out.push({ key: "enabledMcpjsonServers", source, path, counts });
+      if (stringsIn(data.disabledMcpjsonServers).includes(name))
+        out.push({ key: "disabledMcpjsonServers", source, path, counts: true });
+      return out;
+    });
+  const from = (a: McpApproval) =>
+    a.source === "claude-json" ? "your answer in ~/.claude.json" : `${a.source} settings`;
 
   const set = (server: McpServer, status: McpServer["status"], note: string) => {
     server.status = status;
@@ -324,14 +336,26 @@ export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<M
       );
     else if (disabledHere.includes(server.name))
       set(server, "disabled", "Turned off for this project in /mcp");
-    else if (server.scope === "project" && rejected.has(server.name))
-      set(server, "rejected", "Rejected by disabledMcpjsonServers");
-    else if (server.scope === "project" && !approveAll && !approved.has(server.name)) {
+    else if (server.scope === "project") {
+      const answers = answersFor(server.name);
+      if (answers.length > 0) server.approvals = answers;
+      const rejection = answers.find((a) => a.key === "disabledMcpjsonServers");
+      const waiting = answers.find((a) => a.key !== "disabledMcpjsonServers" && !a.counts);
+      const approved = answers.some((a) => a.key !== "disabledMcpjsonServers" && a.counts);
+      if (rejection)
+        set(server, "rejected", `Rejected by disabledMcpjsonServers in ${from(rejection)}`);
       // claude -p connects them without asking, approved or not (docs: permissions#what-runs-before-you-trust-a-folder).
-      if (profile === "print")
+      else if (!approved && profile === "print")
         server.note =
           "Not approved, but claude -p connects .mcp.json servers without asking; the SDK does when settingSources includes project";
-      else set(server, "pending", "Claude Code asks before starting servers from .mcp.json");
+      else if (!approved)
+        set(
+          server,
+          "pending",
+          waiting
+            ? `Claude Code asks before starting it: ${waiting.key} in ${from(waiting)} counts once you trust this folder`
+            : "Claude Code asks before starting servers from .mcp.json: answer its prompt, or list the server in enabledMcpjsonServers in your user settings"
+        );
     }
     if (server.status === "active" || server.status === "pending")
       enabledEndpoints.set(endpoint(d), d);

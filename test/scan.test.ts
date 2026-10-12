@@ -411,6 +411,45 @@ test("claude -p treats an untrusted folder as trusted for hooks and .mcp.json, n
   });
 });
 
+test("each .mcp.json server says which setting or saved answer approved, rejected or holds it", async () => {
+  const f = makeFixture();
+  f.json("app/.mcp.json", {
+    mcpServers: {
+      mine: { command: "a" },
+      theirs: { command: "b" },
+      refused: { command: "c" },
+      unknown: { command: "d" },
+    },
+  });
+  f.json("home/.claude/settings.json", { enabledMcpjsonServers: ["mine"] });
+  f.json("app/.claude/settings.json", { enabledMcpjsonServers: ["theirs"] });
+  f.json("home/.claude.json", {
+    projects: { [f.at("app")]: { disabledMcpjsonServers: ["refused"] } },
+  });
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  const server = (name: string) => view.inventory.mcpServers.find((s) => s.name === name);
+  assert.equal(server("mine")?.status, "active");
+  assert.deepEqual(server("mine")?.approvals, [
+    {
+      key: "enabledMcpjsonServers",
+      source: "user",
+      path: f.at("home/.claude/settings.json"),
+      counts: true,
+    },
+  ]);
+  assert.equal(server("theirs")?.status, "pending");
+  assert.match(
+    server("theirs")?.note ?? "",
+    /enabledMcpjsonServers in project settings counts once you trust/
+  );
+  assert.equal(server("refused")?.status, "rejected");
+  assert.match(server("refused")?.note ?? "", /your answer in ~\/\.claude\.json/);
+  assert.equal(server("unknown")?.approvals, undefined);
+  assert.match(server("unknown")?.note ?? "", /answer its prompt/);
+});
+
 test("MCP policy: denied servers are blocked, an allowlist blocks the rest, managed-mcp.json takes over", async () => {
   const f = makeFixture();
   f.json("home/.claude.json", {

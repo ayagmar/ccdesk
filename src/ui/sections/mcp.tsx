@@ -88,6 +88,23 @@ export const mcp = defineSection<R>({
           <Field label="Defined in">
             <PathValue path={m.sourcePath} />
           </Field>
+          {m.approvals && (
+            <Field label="Approval">
+              <ul className="plain">
+                {m.approvals.map((a) => (
+                  <li key={`${a.key}:${a.path}`}>
+                    <span className="mono">{a.key}</span>{" "}
+                    {a.source === "claude-json"
+                      ? "from your answer to Claude Code's prompt"
+                      : `in ${a.source} settings`}
+                    {!a.counts && ", which counts once you trust this folder"}
+                    <br />
+                    <PathValue path={a.path} />
+                  </li>
+                ))}
+              </ul>
+            </Field>
+          )}
         </dl>
         <p className="muted small">Environment variables and headers are hidden.</p>
         <h3 className="sub-title">Change this server</h3>

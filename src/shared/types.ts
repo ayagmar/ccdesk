@@ -264,6 +264,16 @@ export type McpStatus =
   | "blocked"
   | "invalid";
 
+/** A setting or saved answer that approves or rejects a .mcp.json server. */
+export interface McpApproval {
+  key: "enableAllProjectMcpServers" | "enabledMcpjsonServers" | "disabledMcpjsonServers";
+  /** A settings file, or your answers to Claude Code's prompt in ~/.claude.json. */
+  source: Scope | "claude-json";
+  path: string;
+  /** False for an approval from repository settings that waits until the folder is trusted. */
+  counts: boolean;
+}
+
 export interface McpServer {
   name: string;
   scope: Scope | "plugin";
@@ -274,6 +284,8 @@ export interface McpServer {
   plugin?: string;
   /** Why the server is not started, in plain words. */
   note?: string;
+  /** For a .mcp.json server, every setting or saved answer that names it, highest file first. */
+  approvals?: McpApproval[];
   /** The server as written, with env, header and URL secrets hidden. */
   definition: unknown;
 }

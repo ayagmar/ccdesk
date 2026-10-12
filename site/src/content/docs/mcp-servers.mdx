@@ -34,6 +34,8 @@ When two scopes define a server with the same name, the first one wins and the o
 - **overridden**: another scope defines a server with this name first (see above).
 - **invalid**: Claude Code cannot use the definition as written, for example a `url` without a `type`, which Claude Code reads as a stdio server.
 
+For a `.mcp.json` server, the inspector's **Approval** field lists each settings file, and your saved answers in `~/.claude.json`, that approve or reject it, with a note on any approval that waits for you to trust the folder.
+
 Values under `env` and `headers`, and the user name, password and query string of a `url`, are shown as `•••`. So are secrets in `args`: the value after `--token`, `--api-key`, `--apikey`, `--password`, `--secret`, `--auth` or `--key` (as `--token value` or `--token=value`), a value that starts like a common key (`sk-`, `ghp_`, `github_pat_`, `xoxb-`, `glpat-`, `AKIA`), and the credentials in a URL. The Target column hides them the same way.
 
 ## Changing servers
