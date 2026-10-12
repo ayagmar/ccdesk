@@ -469,22 +469,22 @@ input::placeholder {
 }
 
 /* The header has one row for the index; in a narrow column the key hints, then the counts, make room. */
-@container (max-width: 960px) {
+@container (max-width: 1100px) {
   .section-index kbd {
     display: none;
   }
 }
 
-@container (max-width: 700px) {
+@container (max-width: 840px) {
   .section-index .seg-count {
     display: none;
   }
 }
 
-@container (max-width: 560px) {
+@container (max-width: 680px) {
   .section-index a {
-    padding: 0 4px;
-    font-size: 13px;
+    padding: 0 3px;
+    font-size: 12.5px;
   }
 }
 
