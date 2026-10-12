@@ -8,6 +8,6 @@
     "sourceMap": false,
     "declaration": true
   },
-  "include": ["src/core/**/*.ts", "src/server/**/*.ts", "src/shared/**/*.ts"],
+  "include": ["src/core/**/*.ts", "src/server/**/*.ts", "src/shared/**/*.ts", "src/view/**/*.ts"],
   "exclude": ["node_modules", "dist", "src/ui"]
 }

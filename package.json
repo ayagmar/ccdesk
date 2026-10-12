@@ -35,6 +35,10 @@
       "types": "./dist/core/index.d.ts",
       "default": "./dist/core/index.js"
     },
+    "./view": {
+      "types": "./dist/view/index.d.ts",
+      "default": "./dist/view/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

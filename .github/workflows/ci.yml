@@ -44,7 +44,7 @@ jobs:
       - run: pnpm run schema && git diff --exit-code -- src/shared/settings.schema.json src/shared/hook-events.json
       # Install the packed tarball the way npx would, start it in an empty home and load the page
       # and its script, so a file missing from "files" fails here. Importing the package checks
-      # that its "exports" lead to the built core.
+      # that its "exports" lead to the built core and view.
       - name: Smoke test the package
         run: |
           npm pack --pack-destination "$RUNNER_TEMP"
@@ -52,6 +52,7 @@ jobs:
           npm init -y >/dev/null
           npm install ./ccdesk-*.tgz
           node --input-type=module -e 'const core = await import("ccdesk"); if (typeof core.scanDirectory !== "function") process.exit(1)'
+          node --input-type=module -e 'const view = await import("ccdesk/view"); if (typeof view.buildRows !== "function") process.exit(1)'
           export HOME="$RUNNER_TEMP/home" USERPROFILE="$RUNNER_TEMP/home"
           mkdir -p "$HOME"
           npx --no -- ccdesk --no-open --port 4399 > ccdesk.log 2>&1 &

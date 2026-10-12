@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { valuesIn } from "../src/view/settings.ts";
+import { valuesIn } from "../src/view/index.ts";
 
 test("documented values come from an inline list, without placeholders", () => {
   assert.deepEqual(valuesIn('string, one of `"60s"`, `"5m"`, `"10m"`, or `"never"`'), [
