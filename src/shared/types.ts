@@ -529,7 +529,7 @@ export interface PermissionEdit {
 }
 
 /** A hook as a HookEdit writes it: the matcher group it goes in, and the hook itself. */
-export interface HookPlacement {
+interface HookPlacement {
   event: string;
   /** Empty or absent for a group without a matcher, which matches everything. */
   matcher?: string;

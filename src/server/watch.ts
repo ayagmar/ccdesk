@@ -1,9 +1,9 @@
 import { type FSWatcher, watch } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { storeDirName } from "../shared/memory.ts";
 import { type DirectoryView } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isNetworkPath, mainWorktreeRoot } from "./scan/files.ts";
-import { storeDirName } from "./scan/memory.ts";
 
 /** How long one request waits for a change before answering "nothing changed". */
 const WAIT_MS = 25_000;

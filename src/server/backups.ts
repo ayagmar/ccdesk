@@ -3,15 +3,8 @@ import { basename, dirname, join } from "node:path";
 import { type BackupSummary, type RestorePreview } from "../shared/types.ts";
 import { assertMemoryDir, indexPathIn, revisionOfBoth } from "./mutations.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import {
-  isRecord,
-  isWithin,
-  redactSecrets,
-  revisionOf,
-  shownArgs,
-  shownText,
-  shownUrl,
-} from "./scan/files.ts";
+import { isRecord, isWithin, revisionOf, shownText } from "./scan/files.ts";
+import { hiddenValues, shown } from "./secrets.ts";
 import {
   type BackupManifest,
   backupRoot,
@@ -112,43 +105,11 @@ function isAgentFile(env: ScanEnv, path: string): boolean {
   );
 }
 
-/**
- * Every value ccdesk shows hidden and never changes in a settings file: env and headers objects,
- * URLs with a user, password or query, and a command's args that hold a key. Null for a file that
- * is not valid JSON.
- */
-function hiddenValues(text: string | null): string | null {
-  const found: unknown[] = [];
-  const walk = (value: unknown) => {
-    if (Array.isArray(value)) value.forEach(walk);
-    if (!isRecord(value)) return;
-    for (const [key, inner] of Object.entries(value)) {
-      if ((key === "env" || key === "headers") && isRecord(inner)) found.push(inner);
-      else if (key === "url" && typeof inner === "string" && shownUrl(inner) !== inner)
-        found.push(inner);
-      else if (
-        key === "args" &&
-        "command" in value &&
-        Array.isArray(inner) &&
-        JSON.stringify(shownArgs(inner)) !== JSON.stringify(inner)
-      )
-        found.push(inner);
-      else walk(inner);
-    }
-  };
-  try {
-    walk(text === null ? null : JSON.parse(text));
-  } catch {
-    return null;
-  }
-  return JSON.stringify(found);
-}
-
 /** Settings are shown parsed with env and header values hidden, as everywhere else in ccdesk. */
 function shownSettings(text: string | null): string | null {
   if (text === null) return null;
   try {
-    return `${JSON.stringify(redactSecrets(JSON.parse(text)), null, 2)}\n`;
+    return shown(JSON.parse(text));
   } catch {
     return "(not valid JSON; open the file to see it)\n";
   }
@@ -312,9 +273,9 @@ export async function previewRestore(env: ScanEnv, id: string): Promise<RestoreP
   if (recorded.kind === "mcp-claude") return claudeMcpPreview(id, recorded, dir);
   const plan = await planRestore(env, id);
   const { manifest, current, saved, index } = plan;
-  const shown = manifest.kind === "settings" || manifest.kind === "mcp" ? shownSettings : shownText;
-  const before = shown(current);
-  const after = (onlyIndexLines(plan) ? before : shown(saved)) ?? "";
+  const show = manifest.kind === "settings" || manifest.kind === "mcp" ? shownSettings : shownText;
+  const before = show(current);
+  const after = (onlyIndexLines(plan) ? before : show(saved)) ?? "";
   const blocked = blockedReason(plan);
   return {
     id,

@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import HOOK_EVENTS from "../shared/hook-events.json" with { type: "json" };
+import { EVERY_FILE, PERMISSION_LISTS } from "../shared/scopes.ts";
 import {
   type AgentEdit,
   type HookEdit,
@@ -131,7 +132,7 @@ async function handle(
     if (!Array.isArray(rules)) return send(res, 400, { error: "rules must be a list" });
     const inEffect = rules.map((r) => {
       const { list, rule } = stringFields(r, ["list", "rule"]);
-      if (!LISTS.includes(list as PermissionList))
+      if (!PERMISSION_LISTS.includes(list as PermissionList))
         throw new RequestError(400, "a rule needs a list: allow, ask or deny");
       return { list: list as PermissionList, rule };
     });
@@ -251,9 +252,6 @@ async function handle(
   return send(res, 404, { error: "Not found" });
 }
 
-const SCOPES: Scope[] = ["managed", "user", "project", "local"];
-const LISTS: PermissionList[] = ["allow", "ask", "deny"];
-
 /** The named string fields of a JSON body; anything else is a 400. */
 function stringFields<K extends string>(body: unknown, names: K[]): Record<K, string> {
   if (!isRecord(body) || names.some((n) => typeof body[n] !== "string"))
@@ -273,7 +271,7 @@ async function fields<K extends string>(
 
 function settingsEditFrom(body: unknown): SettingsEdit {
   const { dir, scope, key } = stringFields(body, ["dir", "scope", "key"]);
-  if (!SCOPES.includes(scope as Scope)) throw new RequestError(400, "unknown scope");
+  if (!EVERY_FILE.includes(scope as Scope)) throw new RequestError(400, "unknown scope");
   const value = (body as Record<string, unknown>).value;
   return { dir, scope: scope as Scope, key, ...(value === undefined ? {} : { value }) };
 }
@@ -283,7 +281,7 @@ function permissionEditFrom(body: unknown): PermissionEdit {
   const rule = (value: unknown) => {
     if (value === undefined) return undefined;
     const { list, rule } = stringFields(value, ["list", "rule"]);
-    if (!LISTS.includes(list as PermissionList) || rule.trim() === "")
+    if (!PERMISSION_LISTS.includes(list as PermissionList) || rule.trim() === "")
       throw new RequestError(400, "a rule needs a list (allow, ask or deny) and text");
     return { list: list as PermissionList, rule };
   };

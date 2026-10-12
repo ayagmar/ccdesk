@@ -139,7 +139,7 @@ function defineManaged(servers: unknown, sourcePath: string): Defined[] {
 }
 
 /** Two URLs are one endpoint when they differ only in scheme or host case, a default port or a trailing slash. */
-export function endpoint(d: Defined): string {
+function endpoint(d: Defined): string {
   if (d.command) return `command:${JSON.stringify(d.command)}`;
   if (!d.url) return `none:${d.server.name}`;
   try {

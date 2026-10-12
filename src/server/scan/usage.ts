@@ -1,5 +1,6 @@
 import { open, realpath, stat } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
+import { storeDirName } from "../../shared/memory.ts";
 import {
   type Approval,
   type PermissionList,
@@ -8,7 +9,6 @@ import {
 } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
 import { isCredentials, isDir, isRecord, isWithin, listDir, wildcard, worktrees } from "./files.ts";
-import { storeDirName } from "./memory.ts";
 import { namesTool, parseRule } from "./tools.ts";
 
 /** One tool call, reduced to what counting and rule matching need. Never sent to the browser. */
@@ -40,7 +40,7 @@ interface Transcript {
 }
 
 /** A rule in effect here, as the scan found it. */
-export interface RuleInEffect {
+interface RuleInEffect {
   list: PermissionList;
   rule: string;
 }
@@ -71,7 +71,7 @@ interface Run {
 const waiting = new Map<string, Run>();
 
 /** How long one count may take before it stops; what it read by then stays counted. */
-export const TIME_LIMIT_MS = 60_000;
+const TIME_LIMIT_MS = 60_000;
 
 /** A count that stopped before it finished, because it took too long or nobody wanted it. */
 export class CountStopped extends Error {}

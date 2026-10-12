@@ -2,10 +2,11 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { storeDirName } from "../../shared/memory.ts";
 import { type MemoryStore, type ProjectSummary } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
 import { isCredentials, isDir, isRecord, listDir } from "./files.ts";
-import { readMemoryStore, storeDirName } from "./memory.ts";
+import { readMemoryStore } from "./memory.ts";
 
 interface KnownProject extends ProjectSummary {
   /** The project's auto memory, read once for both the counts and the search catalog. */

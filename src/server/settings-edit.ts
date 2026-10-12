@@ -14,6 +14,7 @@ import { type ScanEnv } from "./scan/env.ts";
 import { isRecord, jsonSyntaxError, redactSecrets, revisionOf } from "./scan/files.ts";
 import { isSkippedMcpRule } from "./scan/permissions.ts";
 import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
+import { hasHiddenValues, shown } from "./secrets.ts";
 import { RefusedError, readIfExists, recordChange, serially, writeAtomic } from "./write.ts";
 
 const properties: Record<string, object> = schema.definitions.ClaudeCodeSettings.properties;
@@ -37,14 +38,6 @@ interface PlannedEdit {
   /** The text ccdesk would write; null when the value failed validation. */
   next: string | null;
   preview: SettingsEditPreview;
-}
-
-function shown(data: Record<string, unknown>): string {
-  return `${JSON.stringify(redactSecrets(data), null, 2)}\n`;
-}
-
-function hasHiddenValues(value: unknown): boolean {
-  return JSON.stringify(redactSecrets(value)) !== JSON.stringify(value);
 }
 
 async function editableFile(
