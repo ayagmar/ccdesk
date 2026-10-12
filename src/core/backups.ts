@@ -3,8 +3,8 @@ import { basename, dirname, join } from "node:path";
 import { type BackupSummary, type RestorePreview } from "../shared/types.ts";
 import { assertMemoryDir, indexPathIn, revisionOfBoth } from "./mutations.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isRecord, isWithin, revisionOf, shownText } from "./scan/files.ts";
-import { hiddenValues, shown } from "./secrets.ts";
+import { isRecord, isWithin, revisionOf } from "./scan/files.ts";
+import { hiddenValues, shown, shownText } from "./secrets.ts";
 import {
   type BackupManifest,
   backupRoot,

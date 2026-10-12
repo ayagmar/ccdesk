@@ -1,14 +1,12 @@
-import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { type BigIntStats } from "node:fs";
 import { type FileHandle, lstat, open, readdir, readlink, realpath, stat } from "node:fs/promises";
-import { basename, dirname, join, normalize, relative, resolve, sep } from "node:path";
-import { promisify } from "node:util";
-import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { type TextFile, type Visibility } from "../../shared/types.ts";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { parse as parseYaml } from "yaml";
+import { type TextFile } from "../../shared/types.ts";
+import { jsonSyntaxError, shownJsonFile, shownText } from "../secrets.ts";
 import { type ScanEnv } from "./env.ts";
 
-const run = promisify(execFile);
 /** Claude Code skips a CLAUDE.md larger than this (docs: memory#auto-memory), so ccdesk reads no more. */
 export const MAX_TEXT_BYTES = 4 * 1024 * 1024;
 
@@ -64,59 +62,6 @@ async function openUnlessCredentials(env: ScanEnv, path: string): Promise<FileHa
     return null;
   }
   return handle;
-}
-
-/**
- * A JSON parse failure without the parser's message, which quotes the text around the fault and
- * so can quote a secret.
- */
-export function jsonSyntaxError(error: unknown): string {
-  const at = /line (\d+) column (\d+)/.exec(String(error));
-  return at ? `not valid JSON (line ${at[1]}, column ${at[2]})` : "not valid JSON";
-}
-
-/**
- * The text ccdesk shows for a file reached as an instruction, import, memory, agent or skill. A
- * settings or MCP file read this way, whatever it is named, would otherwise show its env and
- * headers values, so anything that parses as JSON is shown parsed with them hidden. Frontmatter can
- * hold the same values, in a subagent's inline MCP servers (docs: sub-agents#scope-mcp-servers-to-a-subagent),
- * so frontmatter that holds any is shown re-written with them hidden.
- */
-export function shownText(text: string | null): string | null {
-  if (text === null) return null;
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    return shownFrontmatter(text);
-  }
-  return typeof data === "object" && data !== null
-    ? `${JSON.stringify(redactSecrets(data), null, 2)}\n`
-    : text;
-}
-
-function shownFrontmatter(text: string): string {
-  const match = FRONTMATTER.exec(text);
-  if (!match) return text;
-  let data: unknown;
-  try {
-    data = parseYaml(match[1] ?? "");
-  } catch {
-    return text;
-  }
-  const redacted = redactSecrets(data);
-  if (JSON.stringify(redacted) === JSON.stringify(data)) return text;
-  return `---\n${stringifyYaml(redacted)}---\n${text.slice(match[0].length)}`;
-}
-
-/** A file named .json that does not parse is not shown: its text could still hold a secret. */
-function shownJsonFile(text: string): string {
-  try {
-    JSON.parse(text);
-  } catch {
-    return "(a JSON file ccdesk could not parse, so its text is not shown; open it to see it)\n";
-  }
-  return shownText(text) ?? "";
 }
 
 /**
@@ -262,78 +207,12 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * A server URL as ccdesk shows it: a user name, password or query string can carry a key, so they
- * are hidden, as Claude Code hides the URL in its own status output (docs: mcp).
- */
-export function shownUrl(url: string): string {
-  try {
-    const u = new URL(url);
-    if (!u.username && !u.password && !u.search) return url;
-    if (u.username || u.password) {
-      u.username = "•••";
-      u.password = "";
-    }
-    if (u.search) u.search = "?•••";
-    return decodeURI(u.toString());
-  } catch {
-    return url.replace(/\/\/[^/@]*@/, "//•••@").replace(/\?.*$/, "?•••");
-  }
-}
-
-/** A flag whose value is a secret, such as `--token` or `--api-key`. */
-const SECRET_FLAG = /^--(token|api[-_]?key|apikey|password|secret|auth|key)$/i;
-/** A value that starts like a common API key or token. */
-const KEY_PREFIX = /^(sk-|ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|xox[bp]-|glpat-|AKIA[0-9A-Z]{16})/;
-
-/**
- * A server's command-line arguments as ccdesk shows them: the value after a secret flag, given as
- * `--token value` or `--token=value`, a value that starts like a known key, and the credentials in
- * a URL are hidden.
- */
-export function shownArgs(args: unknown[]): unknown[] {
-  return args.map((arg, i) => {
-    if (typeof arg !== "string") return arg;
-    const previous = args[i - 1];
-    if (typeof previous === "string" && SECRET_FLAG.test(previous) && !arg.startsWith("-"))
-      return "•••";
-    const equals = arg.indexOf("=");
-    if (equals > 0) {
-      const name = arg.slice(0, equals);
-      if (SECRET_FLAG.test(name) || KEY_PREFIX.test(arg.slice(equals + 1))) return `${name}=•••`;
-    }
-    if (KEY_PREFIX.test(arg)) return "•••";
-    if (/^https?:\/\//i.test(arg)) return shownUrl(arg);
-    return arg;
-  });
-}
-
-/**
- * Replace values that commonly hold secrets with a placeholder, keeping the keys: env and headers
- * values, the user, password and query of a `url`, and secret values in the `args` of a command.
- */
-export function redactSecrets(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(redactSecrets);
-  if (!isRecord(value)) return value;
-  // Built with fromEntries: assigning a key named __proto__ would set the prototype instead.
-  return Object.fromEntries(
-    Object.entries(value).map(([key, inner]) => {
-      if ((key === "env" || key === "headers") && isRecord(inner))
-        return [key, Object.fromEntries(Object.keys(inner).map((k) => [k, "•••"]))];
-      if (key === "url" && typeof inner === "string") return [key, shownUrl(inner)];
-      if (key === "args" && "command" in value && Array.isArray(inner))
-        return [key, shownArgs(inner)];
-      return [key, redactSecrets(inner)];
-    })
-  );
-}
-
 interface Frontmatter {
   data: Record<string, unknown>;
   body: string;
 }
 
-const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+export const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
 export function parseFrontmatter(text: string): Frontmatter {
   const match = FRONTMATTER.exec(text);
@@ -373,93 +252,6 @@ export function revisionOf(text: string | null): string {
 
 export function shortHash(text: string): string {
   return createHash("sha1").update(text).digest("hex").slice(0, 10);
-}
-
-export async function gitRoot(dir: string): Promise<string | null> {
-  try {
-    const { stdout } = await run("git", ["-C", dir, "rev-parse", "--show-toplevel"], {
-      timeout: 5000,
-    });
-    // Git prints forward slashes on Windows too; normalise so path comparisons hold.
-    return stdout.trim() ? normalize(stdout.trim()) : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Every checkout of the repository `dir` is in, the main one first; empty outside git. */
-export async function worktrees(dir: string): Promise<string[]> {
-  try {
-    const { stdout } = await run("git", ["-C", dir, "worktree", "list", "--porcelain"], {
-      timeout: 5000,
-    });
-    return stdout
-      .split("\n")
-      .filter((line) => line.startsWith("worktree "))
-      .map((line) => normalize(line.slice("worktree ".length)));
-  } catch {
-    return [];
-  }
-}
-
-/** Main worktree root: worktrees of one repository share Claude Code's auto memory. */
-export async function mainWorktreeRoot(dir: string): Promise<string | null> {
-  try {
-    const { stdout } = await run(
-      "git",
-      ["-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir"],
-      { timeout: 5000 }
-    );
-    const common = stdout.trim();
-    if (!common) return null;
-    return common.endsWith("/.git") || common.endsWith("\\.git")
-      ? normalize(dirname(common))
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Git visibility of each path, batched into two git calls per repository. */
-export async function visibilityOf(
-  root: string | null,
-  paths: string[]
-): Promise<Map<string, Visibility>> {
-  const result = new Map<string, Visibility>();
-  if (paths.length === 0) return result;
-  if (!root) {
-    for (const p of paths) result.set(p, "no-git");
-    return result;
-  }
-  const inside = paths.filter((p) => p !== root && isWithin(root, p));
-  for (const p of paths) if (!inside.includes(p)) result.set(p, "no-git");
-  if (inside.length === 0) return result;
-  const rels = new Map(inside.map((p) => [p, relative(root, p).replaceAll("\\", "/")]));
-  const tracked = await gitLines(root, ["ls-files", "--full-name", "-z", "--", ...inside], "\0");
-  // check-ignore echoes the paths it matched, and on Windows an absolute path does not come back
-  // as written, so it gets relative ones. It accepts -z only with --stdin, so its output is split
-  // by line.
-  const ignored = await gitLines(
-    root,
-    ["check-ignore", "--no-index", "--", ...rels.values()],
-    "\n"
-  );
-  for (const [p, rel] of rels) {
-    if (tracked.has(rel)) result.set(p, "tracked");
-    else if (ignored.has(rel)) result.set(p, "ignored");
-    else result.set(p, "untracked");
-  }
-  return result;
-}
-
-// Failures (including check-ignore's exit 1 for "nothing ignored") read as an empty set.
-async function gitLines(root: string, args: string[], separator: string): Promise<Set<string>> {
-  try {
-    const { stdout } = await run("git", ["-C", root, ...args], { timeout: 5000 });
-    return new Set(stdout.split(separator).filter(Boolean));
-  } catch {
-    return new Set();
-  }
 }
 
 /**

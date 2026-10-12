@@ -14,16 +14,8 @@ import {
 } from "../../shared/types.ts";
 import { buildContext } from "./context.ts";
 import { isConfigHome, type ScanEnv } from "./env.ts";
-import {
-  gitRoot,
-  isDir,
-  isFile,
-  isRecord,
-  mainWorktreeRoot,
-  readJsonObject,
-  stringsIn,
-  visibilityOf,
-} from "./files.ts";
+import { isDir, isFile, isRecord, readJsonObject, stringsIn } from "./files.ts";
+import { gitRoot, mainWorktreeRoot, visibilityOf } from "./git.ts";
 import { AGENTS_MD_MODES, resolveInstructions } from "./instructions.ts";
 import { readInventory } from "./inventory.ts";
 import { readMemoryStore } from "./memory.ts";

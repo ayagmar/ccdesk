@@ -12,11 +12,11 @@ export { isConfigHome, type ScanEnv, scanEnvFromProcess } from "./scan/env.ts";
 
 // Read.
 export { compareSettings } from "./scan/compare.ts";
-export { revisionOf, redactSecrets, shownText } from "./scan/files.ts";
+export { revisionOf } from "./scan/files.ts";
 export { scanDirectory, scanOverview } from "./scan/index.ts";
 export { testPath } from "./scan/path-test.ts";
 export { CountStopped, readUsage } from "./scan/usage.ts";
-export { hasHiddenValues, shown } from "./secrets.ts";
+export { hasHiddenValues, redactSecrets, shown, shownText } from "./secrets.ts";
 export { Watcher } from "./watch.ts";
 
 // Edits: the parse functions turn input from outside (JSON, arguments) into an edit, or throw

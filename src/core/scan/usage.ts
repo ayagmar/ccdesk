@@ -8,7 +8,8 @@ import {
   type Usage,
 } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isCredentials, isDir, isRecord, isWithin, listDir, wildcard, worktrees } from "./files.ts";
+import { isCredentials, isDir, isRecord, isWithin, listDir, wildcard } from "./files.ts";
+import { worktrees } from "./git.ts";
 import { namesTool, parseRule } from "./tools.ts";
 
 /** One tool call, reduced to what counting and rule matching need. Never sent to the browser. */

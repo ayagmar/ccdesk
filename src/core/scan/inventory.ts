@@ -10,6 +10,7 @@ import {
   type SettingsLayer,
   type Trust,
 } from "../../shared/types.ts";
+import { redactSecrets, shownUrl } from "../secrets.ts";
 import { type ScanEnv } from "./env.ts";
 import {
   isDir,
@@ -20,9 +21,7 @@ import {
   parseFrontmatter,
   readJsonObject,
   readTextFile,
-  redactSecrets,
   resolvedPath,
-  shownUrl,
   stringField,
   toStringList,
 } from "./files.ts";

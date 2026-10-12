@@ -4,7 +4,8 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import { storeDirName } from "../shared/memory.ts";
 import { type DirectoryView, type Plugin, type SessionProfile } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isDir, isFile, isNetworkPath, mainWorktreeRoot } from "./scan/files.ts";
+import { isDir, isFile, isNetworkPath } from "./scan/files.ts";
+import { mainWorktreeRoot } from "./scan/git.ts";
 import { scanDirectory } from "./scan/index.ts";
 import { manifestCommandMap, manifestPaths } from "./scan/plugins.ts";
 

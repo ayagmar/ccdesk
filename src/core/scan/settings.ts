@@ -2,8 +2,10 @@ import { lstat } from "node:fs/promises";
 import { join } from "node:path";
 import { allowedScopes, EVERY_FILE, ignoredReason } from "../../shared/scopes.ts";
 import { type EffectiveSetting, type Scope, type SettingsLayer } from "../../shared/types.ts";
+import { redactSecrets } from "../secrets.ts";
 import { type ScanEnv } from "./env.ts";
-import { isRecord, listDir, mainWorktreeRoot, readJsonObject, redactSecrets } from "./files.ts";
+import { isRecord, listDir, readJsonObject } from "./files.ts";
+import { mainWorktreeRoot } from "./git.ts";
 import { type Dropped, sandboxFilter } from "./sandbox.ts";
 
 /** Lowest precedence first, so later layers override earlier ones. */

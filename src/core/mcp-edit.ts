@@ -3,16 +3,10 @@ import { access, stat } from "node:fs/promises";
 import { delimiter, join, resolve } from "node:path";
 import { type Change, type McpEdit, type SettingsEditPreview } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import {
-  gitRoot,
-  isRecord,
-  jsonSyntaxError,
-  mainWorktreeRoot,
-  redactSecrets,
-  revisionOf,
-} from "./scan/files.ts";
+import { isRecord, revisionOf } from "./scan/files.ts";
+import { gitRoot, mainWorktreeRoot } from "./scan/git.ts";
 import { serverProblems } from "./scan/mcp.ts";
-import { hasHiddenValues, secretTexts, shown } from "./secrets.ts";
+import { hasHiddenValues, jsonSyntaxError, redactSecrets, secretTexts, shown } from "./secrets.ts";
 import {
   RefusedError,
   readIfExists,

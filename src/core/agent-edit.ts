@@ -1,7 +1,9 @@
 import { join, resolve } from "node:path";
 import { type AgentEdit, type Change, type SettingsEditPreview } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { gitRoot, revisionOf, shownText } from "./scan/files.ts";
+import { revisionOf } from "./scan/files.ts";
+import { gitRoot } from "./scan/git.ts";
+import { shownText } from "./secrets.ts";
 import { scanDirectory } from "./scan/index.ts";
 import { agentProblems } from "./scan/inventory.ts";
 import {

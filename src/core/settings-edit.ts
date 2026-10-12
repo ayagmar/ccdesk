@@ -12,11 +12,11 @@ import {
   type SettingsEditPreview,
 } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isRecord, jsonSyntaxError, redactSecrets, revisionOf } from "./scan/files.ts";
+import { isRecord, revisionOf } from "./scan/files.ts";
 import { isSkippedMcpRule } from "./scan/permissions.ts";
 import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
 import { ajv, schemaErrors } from "./schema.ts";
-import { hasHiddenValues, shown } from "./secrets.ts";
+import { hasHiddenValues, jsonSyntaxError, redactSecrets, shown } from "./secrets.ts";
 import {
   RefusedError,
   readIfExists,

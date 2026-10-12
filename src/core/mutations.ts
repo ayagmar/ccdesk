@@ -2,7 +2,8 @@ import { access, constants, readdir, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { type Change, type MemoryAction, type MemoryChangePreview } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isWithin, parseFrontmatter, revisionOf, shownText, stringField } from "./scan/files.ts";
+import { isWithin, parseFrontmatter, revisionOf, stringField } from "./scan/files.ts";
+import { shownText } from "./secrets.ts";
 import { deadLinks, indexMentions } from "./scan/memory.ts";
 import {
   RefusedError,
