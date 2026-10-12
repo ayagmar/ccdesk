@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { storeDirName } from "../../shared/memory.ts";
 import {
   type MemoryAction,
   type MemoryChangePreview,
@@ -238,7 +239,7 @@ function MemoryDetails({ row, actions }: { row: R; actions: Actions }) {
   const [adding, setAdding] = useState(false);
   const elsewhere = actions.overview?.sharedMemories.find((s) => s.name === m.name)?.stores ?? [];
   const storeName = m.path.split(/[/\\]/).at(-3);
-  const others = elsewhere.filter((s) => s.projectPath.replace(/[^a-zA-Z0-9]/g, "-") !== storeName);
+  const others = elsewhere.filter((s) => storeDirName(s.projectPath) !== storeName);
 
   return (
     <>

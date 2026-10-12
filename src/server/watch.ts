@@ -1,9 +1,11 @@
 import { type FSWatcher, watch } from "node:fs";
+import { stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { type DirectoryView } from "../shared/types.ts";
+import { storeDirName } from "../shared/memory.ts";
+import { type DirectoryView, type SessionProfile } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isNetworkPath, mainWorktreeRoot } from "./scan/files.ts";
-import { storeDirName } from "./scan/memory.ts";
+import { scanDirectory } from "./scan/index.ts";
 
 /** How long one request waits for a change before answering "nothing changed". */
 const WAIT_MS = 25_000;
@@ -81,10 +83,21 @@ interface Subscription {
   watchers: FSWatcher[];
   /** When a watched file last changed, in ms since the epoch. */
   changedAt: number;
+  /** When a watcher last saw any change, before it settled; 0 for none. */
+  touchedAt: number;
+  /** When the current watchers started. */
+  watchingSince: number;
   waiters: Set<() => void>;
   extra: Target[];
   idle?: NodeJS.Timeout;
   settle?: NodeJS.Timeout;
+}
+
+/** The latest scan of a directory, with when it started and ~/.claude.json as it was then. */
+interface Scanned {
+  view: DirectoryView;
+  startedAt: number;
+  stateFile: string;
 }
 
 /** One set of file watchers per directory a page is looking at, shared by its requests. */
@@ -92,17 +105,54 @@ export class Watcher {
   private readonly subscriptions = new Map<string, Subscription>();
   /** What the latest scan of each directory read, kept for a watch that starts after the scan. */
   private readonly scanned = new Map<string, Target[]>();
+  private readonly latest = new Map<string, Scanned>();
 
-  constructor(private readonly env: ScanEnv) {}
+  constructor(
+    private readonly env: ScanEnv,
+    private readonly scanOf: typeof scanDirectory = scanDirectory
+  ) {}
 
-  /** Remembers what the latest scan of `dir` read, so those files are watched too. */
-  track(dir: string, view: DirectoryView): void {
-    const subscription = this.subscriptions.get(dir);
+  /** Scans `dir` and remembers what the scan read, so those files are watched too. */
+  async scan(dir: string, profile: SessionProfile = "interactive"): Promise<DirectoryView> {
+    const startedAt = Date.now();
+    const stateFile = await this.stateFile();
+    const view = await this.scanOf(this.env, dir, profile);
+    const subscription = this.subscriptions.get(view.path);
+    // Only a watched directory's view can be known to be current later.
+    if (subscription) this.latest.set(view.path, { view, startedAt, stateFile });
     const extra = dependencies(view);
-    this.scanned.set(dir, extra);
-    if (!subscription || JSON.stringify(extra) === JSON.stringify(subscription.extra)) return;
-    subscription.extra = extra;
-    void this.rewatch(dir, subscription);
+    this.scanned.set(view.path, extra);
+    if (subscription && JSON.stringify(extra) !== JSON.stringify(subscription.extra)) {
+      subscription.extra = extra;
+      void this.rewatch(view.path, subscription);
+    }
+    return view;
+  }
+
+  /**
+   * The view of `dir`: the latest scan while it is known to be current, else a new scan. It is
+   * current only while watchers that started before it have seen no change since it started, and
+   * ~/.claude.json, which is not watched, is as it was. Only an interactive scan is reused, as the
+   * path tester describes an interactive session.
+   */
+  async view(dir: string): Promise<DirectoryView> {
+    const latest = this.latest.get(dir);
+    const subscription = this.subscriptions.get(dir);
+    if (
+      latest?.view.profile === "interactive" &&
+      subscription &&
+      subscription.watchingSince < latest.startedAt &&
+      subscription.touchedAt < latest.startedAt &&
+      latest.stateFile === (await this.stateFile())
+    )
+      return latest.view;
+    return this.scan(dir);
+  }
+
+  /** ~/.claude.json's size and time; Claude Code rewrites it too often to watch. */
+  private async stateFile(): Promise<string> {
+    const info = await stat(this.env.claudeJson).catch(() => null);
+    return info ? `${info.size}:${info.mtimeMs}` : "missing";
   }
 
   /**
@@ -147,6 +197,8 @@ export class Watcher {
     const subscription: Subscription = {
       watchers: [],
       changedAt: 0,
+      touchedAt: 0,
+      watchingSince: Number.POSITIVE_INFINITY,
       waiters: new Set(),
       extra: this.scanned.get(dir) ?? [],
     };
@@ -162,6 +214,7 @@ export class Watcher {
     clearTimeout(subscription.settle);
     for (const w of subscription.watchers) w.close();
     this.subscriptions.delete(dir);
+    this.latest.delete(dir);
   }
 
   /** (Re)creates the watchers, so a folder created since, such as a new .claude, is watched. */
@@ -175,6 +228,7 @@ export class Watcher {
         const watcher = watch(target.path, { recursive: target.recursive }, (_event, name) => {
           const changed = name === null ? "" : String(name);
           if (target.names && !target.names.includes(basename(changed))) return;
+          subscription.touchedAt = Date.now();
           clearTimeout(subscription.settle);
           subscription.settle = setTimeout(() => {
             subscription.changedAt = Date.now();
@@ -188,5 +242,6 @@ export class Watcher {
         // A folder that does not exist yet is caught by watching its parent.
       }
     }
+    subscription.watchingSince = Date.now();
   }
 }

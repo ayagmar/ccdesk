@@ -1,5 +1,6 @@
 import { lstat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { storeDirName } from "../../shared/memory.ts";
 import {
   type AgentsMdMode,
   type DirectoryView,
@@ -25,7 +26,7 @@ import {
 } from "./files.ts";
 import { AGENTS_MD_MODES, resolveInstructions } from "./instructions.ts";
 import { readInventory } from "./inventory.ts";
-import { readMemoryStore, storeDirName } from "./memory.ts";
+import { readMemoryStore } from "./memory.ts";
 import { permissionsOf, type Options as TrustOptions, trustWaits } from "./permissions.ts";
 import { listProjects } from "./projects.ts";
 import { effectiveSettings, readSettingsLayers } from "./settings.ts";

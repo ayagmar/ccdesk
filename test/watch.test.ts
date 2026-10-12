@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
+import { scanDirectory } from "../src/server/scan/index.ts";
+import { testPath } from "../src/server/scan/path-test.ts";
 import { Watcher } from "../src/server/watch.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
@@ -58,4 +60,67 @@ test("work in Claude Code's worktrees or unrelated files does not count as a con
   }, 100);
 
   assert.equal((await waiting).changed, false);
+});
+
+/**
+ * A watcher that counts its scans, set up as a page does it: `app` is scanned, then watched, with
+ * change reports from before the watch settled.
+ */
+async function countingWatcher(f: ReturnType<typeof makeFixture>) {
+  const counter = { scans: 0 };
+  const watcher = new Watcher(f.env, (env, dir, profile) => {
+    counter.scans++;
+    return scanDirectory(env, dir, profile);
+  });
+  watchers.push(watcher);
+  await watcher.scan(f.at("app"));
+  await watcher.wait(f.at("app"), Number.MAX_SAFE_INTEGER, new AbortController().signal, 1000);
+  counter.scans = 0;
+  const pathTest = () => testPath(f.env, f.at("app"), "src/api/x.ts", (cwd) => watcher.view(cwd));
+  return { watcher, counter, pathTest };
+}
+
+test("the path tester reuses a scan until a file it read changes", async () => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/api.md", "---\npaths: src/api/**\n---\nAPI\n");
+  const { watcher, counter, pathTest } = await countingWatcher(f);
+
+  // The page's scan started before the watch, so the first test scans again; the next reuses it.
+  await pathTest();
+  await pathTest();
+  assert.equal(counter.scans, 1);
+
+  const since = Date.now();
+  f.write("app/.claude/rules/web.md", "---\npaths: src/**\n---\nWeb\n");
+  await watcher.wait(f.at("app"), since, new AbortController().signal, 5000);
+  const result = await pathTest();
+
+  assert.equal(counter.scans, 2);
+  assert.ok(result.matches.some((m) => m.path.endsWith("web.md")));
+});
+
+test("the path tester does not reuse a claude -p scan, since it describes an interactive session", async () => {
+  const f = makeFixture();
+  const { watcher, counter, pathTest } = await countingWatcher(f);
+  await pathTest();
+  await watcher.scan(f.at("app"), "print");
+  counter.scans = 0;
+
+  await pathTest();
+  await pathTest();
+
+  assert.equal(counter.scans, 1);
+});
+
+test("the path tester scans again after ~/.claude.json changes, which is not watched", async () => {
+  const f = makeFixture();
+  f.json("home/.claude.json", { projects: {} });
+  const { counter, pathTest } = await countingWatcher(f);
+
+  await pathTest();
+  await pathTest();
+  f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
+  await pathTest();
+
+  assert.equal(counter.scans, 2);
 });

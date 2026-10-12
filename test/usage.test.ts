@@ -4,7 +4,7 @@ import { appendFileSync, closeSync, openSync, statSync, utimesSync, writeFileSyn
 import { open } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
-import { storeDirName } from "../src/server/scan/memory.ts";
+import { storeDirName } from "../src/shared/memory.ts";
 import { CountStopped, readUsage } from "../src/server/scan/usage.ts";
 import { type PermissionList } from "../src/shared/types.ts";
 import { type Fixture, makeFixture } from "./helpers/fixture.ts";

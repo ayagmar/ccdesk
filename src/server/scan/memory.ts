@@ -23,11 +23,6 @@ const INDEX_LINE_LIMIT = 200;
 const INDEX_BYTE_LIMIT = 25 * 1024;
 const TYPES: MemoryType[] = ["user", "feedback", "project", "reference"];
 
-/** Claude Code names a project's store after its path with every non-alphanumeric character as "-". */
-export function storeDirName(projectPath: string): string {
-  return projectPath.replace(/[^a-zA-Z0-9]/g, "-");
-}
-
 export async function readMemoryStore(
   env: ScanEnv,
   dir: string,

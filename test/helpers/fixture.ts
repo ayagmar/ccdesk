@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { type ScanEnv } from "../../src/server/scan/env.ts";
+import { storeDirName } from "../../src/shared/memory.ts";
 
 export interface Fixture {
   root: string;
@@ -60,12 +61,7 @@ export function makeFixture(): Fixture {
 
 /** `~/.claude/projects/<name>/memory` for a project path, as Claude Code names it. */
 export function memoryDirFor(fixture: Fixture, projectPath: string): string {
-  return join(
-    fixture.env.claudeDir,
-    "projects",
-    projectPath.replace(/[^a-zA-Z0-9]/g, "-"),
-    "memory"
-  );
+  return join(fixture.env.claudeDir, "projects", storeDirName(projectPath), "memory");
 }
 
 export function memoryFile(name: string, type: string, description: string, body: string): string {

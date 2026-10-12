@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { EDITABLE_SCOPES } from "../shared/scopes.ts";
+import { EDITABLE_SCOPES, PERMISSION_LISTS } from "../shared/scopes.ts";
 import {
   type DirectoryView,
   type Permission,
@@ -13,8 +13,6 @@ import { tilde } from "./format.ts";
 import { lineName } from "./lines.ts";
 import { type Saved } from "./SettingEditor.tsx";
 import { useReviewedChange } from "./useReviewedChange.tsx";
-
-const LISTS: PermissionList[] = ["allow", "ask", "deny"];
 
 type Rule = Extract<Permission, { kind: "rule" }>;
 
@@ -84,7 +82,7 @@ export function PermissionEditor({ view, rule, onSaved }: Props) {
     <section className="editor" aria-label={rule ? "Change this rule" : "Add a rule"}>
       {rule ? (
         <div className="editor-buttons">
-          {LISTS.filter((l) => l !== rule.list).map((l) => (
+          {PERMISSION_LISTS.filter((l) => l !== rule.list).map((l) => (
             <button
               key={l}
               type="button"
@@ -114,7 +112,7 @@ export function PermissionEditor({ view, rule, onSaved }: Props) {
       ) : (
         <>
           <fieldset className="segmented" aria-label="List">
-            {LISTS.map((l) => (
+            {PERMISSION_LISTS.map((l) => (
               <button
                 key={l}
                 type="button"

@@ -10,10 +10,9 @@ import {
   mainWorktreeRoot,
   redactSecrets,
   revisionOf,
-  shownArgs,
-  shownUrl,
 } from "./scan/files.ts";
 import { serverProblems } from "./scan/mcp.ts";
+import { hasHiddenValues, secretTexts, shown } from "./secrets.ts";
 import {
   RefusedError,
   readIfExists,
@@ -58,49 +57,17 @@ export async function claudeProgram(
   return "claude";
 }
 
-/** The user name, password and query of a URL that ccdesk hides. */
-function urlSecrets(text: string): string[] {
-  if (shownUrl(text) === text) return [];
-  const url = URL.parse(text);
-  return [url?.username, url?.password, url?.search.slice(1)].filter((p): p is string => !!p);
-}
-
-/**
- * The env and header values, URL credentials and hidden args in a server definition passed to
- * claude.
- */
+/** The secret values in a server definition passed to claude, which add-json takes as one JSON argument. */
 function secretsIn(args: string[]): string[] {
-  const found: string[] = [];
-  const walk = (value: unknown) => {
-    if (Array.isArray(value)) value.forEach(walk);
-    if (!isRecord(value)) return;
-    for (const [key, inner] of Object.entries(value)) {
-      if ((key === "env" || key === "headers") && isRecord(inner))
-        for (const v of Object.values(inner)) if (typeof v === "string" && v) found.push(v);
-      if (key === "url" && typeof inner === "string") found.push(...urlSecrets(inner));
-      if (key === "args" && "command" in value && Array.isArray(inner)) {
-        const shown = shownArgs(inner);
-        inner.forEach((arg, i) => {
-          if (typeof arg !== "string" || shown[i] === arg) return;
-          if (shown[i] === "•••") found.push(arg);
-          else if (String(shown[i]).endsWith("=•••")) found.push(arg.slice(arg.indexOf("=") + 1));
-          else found.push(...urlSecrets(arg));
-        });
-      }
-      walk(inner);
-    }
-  };
-  // add-json takes the definition as one JSON argument.
-  for (const arg of args) {
-    if (!arg.startsWith("{")) continue;
+  return args.flatMap((arg) => {
+    if (!arg.startsWith("{")) return [];
     try {
-      walk(JSON.parse(arg));
+      return secretTexts(JSON.parse(arg));
     } catch {
       // Not JSON after all, so it holds no definition.
+      return [];
     }
-  }
-  // Longest first, so a value that contains another is hidden whole.
-  return found.sort((a, b) => b.length - a.length);
+  });
 }
 
 export const runClaude: RunClaude = async (args, cwd) => {
@@ -133,14 +100,6 @@ export const runClaude: RunClaude = async (args, cwd) => {
 /** Quotes a word for a POSIX shell, so a command shown to you can be pasted as it is. */
 function quoted(word: string): string {
   return `'${word.replaceAll("'", "'\\''")}'`;
-}
-
-function shown(value: unknown): string {
-  return `${JSON.stringify(redactSecrets(value), null, 2)}\n`;
-}
-
-function hasHiddenValues(value: unknown): boolean {
-  return JSON.stringify(redactSecrets(value)) !== JSON.stringify(value);
 }
 
 interface Planned {
