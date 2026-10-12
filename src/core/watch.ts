@@ -334,8 +334,9 @@ export class Watcher {
           clearTimeout(subscription.settle);
           subscription.settle = setTimeout(() => {
             subscription.changedAt = Date.now();
-            for (const wake of [...subscription.waiters, ...subscription.listeners]) wake();
+            // First, so a subscriber that throws cannot leave the old watchers in place.
             void this.rewatch(dir, subscription);
+            for (const wake of [...subscription.waiters, ...subscription.listeners]) wake();
           }, SETTLE_MS);
         });
         watcher.on("error", () => watcher.close());
