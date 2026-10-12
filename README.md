@@ -17,7 +17,7 @@ See and change everything Claude Code loads on your machine: instruction files, 
 npx ccdesk
 ```
 
-Each piece lives in its own file, at one of six scopes: managed, user, project, local, auto memory or a plugin. ccdesk opens in your browser on the directory you ran it from, lists everything that applies there in the order Claude Code loads it, and names the file behind each piece. When something is wrong, change it on the same page: you review the diff first, and every edit has a backup and an undo. It is not a session viewer or a usage dashboard.
+Each piece lives in its own file, at one of six scopes: managed, user, project, local, auto memory or a plugin. ccdesk opens in your browser on the directory you ran it from, lists everything that applies there in the order Claude Code loads it, and names the file behind each piece. When something is wrong, change it on the same page: you review the diff first, and every file ccdesk writes is backed up and can be undone. It is not a session viewer or a usage dashboard.
 
 **Docs:** [ayagmar.github.io/ccdesk](https://ayagmar.github.io/ccdesk/)
 
@@ -75,7 +75,7 @@ Each piece lives in its own file, at one of six scopes: managed, user, project, 
 - The old file is backed up to `~/.claude/backups/ccdesk/` first. Undo is one click, and **Recent changes** can restore any earlier edit.
 - A settings file that is a symlink, such as one in a dotfiles repository, is written through and stays a link.
 - A file with other hard links is not saved: replacing it would split it from its other names. Edit it in your editor.
-- ccdesk never writes `~/.claude.json`. User and local MCP server changes go through Claude Code's own `claude mcp` command, so they need `claude` on your PATH.
+- ccdesk never writes `~/.claude.json`. User and local MCP server changes go through Claude Code's own `claude mcp` command, so they need `claude` on your PATH. ccdesk keeps no backup of these and cannot undo them; **Recent changes** lists each one with the commands that reverse it.
 
 Details: [Recent changes, backups and undo](https://ayagmar.github.io/ccdesk/recent-changes/)
 
@@ -105,7 +105,7 @@ npx ccdesk [options]
   -h, --help            Show this help
 ```
 
-ccdesk reads `~/.claude` and `~/.claude.json`, or `$CLAUDE_CONFIG_DIR` when it is set, as Claude Code does. To look at another profile without exporting the variable, pass `--config-dir <path>`. Edits made in another editor or by Claude show up within a second. Requires Node.js 22.19 or newer. See [Platform notes](https://ayagmar.github.io/ccdesk/platforms/) for Windows, macOS and WSL.
+ccdesk reads `~/.claude` and `~/.claude.json`, or `$CLAUDE_CONFIG_DIR` when it is set, as Claude Code does. To look at another profile without exporting the variable, pass `--config-dir <path>`. Edits made in another editor or by Claude show up within a second. Changes to `~/.claude.json`, such as trust decisions and MCP approvals, show up when you return to the tab. Requires Node.js 22.19 or newer. See [Platform notes](https://ayagmar.github.io/ccdesk/platforms/) for Windows, macOS and WSL.
 
 ## Privacy and safety
 
