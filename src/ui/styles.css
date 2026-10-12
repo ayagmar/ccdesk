@@ -399,12 +399,14 @@ input::placeholder {
 }
 
 .dir-title .flag,
-.dir-title .profile-switch {
-  flex-shrink: 0;
-}
-
-.dir-title .profile-switch {
-  margin-left: 0;
+/* The session the page describes: a rare choice, so it sits under the header, not in it. */
+.session-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .section-index {
@@ -1901,6 +1903,11 @@ button:disabled {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto;
     padding-top: 18px;
+  }
+
+  /* The header grows here, so the flags wrap under a name they would crush. */
+  .dir-title {
+    flex-wrap: wrap;
   }
 
   .tt-section {

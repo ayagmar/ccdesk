@@ -202,22 +202,6 @@ export function DirectoryPage({
             {view.gitRoot && view.gitRoot !== view.path && (
               <span className="flag">inside {tilde(view.gitRoot)}</span>
             )}
-            <fieldset
-              className="segmented small profile-switch"
-              aria-label="Session"
-              title="Interactive claude asks for workspace trust and .mcp.json approval. claude -p and the SDK never show the trust dialog: they run settings-file hooks and connect .mcp.json servers without asking."
-            >
-              {(["interactive", "print"] as const).map((profile) => (
-                <button
-                  key={profile}
-                  type="button"
-                  aria-pressed={view.profile === profile}
-                  onClick={() => onProfile(profile)}
-                >
-                  {profile === "interactive" ? "interactive session" : "claude -p / SDK"}
-                </button>
-              ))}
-            </fieldset>
             {trust.sessionOnly ? (
               <span
                 className="flag"
@@ -293,6 +277,25 @@ export function DirectoryPage({
             ))}
           </nav>
         </header>
+        <div className="session-line">
+          <span>Describes</span>
+          <fieldset
+            className="segmented small profile-switch"
+            aria-label="Session"
+            title="Interactive claude asks for workspace trust and .mcp.json approval. claude -p and the SDK never show the trust dialog: they run settings-file hooks and connect .mcp.json servers without asking."
+          >
+            {(["interactive", "print"] as const).map((profile) => (
+              <button
+                key={profile}
+                type="button"
+                aria-pressed={view.profile === profile}
+                onClick={() => onProfile(profile)}
+              >
+                {profile === "print" ? "claude -p / SDK" : "interactive session"}
+              </button>
+            ))}
+          </fieldset>
+        </div>
         {view.problems.length > 0 && (
           <section className="problems" role="alert" aria-label="Files ccdesk could not read">
             <Icon name="warn" />

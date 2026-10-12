@@ -19,7 +19,7 @@ A hook is marked off when:
 - managed settings set `disableAllHooks`;
 - `disableAllHooks` is true in the highest settings file that sets it, which turns off every hook except managed ones;
 - managed settings set `allowManagedHooksOnly`, which turns off every hook except managed ones and those of plugins enabled in managed settings;
-- you have not accepted Claude Code's trust dialog for the folder or a parent folder. An interactive session holds back hooks from every settings file until then, your own `~/.claude/settings.json` included. A `claude -p` or SDK run does not ask and runs them; pick **claude -p / SDK** beside the path to see the hooks that way.
+- you have not accepted Claude Code's trust dialog for the folder or a parent folder. An interactive session holds back hooks from every settings file until then, your own `~/.claude/settings.json` included. A `claude -p` or SDK run does not ask and runs them; pick **claude -p / SDK** under the page header to see the hooks that way.
 
 [Built-in tools](../permissions/#built-in-tools) lists, for each tool, the `PreToolUse` hooks whose matcher covers it.
 

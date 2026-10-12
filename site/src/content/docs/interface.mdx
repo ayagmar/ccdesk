@@ -7,7 +7,7 @@ import Screenshot from "../../components/Screenshot.astro";
 
 A directory page answers one question: what is Claude told here, and where does each piece come from? Everything on it is laid out around Claude Code's load order.
 
-The switch beside the path picks the kind of session the page describes. **interactive session**, the default, is a `claude` you type into. **claude -p / SDK** is a scripted run, which never shows the trust dialog. In a folder you have not trusted, that changes three verdicts:
+The switch under the page header picks the kind of session the page describes. **interactive session**, the default, is a `claude` you type into. **claude -p / SDK** is a scripted run, which never shows the trust dialog. In a folder you have not trusted, that changes three verdicts:
 
 - hooks from settings files run;
 - `.mcp.json` servers connect without approval, unless `disabledMcpjsonServers` rejects them. The SDK loads them only when its `settingSources` include project settings;
