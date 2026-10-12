@@ -398,8 +398,13 @@ input::placeholder {
   min-width: 0;
 }
 
-.dir-title .flag {
+.dir-title .flag,
+.dir-title .profile-switch {
   flex-shrink: 0;
+}
+
+.dir-title .profile-switch {
+  margin-left: 0;
 }
 
 .section-index {

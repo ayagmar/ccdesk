@@ -8,7 +8,9 @@ import {
   type McpEdit,
   type PermissionEdit,
   type PermissionList,
+  SESSION_PROFILES,
   type Scope,
+  type SessionProfile,
   type SettingsEdit,
 } from "../shared/types.ts";
 import { listBackups, previewRestore, restoreBackup } from "./backups.ts";
@@ -120,7 +122,10 @@ async function handle(
   if (req.method === "GET" && url.pathname === "/api/directory") {
     const path = url.searchParams.get("path");
     if (!path) return send(res, 400, { error: "path is required" });
-    const view = await scanDirectory(env, path);
+    const profile = url.searchParams.get("profile") ?? "interactive";
+    if (!SESSION_PROFILES.includes(profile as SessionProfile))
+      return send(res, 400, { error: `profile is one of ${SESSION_PROFILES.join(", ")}` });
+    const view = await scanDirectory(env, path, profile as SessionProfile);
     watcher.track(view.path, view);
     return send(res, 200, view);
   }

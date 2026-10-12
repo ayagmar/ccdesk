@@ -1,5 +1,11 @@
 import { join } from "node:path";
-import { type McpServer, type Plugin, type SettingsLayer, type Trust } from "../../shared/types.ts";
+import {
+  type McpServer,
+  type Plugin,
+  type SessionProfile,
+  type SettingsLayer,
+  type Trust,
+} from "../../shared/types.ts";
 import { isConfigHome, type ScanEnv } from "./env.ts";
 import {
   isRecord,
@@ -208,6 +214,7 @@ interface Input {
   layers: SettingsLayer[];
   claudeJson: Record<string, unknown> | null;
   trust: Trust;
+  profile: SessionProfile;
 }
 
 /**
@@ -216,7 +223,7 @@ interface Input {
  * server is one that is configured and allowed, not one that is known to work.
  */
 export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<McpServer[]> {
-  const { env, projectDir, layers, claudeJson, trust } = input;
+  const { env, projectDir, layers, claudeJson, trust, profile } = input;
   const projects = isRecord(claudeJson?.projects) ? claudeJson.projects : {};
   // Local servers live in the entry under the trust key, even from a subdirectory: claude mcp add
   // --scope local writes there and claude mcp list reads only that entry, ignoring one for the
@@ -319,8 +326,13 @@ export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<M
       set(server, "disabled", "Turned off for this project in /mcp");
     else if (server.scope === "project" && rejected.has(server.name))
       set(server, "rejected", "Rejected by disabledMcpjsonServers");
-    else if (server.scope === "project" && !approveAll && !approved.has(server.name))
-      set(server, "pending", "Claude Code asks before starting servers from .mcp.json");
+    else if (server.scope === "project" && !approveAll && !approved.has(server.name)) {
+      // claude -p connects them without asking, approved or not (docs: permissions#what-runs-before-you-trust-a-folder).
+      if (profile === "print")
+        server.note =
+          "Not approved, but claude -p connects .mcp.json servers without asking; the SDK does when settingSources includes project";
+      else set(server, "pending", "Claude Code asks before starting servers from .mcp.json");
+    }
     if (server.status === "active" || server.status === "pending")
       enabledEndpoints.set(endpoint(d), d);
   }

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Change, type DirectoryView, type Overview } from "../shared/types.ts";
+import {
+  type Change,
+  type DirectoryView,
+  type Overview,
+  type SessionProfile,
+} from "../shared/types.ts";
 import { api } from "./api.ts";
 import { ContextView } from "./ContextView.tsx";
 import { tilde } from "./format.ts";
@@ -27,6 +32,8 @@ interface Props {
   onToast: (toast: ToastMessage) => void;
   onOpenDirectory: (path: string) => void;
   onOpenPalette: () => void;
+  /** Describe an interactive session or claude -p and the SDK instead. */
+  onProfile: (profile: SessionProfile) => void;
 }
 
 function isTyping(target: EventTarget | null): boolean {
@@ -49,6 +56,7 @@ export function DirectoryPage({
   onToast,
   onOpenDirectory,
   onOpenPalette,
+  onProfile,
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [adding, setAdding] = useState<Adding | null>(null);
@@ -58,7 +66,10 @@ export function DirectoryPage({
   const [shown, setShown] = useState<Partial<Record<SectionId, number>>>({});
   const filterInput = useRef<HTMLInputElement>(null);
 
-  useEffect(() => replaceListState({ kind: "directory", dir: view.path }, list), [list, view.path]);
+  useEffect(
+    () => replaceListState({ kind: "directory", dir: view.path, profile: view.profile }, list),
+    [list, view.path, view.profile]
+  );
   const changeList = (next: ListState) => {
     setList(next);
     setShown({});
@@ -187,12 +198,22 @@ export function DirectoryPage({
             {view.gitRoot && view.gitRoot !== view.path && (
               <span className="flag">inside {tilde(view.gitRoot)}</span>
             )}
-            <span
-              className="flag"
-              title="ccdesk shows what an interactive claude session loads here. claude -p and the SDK never show the trust dialog: they run settings-file hooks and connect .mcp.json servers without asking."
+            <fieldset
+              className="segmented small profile-switch"
+              aria-label="Session"
+              title="Interactive claude asks for workspace trust and .mcp.json approval. claude -p and the SDK never show the trust dialog: they run settings-file hooks and connect .mcp.json servers without asking."
             >
-              interactive session
-            </span>
+              {(["interactive", "print"] as const).map((profile) => (
+                <button
+                  key={profile}
+                  type="button"
+                  aria-pressed={view.profile === profile}
+                  onClick={() => onProfile(profile)}
+                >
+                  {profile === "interactive" ? "interactive session" : "claude -p / SDK"}
+                </button>
+              ))}
+            </fieldset>
             {trust.sessionOnly ? (
               <span
                 className="flag"
@@ -204,7 +225,11 @@ export function DirectoryPage({
               !trust.trusted && (
                 <span
                   className="flag warn"
-                  title={`Until you accept Claude Code's trust dialog for ${tilde(trust.root)}, ${trust.inheritedFrom ? `its allow rules, extra folders and .mcp.json approvals wait. You trusted ${tilde(trust.inheritedFrom)}, which covers hooks but not those grants.` : "hooks from every settings file, its allow rules, extra folders and .mcp.json approvals wait."}`}
+                  title={
+                    view.profile === "print"
+                      ? `claude -p and the SDK never show the trust dialog. Until you accept it for ${tilde(trust.root)} in an interactive session, they leave out allow rules and extra folders from repository settings.`
+                      : `Until you accept Claude Code's trust dialog for ${tilde(trust.root)}, ${trust.inheritedFrom ? `its allow rules, extra folders and .mcp.json approvals wait. You trusted ${tilde(trust.inheritedFrom)}, which covers hooks but not those grants.` : "hooks from every settings file, its allow rules, extra folders and .mcp.json approvals wait."}`
+                  }
                 >
                   not trusted yet
                 </span>

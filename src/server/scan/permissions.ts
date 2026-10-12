@@ -3,6 +3,7 @@ import {
   type Permission,
   type PermissionList,
   type Scope,
+  type SessionProfile,
   type SettingsLayer,
   type Trust,
 } from "../../shared/types.ts";
@@ -12,16 +13,19 @@ import { ignoredModeReason } from "./settings.ts";
 /**
  * Whether a file's trust-gated settings (permission grants, autoMemoryDirectory) wait for
  * the workspace trust dialog. Claude Code runs git to tell a private local file from a committed one
- * only once the folder or a parent is trusted, so until then the local file waits too, except in
- * your configuration home; a committed local file waits like project settings.
+ * only once the folder or a parent is trusted, or in claude -p and the SDK, which count as accepted;
+ * until then the local file waits too, except in your configuration home. A committed local file
+ * waits like project settings, which -p and the SDK never apply in a folder you have not trusted
+ * (docs: permissions#when-your-local-settings-file-needs-trust, #what-runs-before-you-trust-a-folder).
  */
 export function trustWaits({
   trust,
   inConfigHome,
   localFromRepository,
+  profile,
 }: Options): (scope: Scope) => boolean {
-  const localWaits =
-    !inConfigHome && (trust.trusted ? false : !trust.inheritedFrom || localFromRepository);
+  const gitChecked = profile === "print" || trust.inheritedFrom !== undefined;
+  const localWaits = !inConfigHome && !trust.trusted && (!gitChecked || localFromRepository);
   return (scope) => (scope === "project" && !trust.trusted) || (scope === "local" && localWaits);
 }
 
@@ -42,6 +46,7 @@ export interface Options {
   inConfigHome: boolean;
   /** The local settings file is tracked in git, so Claude Code treats it like repository settings. */
   localFromRepository: boolean;
+  profile: SessionProfile;
 }
 
 /**

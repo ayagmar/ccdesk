@@ -487,8 +487,17 @@ export interface Sharing {
 }
 
 /** Everything that applies when Claude Code starts in one directory. */
+/**
+ * The kind of session ccdesk describes: an interactive `claude`, or `claude -p` and the Agent SDK,
+ * which never show the trust dialog.
+ */
+export type SessionProfile = "interactive" | "print";
+
+export const SESSION_PROFILES: SessionProfile[] = ["interactive", "print"];
+
 export interface DirectoryView {
   path: string;
+  profile: SessionProfile;
   exists: boolean;
   gitRoot: string | null;
   agentsMdMode: AgentsMdMode;

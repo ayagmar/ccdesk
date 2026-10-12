@@ -376,6 +376,41 @@ test("in a subdirectory of a repository, local servers come from the repository 
   assert.deepEqual(await localNames(), ["root-db"]);
 });
 
+test("claude -p treats an untrusted folder as trusted for hooks and .mcp.json, not for repository grants", async () => {
+  const f = makeFixture();
+  const hook = { hooks: { Stop: [{ hooks: [{ type: "command", command: "notify" }] }] } };
+  f.json("home/.claude/settings.json", hook);
+  f.json("app/.claude/settings.json", {
+    permissions: { allow: ["Bash(npm test)"] },
+    disabledMcpjsonServers: ["old"],
+  });
+  f.json("app/.claude/settings.local.json", { permissions: { allow: ["Bash(make)"] } });
+  f.json("app/.mcp.json", {
+    mcpServers: { docs: { command: "docs-mcp" }, old: { command: "old-mcp" } },
+  });
+  const verdicts = (view: View) => ({
+    hook: view.inventory.hooks[0]?.active,
+    rules: Object.fromEntries(
+      view.permissions.flatMap((p) => (p.kind === "rule" ? [[p.rule, p.inEffect]] : []))
+    ),
+    servers: Object.fromEntries(view.inventory.mcpServers.map((s) => [s.name, s.status])),
+  });
+
+  assert.deepEqual(verdicts(await scanDirectory(f.env, f.at("app"))), {
+    hook: false,
+    rules: { "Bash(make)": false, "Bash(npm test)": false },
+    servers: { docs: "pending", old: "rejected" },
+  });
+  const print = await scanDirectory(f.env, f.at("app"), "print");
+  assert.equal(print.profile, "print");
+  // An untracked local file applies once git has checked it, which -p does; project grants never do.
+  assert.deepEqual(verdicts(print), {
+    hook: true,
+    rules: { "Bash(make)": true, "Bash(npm test)": false },
+    servers: { docs: "active", old: "rejected" },
+  });
+});
+
 test("MCP policy: denied servers are blocked, an allowlist blocks the rest, managed-mcp.json takes over", async () => {
   const f = makeFixture();
   f.json("home/.claude.json", {

@@ -27,7 +27,7 @@ When two scopes define a server with the same name, the first one wins and the o
 ## Status
 
 - **configured**: Claude Code starts it in sessions here. ccdesk does not connect to servers, so it cannot tell whether a server works.
-- **needs approval**: a project server you have not approved yet. Approvals come from `enableAllProjectMcpServers` or `enabledMcpjsonServers` in your settings, or from answering Claude Code's prompt. Approvals in project and local files count only once you trust the folder.
+- **needs approval**: a project server you have not approved yet. Approvals come from `enableAllProjectMcpServers` or `enabledMcpjsonServers` in your settings, or from answering Claude Code's prompt. Approvals in project and local files count only once you trust the folder. `claude -p` and the SDK connect these servers without asking, so they show as **configured** in the **claude -p / SDK** view.
 - **rejected**: listed in `disabledMcpjsonServers`.
 - **turned off**: switched off for this project in Claude Code.
 - **blocked**: excluded by `deniedMcpServers` or `allowedMcpServers` in your settings.

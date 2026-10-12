@@ -1279,6 +1279,7 @@ async function saveMcp(edit: Record<string, unknown>) {
 interface ScannedServer {
   name: string;
   scope: string;
+  status: string;
   target: string;
   definition: unknown;
 }
@@ -1287,6 +1288,22 @@ async function serversIn(dir: string): Promise<ScannedServer[]> {
   const view = await call(`/api/directory?path=${encodeURIComponent(dir)}`);
   return (view.json as { inventory: { mcpServers: ScannedServer[] } }).inventory.mcpServers;
 }
+
+test("the directory route describes the session profile it is asked for", async () => {
+  const dir = fixture.at("work/profile");
+  fixture.json("work/profile/.mcp.json", { mcpServers: { docs: { command: "docs-mcp" } } });
+  const status = async (query: string) => {
+    const view = await call(`/api/directory?path=${encodeURIComponent(dir)}${query}`);
+    return view.status === 200
+      ? (view.json as { inventory: { mcpServers: ScannedServer[] } }).inventory.mcpServers[0]
+          ?.status
+      : view.status;
+  };
+
+  assert.equal(await status(""), "pending");
+  assert.equal(await status("&profile=print"), "active");
+  assert.equal(await status("&profile=headless"), 400);
+});
 
 test("a project server is added to .mcp.json, replaced in place, and the change can be undone", async () => {
   const dir = fixture.at("work/mcp-project");

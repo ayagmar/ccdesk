@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type DirectoryView, type Overview, type Usage } from "../shared/types.ts";
+import {
+  type DirectoryView,
+  type Overview,
+  type SessionProfile,
+  type Usage,
+} from "../shared/types.ts";
 import { ApiError, api } from "./api.ts";
 import { setHome } from "./format.ts";
 
@@ -19,7 +24,7 @@ export function errorText(error: unknown): string {
  * itself) reload the page, and so does coming back to the tab, since ~/.claude.json is not watched.
  * `dir` is the directory shown.
  */
-export function useConfig(requested: string | null | undefined) {
+export function useConfig(requested: string | null | undefined, profile: SessionProfile) {
   const [overview, setOverview] = useState<Load<Overview>>({ state: "loading" });
   const [view, setView] = useState<Load<DirectoryView>>({ state: "loading" });
   // The directory the view was asked for; the server answers with the canonical path, which can
@@ -46,10 +51,10 @@ export function useConfig(requested: string | null | undefined) {
 
   // Only the latest request may land, so a slow answer for a folder you left cannot replace the new one.
   const generation = useRef(0);
-  const load = useCallback((path: string, quietly: boolean) => {
+  const load = useCallback((path: string, profile: SessionProfile, quietly: boolean) => {
     const current = ++generation.current;
     if (!quietly) setView({ state: "loading" });
-    api.directory(path).then(
+    api.directory(path, profile).then(
       (data) => {
         if (current !== generation.current) return;
         setView({ state: "ready", data });
@@ -62,14 +67,16 @@ export function useConfig(requested: string | null | undefined) {
   }, []);
 
   useEffect(() => {
-    if (dir !== null) load(dir, false);
-  }, [dir, load]);
+    if (dir !== null) load(dir, profile, false);
+  }, [dir, profile, load]);
 
   // A change can finish after you opened another directory; it must reload the one now open.
   const dirRef = useRef(dir);
   dirRef.current = dir;
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
   const reload = useCallback(() => {
-    if (dirRef.current !== null) load(dirRef.current, true);
+    if (dirRef.current !== null) load(dirRef.current, profileRef.current, true);
     refreshOverview();
   }, [load, refreshOverview]);
 
@@ -109,7 +116,8 @@ export function useConfig(requested: string | null | undefined) {
   }, [reload]);
 
   /** The open directory's view, once the one asked for has arrived. */
-  const scanned = view.state === "ready" && viewFor === dir ? view.data : null;
+  const scanned =
+    view.state === "ready" && viewFor === dir && view.data.profile === profile ? view.data : null;
 
   // Counted after each scan, since the rules to match come from it; the last counts stay shown
   // until new ones arrive, so a reload does not flicker.

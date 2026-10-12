@@ -12,6 +12,7 @@ import {
   type PermissionEdit,
   type PermissionList,
   type RestorePreview,
+  type SessionProfile,
   type SettingsEdit,
   type SettingsEditPreview,
   type Usage,
@@ -76,8 +77,10 @@ async function request<T>(
 
 export const api = {
   overview: () => request<Overview>("/api/overview"),
-  directory: (path: string) =>
-    request<DirectoryView>(`/api/directory?path=${encodeURIComponent(path)}`),
+  directory: (path: string, profile: SessionProfile) =>
+    request<DirectoryView>(
+      `/api/directory?path=${encodeURIComponent(path)}${profile === "interactive" ? "" : `&profile=${profile}`}`
+    ),
   /** How Claude used tools in the sessions started in `path`, and how many calls each rule covers. */
   usage: (
     path: string,

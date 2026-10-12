@@ -6,6 +6,7 @@ import { Palette } from "./Palette.tsx";
 import { Rail } from "./Rail.tsx";
 import { buildRows } from "./sections/index.ts";
 import { Toast, type ToastMessage } from "./Toast.tsx";
+import { type SessionProfile } from "../shared/types.ts";
 import { type Page, pushPage, readPage } from "./url.ts";
 import { useConfig } from "./useConfig.ts";
 
@@ -24,7 +25,8 @@ export function App() {
   const [visit, setVisit] = useState(0);
 
   // A directory page opened without a path shows the directory ccdesk was started in.
-  const config = useConfig(page.kind === "directory" ? page.dir : null);
+  const profile = page.kind === "directory" ? page.profile : "interactive";
+  const config = useConfig(page.kind === "directory" ? page.dir : null, profile);
   const { view, data, dir, reload } = config;
   const overview = config.overview.state === "ready" ? config.overview.data : null;
   const rows = useMemo(() => (data ? buildRows(data) : []), [data]);
@@ -34,10 +36,16 @@ export function App() {
     setVisit((v) => v + 1);
     pushPage(next);
   }, []);
+  // Another directory opens with the same session profile.
   const openDirectory = useCallback(
     (path: string | null) =>
-      open(path === null ? { kind: "all" } : { kind: "directory", dir: path }),
-    [open]
+      open(path === null ? { kind: "all" } : { kind: "directory", dir: path, profile }),
+    [open, profile]
+  );
+  const changeProfile = useCallback(
+    (next: SessionProfile) =>
+      setPage((p) => (p.kind === "directory" ? { ...p, profile: next } : p)),
+    []
   );
   useEffect(() => {
     const onPop = () => {
@@ -117,6 +125,7 @@ export function App() {
             onToast={setToast}
             onOpenDirectory={openDirectory}
             onOpenPalette={() => setPalette(true)}
+            onProfile={changeProfile}
           />
         )}
       </main>

@@ -6,6 +6,7 @@ import {
   type Inventory,
   type Plugin,
   type Scope,
+  type SessionProfile,
   type SettingsLayer,
   type Trust,
 } from "../../shared/types.ts";
@@ -259,6 +260,7 @@ interface InventoryInput {
   layers: SettingsLayer[];
   claudeJson: Record<string, unknown> | null;
   trust: Trust;
+  profile: SessionProfile;
 }
 
 /**
@@ -420,7 +422,7 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
       ...(await readOutputStyles(env, projectDir, gitRoot)),
       ...fromPlugins.flatMap((p) => p.outputStyles),
     ],
-    hooks: await readHooks(env, layers, active, input.trust),
+    hooks: await readHooks(env, layers, active, input.trust, input.profile),
     mcpServers: await readMcpServers(input, active),
     plugins,
   };
@@ -430,7 +432,8 @@ async function readHooks(
   env: ScanEnv,
   layers: SettingsLayer[],
   plugins: Plugin[],
-  trust: Trust
+  trust: Trust,
+  profile: SessionProfile
 ): Promise<Hook[]> {
   const out: Hook[] = [];
   for (const layer of layers) {
@@ -460,7 +463,7 @@ async function readHooks(
   // until the folder or a parent covering it is trusted; -p and the SDK do not (docs:
   // hooks#workspace-trust, permissions#what-runs-before-you-trust-a-folder). The docs say nothing
   // of plugin hooks, so those are left as they are.
-  const heldBack = !trust.trusted && !trust.inheritedFrom;
+  const heldBack = profile === "interactive" && !trust.trusted && !trust.inheritedFrom;
   for (const hook of out) {
     const organisation =
       hook.source === "managed" || (hook.plugin !== undefined && forcedByManaged.has(hook.plugin));

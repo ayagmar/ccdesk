@@ -7,6 +7,7 @@ import {
   type MemoryStore,
   type Overview,
   type Problem,
+  type SessionProfile,
   type Sharing,
   type Trust,
 } from "../../shared/types.ts";
@@ -72,7 +73,11 @@ export async function scanOverview(env: ScanEnv, launchDir: string): Promise<Ove
 }
 
 /** Everything Claude Code reads when started in `dir`. */
-export async function scanDirectory(env: ScanEnv, dir: string): Promise<DirectoryView> {
+export async function scanDirectory(
+  env: ScanEnv,
+  dir: string,
+  profile: SessionProfile = "interactive"
+): Promise<DirectoryView> {
   const path = resolve(dir);
   const exists = await isDir(path);
   const claudeJson = await readClaudeJson(env);
@@ -107,6 +112,7 @@ export async function scanDirectory(env: ScanEnv, dir: string): Promise<Director
     layers: settings,
     claudeJson,
     trust,
+    profile,
   });
 
   // Every project file that shapes Claude here, so the UI can say who sees each one.
@@ -152,7 +158,12 @@ export async function scanDirectory(env: ScanEnv, dir: string): Promise<Director
         )
     )
   ).some(Boolean);
-  const trustOptions = { trust, inConfigHome: isConfigHome(env, path), localFromRepository };
+  const trustOptions = {
+    trust,
+    inConfigHome: isConfigHome(env, path),
+    localFromRepository,
+    profile,
+  };
   const memory = await readMemory(env, mainRoot, path, effective, trustOptions);
   const permissions = permissionsOf(settings, trustOptions);
 
@@ -168,6 +179,7 @@ export async function scanDirectory(env: ScanEnv, dir: string): Promise<Director
 
   return {
     path,
+    profile,
     exists,
     gitRoot: root,
     agentsMdMode: mode,
@@ -244,7 +256,8 @@ async function readMemory(
   const setting = effective.find((s) => s.key === "autoMemoryDirectory");
   // A value from a repository file counts once the folder is trusted, like hooks (docs:
   // settings-reference#automemorydirectory); until then the next file down that sets it decides.
-  const waitsForTrust = trustWaits(trustOptions);
+  // claude -p and the SDK treat the folder as trusted for hooks, so for this too.
+  const waitsForTrust = trustOptions.profile === "print" ? () => false : trustWaits(trustOptions);
   const candidates = setting
     ? [{ scope: setting.from[0], value: setting.value }, ...setting.overridden]
     : [];

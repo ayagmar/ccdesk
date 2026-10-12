@@ -1,9 +1,10 @@
+import { type SessionProfile } from "../shared/types.ts";
 import { LINES, type Line } from "./lines.ts";
 import { type SectionId } from "./sections/types.ts";
 
 /** Which page is open: a directory (undefined until the launch directory is known), all directories, or recent changes. */
 export type Page =
-  | { kind: "directory"; dir: string | undefined }
+  | { kind: "directory"; dir: string | undefined; profile: SessionProfile }
   | { kind: "all" }
   | { kind: "changes" };
 
@@ -31,7 +32,11 @@ export function readPage(): Page {
   const params = new URLSearchParams(location.search);
   if (params.has("changes")) return { kind: "changes" };
   if (params.has("all")) return { kind: "all" };
-  return { kind: "directory", dir: params.get("dir") ?? undefined };
+  return {
+    kind: "directory",
+    dir: params.get("dir") ?? undefined,
+    profile: params.get("profile") === "print" ? "print" : "interactive",
+  };
 }
 
 export function readListState(): ListState {
@@ -54,7 +59,9 @@ export function readListState(): ListState {
 function pageParams(page: Page): URLSearchParams {
   if (page.kind === "changes") return new URLSearchParams("changes");
   if (page.kind === "all") return new URLSearchParams("all");
-  return new URLSearchParams(page.dir ? { dir: page.dir } : {});
+  const params = new URLSearchParams(page.dir ? { dir: page.dir } : {});
+  if (page.profile !== "interactive") params.set("profile", page.profile);
+  return params;
 }
 
 function write(params: URLSearchParams, push: boolean) {

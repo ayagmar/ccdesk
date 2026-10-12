@@ -7,7 +7,13 @@ import Screenshot from "../../components/Screenshot.astro";
 
 A directory page answers one question: what is Claude told here, and where does each piece come from? Everything on it is laid out around Claude Code's load order.
 
-The page describes an interactive `claude` session, as the **interactive session** label beside the path says. `claude -p` and the SDK never show the trust dialog, so in a folder you have not trusted they run hooks from settings files and connect `.mcp.json` servers that ccdesk marks as waiting.
+The switch beside the path picks the kind of session the page describes. **interactive session**, the default, is a `claude` you type into. **claude -p / SDK** is a scripted run, which never shows the trust dialog. In a folder you have not trusted, that changes three verdicts:
+
+- hooks from settings files run;
+- `.mcp.json` servers connect without approval, unless `disabledMcpjsonServers` rejects them. The SDK loads them only when its `settingSources` include project settings;
+- an untracked `.claude/settings.local.json` applies, and so does `autoMemoryDirectory` from project or local settings.
+
+Allow rules and extra folders from `.claude/settings.json`, or from a local file tracked in git, still wait until you trust the folder in an interactive session. The choice is kept in the address as `profile=print`, so a reload or a shared link keeps it.
 
 ## The route strip
 
