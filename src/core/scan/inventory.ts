@@ -15,16 +15,15 @@ import { type ScanEnv } from "./env.ts";
 import {
   isDir,
   isFile,
-  isRecord,
   isWithin,
   listDir,
-  parseFrontmatter,
   readJsonObject,
   readTextFile,
   resolvedPath,
   stringField,
   toStringList,
 } from "./files.ts";
+import { isRecord, parseFrontmatter } from "./data.ts";
 import { ancestorsRootFirst } from "./instructions.ts";
 import { readMcpServers } from "./mcp.ts";
 import {

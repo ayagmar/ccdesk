@@ -17,12 +17,12 @@ import {
   isNetworkPath,
   isWithin,
   MAX_TEXT_BYTES,
-  parseFrontmatter,
   readTextFile,
   resolvedPath,
   toStringList,
   walkMarkdown,
 } from "./files.ts";
+import { parseFrontmatter } from "./data.ts";
 
 const MAX_IMPORT_HOPS = 4;
 

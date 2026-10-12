@@ -2,7 +2,8 @@ import { join, resolve } from "node:path";
 import { HIGHEST_FIRST } from "../../shared/scopes.ts";
 import { type Plugin, type SettingsLayer } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isRecord, isWithin, readJsonObject, resolvedPath, stringField } from "./files.ts";
+import { isWithin, readJsonObject, resolvedPath, stringField } from "./files.ts";
+import { isRecord } from "./data.ts";
 
 function manifestPath(plugin: Plugin): string {
   return join(plugin.installPath, ".claude-plugin", "plugin.json");

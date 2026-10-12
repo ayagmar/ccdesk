@@ -8,7 +8,8 @@ import {
   type MemoryStore,
 } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isWithin, parseFrontmatter, readTextFile, resolvedPath } from "./files.ts";
+import { isWithin, readTextFile, resolvedPath } from "./files.ts";
+import { parseFrontmatter } from "./data.ts";
 
 /**
  * Imports can name any file, so a cloned repo's CLAUDE.md could point at private files.

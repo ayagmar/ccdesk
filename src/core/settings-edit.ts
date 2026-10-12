@@ -12,7 +12,8 @@ import {
   type SettingsEditPreview,
 } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isRecord, revisionOf } from "./scan/files.ts";
+import { revisionOf } from "./scan/files.ts";
+import { isRecord } from "./scan/data.ts";
 import { isSkippedMcpRule } from "./scan/permissions.ts";
 import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
 import { ajv, schemaErrors } from "./schema.ts";

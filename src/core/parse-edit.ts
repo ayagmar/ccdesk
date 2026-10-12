@@ -9,7 +9,7 @@ import {
   type Scope,
   type SettingsEdit,
 } from "../shared/types.ts";
-import { isRecord } from "./scan/files.ts";
+import { isRecord } from "./scan/data.ts";
 
 /**
  * An edit that is not well formed, such as an unknown scope or a missing field: the caller sent

@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import { type BigIntStats } from "node:fs";
 import { type FileHandle, lstat, open, readdir, readlink, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { parse as parseYaml } from "yaml";
 import { type TextFile } from "../../shared/types.ts";
 import { jsonSyntaxError, shownJsonFile, shownText } from "../secrets.ts";
+import { isRecord } from "./data.ts";
 import { type ScanEnv } from "./env.ts";
 
 /** Claude Code skips a CLAUDE.md larger than this (docs: memory#auto-memory), so ccdesk reads no more. */
@@ -200,28 +200,6 @@ export async function readJsonObject(
     return { ok: true, data };
   } catch (error) {
     return { ok: false, missing: false, unparsed: true, error: jsonSyntaxError(error) };
-  }
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-interface Frontmatter {
-  data: Record<string, unknown>;
-  body: string;
-}
-
-export const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
-
-export function parseFrontmatter(text: string): Frontmatter {
-  const match = FRONTMATTER.exec(text);
-  if (!match) return { data: {}, body: text };
-  try {
-    const data: unknown = parseYaml(match[1] ?? "");
-    return { data: isRecord(data) ? data : {}, body: text.slice(match[0].length) };
-  } catch {
-    return { data: {}, body: text.slice(match[0].length) };
   }
 }
 

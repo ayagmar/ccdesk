@@ -11,7 +11,7 @@ ccdesk is one npm package. `src/core` reads and writes Claude Code's configurati
 | `src/server/commands.ts` | What `ccdesk scan --json` and `ccdesk explain` print. Imports only the core and `src/view`. |
 | `src/server/start.ts` | `startServer(options)`: serves a core on 127.0.0.1 and resolves `{ url, close }`. |
 | `src/server/server.ts` | The `/api/*` routes, each a call on the core it is given; the token, Host and Origin checks, security headers, and the built UI. Turns errors into status codes. |
-| `src/core/scan/` | Reads. `index.ts` has `scanOverview` and `scanDirectory`; the other files each read one part (settings, instructions, memory, MCP, plugins, permissions, tools, context, usage, compare, path-test). `env.ts` defines `ScanEnv`, `files.ts` reads files (never the credentials file) and `git.ts` asks git for roots, worktrees and what is tracked. |
+| `src/core/scan/` | Reads. `index.ts` has `scanOverview` and `scanDirectory`; the other files each read one part (settings, instructions, memory, MCP, plugins, permissions, tools, context, usage, compare, path-test). `env.ts` defines `ScanEnv`, `files.ts` reads files (never the credentials file), `data.ts` has `isRecord` and frontmatter parsing, and `git.ts` asks git for roots, worktrees and what is tracked. |
 | `src/core/settings-edit.ts` | Settings, permission and hook edits, all in settings files. |
 | `src/core/agent-edit.ts`, `mcp-edit.ts`, `mutations.ts` | Subagent files, MCP servers, and auto memory. |
 | `src/core/parse-edit.ts` | Turns untrusted input (a JSON body) into a typed edit, or throws `InvalidEditError`. |

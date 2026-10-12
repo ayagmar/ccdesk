@@ -5,7 +5,8 @@ import { createInterface } from "node:readline";
 import { storeDirName } from "../../shared/memory.ts";
 import { type MemoryStore, type ProjectSummary } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isCredentials, isDir, isRecord, listDir } from "./files.ts";
+import { isCredentials, isDir, listDir } from "./files.ts";
+import { isRecord } from "./data.ts";
 import { readMemoryStore } from "./memory.ts";
 
 interface KnownProject extends ProjectSummary {

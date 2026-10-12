@@ -6,13 +6,13 @@ import {
   isWithin,
   listDir,
   MAX_TEXT_BYTES,
-  parseFrontmatter,
   readTextFile,
   resolvedPath,
   stringsIn,
   toStringList,
   walkMarkdown,
 } from "./files.ts";
+import { parseFrontmatter } from "./data.ts";
 import { scanDirectory } from "./index.ts";
 import { applySkillOverrides, readSkill } from "./inventory.ts";
 

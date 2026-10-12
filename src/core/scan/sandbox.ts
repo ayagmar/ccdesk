@@ -1,5 +1,6 @@
 import { type Scope } from "../../shared/types.ts";
-import { isRecord, stringsIn } from "./files.ts";
+import { stringsIn } from "./files.ts";
+import { isRecord } from "./data.ts";
 
 /** A part of one file's `sandbox` value that Claude Code ignores, and why. */
 export interface Dropped {

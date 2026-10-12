@@ -10,7 +10,8 @@ import {
 } from "../../shared/types.ts";
 import { redactSecrets, shownUrl } from "../secrets.ts";
 import { isConfigHome, type ScanEnv } from "./env.ts";
-import { isRecord, readJsonObject, stringField, stringsIn, wildcard } from "./files.ts";
+import { readJsonObject, stringField, stringsIn, wildcard } from "./files.ts";
+import { isRecord } from "./data.ts";
 import { manifestConfigs } from "./plugins.ts";
 import serverSchema from "../../shared/mcp-server.schema.json" with { type: "json" };
 import { ajv, schemaErrors } from "../schema.ts";

@@ -7,15 +7,8 @@ import {
   type TextFile,
 } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import {
-  isDir,
-  listDir,
-  parseFrontmatter,
-  readTextFile,
-  revisionOf,
-  shortHash,
-  stringField,
-} from "./files.ts";
+import { isDir, listDir, readTextFile, revisionOf, shortHash, stringField } from "./files.ts";
+import { parseFrontmatter } from "./data.ts";
 
 const INDEX_FILE = "MEMORY.md";
 /** Claude Code reads only this much of MEMORY.md at session start (docs: memory#auto-memory). */

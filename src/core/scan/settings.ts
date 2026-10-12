@@ -4,7 +4,8 @@ import { allowedScopes, EVERY_FILE, ignoredReason } from "../../shared/scopes.ts
 import { type EffectiveSetting, type Scope, type SettingsLayer } from "../../shared/types.ts";
 import { redactSecrets } from "../secrets.ts";
 import { type ScanEnv } from "./env.ts";
-import { isRecord, listDir, readJsonObject } from "./files.ts";
+import { listDir, readJsonObject } from "./files.ts";
+import { isRecord } from "./data.ts";
 import { mainWorktreeRoot } from "./git.ts";
 import { type Dropped, sandboxFilter } from "./sandbox.ts";
 

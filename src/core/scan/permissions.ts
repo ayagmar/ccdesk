@@ -7,7 +7,8 @@ import {
   type SettingsLayer,
   type Trust,
 } from "../../shared/types.ts";
-import { isRecord, stringsIn } from "./files.ts";
+import { stringsIn } from "./files.ts";
+import { isRecord } from "./data.ts";
 import { ignoredModeReason } from "./settings.ts";
 
 /**
