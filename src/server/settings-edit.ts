@@ -1,5 +1,5 @@
 import { stat } from "node:fs/promises";
-import { Ajv, type ValidateFunction } from "ajv";
+import { type ValidateFunction } from "ajv";
 import { allowedScopes, ignoredReason } from "../shared/scopes.ts";
 import schema from "../shared/settings.schema.json" with { type: "json" };
 import {
@@ -14,10 +14,10 @@ import { type ScanEnv } from "./scan/env.ts";
 import { isRecord, jsonSyntaxError, redactSecrets, revisionOf } from "./scan/files.ts";
 import { isSkippedMcpRule } from "./scan/permissions.ts";
 import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
+import { ajv, schemaErrors } from "./schema.ts";
 import { RefusedError, readIfExists, recordChange, serially, writeAtomic } from "./write.ts";
 
 const properties: Record<string, object> = schema.definitions.ClaudeCodeSettings.properties;
-const ajv = new Ajv({ allErrors: true, strict: false });
 const validators = new Map<string, ValidateFunction>();
 
 function validatorFor(key: string): ValidateFunction | null {
@@ -114,13 +114,8 @@ async function planKey(
   const reformats =
     raw !== null && raw.trim() !== "" && raw !== `${JSON.stringify(data, null, 2)}\n`;
   const base = { path, before, revision: revisionOf(raw), reformats };
-  const next = { ...data };
-  if (nextValue === undefined) {
-    delete next[key];
-  } else if (!validate(nextValue)) {
-    const errors = (validate.errors ?? []).map(
-      (e) => `${key}${e.instancePath.replaceAll("/", ".")} ${e.message ?? "is invalid"}`
-    );
+  const errors = nextValue === undefined ? [] : schemaErrors(validate, nextValue, key);
+  if (errors.length > 0)
     return {
       path,
       scope: file.scope,
@@ -128,9 +123,9 @@ async function planKey(
       next: null,
       preview: { ...base, after: before ?? "", errors },
     };
-  } else {
-    next[key] = nextValue;
-  }
+  const next = { ...data };
+  if (nextValue === undefined) delete next[key];
+  else next[key] = nextValue;
   return {
     path,
     scope: file.scope,

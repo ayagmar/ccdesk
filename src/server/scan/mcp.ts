@@ -19,26 +19,33 @@ import {
   wildcard,
 } from "./files.ts";
 import { manifestConfigs } from "./plugins.ts";
+import serverSchema from "../../shared/mcp-server.schema.json" with { type: "json" };
+import { ajv, schemaErrors } from "../schema.ts";
 import { readManagedSettings } from "./settings.ts";
 
+const validateServer = ajv.compile(serverSchema);
+
 /**
- * What makes a server definition one Claude Code cannot start; it checks the rest when it starts
- * the server (docs: mcp).
+ * What makes a server definition one Claude Code cannot start: a missing command or url, a type it
+ * does not know, or a field the docs define holding the wrong kind of value (docs: mcp). It checks
+ * the rest when it starts the server.
  */
 export function serverProblems(definition: unknown): string[] {
   if (!isRecord(definition)) return ["A server must be a JSON object."];
   const type = typeof definition.type === "string" ? definition.type : "";
-  if (type === "" || type === "stdio")
-    return typeof definition.command === "string" && definition.command.trim() !== ""
-      ? []
-      : [
-          typeof definition.url === "string"
-            ? 'A server with a url needs a "type", such as "http"; without one it is read as a stdio server.'
-            : 'A stdio server needs a "command".',
-        ];
-  return typeof definition.url === "string" && definition.url !== ""
-    ? []
-    : [`A ${type} server needs a "url".`];
+  if (type === "sdk")
+    return ['Only an SDK host application can register a "sdk" server; Claude Code skips it here.'];
+  const problems: string[] = [];
+  if (type === "" || type === "stdio") {
+    if (typeof definition.command !== "string" || definition.command.trim() === "")
+      problems.push(
+        typeof definition.url === "string"
+          ? 'A server with a url needs a "type", such as "http"; without one it is read as a stdio server.'
+          : 'A stdio server needs a "command".'
+      );
+  } else if (typeof definition.url !== "string" || definition.url === "")
+    problems.push(`A ${type} server needs a "url".`);
+  return [...problems, ...schemaErrors(validateServer, definition, "")];
 }
 
 /** A server definition with what policy matching needs, which the UI does not. */

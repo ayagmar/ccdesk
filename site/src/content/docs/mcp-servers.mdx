@@ -32,7 +32,7 @@ When two scopes define a server with the same name, the first one wins and the o
 - **turned off**: switched off for this project in Claude Code.
 - **blocked**: excluded by `deniedMcpServers` or `allowedMcpServers` in your settings.
 - **overridden**: another scope defines a server with this name first (see above).
-- **invalid**: Claude Code cannot use the definition as written, for example a `url` without a `type`, which Claude Code reads as a stdio server.
+- **invalid**: Claude Code cannot use the definition as written: a `url` without a `type`, which Claude Code reads as a stdio server; a `type` it does not know, or `sdk`, which only an SDK application can register; or a field from Claude Code's MCP docs holding the wrong kind of value, such as `args` written as one string instead of a list. ccdesk checks the same rules before it adds or changes a server.
 
 For a `.mcp.json` server, the inspector's **Approval** field lists each settings file, and your saved answers in `~/.claude.json`, that approve or reject it, with a note on any approval that waits for you to trust the folder.
 

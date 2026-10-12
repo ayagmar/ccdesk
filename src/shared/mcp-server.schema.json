@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$comment": "One server entry of .mcp.json, ~/.claude.json or claude mcp add-json, with the fields https://code.claude.com/docs/en/mcp defines. Fields it does not name are left alone.",
+  "type": "object",
+  "properties": {
+    "type": { "enum": ["stdio", "http", "streamable-http", "sse", "ws"] },
+    "command": { "type": "string" },
+    "args": { "type": "array", "items": { "type": "string" } },
+    "env": { "type": "object", "additionalProperties": { "type": "string" } },
+    "url": { "type": "string" },
+    "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+    "headersHelper": { "type": "string" },
+    "oauth": {
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "callbackPort": { "type": "integer" },
+        "authServerMetadataUrl": { "type": "string" },
+        "scopes": { "type": "string" }
+      }
+    },
+    "timeout": { "type": "number" },
+    "alwaysLoad": { "type": "boolean" }
+  }
+}

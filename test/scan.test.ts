@@ -129,6 +129,16 @@ test("a server Claude Code cannot start is marked invalid, with what it lacks", 
       local: { type: "stdio" },
       remote: { url: "https://mcp.example/api" },
       fine: { command: "fine-mcp" },
+      socket: {
+        type: "ws",
+        url: "wss://mcp.example/socket",
+        headersHelper: "./token.sh",
+        alwaysLoad: true,
+      },
+      oauth: { type: "streamable-http", url: "https://mcp.example", oauth: { callbackPort: 8080 } },
+      flags: { command: "x-mcp", args: "--verbose", env: { PORT: 8080 } },
+      unknown: { type: "websocket", url: "wss://mcp.example" },
+      host: { type: "sdk" },
     },
   });
 
@@ -140,6 +150,14 @@ test("a server Claude Code cannot start is marked invalid, with what it lacks", 
   assert.deepEqual(notes.local, ["invalid", 'A stdio server needs a "command".']);
   assert.equal(notes.remote?.[0], "invalid");
   assert.deepEqual(notes.fine, ["active", null]);
+  assert.deepEqual(notes.socket, ["active", null]);
+  assert.deepEqual(notes.oauth, ["active", null]);
+  assert.deepEqual(notes.flags, ["invalid", "args must be array"]);
+  assert.match(
+    notes.unknown?.[1] ?? "",
+    /^type must be equal to one of the allowed values: stdio, http/
+  );
+  assert.match(notes.host?.[1] ?? "", /Only an SDK host application/);
 });
 
 test(".mcp.json servers wait for approval, and a server defined twice uses the closer definition", async () => {
