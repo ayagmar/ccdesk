@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.2.2](https://github.com/ayagmar/ccdesk/compare/v0.2.1...v0.2.2) (2026-10-12)
+
+### Bug Fixes
+
+* **agents:** refuse agent text with values its review would hide ([3a9b39f](https://github.com/ayagmar/ccdesk/commit/3a9b39f2634cf4a10a9fc9a7ba7c627dddebd9da))
+* **compare:** ignore key order when comparing settings ([db71cde](https://github.com/ayagmar/ccdesk/commit/db71cde8c19c4bae292e5f41cd8d8c0cf7c578e4))
+* **context:** count a linked rule imported by its target's path once ([63830ef](https://github.com/ayagmar/ccdesk/commit/63830ef9096c2a86005cb60bad3d1c872921cdc1))
+* **context:** count a rule in a linked folder once when it is also imported ([168039b](https://github.com/ayagmar/ccdesk/commit/168039b738524b1d72f5e48edfcb51bea069a506))
+* **context:** prefer the real path the scan recorded when deduplicating ([d5a3e75](https://github.com/ayagmar/ccdesk/commit/d5a3e7566668156de9a3739b9fa51a39301cf697))
+* **env:** make a relative CLAUDE_CONFIG_DIR absolute ([2939488](https://github.com/ayagmar/ccdesk/commit/2939488c5ded1869367ca769218f17be8880fcd4))
+* **hooks:** refuse a replacement hook with hidden header values ([c40e7b4](https://github.com/ayagmar/ccdesk/commit/c40e7b4dfeda44fe104ad24cbd790a846da31266))
+* **mcp:** name the chosen profile in the claude commands ccdesk shows ([4d99fbd](https://github.com/ayagmar/ccdesk/commit/4d99fbd37087fa0a6332bc997975efb510d123b5))
+* **mcp:** run claude with the profile chosen by --config-dir ([02c6af0](https://github.com/ayagmar/ccdesk/commit/02c6af0bd56235874dd1a46dd1a3aaf124f299b8))
+* **path-test:** apply startup's rules to a subfolder's linked rules ([49d426c](https://github.com/ayagmar/ccdesk/commit/49d426c07beb5ce8e6538c2091b5e3c989d356e1))
+* **path-test:** keep AGENTS.md out when a subfolder's CLAUDE.md is skipped ([c05ed89](https://github.com/ayagmar/ccdesk/commit/c05ed89f04db3a83b1dad2e35b803cbb4af2e4a3))
+* **path-test:** match a linked rule's target against excludes only as startup does ([dfb6a79](https://github.com/ayagmar/ccdesk/commit/dfb6a79ae70c7eb4c94f4905c76b78f081c8afce))
+* **path-test:** skip subfolder instructions and rules over 4 MiB ([3696d74](https://github.com/ayagmar/ccdesk/commit/3696d74ec070dda64184b100b9eecef181e52884))
+* **scan:** cite the docs section on MCP rules with parentheses ([901c372](https://github.com/ayagmar/ccdesk/commit/901c3729ed4089bdfd5dd19a6265a5995aae1458))
+* **scan:** treat a name starting with two dots as inside its folder ([af6b025](https://github.com/ayagmar/ccdesk/commit/af6b02549e55a24394197da08326412bb1890059))
+* **settings:** refuse hook events Claude Code does not know ([b6561e6](https://github.com/ayagmar/ccdesk/commit/b6561e6f9b5a86a9fa27b3138cb570f493edb0d5))
+* **usage:** do not start a count for a page that already left ([4984a58](https://github.com/ayagmar/ccdesk/commit/4984a585d6a6ccd3914f2e06b9f274bd4b66eb21))
+* **watch:** answer a wait whose watcher closed while it was starting ([5c63129](https://github.com/ayagmar/ccdesk/commit/5c63129bdb60d9bc5f6d13a7665e4f273dcfb406))
+* **watch:** answer waiting pages when the watcher closes ([ad1c5ea](https://github.com/ayagmar/ccdesk/commit/ad1c5ea1080362858755e5f2c09e4bf19a3682e2))
+* **watch:** refresh when a file inside an installed plugin changes ([a09a99e](https://github.com/ayagmar/ccdesk/commit/a09a99e38c37c765c5117138324d50174ad7b142))
+* **watch:** refresh when a missing import is created ([279b033](https://github.com/ayagmar/ccdesk/commit/279b03353f414ed9faeaf0a86450c49da56aea1a))
+* **watch:** refresh when a missing import's folder appears later ([91f6444](https://github.com/ayagmar/ccdesk/commit/91f644452c3975dd09b2f1fbb86b2c96cf5da561))
+* **watch:** watch ~/.claude/plugins only for the install list ([382b6b0](https://github.com/ayagmar/ccdesk/commit/382b6b0990c82f71dab37cfd8840bd1aec42c47e))
+* **watch:** watch only the plugin files the scan reads ([8d12adc](https://github.com/ayagmar/ccdesk/commit/8d12adcfa0cdf74097273516d04130a99cffe578))
+
 ## [0.2.1](https://github.com/ayagmar/ccdesk/compare/v0.2.0...v0.2.1) (2026-10-12)
 
 ### Features
