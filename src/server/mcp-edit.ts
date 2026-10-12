@@ -232,8 +232,11 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
     name,
     JSON.stringify(definition),
   ];
+  // The commands shown and recorded name the profile, so pasting one changes the same servers.
+  const claude =
+    env.configDir === undefined ? "claude" : `CLAUDE_CONFIG_DIR=${quoted(env.configDir)} claude`;
   const addCommand = (name: string, definition: unknown) =>
-    `claude mcp add-json --scope ${edit.scope} -- ${quoted(name)} ${quoted(JSON.stringify(definition))}`;
+    `${claude} mcp add-json --scope ${edit.scope} -- ${quoted(name)} ${quoted(JSON.stringify(definition))}`;
   const before = Object.keys(servers).length > 0 ? shown(servers) : null;
   // Recent changes lists the edit with the servers it touched, values hidden as the page shows
   // them, and the commands that put them back from the folder claude ran in.
@@ -247,7 +250,7 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
       shownBefore: shown(touched(servers)),
       shownAfter: shown(touched(edited(servers, edit))),
       undoCommands: [
-        ...(add ? [`${at}claude mcp remove --scope ${edit.scope} -- ${quoted(add.name)}`] : []),
+        ...(add ? [`${at}${claude} mcp remove --scope ${edit.scope} -- ${quoted(add.name)}`] : []),
         ...(remove ? [`${at}${addCommand(remove.name, redactSecrets(servers[remove.name]))}`] : []),
       ],
     });
@@ -264,7 +267,7 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
       errors,
       // Shown with secrets hidden; the command that runs has the values you typed.
       commands: [
-        ...(remove ? [`claude mcp remove --scope ${edit.scope} -- ${quoted(remove.name)}`] : []),
+        ...(remove ? [`${claude} mcp remove --scope ${edit.scope} -- ${quoted(remove.name)}`] : []),
         ...(add ? [addCommand(add.name, redactSecrets(add.definition))] : []),
       ],
     },

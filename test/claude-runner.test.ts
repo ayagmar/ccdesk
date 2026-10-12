@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { chmodSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { claudeProgram, runClaude } from "../src/server/mcp-edit.ts";
+import { listBackups, previewRestore } from "../src/server/backups.ts";
+import { claudeProgram, previewMcpEdit, runClaude, saveMcpEdit } from "../src/server/mcp-edit.ts";
 import { scanEnvFromProcess } from "../src/server/scan/env.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
@@ -92,6 +93,34 @@ test(
     }
   }
 );
+
+test("with a chosen profile, the claude commands ccdesk shows and records name it", async () => {
+  const f = makeFixture();
+  const configDir = f.at("work profile");
+  const env = {
+    ...f.env,
+    configDir,
+    claudeDir: configDir,
+    claudeJson: join(configDir, ".claude.json"),
+  };
+  f.write(env.claudeJson, JSON.stringify({ mcpServers: { api: { command: "api-mcp" } } }));
+  const edit = {
+    dir: f.env.home,
+    scope: "user" as const,
+    remove: { name: "api", definition: { command: "api-mcp" } },
+  };
+  const ran = async () => "";
+  const profile = `CLAUDE_CONFIG_DIR='${configDir}' claude mcp`;
+
+  const preview = await previewMcpEdit(env, edit, ran);
+  assert.deepEqual(preview.commands, [`${profile} remove --scope user -- 'api'`]);
+  await saveMcpEdit(env, edit, preview.revision, ran);
+  const [change] = (await listBackups(env, { limit: 1 })).changes;
+  assert.ok(change);
+  assert.deepEqual((await previewRestore(env, change.id)).undoCommands, [
+    `${profile} add-json --scope user -- 'api' '{"command":"api-mcp"}'`,
+  ]);
+});
 
 test("on Windows, an npm install of Claude Code runs the claude.exe its claude.cmd starts", async () => {
   const f = makeFixture();
