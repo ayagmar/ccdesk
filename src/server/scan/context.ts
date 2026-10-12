@@ -110,8 +110,13 @@ export async function buildContext(input: ContextInput): Promise<ContextBlock[]>
     );
   }
 
-  // A file both imported and loaded on its own (a rule, an AGENTS.md) is counted once, as itself.
-  const loaded = new Set(instructions.filter((i) => i.status === "loaded").map((i) => i.path));
+  // A file both imported and loaded on its own (a rule, an AGENTS.md) is counted once, as itself,
+  // also when it is loaded through a link and imported by its target's path.
+  const loaded = new Set(
+    instructions
+      .filter((i) => i.status === "loaded")
+      .flatMap((i) => (i.realPath ? [i.path, i.realPath] : [i.path]))
+  );
   const added = new Set<string>();
   // An imported file comes before the text that imports it ("Claude reads the imported file
   // first, then the rest"), and its own imports before it.

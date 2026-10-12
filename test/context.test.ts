@@ -52,6 +52,23 @@ test("a rule that CLAUDE.md also imports is counted once", async () => {
   );
 });
 
+test("a linked rule that CLAUDE.md imports by its target's path is counted once", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "@docs/shared.md\n");
+  const target = f.write("app/docs/shared.md", "Shared rules.\n");
+  f.link("app/.claude/rules/shared.md", target);
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    counted(view.context).map((b) => [b.kind, b.path]),
+    [
+      ["instruction", f.at("app/CLAUDE.md")],
+      ["instruction", f.at("app/.claude/rules/shared.md")],
+    ]
+  );
+});
+
 test("context counts what Claude Code injects: no frontmatter, no HTML comments, and the skill and subagent listings", async () => {
   const f = makeFixture();
   f.write("home/.claude/CLAUDE.md", "<!-- maintainer note -->\nUse pnpm.\n");
