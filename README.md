@@ -20,7 +20,7 @@ ccdesk opens in your browser on the directory you ran it from. It shows what Cla
 
 **Docs:** [ayagmar.github.io/ccdesk](https://ayagmar.github.io/ccdesk/)
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/directory-dark.webp" /><img alt="ccdesk on a made-up project: the load order across the top, then instruction files and settings, each marked with the scope it comes from" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/directory-light.webp" /></picture>
+<a href="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/directory-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/directory-dark.webp" /><img alt="ccdesk on a made-up project: the load order across the top, then instruction files and settings, each marked with the scope it comes from" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/directory-light.webp" /></picture></a>
 
 ## What it covers
 
@@ -39,16 +39,16 @@ ccdesk opens in your browser on the directory you ran it from. It shows what Cla
 
 <table>
   <tr>
-    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/permissions-dark.webp" /><img alt="The permissions table with rules from user, project and local settings, and three suggested allow rules" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/permissions-light.webp" /></picture></td>
-    <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/context-dark.webp" /><img alt="What Claude sees: instruction files, memory and skill listing in load order, with sizes and token estimates" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/context-light.webp" /></picture></td>
+    <td width="50%"><a href="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/permissions-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/permissions-dark.webp" /><img alt="The permissions table with rules from user, project and local settings, and three suggested allow rules" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/permissions-light.webp" /></picture></a></td>
+    <td width="50%"><a href="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/context-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/context-dark.webp" /><img alt="What Claude sees: instruction files, memory and skill listing in load order, with sizes and token estimates" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/context-light.webp" /></picture></a></td>
   </tr>
   <tr>
     <td>Permissions, with allow rules suggested from the calls you approved</td>
     <td>What Claude sees when a session starts here</td>
   </tr>
   <tr>
-    <td><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/memory-dark.webp" /><img alt="Auto memory for a directory, with checks on the MEMORY.md index" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/memory-light.webp" /></picture></td>
-    <td><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/changes-dark.webp" /><img alt="Recent changes: every edit ccdesk made, each one restorable" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/changes-light.webp" /></picture></td>
+    <td><a href="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/memory-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/memory-dark.webp" /><img alt="Auto memory for a directory, with checks on the MEMORY.md index" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/memory-light.webp" /></picture></a></td>
+    <td><a href="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/changes-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/changes-dark.webp" /><img alt="Recent changes: every edit ccdesk made, each one restorable" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/changes-light.webp" /></picture></a></td>
   </tr>
   <tr>
     <td>Auto memory and its index</td>
@@ -58,7 +58,7 @@ ccdesk opens in your browser on the directory you ran it from. It shows what Cla
 
 ## How changes are made
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/review-dark.webp" /><img align="right" width="300" alt="Changing the model setting: the files that set it, the value Claude Code uses, and the diff to project settings before saving" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/review-light.webp" /></picture>
+<a href="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/review-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/review-dark.webp" /><img align="right" width="300" alt="Changing the model setting: the files that set it, the value Claude Code uses, and the diff to project settings before saving" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/review-light.webp" /></picture></a>
 
 - You see the exact diff before anything is written, and Save writes exactly that diff. If the file changed in the meantime, ccdesk asks you to review again.
 - Settings and hooks are checked against Claude Code's settings schema. Other keys in the file stay as they are.
