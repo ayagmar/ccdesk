@@ -300,3 +300,12 @@ h1#_top {
 .lightbox-close:hover {
   border-color: var(--ink);
 }
+
+/* Starlight colours its social links with the accent, which DESIGN.md keeps for focus and selection. */
+.social-icons a {
+  color: var(--ink);
+}
+
+.social-icons a:hover {
+  color: var(--muted);
+}
