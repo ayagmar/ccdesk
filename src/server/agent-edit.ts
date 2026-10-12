@@ -62,7 +62,12 @@ async function plan(env: ScanEnv, edit: AgentEdit): Promise<Planned> {
     throw new RefusedError(
       `${path} has env, header or URL values ccdesk does not show; edit it in your editor instead.`
     );
-  const errors = edit.text === null ? [] : agentProblems(edit.text);
+  let errors = edit.text === null ? [] : agentProblems(edit.text);
+  // Nor does it write values its review would hide.
+  if (edit.text !== null && errors.length === 0 && shownText(edit.text) !== edit.text)
+    errors = [
+      "ccdesk does not write env, header or URL values it would then hide; add them in your editor instead.",
+    ];
   return {
     path,
     raw,

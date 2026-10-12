@@ -1861,6 +1861,18 @@ test("an agent file Claude Code would skip is not saved", async () => {
   assert.equal(existsSync(join(fixture.env.claudeDir, "agents", "bad.md")), false);
 });
 
+test("an agent is not saved with header values its review would hide", async () => {
+  const dir = fixture.at("work/agents-secret");
+  const text =
+    "---\nname: api\ndescription: Calls the API\nmcpServers:\n  - api:\n      type: http\n      url: https://mcp.example.com\n      headers:\n        Authorization: s3cret\n---\n\nUse the API.\n";
+
+  const res = await saveAgent({ dir, create: { scope: "user", file: "api" }, text });
+
+  assert.equal(existsSync(join(fixture.env.claudeDir, "agents", "api.md")), false);
+  assert.ok((res.json as Preview).errors.length > 0);
+  assert.doesNotMatch(JSON.stringify(res.json), /s3cret/);
+});
+
 test("only agents shown here can be changed, and a new one cannot leave its agents folder", async () => {
   const dir = fixture.at("work/agents-confined");
   const other = fixture.write("work/elsewhere/notes.md", "keep me\n");
