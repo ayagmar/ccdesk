@@ -230,6 +230,26 @@ test("a mutation from another web origin is refused", async () => {
   assert.equal(existsSync(old), true);
 });
 
+test("a hook event Claude Code does not know is not written, unless the file already has it", async () => {
+  const dir = fixture.at("work/hook-events");
+  const file = fixture.json("work/hook-events/.claude/settings.json", {
+    hooks: { OldEvent: [{ hooks: [{ type: "command", command: "old" }] }] },
+  });
+  const hook = { hooks: [{ type: "command", command: "x" }] };
+  const preview = (value: unknown) =>
+    call("/api/settings/preview", {
+      method: "POST",
+      body: { dir, scope: "project", key: "hooks", value },
+    });
+  const before = readFileSync(file, "utf8");
+
+  const unknown = (await preview({ OldEvent: [hook], Nope: [hook] })).json as Preview;
+  assert.deepEqual(unknown.errors, ["Nope is not a hook event Claude Code knows."]);
+  const kept = (await preview({ OldEvent: [hook], Stop: [hook] })).json as Preview;
+  assert.deepEqual(kept.errors, []);
+  assert.equal(readFileSync(file, "utf8"), before);
+});
+
 test("a settings edit is previewed as a file change, then saved with a backup", async () => {
   const dir = fixture.at("work/site");
   const file = fixture.json("work/site/.claude/settings.json", { model: "sonnet" });

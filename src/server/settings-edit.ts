@@ -1,5 +1,6 @@
 import { stat } from "node:fs/promises";
 import { type ValidateFunction } from "ajv";
+import HOOK_EVENTS from "../shared/hook-events.json" with { type: "json" };
 import { allowedScopes, ignoredReason } from "../shared/scopes.ts";
 import schema from "../shared/settings.schema.json" with { type: "json" };
 import {
@@ -107,7 +108,10 @@ async function planKey(
   const reformats =
     raw !== null && raw.trim() !== "" && raw !== `${JSON.stringify(data, null, 2)}\n`;
   const base = { path, before, revision: revisionOf(raw), reformats };
-  const errors = nextValue === undefined ? [] : schemaErrors(validate, nextValue, key);
+  const errors =
+    nextValue === undefined
+      ? []
+      : [...schemaErrors(validate, nextValue, key), ...newHookEvents(key, data[key], nextValue)];
   if (errors.length > 0)
     return {
       path,
@@ -166,6 +170,18 @@ async function planPermissionEdit(env: ScanEnv, edit: PermissionEdit): Promise<P
     }
     return Object.keys(permissions).length > 0 ? permissions : undefined;
   });
+}
+
+/**
+ * Hook events an edit brings in that Claude Code does not know, which the schema allows. Ones the
+ * file already has stay, so a file written for another Claude Code version can still be edited.
+ */
+function newHookEvents(key: string, before: unknown, after: unknown): string[] {
+  if (key !== "hooks" || !isRecord(after)) return [];
+  const had = isRecord(before) ? Object.keys(before) : [];
+  return Object.keys(after)
+    .filter((event) => !HOOK_EVENTS.includes(event) && !had.includes(event))
+    .map((event) => `${event} is not a hook event Claude Code knows.`);
 }
 
 /** The matcher a group is written with; a missing or empty one matches everything. */
