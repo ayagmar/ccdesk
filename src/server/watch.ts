@@ -90,6 +90,8 @@ interface Subscription {
 /** One set of file watchers per directory a page is looking at, shared by its requests. */
 export class Watcher {
   private readonly subscriptions = new Map<string, Subscription>();
+  /** What the latest scan of each directory read, kept for a watch that starts after the scan. */
+  private readonly scanned = new Map<string, Target[]>();
 
   constructor(private readonly env: ScanEnv) {}
 
@@ -97,6 +99,7 @@ export class Watcher {
   track(dir: string, view: DirectoryView): void {
     const subscription = this.subscriptions.get(dir);
     const extra = dependencies(view);
+    this.scanned.set(dir, extra);
     if (!subscription || JSON.stringify(extra) === JSON.stringify(subscription.extra)) return;
     subscription.extra = extra;
     void this.rewatch(dir, subscription);
@@ -145,7 +148,7 @@ export class Watcher {
       watchers: [],
       changedAt: 0,
       waiters: new Set(),
-      extra: [],
+      extra: this.scanned.get(dir) ?? [],
     };
     this.subscriptions.set(dir, subscription);
     await this.rewatch(dir, subscription);
