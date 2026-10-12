@@ -5,6 +5,7 @@ import {
   isFile,
   isWithin,
   listDir,
+  MAX_TEXT_BYTES,
   parseFrontmatter,
   readTextFile,
   stringsIn,
@@ -74,7 +75,10 @@ export async function testPath(
   for (const folder of between) {
     const nested = async (name: string, scope: PathMatch["scope"]) => {
       const path = join(folder, name);
-      if (excluded(path) || !(await readTextFile(env, path))) return false;
+      if (excluded(path)) return false;
+      // Claude Code skips an instruction file over the limit, as it does at startup.
+      const file = await readTextFile(env, path);
+      if (!file || file.bytes > MAX_TEXT_BYTES) return false;
       matches.push({ kind: "nested", path, scope });
       return true;
     };
@@ -89,7 +93,7 @@ export async function testPath(
     if (agents) await nested("AGENTS.md", "project");
     for (const path of await walkMarkdown(join(folder, ".claude", "rules"))) {
       const text = await readTextFile(env, path);
-      if (!text || excluded(path)) continue;
+      if (!text || text.bytes > MAX_TEXT_BYTES || excluded(path)) continue;
       const globs = toStringList(parseFrontmatter(text.text).data.paths);
       const glob =
         globs.length === 0 ? undefined : firstMatch(globs, slashed(relative(folder, target)));

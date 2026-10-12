@@ -29,6 +29,21 @@ test("touching a file brings in matching path rules, skills and the CLAUDE.md fi
   );
 });
 
+test("a subfolder's instruction file or rule over 4 MiB does not load, one at the limit does", async () => {
+  const f = makeFixture();
+  const limit = 4 * 1024 * 1024;
+  f.write("app/src/CLAUDE.md", "x".repeat(limit + 1));
+  f.write("app/src/.claude/rules/big.md", "x".repeat(limit + 1));
+  f.write("app/src/api/CLAUDE.md", "x".repeat(limit));
+
+  const result = await testPath(f.env, f.at("app"), "src/api/users.ts");
+
+  assert.deepEqual(
+    result.matches.map((m) => [m.kind, f.rel(m.path)]),
+    [["nested", "app/src/api/CLAUDE.md"]]
+  );
+});
+
 test("a nested skill whose folder name another skill has is named with its directory", async () => {
   const f = makeFixture();
   const skill = (name: string) => `---\nname: ${name}\ndescription: Deploy ${name}\n---\n`;
