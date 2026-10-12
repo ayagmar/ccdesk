@@ -1,6 +1,6 @@
 # Architecture
 
-ccdesk is one npm package. `src/core` reads and writes Claude Code's configuration, `src/server` serves it over HTTP and holds the `ccdesk` bin, and a React page in `src/ui` talks to the server. `src/shared` holds the types they all use. `src/core` imports nothing from `src/server`; `src/core/index.ts` is the package's import entry point (`import { scanDirectory } from "ccdesk"`). The [contributing page](https://ayagmar.github.io/ccdesk/contributing/) covers the development loop, the generated data and releases; this file covers how the code fits together.
+ccdesk is one npm package. `src/core` reads and writes Claude Code's configuration, `src/server` serves it over HTTP and holds the `ccdesk` bin, `src/view` turns what the core reads into the rows a front end lists, and a React page in `src/ui` talks to the server. `src/shared` holds the types they all use. `src/core` imports nothing from `src/server`; `src/core/index.ts` is the package's import entry point (`import { scanDirectory } from "ccdesk"`), and `src/view/index.ts` is `ccdesk/view`. The [contributing page](https://ayagmar.github.io/ccdesk/contributing/) covers the development loop, the generated data and releases; this file covers how the code fits together.
 
 ## Module map
 
@@ -22,20 +22,22 @@ ccdesk is one npm package. `src/core` reads and writes Claude Code's configurati
 | `src/core/open.ts` | Opens a file in the editor the `ScanEnv`'s environment names, or a URL in the default browser, the way its platform starts one. |
 | `src/core/core.ts` | `createCore(env, options)`: every read and change with `env` bound, its own change queue and usage cache, and the editor and `claude` it starts. |
 | `src/core/index.ts` | The import entry point; re-exports `createCore` and the free functions. |
+| `src/view/sections/` | Each section's rows, columns and sort keys, filter text, labels, facets and empty text, as a `ViewSection`; `index.ts` lists them in page order and has `buildRows`. `rows`, `label`, `heading` and `facet.order` take a `ViewContext`: a formatter for the home folder and the settings reference. |
+| `src/view/` | What the page shows without React: `formatter(home)` and the other text helpers, the scope lines, the diff, the usage sentences, and `fieldKind` and `valuesIn` for settings. `index.ts` is `ccdesk/view`. |
 | `src/shared/` | Types (`types.ts`), scope lists, and the JSON generated from Claude Code's SDK and docs. No Node or DOM imports. |
-| `src/ui/` | The page. Imports only `src/shared` and calls the server through `api.ts`. `sections/` defines each table on the directory page. |
+| `src/ui/` | The page. Imports `src/shared` and `src/view`, and calls the server through `api.ts`. `sections/` adds each table's cells, heading notes and inspector to the view's section. |
 
 ## From disk to the page
 
 ```
-ScanEnv → scanDirectory(env, dir, profile) → DirectoryView → /api/directory → sections → rows
+ScanEnv → scanDirectory(env, dir, profile) → DirectoryView → /api/directory → buildRows (src/view) → rows → cells (src/ui)
 ```
 
 `ScanEnv` holds every location ccdesk reads: home, the Claude folder, `.claude.json`, the managed folder, the platform, and `processEnv`, the environment ccdesk finds an editor and `claude` in and passes to them. `scanEnvFromProcess` builds it from the real machine; tests build one around a throwaway folder with `makeFixture()`, whose `processEnv` is empty. Every read and write takes it as its first argument, so nothing in the core reads `homedir()`, `process.platform` or `process.env` itself; only the free `openInEditor` and `runClaude` still default to them.
 
 `createCore(env, { runClaude?, openFile? })` binds `env` to every read and change and returns them as methods, such as `core.scanDirectory(dir)` and `core.saveSettingsEdit(edit, revision)`. The server takes a core; tests pass `runClaude` and `openFile` fakes so nothing is started.
 
-`scanDirectory` returns one `DirectoryView`: the instruction files, settings layers and effective settings, permissions, built-in tools, memory, hooks, MCP servers, extensions, context, trust, sharing and problems for one directory and session profile. The page fetches it through `Watcher.scan`, which also records the files the scan read so a change to any of them wakes `/api/watch`. On the page, `useConfig` holds the view, `sections/index.ts` lists the sections in page order, and each section turns the view into rows.
+`scanDirectory` returns one `DirectoryView`: the instruction files, settings layers and effective settings, permissions, built-in tools, memory, hooks, MCP servers, extensions, context, trust, sharing and problems for one directory and session profile. The page fetches it through `Watcher.scan`, which also records the files the scan read so a change to any of them wakes `/api/watch`. On the page, `useConfig` holds the view and `buildRows` from `src/view` turns it into rows, one list per section in page order. `src/ui/sections/index.ts` joins each view section to the page's cells and inspector by section id. Outside the page, `buildRows(view, { format: formatter(env.home), reference: REFERENCE })` gives the same rows.
 
 Usage counts arrive separately: the page posts the rules in effect to `/api/usage` after each scan, and `readUsage` counts calls in the transcripts. The settings schema and catalog are fetched once from `/api/reference`; no directory is shown before they arrive.
 
@@ -87,7 +89,7 @@ The free save functions and `readUsage`, kept for one release beside `createCore
 Still in module scope, and shared by every core:
 
 - `settings-edit.ts`: compiled schema validators, and `schema.ts`: the Ajv instance. Both are compiled from the bundled schema and never change, so sharing them changes no result.
-- In the page: `format.ts` keeps the home folder for `tilde()`, and `reference.ts` keeps the data from `/api/reference`.
+- In the page: `format.ts` keeps the formatter for the home folder the overview names, and `reference.ts` keeps the data from `/api/reference`. `src/view` keeps neither; its callers pass them in a `ViewContext`.
 
 `Watcher` is per instance; the server makes one from its core's `env`.
 
