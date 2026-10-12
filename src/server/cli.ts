@@ -81,11 +81,13 @@ function main() {
     console.log(`ccdesk is running at ${url}\nPress Ctrl+C to stop.`);
     if (values.open) openBrowser(url);
   });
-  process.once("SIGINT", () => {
+  const stop = () => {
     // An open browser tab keeps a connection alive, which would hold close() open.
     server.close(() => process.exit(0));
     server.closeAllConnections();
-  });
+  };
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
 }
 
 function openBrowser(url: string) {

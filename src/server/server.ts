@@ -391,7 +391,13 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 
 async function serveStatic(uiDir: string | null, pathname: string, res: ServerResponse) {
   if (!uiDir) return send(res, 404, { error: "UI is served by the Vite dev server" });
-  const rel = normalize(decodeURIComponent(pathname)).replace(/^[/\\]+/, "");
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    return send(res, 400, { error: "Bad request" });
+  }
+  const rel = normalize(decoded).replace(/^[/\\]+/, "");
   const target = join(uiDir, rel === "" ? "index.html" : rel);
   if (!target.startsWith(uiDir + sep) && target !== uiDir)
     return send(res, 403, { error: "Forbidden" });
