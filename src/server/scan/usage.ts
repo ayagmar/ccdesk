@@ -98,6 +98,8 @@ export function readUsage(
 ): Promise<Usage> {
   const key = JSON.stringify([env.claudeDir, resolve(dir), rules, timeLimitMs, maxCachedCalls]);
   let run = waiting.get(key);
+  // Nobody would wait for a new count, so none starts to hold up the queue.
+  if (!run && signal?.aborted) return Promise.reject(stoppedBecause(signal));
   if (!run) {
     const stop = new AbortController();
     const promise = queue.then(() => {

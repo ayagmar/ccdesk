@@ -424,7 +424,15 @@ test("a count nobody waits for any more stops without holding up the next one", 
   assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 4);
 });
 
-// FIFOs stand in for a hung disk, such as a network mount; Windows has no mkfifo.
+test("a count asked for by a page that already left is not started", async () => {
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  f.write(join(storeOf(f, dir), "one.jsonl"), bash("ls"));
+
+  await assert.rejects(readUsage(f.env, dir, [], { signal: AbortSignal.abort() }), CountStopped);
+  assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 1);
+});
+
 test("a count shared by two pages keeps going when one of them leaves", async () => {
   const f = makeFixture();
   const dir = f.at("work", "app");
