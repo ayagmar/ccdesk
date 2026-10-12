@@ -5,7 +5,12 @@ import { defineConfig } from "vite";
 export default defineConfig({
   root: "src/ui",
   plugins: [react()],
-  build: { outDir: "../../dist/ui", emptyOutDir: true },
+  build: {
+    outDir: "../../dist/ui",
+    emptyOutDir: true,
+    // Keep fonts as files: the server's CSP allows fonts from 'self' only, not data: URLs.
+    assetsInlineLimit: (file) => (file.endsWith(".woff2") ? false : undefined),
+  },
   server: {
     port: 4320,
     proxy: {
