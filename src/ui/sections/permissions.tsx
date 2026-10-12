@@ -343,8 +343,9 @@ function SuggestedRule({ row, actions }: { row: Suggested; actions: Actions }) {
       </section>
       <p className="muted small">
         Counted from Claude Code's transcripts for{" "}
-        {view.usage ? sessionsHere(view.usage) : "this directory"}. ccdesk reads only which tool ran
-        and whether you allowed it; it never shows what was in a session.
+        {view.usage ? sessionsHere(view.usage) : "this directory"}. ccdesk reads each call's tool,
+        command or address and whether you allowed it, and shows only counts and rule patterns,
+        never what was in a session.
       </p>
     </>
   );
