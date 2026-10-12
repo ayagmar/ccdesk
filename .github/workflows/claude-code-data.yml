@@ -53,6 +53,9 @@ jobs:
           pnpm run schema
           pnpm run scopes
           pnpm run tools
+          # The generators write JSON.stringify output; formatting it first keeps a formatting-only
+          # difference from counting as a change and failing the format check.
+          pnpm exec biome format --write src/shared/settings.schema.json src/shared/hook-events.json src/shared/settings-scopes.json src/shared/settings-catalog.json src/shared/builtin-tools.json
           # Sections of the docs the code follows by hand; any change needs a person to check the code.
           pnpm -s run docs:fingerprints > "$RUNNER_TEMP/docs-changes.md"
           if git diff --quiet; then
