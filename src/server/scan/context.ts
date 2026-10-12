@@ -117,7 +117,7 @@ export async function buildContext(input: ContextInput): Promise<ContextBlock[]>
       await Promise.all(
         instructions
           .filter((i) => i.status === "loaded")
-          .map(async (i) => [i.path, await resolvedPath(i.path)])
+          .map(async (i) => [i.path, i.realPath ?? (await resolvedPath(i.path))])
       )
     ).flat()
   );
