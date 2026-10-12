@@ -15,10 +15,12 @@ import { namesTool, parseRule } from "./tools.ts";
 interface Call {
   tool: string;
   at: string;
-  /** Bash and Monitor: the command, for matching Bash rules. */
-  command?: string;
+  /** Bash and Monitor: every command a Bash rule might see in the call (see everyCommandIn). */
+  commands?: string[];
   /** WebFetch: the host, for matching domain rules. */
   host?: string;
+  /** The allow rule that would have covered the call (see ruleFor). */
+  rule: string | null;
   /** Set when Claude Code asked you: true when you allowed the call. */
   byYou?: boolean;
 }
@@ -44,10 +46,14 @@ export interface RuleInEffect {
 }
 
 /**
- * Transcripts already counted, by path, so reopening a directory reads only what was added. It
- * keeps the commands of every directory opened since ccdesk started, in memory only.
+ * Transcripts already counted, by path, so reopening a directory reads only what was added. Kept
+ * in memory only, least recently counted first; once they hold more than MAX_CACHED_CALLS calls,
+ * the oldest are dropped and read again when needed.
  */
 const transcripts = new Map<string, Transcript>();
+
+/** Roughly how many calls the cache keeps, beyond those of the directory counted last. */
+export const MAX_CACHED_CALLS = 100_000;
 
 /** A transcript is read in parts this size, so one huge file never becomes one huge string. */
 const CHUNK = 8 * 1024 * 1024;
@@ -84,9 +90,13 @@ export function readUsage(
   env: ScanEnv,
   dir: string,
   rules: RuleInEffect[],
-  { signal, timeLimitMs = TIME_LIMIT_MS }: { signal?: AbortSignal; timeLimitMs?: number } = {}
+  {
+    signal,
+    timeLimitMs = TIME_LIMIT_MS,
+    maxCachedCalls = MAX_CACHED_CALLS,
+  }: { signal?: AbortSignal; timeLimitMs?: number; maxCachedCalls?: number } = {}
 ): Promise<Usage> {
-  const key = JSON.stringify([env.claudeDir, resolve(dir), rules, timeLimitMs]);
+  const key = JSON.stringify([env.claudeDir, resolve(dir), rules, timeLimitMs, maxCachedCalls]);
   let run = waiting.get(key);
   if (!run) {
     const stop = new AbortController();
@@ -99,7 +109,7 @@ export function readUsage(
         if (during.aborted) onStop();
         else during.addEventListener("abort", onStop, { once: true });
       });
-      return Promise.race([count(env, resolve(dir), rules, during), stopped]);
+      return Promise.race([count(env, resolve(dir), rules, during, maxCachedCalls), stopped]);
     });
     run = { promise, stop, waiters: 0 };
     waiting.set(key, run);
@@ -136,7 +146,8 @@ async function count(
   env: ScanEnv,
   dir: string,
   rules: RuleInEffect[],
-  signal: AbortSignal
+  signal: AbortSignal,
+  maxCachedCalls: number
 ): Promise<Usage> {
   checkStopped(signal);
   const checkouts = await worktrees(dir);
@@ -153,6 +164,7 @@ async function count(
   const storeNames = await listDir(projects);
   const taken = new Set<string>();
   const calls: Call[] = [];
+  const counted = new Set<string>();
   let sessions = 0;
   for (const folder of folders) {
     const own = storeDirName(folder);
@@ -174,6 +186,7 @@ async function count(
           (await transcript(env, file, signal))?.startCwd;
         if (start ? !isWithin(folder, start) : name !== own) continue;
         taken.add(file);
+        counted.add(file);
         calls.push(...((await transcript(env, file, signal))?.calls ?? []));
         if (file === session) sessions++;
       }
@@ -182,6 +195,7 @@ async function count(
         if (path.startsWith(store + sep) && !files.has(path)) transcripts.delete(path);
     }
   }
+  trimCache(counted, maxCachedCalls);
   return {
     sessions,
     repository,
@@ -190,6 +204,17 @@ async function count(
     approvals: approvals(calls, rules),
     matches: Object.fromEntries(rules.map((r) => [r.rule, matchCount(r, calls)])),
   };
+}
+
+/** Drops the least recently counted transcripts over the limit, keeping those just counted. */
+function trimCache(counted: Set<string>, maxCalls: number): void {
+  let total = 0;
+  for (const known of transcripts.values()) total += known.calls.length;
+  for (const [path, known] of transcripts) {
+    if (total <= maxCalls || counted.has(path)) return;
+    transcripts.delete(path);
+    total -= known.calls.length;
+  }
 }
 
 /** A store's transcripts, each with the session it belongs to: itself, or a subagent's session. */
@@ -219,10 +244,11 @@ async function transcript(
   checkStopped(signal);
   if (!info?.isFile()) return null;
   let known = transcripts.get(file);
-  if (!known || info.size < known.offset) {
+  if (!known || info.size < known.offset)
     known = { size: 0, mtimeMs: 0, offset: 0, calls: [], byId: new Map() };
-    transcripts.set(file, known);
-  }
+  // Set again so the map stays in order of last use.
+  transcripts.delete(file);
+  transcripts.set(file, known);
   if (known.size === info.size && known.mtimeMs === info.mtimeMs) return known;
   try {
     await readFrom(file, known, info.size, signal);
@@ -303,16 +329,21 @@ function read(line: string, transcript: Transcript): void {
 }
 
 function callOf(tool: string, input: Record<string, unknown>, at: string): Call {
-  const call: Call = { tool, at };
-  if ((tool === "Bash" || tool === "Monitor") && typeof input.command === "string")
-    call.command = input.command;
+  const command =
+    (tool === "Bash" || tool === "Monitor") && typeof input.command === "string"
+      ? input.command
+      : undefined;
+  let host: string | undefined;
   if (tool === "WebFetch" && typeof input.url === "string") {
     try {
-      call.host = new URL(input.url).hostname.replace(/\.$/, "");
+      host = new URL(input.url).hostname.replace(/\.$/, "");
     } catch {
       // Not a URL: no domain rule can match it.
     }
   }
+  const call: Call = { tool, at, rule: ruleFor(tool, command, host) };
+  if (command !== undefined) call.commands = everyCommandIn(command);
+  if (host !== undefined) call.host = host;
   return call;
 }
 
@@ -338,8 +369,7 @@ function approvals(calls: Call[], rules: RuleInEffect[]): Approval[] {
   const groups = new Map<string, Call[]>();
   for (const c of calls) {
     if (c.byYou !== true) continue;
-    const rule = ruleFor(c);
-    if (rule) groups.set(rule, [...(groups.get(rule) ?? []), c]);
+    if (c.rule) groups.set(c.rule, [...(groups.get(c.rule) ?? []), c]);
   }
   const refused = calls.filter((c) => c.byYou === false);
   const out: Approval[] = [];
@@ -414,11 +444,15 @@ const PATH_TOOLS = new Set(["Read", "Edit", "Write", "NotebookEdit", "Glob", "Gr
  * permissions#process-wrappers) and file tools. A rule takes no other words from a command, so
  * arguments never leave the server.
  */
-function ruleFor(call: Call): string | null {
-  if (call.tool === "Bash") {
-    if (call.command === undefined || /[`$<>(){}]/.test(call.command)) return null;
-    if (/^\s*\w+=/.test(call.command)) return null;
-    const parts = subcommands(call.command);
+function ruleFor(
+  tool: string,
+  command: string | undefined,
+  host: string | undefined
+): string | null {
+  if (tool === "Bash") {
+    if (command === undefined || /[`$<>(){}]/.test(command)) return null;
+    if (/^\s*\w+=/.test(command)) return null;
+    const parts = subcommands(command);
     if (parts.length !== 1) return null;
     const [program, ...rest] = (parts[0] ?? "").split(/\s+/);
     if (!program) return null;
@@ -428,10 +462,9 @@ function ruleFor(call: Call): string | null {
     );
     return sub ? `Bash(${program} ${sub} *)` : null;
   }
-  if (call.tool === "WebFetch") return call.host ? `WebFetch(domain:${call.host})` : null;
-  if (PATH_TOOLS.has(call.tool) || call.tool === "PowerShell" || call.tool === "Monitor")
-    return null;
-  return call.tool;
+  if (tool === "WebFetch") return host ? `WebFetch(domain:${host})` : null;
+  if (PATH_TOOLS.has(tool) || tool === "PowerShell" || tool === "Monitor") return null;
+  return tool;
 }
 
 const SEPARATORS = /&&|\|\||\|&|[;|&\n]/;
@@ -525,7 +558,7 @@ function matcherFor({ list, rule }: RuleInEffect): ((call: Call) => boolean) | n
   if (tool === "Bash") {
     const pattern = bashPattern(specifier);
     if (pattern === null) return null;
-    return (c) => c.command !== undefined && everyCommandIn(c.command).some(pattern);
+    return (c) => c.commands?.some(pattern) === true;
   }
   if (tool === "WebFetch" && specifier.startsWith("domain:")) {
     const host = wildcard(specifier.slice(7).replace(/\.$/, ""), "i");
