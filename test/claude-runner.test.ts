@@ -3,6 +3,7 @@ import { chmodSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { claudeProgram, runClaude } from "../src/server/mcp-edit.ts";
+import { scanEnvFromProcess } from "../src/server/scan/env.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
 // The fake claude is a shell script.
@@ -21,7 +22,8 @@ test(
       await assert.rejects(
         runClaude(
           ["mcp", "add-json", "--scope", "user", "--", "db", JSON.stringify(definition)],
-          f.at()
+          f.at(),
+          undefined
         ),
         (error: Error) => {
           assert.doesNotMatch(error.message, /s3cret/);
@@ -52,7 +54,7 @@ test(
         args: ["--api-key", "arg-777", "--token=arg-888"],
       };
       await assert.rejects(
-        runClaude(["mcp", "add-json", "--", "api", JSON.stringify(definition)], f.at()),
+        runClaude(["mcp", "add-json", "--", "api", JSON.stringify(definition)], f.at(), undefined),
         (error: Error) => {
           assert.match(error.message, /invalid server/);
           assert.doesNotMatch(error.message, /hunter2|abc123|tok-999|arg-777|arg-888/);
@@ -61,6 +63,32 @@ test(
       );
     } finally {
       process.env.PATH = path;
+    }
+  }
+);
+
+test(
+  "claude changes the profile chosen with --config-dir, not the one the shell names",
+  notOnWindows,
+  async () => {
+    const f = makeFixture();
+    chmodSync(f.write("bin/claude", '#!/bin/sh\necho "profile=$CLAUDE_CONFIG_DIR"\n'), 0o755);
+    const path = process.env.PATH;
+    process.env.PATH = f.at("bin");
+    process.env.CLAUDE_CONFIG_DIR = f.at("shell-profile");
+    try {
+      const chosen = scanEnvFromProcess(f.at("work-profile")).configDir;
+      assert.equal(
+        (await runClaude(["mcp", "list"], f.at(), chosen)).trim(),
+        `profile=${f.at("work-profile")}`
+      );
+      delete process.env.CLAUDE_CONFIG_DIR;
+      // With no profile chosen, claude finds ~/.claude.json itself, as from a terminal.
+      const none = scanEnvFromProcess().configDir;
+      assert.equal((await runClaude(["mcp", "list"], f.at(), none)).trim(), "profile=");
+    } finally {
+      process.env.PATH = path;
+      delete process.env.CLAUDE_CONFIG_DIR;
     }
   }
 );

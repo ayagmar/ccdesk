@@ -6,6 +6,8 @@ export interface ScanEnv {
   home: string;
   /** `~/.claude`, or `--config-dir` or `CLAUDE_CONFIG_DIR` when set. */
   claudeDir: string;
+  /** CLAUDE_CONFIG_DIR for the claude commands ccdesk runs: `--config-dir` or the shell's; unset for ~/.claude. */
+  configDir?: string | undefined;
   /** Claude Code's own state file: OAuth, trust decisions, user MCP servers. Read-only for ccdesk. */
   claudeJson: string;
   /** System directory for organisation-managed CLAUDE.md and managed-settings.json. */
@@ -25,6 +27,7 @@ export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
   return {
     home,
     claudeDir: configDir ?? join(home, ".claude"),
+    configDir,
     // Claude Code keeps .claude.json beside the config dir it was given.
     claudeJson: configDir ? join(configDir, ".claude.json") : join(home, ".claude.json"),
     managedDir: managedDirFor(process.platform),

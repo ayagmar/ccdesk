@@ -26,7 +26,12 @@ import {
  * Runs `claude` with these arguments in `cwd` and resolves with its output. Replaced in tests, so
  * nothing outside the test changes.
  */
-export type RunClaude = (args: string[], cwd: string) => Promise<string>;
+/** Runs claude with the profile ccdesk reads, so its edits land where the page shows them. */
+export type RunClaude = (
+  args: string[],
+  cwd: string,
+  configDir: string | undefined
+) => Promise<string>;
 
 const exists = (path: string) =>
   access(path).then(
@@ -70,10 +75,13 @@ function secretsIn(args: string[]): string[] {
   });
 }
 
-export const runClaude: RunClaude = async (args, cwd) => {
+export const runClaude: RunClaude = async (args, cwd, configDir) => {
   const program = await claudeProgram();
+  // Set only for a chosen profile: Claude Code also moves .claude.json into a CLAUDE_CONFIG_DIR.
+  const env =
+    configDir === undefined ? process.env : { ...process.env, CLAUDE_CONFIG_DIR: configDir };
   return new Promise((done, fail) => {
-    execFile(program, args, { cwd, timeout: 30_000 }, (error, stdout, stderr) => {
+    execFile(program, args, { cwd, env, timeout: 30_000 }, (error, stdout, stderr) => {
       if ((error as NodeJS.ErrnoException | null)?.code === "ENOENT")
         return fail(
           new RefusedError(
@@ -261,14 +269,15 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
       ],
     },
     save: async () => {
-      if (remove) await run(["mcp", "remove", "--scope", edit.scope, "--", remove.name], cwd);
+      if (remove)
+        await run(["mcp", "remove", "--scope", edit.scope, "--", remove.name], cwd, env.configDir);
       // The change is made by then; a record that cannot be written only leaves it unlisted.
       if (!add) {
         await record().catch(() => undefined);
         return { target: env.claudeJson };
       }
       try {
-        await run(addArgs(add.name, add.definition), cwd);
+        await run(addArgs(add.name, add.definition), cwd, env.configDir);
       } catch (error) {
         if (!remove) throw error;
         // A replaced server goes back as it was, so a refused add does not lose it. When that
@@ -276,7 +285,7 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
         // belongs to; a replaced server has no hidden values (see checked), so the command shows
         // nothing the page does not.
         const original = servers[remove.name];
-        await run(addArgs(remove.name, original), cwd).catch(() => {
+        await run(addArgs(remove.name, original), cwd, env.configDir).catch(() => {
           throw new RefusedError(
             `ccdesk removed ${remove.name}, then could not add it back. In bash, zsh or Git Bash, put it back with: ${edit.scope === "local" ? `cd ${quoted(cwd)} && ` : ""}${addCommand(remove.name, original)} (${error instanceof Error ? error.message : String(error)})`
           );
