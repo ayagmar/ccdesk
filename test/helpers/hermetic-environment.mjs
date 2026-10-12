@@ -6,11 +6,17 @@ import { join } from "node:path";
 const sandboxRoot = mkdtempSync(join(tmpdir(), "ccdesk-test-process-"));
 const sandboxHome = join(sandboxRoot, "home");
 mkdirSync(sandboxHome, { recursive: true });
+// Fixtures are made in tmpdir(), so pointing it here removes them with the sandbox.
+const sandboxTmp = join(sandboxRoot, "tmp");
+mkdirSync(sandboxTmp);
 
 delete process.env.CLAUDE_CONFIG_DIR;
 delete process.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY;
 Object.assign(process.env, {
   HOME: sandboxHome,
+  TMPDIR: sandboxTmp,
+  TMP: sandboxTmp,
+  TEMP: sandboxTmp,
   USERPROFILE: sandboxHome,
   XDG_CONFIG_HOME: join(sandboxRoot, "xdg-config"),
   GIT_CONFIG_GLOBAL: join(sandboxRoot, "gitconfig"),
