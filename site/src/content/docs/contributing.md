@@ -3,7 +3,7 @@ title: Contributing
 description: The development loop, the generated Claude Code data, the docs site, and how releases are made.
 ---
 
-ccdesk is a Node.js server in TypeScript (`src/server`) that serves a React app built with Vite (`src/ui`); `src/shared` holds the types and generated data both use. Tests use `node:test`, linting and formatting use Biome, and packages are managed with pnpm. The source is on [GitHub](https://github.com/ayagmar/ccdesk).
+ccdesk is a Node.js server in TypeScript (`src/server`) that serves a React app built with Vite (`src/ui`); `src/shared` holds the types both use and the data generated from Claude Code. Tests use `node:test`, linting and formatting use Biome, and packages are managed with pnpm. The source is on [GitHub](https://github.com/ayagmar/ccdesk).
 
 ## Development loop
 
@@ -24,11 +24,16 @@ Tests never touch your real `~/.claude`. Each test process gets a throwaway home
 - `src/server/scan/` reads. Every function takes the `ScanEnv` (home, Claude folder, `.claude.json`, managed folder, platform), so tests point it at a fixture instead of your machine. `scanDirectory` returns the `DirectoryView` a page shows, and `scanOverview` the start page.
 - The edit modules (`settings-edit.ts`, `agent-edit.ts`, `mcp-edit.ts`, `mutations.ts` for memory) and `backups.ts` write. `write.ts` holds what they share: atomic writes through links, the backup folder and its manifest, and the queue that runs changes one at a time.
 - `watch.ts` watches the files a scan read and wakes the page's long poll on `/api/watch` when one changes. `~/.claude.json` is not watched; the page reloads when you return to the tab.
-- `src/shared` holds the types and generated data both sides use, and imports neither Node nor the DOM. `src/ui` imports only `src/shared` and talks to the server through `src/ui/api.ts`.
+- `src/shared` holds the types and generated data, and imports neither Node nor the DOM. `src/ui` imports only `src/shared` and talks to the server through `src/ui/api.ts`; it gets the settings schema, settings catalog and hook events from `/api/reference` instead of bundling them.
+- `src/core/index.ts` re-exports the reading and writing code without the HTTP server. It is what `import ... from "ccdesk"` loads.
 
 Every edit goes through the same steps. The UI sends the edit to a `preview` route, which returns the diff and the `revision` of what it read. The save route takes the same edit with that revision, plans it again from the file on disk and writes only if the revision still matches; otherwise it throws `RefusedError` (409), and the page asks you to review again. The same error also refuses edits ccdesk never makes, such as to managed settings or credentials, so its message says which case it is. A save returns a `Change` whose `id` is its backup folder, which is what Undo and Recent changes restore. User and local MCP edits are the exception: they run `claude mcp`, keep no backup and return no `Change`.
 
+Request bodies are turned into edits by the parsers in `parse-edit.ts`, which throw `InvalidEditError` (400) for input no review could have produced, such as an unknown scope.
+
 Values ccdesk hides on the page (env values, headers, keys in URLs and arguments) are redacted in the scan, so they never reach the browser. ccdesk never writes back a value the page saw as `•••`, so a setting, server, hook or agent that holds one is edited in its file instead. Settings, hooks and agents also refuse new values the review would hide; a new MCP server may hold the env values and headers you type for it.
+
+[ARCHITECTURE.md](https://github.com/ayagmar/ccdesk/blob/master/ARCHITECTURE.md) in the repository goes further: the module map, where secrets are hidden, the backup folder layout and what state is shared across a process. The [`docs/` folder](https://github.com/ayagmar/ccdesk/tree/master/docs) holds the plan for splitting the core from the web server and a list of feature ideas.
 
 ## Claude Code data
 

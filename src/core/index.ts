@@ -1,5 +1,6 @@
 // The core: everything a front end needs to read and change Claude Code's configuration, without
-// HTTP. It re-exports the modules in src/server and src/shared where they live today.
+// HTTP. It re-exports the modules in src/server and src/shared where they live today; see
+// ARCHITECTURE.md for how they fit together and docs/split-plan.md for where they are going.
 
 // Environment: every function below takes the ScanEnv first.
 export { isConfigHome, type ScanEnv, scanEnvFromProcess } from "../server/scan/env.ts";

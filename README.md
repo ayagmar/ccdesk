@@ -126,7 +126,7 @@ pnpm dev:ui     # UI with hot reload on localhost:4320
 pnpm check      # typecheck, lint, format, tests, build
 ```
 
-Tests never touch your real `~/.claude`; each one builds a throwaway home directory. The settings schema, scopes and built-in tools are generated from [`@anthropic-ai/claude-agent-sdk`](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) and Claude Code's docs, and a daily workflow opens a pull request when they change. [Contributing](https://ayagmar.github.io/ccdesk/contributing/) covers the generators, the docs site and releases.
+Tests never touch your real `~/.claude`; each one builds a throwaway home directory. The settings schema, scopes and built-in tools are generated from [`@anthropic-ai/claude-agent-sdk`](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) and Claude Code's docs, and a daily workflow opens a pull request when they change. [Contributing](https://ayagmar.github.io/ccdesk/contributing/) covers the generators, the docs site and releases. [ARCHITECTURE.md](ARCHITECTURE.md) explains how the code fits together, and [`docs/`](docs/) holds the plan for splitting the core from the web server and feature ideas.
 
 ## License
 
