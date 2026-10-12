@@ -168,6 +168,25 @@ test(".mcp.json servers wait for approval, and a server defined twice uses the c
   assert.equal(status(trusted)["project:db"], "active");
 });
 
+test("answering the .mcp.json prompt with use all servers starts every server from it", async () => {
+  const f = makeFixture();
+  f.json("app/.mcp.json", {
+    mcpServers: { docs: { command: "docs-mcp" }, db: { command: "db-mcp" } },
+  });
+  f.json("home/.claude.json", {
+    projects: {
+      [f.at("app")]: { hasTrustDialogAccepted: true, enableAllProjectMcpServers: true },
+    },
+  });
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    view.inventory.mcpServers.map((s) => s.status),
+    ["active", "active"]
+  );
+});
+
 test("project allow rules wait for the trust dialog; deny rules apply at once", async () => {
   const f = makeFixture();
   f.json("app/.claude/settings.json", {

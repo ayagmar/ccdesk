@@ -264,7 +264,11 @@ export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<M
       trust.trusted ||
       (l.scope === "local" && isConfigHome(env, projectDir))
   );
-  const approveAll = approvalLayers.some((l) => l.data?.enableAllProjectMcpServers === true);
+  // Your answers to the .mcp.json prompt sit in the project entry: claude mcp list counts an
+  // enableAllProjectMcpServers there, and claude mcp reset-project-choices clears it (v2.1.296).
+  const approveAll =
+    approvalLayers.some((l) => l.data?.enableAllProjectMcpServers === true) ||
+    project.enableAllProjectMcpServers === true;
   const approved = new Set([
     ...approvalLayers.flatMap((l) => stringsIn(l.data?.enabledMcpjsonServers)),
     ...stringsIn(project.enabledMcpjsonServers),
