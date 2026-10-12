@@ -31,7 +31,7 @@ export function trustWaits({
 
 /**
  * An MCP rule with a parameter, which Claude Code skips when it reads a settings file; such a rule
- * works only from --disallowedTools (docs: permissions#match-specific-tool-uses).
+ * works only from --disallowedTools (docs: permissions#match-by-input-parameter).
  */
 export function isSkippedMcpRule(rule: string): boolean {
   return /^mcp__[^(]*\(/.test(rule);
