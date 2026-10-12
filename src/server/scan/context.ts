@@ -8,7 +8,7 @@ import {
   type MemoryStore,
 } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isWithin, parseFrontmatter, readTextFile } from "./files.ts";
+import { isWithin, parseFrontmatter, readTextFile, resolvedPath } from "./files.ts";
 
 /**
  * Imports can name any file, so a cloned repo's CLAUDE.md could point at private files.
@@ -111,11 +111,15 @@ export async function buildContext(input: ContextInput): Promise<ContextBlock[]>
   }
 
   // A file both imported and loaded on its own (a rule, an AGENTS.md) is counted once, as itself,
-  // also when it is loaded through a link and imported by its target's path.
+  // also when it is loaded through a link, to it or to its folder, and imported by its real path.
   const loaded = new Set(
-    instructions
-      .filter((i) => i.status === "loaded")
-      .flatMap((i) => (i.realPath ? [i.path, i.realPath] : [i.path]))
+    (
+      await Promise.all(
+        instructions
+          .filter((i) => i.status === "loaded")
+          .map(async (i) => [i.path, await resolvedPath(i.path)])
+      )
+    ).flat()
   );
   const added = new Set<string>();
   // An imported file comes before the text that imports it ("Claude reads the imported file
