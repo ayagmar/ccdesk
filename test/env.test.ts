@@ -15,3 +15,12 @@ test("--config-dir is read like CLAUDE_CONFIG_DIR and wins over it", () => {
     delete process.env.CLAUDE_CONFIG_DIR;
   }
 });
+
+test("a relative CLAUDE_CONFIG_DIR names the same folder for ccdesk and the claude it runs", () => {
+  process.env.CLAUDE_CONFIG_DIR = join("profiles", "home");
+  try {
+    assert.equal(scanEnvFromProcess().configDir, resolve("profiles", "home"));
+  } finally {
+    delete process.env.CLAUDE_CONFIG_DIR;
+  }
+});

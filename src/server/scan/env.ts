@@ -22,8 +22,9 @@ export interface ScanEnv {
 /** `configDirFlag`, from `--config-dir`, stands in for CLAUDE_CONFIG_DIR and wins over it. */
 export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
   const home = homedir();
-  const configDir =
-    configDirFlag !== undefined ? resolve(configDirFlag) : process.env.CLAUDE_CONFIG_DIR;
+  // Made absolute here, from the folder ccdesk started in, because claude runs elsewhere.
+  const chosen = configDirFlag ?? (process.env.CLAUDE_CONFIG_DIR || undefined);
+  const configDir = chosen === undefined ? undefined : resolve(chosen);
   return {
     home,
     claudeDir: configDir ?? join(home, ".claude"),
