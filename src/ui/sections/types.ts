@@ -33,8 +33,8 @@ export type Row =
       section: "tools";
       line: Line | null;
       item: BuiltinTool;
-      /** Calls in the sessions started here; null until counted. */
-      calls: number | null;
+      /** Calls in the sessions started here; undefined while counting, null if counting failed. */
+      calls: number | null | undefined;
     }
   | { id: string; section: "memory"; line: Line; item: Memory }
   | { id: string; section: "hooks"; line: Line; item: Hook }

@@ -18,9 +18,9 @@ import { type Actions, defineSection, type RowOf } from "./types.ts";
 
 type R = RowOf<"tools">;
 
-/** Calls counted here: null while counting or when the transcripts could not be read. */
-function callsOf(usage: Usage | null | undefined, name: string): number | null {
-  if (!usage) return null;
+/** Calls counted here: undefined while counting, null when the transcripts could not be read. */
+function callsOf(usage: Usage | null | undefined, name: string): number | null | undefined {
+  if (!usage) return usage;
   return usage.tools.find((t) => t.tool === name)?.calls ?? 0;
 }
 
@@ -265,7 +265,17 @@ export const tools = defineSection<R>({
           )}
           {t.hooks > 0 && <span className="flag">{plural(t.hooks, "hook")}</span>}
         </td>
-        <td className={`num${row.calls ? " used" : ""}`}>{row.calls ?? "…"}</td>
+        <td className={`num${row.calls ? " used" : ""}`}>
+          {row.calls === undefined ? (
+            "…"
+          ) : row.calls === null ? (
+            <span className="muted" title="ccdesk could not finish counting the transcripts">
+              ?
+            </span>
+          ) : (
+            row.calls
+          )}
+        </td>
         <td className="desc">
           <Described text={t.description.split(/(?<=\.)\s/)[0] ?? ""} />
         </td>
