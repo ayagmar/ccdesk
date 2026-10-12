@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { basename } from "node:path";
 import { test } from "node:test";
+import { scanDirectory } from "../src/server/scan/index.ts";
 import { testPath } from "../src/server/scan/path-test.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
@@ -95,6 +96,22 @@ test("a subfolder's rules linked from outside the project load as they would at 
   });
   // Once approved, only the linked rules without a paths field load.
   assert.deepEqual(await loaded(), ["style.md"]);
+});
+
+test("a rule in a folder linked within the project is not excluded by its target's path, as at startup", async () => {
+  const f = makeFixture();
+  f.write("app/rules-src/api.md", '---\npaths: ["**/*.ts"]\n---\nValidate.\n');
+  f.link("app/.claude/rules", f.at("app/rules-src"));
+  f.link("app/sub/.claude/rules", f.at("app/rules-src"));
+  f.json("app/.claude/settings.local.json", { claudeMdExcludes: ["**/rules-src/**"] });
+
+  const startup = (await scanDirectory(f.env, f.at("app"))).instructions.find(
+    (i) => i.path === f.at("app/.claude/rules/api.md")
+  );
+  assert.equal(startup?.status, "on-match");
+
+  const result = await testPath(f.env, f.at("app"), "sub/x.ts");
+  assert.ok(result.matches.some((m) => m.path === f.at("app/sub/.claude/rules/api.md")));
 });
 
 test("an excluded rule and a skill Claude cannot invoke itself do not load for matching files", async () => {
