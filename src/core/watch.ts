@@ -154,6 +154,8 @@ interface Subscription {
   /** When the current watchers started. */
   watchingSince: number;
   waiters: Set<() => void>;
+  /** Callers of `subscribe`, called after every change until they unsubscribe. */
+  listeners: Set<() => void>;
   extra: Target[];
   idle?: NodeJS.Timeout;
   settle?: NodeJS.Timeout;
@@ -231,7 +233,7 @@ export class Watcher {
     signal: AbortSignal,
     timeoutMs = WAIT_MS
   ): Promise<{ changed: boolean; at: number }> {
-    const subscription = await this.subscribe(dir);
+    const subscription = await this.watching(dir);
     clearTimeout(subscription.idle);
     // Closed while its watchers were starting: there is nothing left to wait on.
     const closed = this.subscriptions.get(dir) !== subscription;
@@ -249,18 +251,45 @@ export class Watcher {
           subscription.waiters.add(done);
         });
     } finally {
-      // A dropped subscription has nothing left to clean up later.
-      if (subscription.waiters.size === 0 && this.subscriptions.get(dir) === subscription)
-        subscription.idle = setTimeout(() => this.drop(dir), IDLE_MS);
+      this.release(dir, subscription);
     }
     return { changed: subscription.changedAt > since, at: subscription.changedAt };
+  }
+
+  /**
+   * Calls `onChange` once after each change to what ccdesk shows for `dir`, until the returned
+   * function is called. Resolves once the watchers have started, so a change made after it
+   * resolves is seen. `close` stops the calls without making one.
+   */
+  async subscribe(dir: string, onChange: () => void): Promise<() => void> {
+    const subscription = await this.watching(dir);
+    // Closed while its watchers were starting: nothing will change.
+    if (this.subscriptions.get(dir) !== subscription) return () => {};
+    clearTimeout(subscription.idle);
+    // A function of its own, so the same onChange subscribed twice is unsubscribed twice.
+    const listener = () => onChange();
+    subscription.listeners.add(listener);
+    return () => {
+      if (subscription.listeners.delete(listener)) this.release(dir, subscription);
+    };
+  }
+
+  /** Drops the watchers of `dir` after a while once no one waits or listens for changes. */
+  private release(dir: string, subscription: Subscription): void {
+    // A dropped subscription has nothing left to clean up later.
+    if (
+      subscription.waiters.size === 0 &&
+      subscription.listeners.size === 0 &&
+      this.subscriptions.get(dir) === subscription
+    )
+      subscription.idle = setTimeout(() => this.drop(dir), IDLE_MS);
   }
 
   close(): void {
     for (const dir of [...this.subscriptions.keys()]) this.drop(dir);
   }
 
-  private async subscribe(dir: string): Promise<Subscription> {
+  private async watching(dir: string): Promise<Subscription> {
     const existing = this.subscriptions.get(dir);
     if (existing) return existing;
     const subscription: Subscription = {
@@ -269,6 +298,7 @@ export class Watcher {
       touchedAt: 0,
       watchingSince: Number.POSITIVE_INFINITY,
       waiters: new Set(),
+      listeners: new Set(),
       extra: this.scanned.get(dir) ?? [],
     };
     this.subscriptions.set(dir, subscription);
@@ -304,7 +334,7 @@ export class Watcher {
           clearTimeout(subscription.settle);
           subscription.settle = setTimeout(() => {
             subscription.changedAt = Date.now();
-            for (const wake of [...subscription.waiters]) wake();
+            for (const wake of [...subscription.waiters, ...subscription.listeners]) wake();
             void this.rewatch(dir, subscription);
           }, SETTLE_MS);
         });

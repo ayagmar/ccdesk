@@ -119,6 +119,43 @@ test("files a plugin's MCP server writes in its own folder do not count as a con
   assert.equal((await waiting).changed, false);
 });
 
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("a subscriber hears once about an editor's save, and nothing after unsubscribing", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "one\n");
+  const watcher = watcherFor(f);
+  // macOS can report changes made just before a watch starts; let those settle first.
+  await watcher.wait(f.at("app"), Number.MAX_SAFE_INTEGER, new AbortController().signal, 1000);
+  let calls = 0;
+  const unsubscribe = await watcher.subscribe(f.at("app"), () => calls++);
+
+  // An editor writes a file in several steps; the subscriber hears about the save once.
+  f.write("app/CLAUDE.md", "two\n");
+  await pause(100);
+  f.write("app/CLAUDE.md", "three\n");
+  await pause(1000);
+  assert.equal(calls, 1);
+
+  unsubscribe();
+  f.write("app/CLAUDE.md", "four\n");
+  await pause(1000);
+  assert.equal(calls, 1);
+});
+
+test("closing the watcher does not tell a subscriber something changed", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "one\n");
+  const watcher = watcherFor(f);
+  let calls = 0;
+  await watcher.subscribe(f.at("app"), () => calls++);
+
+  watcher.close();
+  await pause(100);
+
+  assert.equal(calls, 0);
+});
+
 test("closing the watcher answers a page still waiting, instead of keeping it until the timeout", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "one\n");
