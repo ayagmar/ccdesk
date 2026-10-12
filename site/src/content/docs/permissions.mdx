@@ -57,6 +57,6 @@ The Built-in tools section lists every tool Claude Code ships with, what it does
 - **asks every time** or **runs without asking**: an ask or allow rule names the whole tool;
 - **asks first** or **no approval needed**: no rule names the whole tool, so the tool's own default applies.
 
-The outcomes are worked out as in Manual mode; the section header says which mode sessions here start in. Rules that cover only some uses, such as `Bash(git push *)` or an `Edit` path, and `PreToolUse` hooks whose matcher covers the tool are listed beside it. **Used** counts how often Claude called the tool in this directory's sessions; see [Tool usage counts](../tool-usage/).
+The outcomes are worked out as in Manual mode; the section header says which mode sessions here start in. Rules that cover only some uses, such as `Bash(git push *)` or an `Edit` path, and `PreToolUse` hooks whose matcher covers the tool are listed beside it. A rule naming the whole of `Bash` is listed under Monitor this way too: Monitor runs its commands under the Bash rules, but not its WebSocket watches. **Used** counts how often Claude called the tool in this directory's sessions, and shows `?` if the transcripts could not be counted; see [Tool usage counts](../tool-usage/).
 
 Select a tool to turn it off with a deny rule in the file you choose, or turn it back on by removing the rules that remove it. A tool removed by a managed rule stays off.

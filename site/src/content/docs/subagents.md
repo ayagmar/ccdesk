@@ -19,7 +19,7 @@ Subfolders are read too. When two files define an agent with the same name, the 
 - **Project** puts it in the repository's `.claude/agents` (the open directory's, outside git), where everyone who clones gets it once it is committed.
 - **User** puts it in `~/.claude/agents`, for you in every project.
 
-Give it a file name (letters, digits, `.`, `_` and `-`; ccdesk adds `.md`) and the file's contents. The frontmatter needs a `name` and a `description`, as Claude Code requires. The name cannot contain `:` or start with `-`, and is at most 256 characters long.
+Give it a file name (letters, digits, `.`, `_` and `-`; ccdesk adds `.md` if you leave it off) and the file's contents. The frontmatter needs a `name` and a `description`, as Claude Code requires. The name cannot contain `:` or start with `-`, and is at most 256 characters long.
 
 ```md
 ---
