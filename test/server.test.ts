@@ -1403,6 +1403,27 @@ test("keys in a server's args are hidden, and such a server is not rewritten", a
   assert.doesNotMatch(JSON.stringify(userAdd.json), /secret/);
 });
 
+test("a restore that would bring back a different key in a server's args is refused", async () => {
+  const dir = fixture.at("work/mcp-args-restore");
+  const servers = (key: string) => ({
+    mcpServers: { api: { command: "npx", args: ["some-mcp", "--api-key", key] } },
+  });
+  const file = fixture.json("work/mcp-args-restore/.mcp.json", servers("old-key"));
+  const added = await saveMcp({
+    dir,
+    scope: "project",
+    add: { name: "docs", definition: { command: "docs-mcp" } },
+  });
+  assert.equal(added.status, 200);
+  fixture.json("work/mcp-args-restore/.mcp.json", servers("rotated-key"));
+
+  const { preview, res } = await restoreReviewed((added.json as Change).id);
+
+  assert.match(preview.blocked ?? "", /Hidden values/);
+  assert.equal(res.status, 409);
+  assert.match(readFileSync(file, "utf8"), /rotated-key/);
+});
+
 test("user and local servers are changed through claude mcp, never by writing ~/.claude.json", async () => {
   const dir = fixture.at("work/mcp-local");
   fixture.write("work/mcp-local/README.md", "x");

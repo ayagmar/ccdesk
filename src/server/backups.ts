@@ -8,6 +8,7 @@ import {
   isWithin,
   redactSecrets,
   revisionOf,
+  shownArgs,
   shownText,
   shownUrl,
 } from "./scan/files.ts";
@@ -110,7 +111,8 @@ function isAgentFile(env: ScanEnv, path: string): boolean {
 
 /**
  * Every value ccdesk shows hidden and never changes in a settings file: env and headers objects,
- * and URLs with a user, password or query. Null for a file that is not valid JSON.
+ * URLs with a user, password or query, and a command's args that hold a key. Null for a file that
+ * is not valid JSON.
  */
 function hiddenValues(text: string | null): string | null {
   const found: unknown[] = [];
@@ -120,6 +122,13 @@ function hiddenValues(text: string | null): string | null {
     for (const [key, inner] of Object.entries(value)) {
       if ((key === "env" || key === "headers") && isRecord(inner)) found.push(inner);
       else if (key === "url" && typeof inner === "string" && shownUrl(inner) !== inner)
+        found.push(inner);
+      else if (
+        key === "args" &&
+        "command" in value &&
+        Array.isArray(inner) &&
+        JSON.stringify(shownArgs(inner)) !== JSON.stringify(inner)
+      )
         found.push(inner);
       else walk(inner);
     }
@@ -251,7 +260,7 @@ function blockedReason(plan: Plan): string | undefined {
     now !== null &&
     now !== hiddenValues(saved)
   )
-    return "Hidden values in this file (env, headers or a URL's key) changed since the backup. ccdesk does not show or change those, so restore this one by hand.";
+    return "Hidden values in this file (env, headers, a URL's key or a key in args) changed since the backup. ccdesk does not show or change those, so restore this one by hand.";
   // A retry after a restore that wrote the memory but not MEMORY.md finds the memory already back.
   if (manifest.kind === "memory-delete" && current !== null && current !== saved)
     return "A memory with this file name exists again; delete or rename it first.";
