@@ -1,6 +1,6 @@
 // The core: everything a front end needs to read and change Claude Code's configuration, without
-// HTTP. It re-exports the modules in src/server and src/shared where they live today; see
-// ARCHITECTURE.md for how they fit together and docs/split-plan.md for where they are going.
+// HTTP. It re-exports the modules in src/core and src/shared; see ARCHITECTURE.md for how they
+// fit together and docs/split-plan.md for where they are going.
 
 // The core for one machine: createCore(env) returns the reads and changes below with the env
 // already passed, its own change queue and usage cache, and the editor and claude its env names.

@@ -3,7 +3,7 @@ title: Contributing
 description: The development loop, the generated Claude Code data, the docs site, and how releases are made.
 ---
 
-ccdesk is a Node.js server in TypeScript (`src/server`) that serves a React app built with Vite (`src/ui`); `src/shared` holds the types both use and the data generated from Claude Code. Tests use `node:test`, linting and formatting use Biome, and packages are managed with pnpm. The source is on [GitHub](https://github.com/ayagmar/ccdesk).
+ccdesk is a Node.js server in TypeScript (`src/server`) that serves a React app built with Vite (`src/ui`). The server calls the reading and writing code in `src/core`, and `src/shared` holds the types both use and the data generated from Claude Code. Tests use `node:test`, linting and formatting use Biome, and packages are managed with pnpm. The source is on [GitHub](https://github.com/ayagmar/ccdesk).
 
 ## Development loop
 
@@ -21,11 +21,11 @@ Tests never touch your real `~/.claude`. Each test process gets a throwaway home
 ## How the code fits together
 
 - `src/server/cli.ts` is the `ccdesk` bin. It reads the flags with `parse` from `args.ts`, builds a `ScanEnv` with `scanEnvFromProcess`, binds it to a core with `createCore` and starts the server with `startServer` from `start.ts`. The server in `server.ts` answers the `/api/*` routes and serves the built UI. Every `/api/` request needs the per-run token in the `x-ccdesk-token` header.
-- `src/server/scan/` reads. Every function takes the `ScanEnv` (home, Claude folder, `.claude.json`, managed folder, platform, and the environment ccdesk finds your editor and `claude` in), so tests point it at a fixture instead of your machine. `scanDirectory` returns the `DirectoryView` a page shows, and `scanOverview` the start page.
-- The edit modules (`settings-edit.ts`, `agent-edit.ts`, `mcp-edit.ts`, `mutations.ts` for memory) and `backups.ts` write. `write.ts` holds what they share: atomic writes through links, the backup folder and its manifest, and the queue that runs changes one at a time.
+- `src/core/scan/` reads. Every function takes the `ScanEnv` (home, Claude folder, `.claude.json`, managed folder, platform, and the environment ccdesk finds your editor and `claude` in), so tests point it at a fixture instead of your machine. `scanDirectory` returns the `DirectoryView` a page shows, and `scanOverview` the start page.
+- The edit modules in `src/core` (`settings-edit.ts`, `agent-edit.ts`, `mcp-edit.ts`, `mutations.ts` for memory) and `backups.ts` write. `write.ts` holds what they share: atomic writes through links, the backup folder and its manifest, and the queue that runs changes one at a time.
 - `watch.ts` watches the files a scan read and wakes the page's long poll on `/api/watch` when one changes. `~/.claude.json` is not watched; the page reloads when you return to the tab.
 - `src/shared` holds the types and generated data, and imports neither Node nor the DOM. `src/ui` imports only `src/shared` and talks to the server through `src/ui/api.ts`; it gets the settings schema, settings catalog and hook events from `/api/reference` instead of bundling them.
-- `src/core/index.ts` re-exports the reading and writing code without the HTTP server. It is what `import ... from "ccdesk"` loads. `createCore(env)` in `src/core/core.ts` returns that code with `env` already passed, its own change queue and usage cache; the server routes call a core, and tests give it fake `runClaude` and `openFile` functions.
+- `src/core/index.ts` exports the reading and writing code without the HTTP server. It is what `import ... from "ccdesk"` loads. `createCore(env)` in `src/core/core.ts` returns that code with `env` already passed, its own change queue and usage cache; the server routes call a core, and tests give it fake `runClaude` and `openFile` functions.
 
 Every edit goes through the same steps. The UI sends the edit to a `preview` route, which returns the diff and the `revision` of what it read. The save route takes the same edit with that revision, plans it again from the file on disk and writes only if the revision still matches; otherwise it throws `RefusedError` (409), and the page asks you to review again. The same error also refuses edits ccdesk never makes, such as to managed settings or credentials, so its message says which case it is. A save returns a `Change` whose `id` is its backup folder, which is what Undo and Recent changes restore. User and local MCP edits are the exception: they run `claude mcp`, keep no backup and return no `Change`.
 

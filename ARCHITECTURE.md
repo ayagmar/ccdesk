@@ -1,6 +1,6 @@
 # Architecture
 
-ccdesk is one npm package: a Node server in `src/server` that reads and writes Claude Code's configuration, and a React page in `src/ui` that talks to it over HTTP. `src/shared` holds the types both sides use. `src/core/index.ts` re-exports the parts of `src/server` and `src/shared` that do not depend on HTTP, and is the package's import entry point (`import { scanDirectory } from "ccdesk"`). The [contributing page](https://ayagmar.github.io/ccdesk/contributing/) covers the development loop, the generated data and releases; this file covers how the code fits together.
+ccdesk is one npm package. `src/core` reads and writes Claude Code's configuration, `src/server` serves it over HTTP and holds the `ccdesk` bin, and a React page in `src/ui` talks to the server. `src/shared` holds the types they all use. `src/core` imports nothing from `src/server`; `src/core/index.ts` is the package's import entry point (`import { scanDirectory } from "ccdesk"`). The [contributing page](https://ayagmar.github.io/ccdesk/contributing/) covers the development loop, the generated data and releases; this file covers how the code fits together.
 
 ## Module map
 
@@ -10,16 +10,16 @@ ccdesk is one npm package: a Node server in `src/server` that reads and writes C
 | `src/server/args.ts` | `parse(argv)`: the flags as a command, or a `UsageError` with the message to print. Reads no files. |
 | `src/server/start.ts` | `startServer(options)`: serves a core on 127.0.0.1 and resolves `{ url, close }`. |
 | `src/server/server.ts` | The `/api/*` routes, each a call on the core it is given; the token, Host and Origin checks, security headers, and the built UI. Turns errors into status codes. |
-| `src/server/scan/` | Reads. `index.ts` has `scanOverview` and `scanDirectory`; the other files each read one part (settings, instructions, memory, MCP, plugins, permissions, tools, context, usage, compare, path-test). `env.ts` defines `ScanEnv`. |
-| `src/server/settings-edit.ts` | Settings, permission and hook edits, all in settings files. |
-| `src/server/agent-edit.ts`, `mcp-edit.ts`, `mutations.ts` | Subagent files, MCP servers, and auto memory. |
-| `src/server/parse-edit.ts` | Turns untrusted input (a JSON body) into a typed edit, or throws `InvalidEditError`. |
-| `src/server/write.ts` | What every write shares: atomic writes through links, the backup folder and its manifest, the queue that runs changes one at a time, `RefusedError` and `StaleError`. |
-| `src/server/backups.ts` | Lists, previews and restores backups (Recent changes and Undo). |
-| `src/server/secrets.ts`, `scan/files.ts` | What the page may see: `redactSecrets`, `shownText`, `shown`, `hasHiddenValues`. |
-| `src/server/watch.ts` | `Watcher`: scans a directory, watches the files the scan read, and answers the page's long poll. |
-| `src/server/reference.ts` | The settings schema, settings catalog and hook events, served by `/api/reference`. |
-| `src/server/open.ts` | Opens a file in the editor the `ScanEnv`'s environment names, or a URL in the default browser, the way its platform starts one. |
+| `src/core/scan/` | Reads. `index.ts` has `scanOverview` and `scanDirectory`; the other files each read one part (settings, instructions, memory, MCP, plugins, permissions, tools, context, usage, compare, path-test). `env.ts` defines `ScanEnv`, `files.ts` reads files (never the credentials file) and `git.ts` asks git for roots, worktrees and what is tracked. |
+| `src/core/settings-edit.ts` | Settings, permission and hook edits, all in settings files. |
+| `src/core/agent-edit.ts`, `mcp-edit.ts`, `mutations.ts` | Subagent files, MCP servers, and auto memory. |
+| `src/core/parse-edit.ts` | Turns untrusted input (a JSON body) into a typed edit, or throws `InvalidEditError`. |
+| `src/core/write.ts` | What every write shares: atomic writes through links, the backup folder and its manifest, the queue that runs changes one at a time, `RefusedError` and `StaleError`. |
+| `src/core/backups.ts` | Lists, previews and restores backups (Recent changes and Undo). |
+| `src/core/secrets.ts` | What the page may see: `redactSecrets`, `shownText`, `shown`, `hasHiddenValues`. |
+| `src/core/watch.ts` | `Watcher`: scans a directory, watches the files the scan read, and answers the page's long poll. |
+| `src/core/reference.ts` | The settings schema, settings catalog and hook events, served by `/api/reference`. |
+| `src/core/open.ts` | Opens a file in the editor the `ScanEnv`'s environment names, or a URL in the default browser, the way its platform starts one. |
 | `src/core/core.ts` | `createCore(env, options)`: every read and change with `env` bound, its own change queue and usage cache, and the editor and `claude` it starts. |
 | `src/core/index.ts` | The import entry point; re-exports `createCore` and the free functions. |
 | `src/shared/` | Types (`types.ts`), scope lists, and the JSON generated from Claude Code's SDK and docs. No Node or DOM imports. |
@@ -41,7 +41,7 @@ Usage counts arrive separately: the page posts the rules in effect to `/api/usag
 
 ## Secrets
 
-Values under `env` and `headers`, keys in URLs, and secret-looking arguments of MCP servers are replaced with `•••` by `redactSecrets` in `scan/files.ts`. The scan applies it before a value goes into a `DirectoryView`, and every preview and restore preview shows files through `shownText` or `shown`, so a hidden value never reaches the browser, diffs included. Files named like the credentials file, or linked to it, are never read (`isSecretPath`, `isCredentials`).
+Values under `env` and `headers`, keys in URLs, and secret-looking arguments of MCP servers are replaced with `•••` by `redactSecrets` in `secrets.ts`. The scan applies it before a value goes into a `DirectoryView`, and every preview and restore preview shows files through `shownText` or `shown`, so a hidden value never reaches the browser, diffs included. Files named like the credentials file, or linked to it, are never read (`isSecretPath`, `isCredentials`).
 
 ccdesk never writes back a value the page saw as `•••`. Settings, hook and agent edits refuse when the value they change holds a hidden value, or when the new value would be hidden (`settings-edit.ts`, `agent-edit.ts`). Restoring a settings or MCP file is refused when its hidden values changed since the backup, unless the file no longer parses. A new MCP server may hold the env values and headers you type for it.
 
