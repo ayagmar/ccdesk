@@ -184,7 +184,8 @@ export class Watcher {
           subscription.waiters.add(done);
         });
     } finally {
-      if (subscription.waiters.size === 0)
+      // A dropped subscription has nothing left to clean up later.
+      if (subscription.waiters.size === 0 && this.subscriptions.get(dir) === subscription)
         subscription.idle = setTimeout(() => this.drop(dir), IDLE_MS);
     }
     return { changed: subscription.changedAt > since, at: subscription.changedAt };
@@ -218,6 +219,8 @@ export class Watcher {
     for (const w of subscription.watchers) w.close();
     this.subscriptions.delete(dir);
     this.latest.delete(dir);
+    // Pages still waiting are answered now, so no timer outlives the watcher.
+    for (const wake of [...subscription.waiters]) wake();
   }
 
   /** (Re)creates the watchers, so a folder created since, such as a new .claude, is watched. */
