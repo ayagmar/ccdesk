@@ -190,6 +190,12 @@ export function DirectoryPage({
             {view.gitRoot && view.gitRoot !== view.path && (
               <span className="flag">inside {tilde(view.gitRoot)}</span>
             )}
+            <span
+              className="flag"
+              title="ccdesk shows what an interactive claude session loads here. claude -p and the SDK never show the trust dialog: they run settings-file hooks and connect .mcp.json servers without asking."
+            >
+              interactive session
+            </span>
             {trust.sessionOnly ? (
               <span
                 className="flag"
