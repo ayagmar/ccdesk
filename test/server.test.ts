@@ -169,6 +169,18 @@ test("deleting a memory removes its file and index line, and undo puts both back
   assert.match(readFileSync(`${dir}/MEMORY.md`, "utf8"), /\[Old\]\(old\.md\)/);
 });
 
+test("deleting a memory also removes an index line that names it as [[name]]", async () => {
+  const dir = memoryDirFor(fixture, "/work/wiki");
+  fixture.write(`${dir}/MEMORY.md`, "- [Keep](keep.md) — stays\n- [[gone]] — stale\n");
+  fixture.write(`${dir}/keep.md`, memoryFile("keep", "user", "stays", "x"));
+  const gone = fixture.write(`${dir}/gone.md`, memoryFile("gone", "project", "stale", "y"));
+
+  const deleted = await deleteMemory(gone);
+
+  assert.equal(deleted.status, 200);
+  assert.equal(readFileSync(`${dir}/MEMORY.md`, "utf8"), "- [Keep](keep.md) — stays\n");
+});
+
 test("a memory that changed since you looked at it is not deleted", async () => {
   const { old } = seedMemory();
   const { revision } = (await previewMemory("delete", old)).json as { revision: string };

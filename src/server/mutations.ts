@@ -3,7 +3,7 @@ import { basename, dirname, join } from "node:path";
 import { type Change, type MemoryAction, type MemoryChangePreview } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isWithin, parseFrontmatter, revisionOf, shownText, stringField } from "./scan/files.ts";
-import { deadLinks } from "./scan/memory.ts";
+import { deadLinks, indexMentions } from "./scan/memory.ts";
 import {
   RefusedError,
   readIfExists,
@@ -96,7 +96,7 @@ async function planDelete(env: ScanEnv, path: string): Promise<Plan> {
   const index = await readIfExists(env, indexPath);
   const removedIndexLines: string[] = [];
   const kept = (index ?? "").split("\n").filter((line) => {
-    if (!line.includes(`(${basename(real)})`)) return true;
+    if (!indexMentions(line, basename(real))) return true;
     removedIndexLines.push(line);
     return false;
   });

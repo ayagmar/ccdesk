@@ -108,7 +108,8 @@ export function deadLinks(line: string, files: string[]): string[] {
     .filter((f) => !files.includes(f));
 }
 
-function indexMentions(index: string, file: string): boolean {
+/** Whether MEMORY.md text points at a memory file, as a Markdown link or a [[name]] link. */
+export function indexMentions(index: string, file: string): boolean {
   return index.includes(`(${file})`) || index.includes(`[[${file.replace(/\.md$/, "")}]]`);
 }
 
