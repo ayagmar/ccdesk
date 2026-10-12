@@ -8,21 +8,17 @@ import {
   type Usage,
 } from "../../shared/types.ts";
 import { lineName } from "../../view/lines.ts";
+import { outcome } from "../../view/sections/tools.ts";
+import { type RowOf } from "../../view/sections/types.ts";
 import { sessionsHere } from "../../view/usage.ts";
 import { Bullet } from "../Bullet.tsx";
 import { plural, tilde } from "../format.ts";
 import { Icon } from "../Icon.tsx";
 import { fileFor, ScopePicker, usePermissionChange } from "../PermissionEditor.tsx";
 import { Field, NameButton } from "./kit.tsx";
-import { type Actions, defineSection, type RowOf } from "./types.ts";
+import { type Actions, type SectionUi } from "./types.ts";
 
 type R = RowOf<"tools">;
-
-/** Calls counted here: undefined while counting, null when the transcripts could not be read. */
-function callsOf(usage: Usage | null | undefined, name: string): number | null | undefined {
-  if (!usage) return usage;
-  return usage.tools.find((t) => t.tool === name)?.calls ?? 0;
-}
 
 /** What the transcripts say about the tool here, as one sentence. */
 function usedHere(usage: Usage | null | undefined, name: string): string {
@@ -35,20 +31,6 @@ function usedHere(usage: Usage | null | undefined, name: string): string {
   return `${plural(tool.calls, "call")} in ${sessionsHere(usage)}${
     asked > 0 ? `; asked you ${plural(asked, "time")}, you refused ${tool.refused}` : ""
   }`;
-}
-
-/** What happens when Claude wants the tool, in Manual mode. */
-function outcome(tool: BuiltinTool): string {
-  switch (tool.verdict) {
-    case "denied":
-      return "removed";
-    case "asks":
-      return "asks every time";
-    case "allowed":
-      return "runs without asking";
-    case "default":
-      return tool.asks ? "asks first" : "no approval needed";
-  }
 }
 
 function explanation(tool: BuiltinTool): string {
@@ -216,26 +198,7 @@ function Described({ text }: { text: string }) {
   );
 }
 
-export const tools = defineSection<R>({
-  id: "tools",
-  title: "Built-in tools",
-  short: "Tools",
-  rows: (view) =>
-    view.tools.map((item) => ({
-      id: `tool:${item.name}`,
-      section: "tools",
-      line: item.decidedBy?.scope ?? null,
-      item,
-      calls: callsOf(view.usage, item.name),
-    })),
-  columns: [
-    { label: "" },
-    { label: "Tool", sort: (r) => r.item.name },
-    { label: "Outcome", sort: (r) => outcome(r.item) },
-    { label: "Rules and hooks", sort: (r) => r.item.scoped.length + r.item.hooks },
-    { label: "Used", sort: (r) => r.calls ?? -1 },
-    { label: "Description" },
-  ],
+export const tools: SectionUi<R> = {
   cells: (row, _actions, select) => {
     const t = row.item;
     const checked = t.scoped.filter((r) => !r.unchecked);
@@ -281,22 +244,6 @@ export const tools = defineSection<R>({
         </td>
       </>
     );
-  },
-  empty: () => "ccdesk has no list of built-in tools.",
-  dimmed: (row) => row.item.verdict === "denied",
-  text: (row) => `tool ${row.item.name} ${outcome(row.item)} ${row.item.description}`,
-  label: (row) => `tool ${row.item.name}`,
-  heading: (row) => row.item.name,
-  facet: {
-    label: "Filter tools by outcome",
-    of: (row) => outcome(row.item),
-    order: [
-      "removed",
-      "asks every time",
-      "asks first",
-      "runs without asking",
-      "no approval needed",
-    ],
   },
   Head: ({ actions }) => (
     <span className="tt-note">
@@ -354,4 +301,4 @@ export const tools = defineSection<R>({
       </>
     );
   },
-});
+};

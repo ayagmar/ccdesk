@@ -5,7 +5,7 @@ import { ago, tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
 import { PAGE } from "./list.ts";
 import { ShowMore, SortHeaders } from "./SortHeaders.tsx";
-import { type Column } from "./sections/types.ts";
+import { type Column } from "../view/sections/types.ts";
 import { NO_LIST_STATE, readListState, replaceListState, type Sort } from "./url.ts";
 
 const COLUMNS: Array<Column<ProjectSummary>> = [

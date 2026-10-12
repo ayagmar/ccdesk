@@ -1,7 +1,9 @@
 import { type ReactNode } from "react";
 import { type Group, PAGE } from "./list.ts";
 import { ShowMore, SortHeaders } from "./SortHeaders.tsx";
-import { type Actions, type Row, type SectionId } from "./sections/types.ts";
+import { type Row, type SectionId } from "../view/sections/types.ts";
+import { pageContext } from "./sections/index.ts";
+import { type Actions } from "./sections/types.ts";
 import { type ListState, type Sort } from "./url.ts";
 
 interface Props {
@@ -51,9 +53,9 @@ export function Timetable({
               {section.facet && (
                 <Facets
                   label={section.facet.label}
-                  values={facetValues(all, section.facet.of, section.facet.order)}
+                  values={facetValues(all, section.facet.of, section.facet.order?.(pageContext()))}
                   current={state.only[section.id]}
-                  render={section.facet.render}
+                  render={section.renderFacet}
                   onPick={(value) => onOnly(section.id, value)}
                 />
               )}

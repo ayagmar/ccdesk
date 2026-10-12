@@ -1,36 +1,14 @@
+import { type RowOf } from "../../view/sections/types.ts";
 import { Bullet } from "../Bullet.tsx";
 import { tildeAll } from "../format.ts";
 import { HookEditor } from "../HookEditor.tsx";
 import { Icon } from "../Icon.tsx";
 import { Field, NameButton, PathValue } from "./kit.tsx";
-import { defineSection, type RowOf } from "./types.ts";
+import { type SectionUi } from "./types.ts";
 
 type R = RowOf<"hooks">;
 
-export const hooks = defineSection<R>({
-  id: "hooks",
-  title: "Hooks",
-  rows: (view) => {
-    // Named by what the hook is, so a selection survives hooks added above it.
-    const seen = new Map<string, number>();
-    return view.inventory.hooks.map((item) => {
-      const key = `hook:${item.sourcePath}:${item.event}:${item.matcher ?? ""}:${item.command}`;
-      const count = seen.get(key) ?? 0;
-      seen.set(key, count + 1);
-      return {
-        id: count === 0 ? key : `${key}:${count}`,
-        section: "hooks",
-        line: item.source,
-        item,
-      };
-    });
-  },
-  columns: [
-    { label: "", sort: (r) => r.item.source },
-    { label: "Event", sort: (r) => r.item.event },
-    { label: "Matcher", sort: (r) => r.item.matcher ?? "" },
-    { label: "Runs" },
-  ],
+export const hooks: SectionUi<R> = {
   cells: (row, _actions, select) => {
     const h = row.item;
     return (
@@ -53,12 +31,6 @@ export const hooks = defineSection<R>({
       </>
     );
   },
-  empty: () => "No hooks run here.",
-  dimmed: (row) => !row.item.active,
-  text: (row) => `${row.item.event} ${row.item.matcher ?? ""} ${row.item.command}`,
-  label: (row) => `${row.item.event} hook: ${row.item.command}`,
-  heading: (row) => `${row.item.event} hook`,
-  facet: { label: "Filter hooks by event", of: (row) => row.item.event },
   Head: ({ actions }) => (
     <button type="button" className="head-action" onClick={() => actions.onAdd("hook")}>
       <Icon name="plus" /> Add hook
@@ -88,4 +60,4 @@ export const hooks = defineSection<R>({
       </>
     );
   },
-});
+};

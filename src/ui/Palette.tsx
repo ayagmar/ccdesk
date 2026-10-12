@@ -3,8 +3,8 @@ import { type Overview } from "../shared/types.ts";
 import { Bullet } from "./Bullet.tsx";
 import { tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
-import { sectionOf } from "./sections/index.ts";
-import { type Row } from "./sections/types.ts";
+import { pageContext, sectionOf } from "./sections/index.ts";
+import { type Row } from "../view/sections/types.ts";
 
 type Result =
   | { kind: "dir"; key: string; label: string; path: string }
@@ -68,7 +68,12 @@ export function Palette({
     }
     const items: Result[] = rows
       .filter((r) => q && sectionOf(r.section).text(r).toLowerCase().includes(q))
-      .map((r) => ({ kind: "row", key: r.id, label: sectionOf(r.section).label(r), row: r }));
+      .map((r) => ({
+        kind: "row",
+        key: r.id,
+        label: sectionOf(r.section).label(r, pageContext()),
+        row: r,
+      }));
     const here = new Set(rows.map((r) => r.id));
     const memories: Result[] = (overview?.memoryCatalog ?? [])
       .filter(

@@ -5,7 +5,8 @@ import { DirectoryPage } from "./DirectoryPage.tsx";
 import { OverviewPage } from "./OverviewPage.tsx";
 import { Palette } from "./Palette.tsx";
 import { Rail, type TextSize } from "./Rail.tsx";
-import { buildRows } from "./sections/index.ts";
+import { buildRows } from "../view/sections/index.ts";
+import { pageContext } from "./sections/index.ts";
 import { Toast, type ToastMessage } from "./Toast.tsx";
 import { type SessionProfile } from "../shared/types.ts";
 import { type Page, pushPage, readPage } from "./url.ts";
@@ -34,7 +35,7 @@ export function App() {
   const config = useConfig(page.kind === "directory" ? page.dir : null, profile);
   const { view, data, dir, reload } = config;
   const overview = config.overview.state === "ready" ? config.overview.data : null;
-  const rows = useMemo(() => (data ? buildRows(data) : []), [data]);
+  const rows = useMemo(() => (data ? buildRows(data, pageContext()) : []), [data]);
 
   const open = useCallback((next: Page) => {
     setPage(next);

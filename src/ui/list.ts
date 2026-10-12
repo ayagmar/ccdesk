@@ -1,4 +1,5 @@
-import { type Row, type Section, type SectionId } from "./sections/types.ts";
+import { type Row, type SectionId } from "../view/sections/types.ts";
+import { type Section } from "./sections/types.ts";
 import { type ListState } from "./url.ts";
 
 /** Rows shown per section before "Show more". */

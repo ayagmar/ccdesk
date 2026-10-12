@@ -1,6 +1,6 @@
 import { type SessionProfile } from "../shared/types.ts";
 import { LINES, type Line } from "../view/lines.ts";
-import { type SectionId } from "./sections/types.ts";
+import { type SectionId } from "../view/sections/types.ts";
 
 /**
  * Which page is open: a directory (undefined until the launch directory is known), all

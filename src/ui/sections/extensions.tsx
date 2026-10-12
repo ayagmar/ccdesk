@@ -1,14 +1,13 @@
 import { type Entry } from "../../shared/types.ts";
+import { type RowOf } from "../../view/sections/types.ts";
 import { AgentEditor } from "../AgentEditor.tsx";
 import { Bullet } from "../Bullet.tsx";
 import { ago, tilde } from "../format.ts";
 import { Icon } from "../Icon.tsx";
 import { Contents, Field, LinkMark, NameButton, PathValue, stripFrontmatter } from "./kit.tsx";
-import { defineSection, type EntryKind, type RowOf } from "./types.ts";
+import { type SectionUi } from "./types.ts";
 
 type R = RowOf<"extensions">;
-
-const KINDS = ["agent", "skill", "command", "output style", "plugin"];
 
 /** Why an agent, skill or command is not offered to Claude as usual, if it is not. */
 function notOffered(e: Entry): string | null {
@@ -22,47 +21,7 @@ function notOffered(e: Entry): string | null {
   return null;
 }
 
-export const extensions = defineSection<R>({
-  id: "extensions",
-  title: "Agents, skills & plugins",
-  short: "Extensions",
-  rows: (view) => {
-    const inv = view.inventory;
-    const entries: Array<[EntryKind, typeof inv.agents]> = [
-      ["agent", inv.agents],
-      ["skill", inv.skills],
-      ["command", inv.commands],
-      ["output style", inv.outputStyles],
-    ];
-    return [
-      ...entries.flatMap(([kind, list]) =>
-        list.map(
-          (item): R => ({
-            id: `ent:${kind}:${item.path}`,
-            section: "extensions",
-            line: item.scope,
-            item,
-            kind,
-          })
-        )
-      ),
-      ...inv.plugins.map(
-        (item): R => ({
-          id: `plug:${item.id}`,
-          section: "extensions",
-          line: "plugin",
-          item,
-          kind: "plugin",
-        })
-      ),
-    ];
-  },
-  columns: [
-    { label: "", sort: (r) => r.line },
-    { label: "Kind", sort: (r) => KINDS.indexOf(r.kind) },
-    { label: "Name", sort: (r) => (r.kind === "plugin" ? r.item.id : (r.item.id ?? r.item.name)) },
-    { label: "Description" },
-  ],
+export const extensions: SectionUi<R> = {
   cells: (row, _actions, select) => {
     if (row.kind === "plugin") {
       const p = row.item;
@@ -98,19 +57,6 @@ export const extensions = defineSection<R>({
       </>
     );
   },
-  empty: () => "No subagents, skills, commands or plugins.",
-  dimmed: (row) =>
-    row.kind === "plugin"
-      ? !row.item.enabled
-      : Boolean(row.item.shadowedBy || row.item.skipped) || row.item.override === "off",
-  text: (row) =>
-    row.kind === "plugin"
-      ? `plugin ${row.item.id}`
-      : `${row.kind} ${row.item.id ?? row.item.name} ${row.item.description}`,
-  label: (row) =>
-    row.kind === "plugin" ? `plugin ${row.item.id}` : `${row.kind} ${row.item.id ?? row.item.name}`,
-  heading: (row) => (row.kind === "plugin" ? row.item.id : (row.item.id ?? row.item.name)),
-  facet: { label: "Filter by kind", of: (row) => row.kind, order: KINDS },
   Head: ({ actions }) => (
     <button type="button" className="head-action" onClick={() => actions.onAdd("agent")}>
       <Icon name="plus" /> Create agent
@@ -173,4 +119,4 @@ export const extensions = defineSection<R>({
       </>
     );
   },
-});
+};

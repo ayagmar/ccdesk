@@ -1,21 +1,16 @@
 import { useEffect, useState } from "react";
 import { storeDirName } from "../../shared/memory.ts";
-import {
-  type MemoryAction,
-  type MemoryChangePreview,
-  type MemoryType,
-} from "../../shared/types.ts";
+import { type MemoryAction, type MemoryChangePreview } from "../../shared/types.ts";
+import { type RowOf } from "../../view/sections/types.ts";
 import { api } from "../api.ts";
 import { Bullet } from "../Bullet.tsx";
 import { DiffView } from "../DiffView.tsx";
 import { ago, tilde } from "../format.ts";
 import { Icon } from "../Icon.tsx";
 import { Contents, Field, NameButton, PathValue } from "./kit.tsx";
-import { type Actions, defineSection, type RowOf } from "./types.ts";
+import { type Actions, type SectionUi } from "./types.ts";
 
 type R = RowOf<"memory">;
-
-const MEMORY_TYPES: MemoryType[] = ["user", "feedback", "project", "reference", "unknown"];
 
 function TypeName({ type }: { type: string }) {
   return (
@@ -26,27 +21,7 @@ function TypeName({ type }: { type: string }) {
   );
 }
 
-export const memory = defineSection<R>({
-  id: "memory",
-  title: "Memory",
-  rows: (view) =>
-    view.memory.memories.map((item) => ({
-      id: `mem:${item.path}`,
-      section: "memory",
-      line: "memory",
-      item,
-    })),
-  columns: [
-    { label: "" },
-    { label: "Name", sort: (r) => r.item.name },
-    { label: "Type", sort: (r) => MEMORY_TYPES.indexOf(r.item.type) },
-    { label: "Description" },
-    {
-      label: "Checks",
-      sort: (r) => Number(!r.item.inIndex) * 10 + r.item.brokenLinks.length,
-    },
-    { label: "Updated", sort: (r) => r.item.mtime },
-  ],
+export const memory: SectionUi<R> = {
   cells: (row, { sharedNames }, select) => {
     const m = row.item;
     return (
@@ -80,22 +55,10 @@ export const memory = defineSection<R>({
       </>
     );
   },
-  empty: (view) =>
-    view.memory.index
-      ? "MEMORY.md is here, but no memory files."
-      : "Claude hasn't saved any memory for this directory yet.",
-  text: (row) => `${row.item.name} ${row.item.description} ${row.item.type} ${row.item.body}`,
-  label: (row) => `memory ${row.item.name}`,
-  heading: (row) => row.item.name,
-  facet: {
-    label: "Filter memory by type",
-    of: (row) => row.item.type,
-    order: MEMORY_TYPES,
-    render: (type) => <TypeName type={type} />,
-  },
+  renderFacet: (type) => <TypeName type={type} />,
   Head: MemoryHead,
   Details: MemoryDetails,
-});
+};
 
 function MemoryHead({ actions }: { actions: Actions }) {
   const store = actions.view.memory;

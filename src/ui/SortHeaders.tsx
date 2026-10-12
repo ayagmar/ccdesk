@@ -1,4 +1,4 @@
-import { type Column } from "./sections/types.ts";
+import { type Column } from "../view/sections/types.ts";
 import { type Sort } from "./url.ts";
 
 /** Ascending, then descending, then back to the list's own order. */

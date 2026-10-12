@@ -6,8 +6,9 @@ import { Icon } from "./Icon.tsx";
 import { McpEditor } from "./McpEditor.tsx";
 import { PermissionEditor } from "./PermissionEditor.tsx";
 import { SettingEditor } from "./SettingEditor.tsx";
-import { sectionOf } from "./sections/index.ts";
-import { type Actions, type Adding, type Row } from "./sections/types.ts";
+import { pageContext, sectionOf } from "./sections/index.ts";
+import { type Row } from "../view/sections/types.ts";
+import { type Actions, type Adding } from "./sections/types.ts";
 
 interface Props {
   row: Row | null;
@@ -80,7 +81,7 @@ export function Inspector({ row, adding, actions, onClose }: Props) {
       <header className="insp-head">
         {row.line ? <Bullet line={row.line} /> : <Icon name="command" />}
         <h2 ref={heading} tabIndex={-1}>
-          {section.heading(row)}
+          {section.heading(row, pageContext())}
         </h2>
         <button type="button" className="icon-button" onClick={onClose} aria-label="Close details">
           <Icon name="close" />

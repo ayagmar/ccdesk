@@ -1,35 +1,17 @@
 import { EDITABLE_SCOPES, HIGHEST_FIRST } from "../../shared/scopes.ts";
 import { type Scope } from "../../shared/types.ts";
-import { type Line, lineName } from "../../view/lines.ts";
+import { lineName } from "../../view/lines.ts";
+import { type RowOf } from "../../view/sections/types.ts";
 import { Bullet } from "../Bullet.tsx";
 import { preview, tildeAll } from "../format.ts";
 import { Icon } from "../Icon.tsx";
 import { SettingEditor } from "../SettingEditor.tsx";
 import { Field, NameButton, PathValue } from "./kit.tsx";
-import { defineSection, type RowOf } from "./types.ts";
+import { type SectionUi } from "./types.ts";
 
 type R = RowOf<"settings">;
 
-export const settings = defineSection<R>({
-  id: "settings",
-  title: "Settings",
-  rows: (view) =>
-    view.effective.map((item) => {
-      const lines = item.from as Line[];
-      return {
-        id: `set:${item.key}`,
-        section: "settings",
-        line: lines[lines.length - 1] ?? "user",
-        item,
-        lines,
-      };
-    }),
-  columns: [
-    { label: "", sort: (r) => HIGHEST_FIRST.indexOf((r.item.from[0] ?? "user") as Scope) },
-    { label: "Key", sort: (r) => r.item.key },
-    { label: "Value" },
-    { label: "Overrides" },
-  ],
+export const settings: SectionUi<R> = {
   cells: (row, _actions, select) => {
     const s = row.item;
     return (
@@ -69,16 +51,6 @@ export const settings = defineSection<R>({
       </>
     );
   },
-  empty: () => "No settings files set anything here.",
-  // The Overrides column only earns its space when some value beats or merges with another file.
-  tableClass: (rows) =>
-    rows.some((r) => r.item.merged || r.item.overridden.length > 0 || r.item.ignored.length > 0)
-      ? ""
-      : "no-overrides",
-  dimmed: (row) => row.item.from.length === 0,
-  text: (row) => `${row.item.key} ${JSON.stringify(row.item.value)}`,
-  label: (row) => `setting ${row.item.key}`,
-  heading: (row) => row.item.key,
   Head: ({ actions }) => (
     <>
       <button type="button" className="head-action" onClick={actions.onCompare}>
@@ -160,4 +132,4 @@ export const settings = defineSection<R>({
       </>
     );
   },
-});
+};

@@ -1,40 +1,15 @@
-import { type McpStatus } from "../../shared/types.ts";
+import { STATUS } from "../../view/sections/mcp.ts";
+import { type RowOf } from "../../view/sections/types.ts";
 import { Bullet } from "../Bullet.tsx";
 import { tildeAll } from "../format.ts";
 import { Icon } from "../Icon.tsx";
 import { McpEditor } from "../McpEditor.tsx";
 import { Field, NameButton, PathValue } from "./kit.tsx";
-import { defineSection, type RowOf } from "./types.ts";
+import { type SectionUi } from "./types.ts";
 
 type R = RowOf<"mcp">;
 
-const STATUS: Record<McpStatus, string> = {
-  active: "configured",
-  pending: "needs approval",
-  shadowed: "overridden",
-  disabled: "turned off",
-  rejected: "rejected",
-  blocked: "blocked",
-  invalid: "invalid",
-};
-
-export const mcp = defineSection<R>({
-  id: "mcp",
-  title: "MCP servers",
-  rows: (view) =>
-    view.inventory.mcpServers.map((item) => ({
-      id: `mcp:${item.scope}:${item.plugin ?? ""}:${item.name}`,
-      section: "mcp",
-      line: item.scope,
-      item,
-    })),
-  columns: [
-    { label: "", sort: (r) => r.item.scope },
-    { label: "Server", sort: (r) => r.item.name },
-    { label: "Transport", sort: (r) => r.item.transport },
-    { label: "Target" },
-    { label: "Status", sort: (r) => Object.keys(STATUS).indexOf(r.item.status) },
-  ],
+export const mcp: SectionUi<R> = {
   cells: (row, _actions, select) => {
     const m = row.item;
     return (
@@ -54,16 +29,6 @@ export const mcp = defineSection<R>({
         </td>
       </>
     );
-  },
-  empty: () => "No MCP servers are configured for this directory.",
-  dimmed: (row) => row.item.status !== "active",
-  text: (row) => `${row.item.name} ${row.item.target}`,
-  label: (row) => `MCP ${row.item.name}`,
-  heading: (row) => row.item.name,
-  facet: {
-    label: "Filter MCP servers by status",
-    of: (row) => STATUS[row.item.status],
-    order: Object.values(STATUS),
   },
   Head: ({ actions }) => (
     <button type="button" className="head-action" onClick={() => actions.onAdd("mcp")}>
@@ -112,4 +77,4 @@ export const mcp = defineSection<R>({
       </>
     );
   },
-});
+};
