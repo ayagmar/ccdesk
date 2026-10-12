@@ -6,7 +6,9 @@ ccdesk is one npm package: a Node server in `src/server` that reads and writes C
 
 | Path | What it does |
 | --- | --- |
-| `src/server/cli.ts` | Parses the flags, builds a `ScanEnv` and a core, starts the server, opens the browser. |
+| `src/server/cli.ts` | The `ccdesk` bin: parses the flags, builds a `ScanEnv` and a core, starts the server, opens the browser, and prints. |
+| `src/server/args.ts` | `parse(argv)`: the flags as a command, or a `UsageError` with the message to print. Reads no files. |
+| `src/server/start.ts` | `startServer(options)`: serves a core on 127.0.0.1 and resolves `{ url, close }`. |
 | `src/server/server.ts` | The `/api/*` routes, each a call on the core it is given; the token, Host and Origin checks, security headers, and the built UI. Turns errors into status codes. |
 | `src/server/scan/` | Reads. `index.ts` has `scanOverview` and `scanDirectory`; the other files each read one part (settings, instructions, memory, MCP, plugins, permissions, tools, context, usage, compare, path-test). `env.ts` defines `ScanEnv`. |
 | `src/server/settings-edit.ts` | Settings, permission and hook edits, all in settings files. |
@@ -17,7 +19,7 @@ ccdesk is one npm package: a Node server in `src/server` that reads and writes C
 | `src/server/secrets.ts`, `scan/files.ts` | What the page may see: `redactSecrets`, `shownText`, `shown`, `hasHiddenValues`. |
 | `src/server/watch.ts` | `Watcher`: scans a directory, watches the files the scan read, and answers the page's long poll. |
 | `src/server/reference.ts` | The settings schema, settings catalog and hook events, served by `/api/reference`. |
-| `src/server/open.ts` | Opens a file in the editor the `ScanEnv`'s environment names, the way its platform starts one. |
+| `src/server/open.ts` | Opens a file in the editor the `ScanEnv`'s environment names, or a URL in the default browser, the way its platform starts one. |
 | `src/core/core.ts` | `createCore(env, options)`: every read and change with `env` bound, its own change queue and usage cache, and the editor and `claude` it starts. |
 | `src/core/index.ts` | The import entry point; re-exports `createCore` and the free functions. |
 | `src/shared/` | Types (`types.ts`), scope lists, and the JSON generated from Claude Code's SDK and docs. No Node or DOM imports. |

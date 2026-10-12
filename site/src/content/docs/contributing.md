@@ -20,7 +20,7 @@ Tests never touch your real `~/.claude`. Each test process gets a throwaway home
 
 ## How the code fits together
 
-- `src/server/cli.ts` parses the flags, builds a `ScanEnv` with `scanEnvFromProcess`, binds it to a core with `createCore` and starts the server from `server.ts`, which answers the `/api/*` routes and serves the built UI. Every `/api/` request needs the per-run token in the `x-ccdesk-token` header.
+- `src/server/cli.ts` is the `ccdesk` bin. It reads the flags with `parse` from `args.ts`, builds a `ScanEnv` with `scanEnvFromProcess`, binds it to a core with `createCore` and starts the server with `startServer` from `start.ts`. The server in `server.ts` answers the `/api/*` routes and serves the built UI. Every `/api/` request needs the per-run token in the `x-ccdesk-token` header.
 - `src/server/scan/` reads. Every function takes the `ScanEnv` (home, Claude folder, `.claude.json`, managed folder, platform, and the environment ccdesk finds your editor and `claude` in), so tests point it at a fixture instead of your machine. `scanDirectory` returns the `DirectoryView` a page shows, and `scanOverview` the start page.
 - The edit modules (`settings-edit.ts`, `agent-edit.ts`, `mcp-edit.ts`, `mutations.ts` for memory) and `backups.ts` write. `write.ts` holds what they share: atomic writes through links, the backup folder and its manifest, and the queue that runs changes one at a time.
 - `watch.ts` watches the files a scan read and wakes the page's long poll on `/api/watch` when one changes. `~/.claude.json` is not watched; the page reloads when you return to the tab.

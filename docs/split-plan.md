@@ -15,14 +15,9 @@ These landed after v0.2.2.
 - **A core-level round trip.** `test/core-edits.test.ts` saves and undoes a permission edit through the core. Settings, agent, project MCP and memory round trips stay in `test/server.test.ts`, whose routes pass edits straight to the same functions.
 - **Generated data comes from the server.** The settings schema, catalog and hook events are exported from the core as `REFERENCE` and served by `/api/reference`, so the page no longer bundles them (913 kB to 496 kB).
 - **The core has its seams (step 1).** `createCore(env, { runClaude?, openFile? })` in `src/core/core.ts` returns every read and change with `env` bound, and `createCcdeskServer` takes a core instead of `env`, `openFile` and `runClaude`. Each core makes its own change queue (`changeQueue()` in `write.ts`) and usage counter (`usageCounter()` in `scan/usage.ts`). `ScanEnv` gained `processEnv`, the environment ccdesk finds an editor and `claude` in; `openInEditor`, its `launch`, and `claudeRunner(env)` (which replaces `runClaude`'s body) take the platform and environment from it, and `claudeProgram` lost its `process` defaults. The free save functions take an optional queue as their last argument and `openInEditor` an optional host, defaulting to the process-wide queue and `process`; `readUsage` and `runClaude` use a process-wide counter and `process`. Existing calls still work; remove these defaults and wrappers one release later. The compiled schema validators in `settings-edit.ts` stay in module scope: they come from the bundled schema and never differ between cores, and Ajv caches compiled schemas itself. Tests: `test/core-instances.test.ts` (a save on one core does not wait for another core's; one core's usage count does not evict another's cache; a `win32` env opens a `.cmd` editor through `cmd.exe` and runs the `claude.exe` behind npm's `claude.cmd`, with the env's environment).
+- **The CLI is split (step 2).** `parse(argv)` in `src/server/args.ts` turns the arguments into `{ command: "help" }` or `{ command: "serve", port, configDir, open, dev }` and throws `UsageError` with the message to print; it reads no files, so the bin still checks that `--config-dir` is a folder. `startServer(options)` in `src/server/start.ts` takes the server's options (a core, the launch folder, the token, `uiDir`) and a port, listens on 127.0.0.1, and resolves `{ url, close }`, or rejects when it cannot listen. `cli.ts` is now the short bin that wires them together and prints. The browser opens through `openBrowser(url, host)` in `open.ts`, which uses the same `launch` as the editor with the core's `env`; it now also reports an opener that exits with an error, such as `xdg-open` with no browser set, where the old launcher only reported one that failed to start. Test: `test/cli.test.ts` (the default and each flag, `--dev`'s port, refused ports and unknown flags, a server started with `uiDir: null` that answers at its URL and closes with a kept-alive connection open, and a port in use).
 
 ## Remaining steps
-
-### 2. Split the CLI
-
-Scope: `cli.ts` today parses flags, builds a core, starts the server and opens the browser in one `main()` that runs on import, with its own browser launcher, `openBrowser`. Split it into a pure `parse(argv)`, a `startServer(options)` that takes a core and returns `{ url, close }`, and a short bin. Open the browser through `open.ts`'s spawn plan, with the platform and environment from the core's `env`.
-
-Done when: `parse` has unit tests for the flags and errors, `startServer` runs in a test with `uiDir: null`, and CI's pack smoke test still passes.
 
 ### 3. Move the files
 
@@ -44,7 +39,7 @@ Done when: a test sees `onChange` called once after a watched file changes, and 
 
 ### 6. Build a CLI on the core
 
-Scope: subcommands of the existing `ccdesk` bin, such as `ccdesk scan --json` (see [feature ideas](feature-ideas.md)), importing only `ccdesk` (the core), never `src/server/server.ts`.
+Scope: subcommands of the existing `ccdesk` bin, such as `ccdesk scan --json` (see [feature ideas](feature-ideas.md)), importing only `ccdesk` (the core), never `src/server/server.ts`. Each subcommand becomes a `command` in what `parse` returns. `cli.ts` imports `start.ts`, and through it the server, at the top; load it with `import()` only for `serve` so a subcommand never loads the server.
 
 Done when: the subcommands work from the packed package, and their output is tested against a fixture. Decide on workspace packages only after this, and only if the release schedules need to differ.
 
