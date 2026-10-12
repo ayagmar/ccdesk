@@ -5,8 +5,9 @@
     "rootDir": "src",
     "outDir": "dist",
     "lib": ["ES2023"],
-    "sourceMap": false
+    "sourceMap": false,
+    "declaration": true
   },
-  "include": ["src/server/**/*.ts", "src/shared/**/*.ts"],
+  "include": ["src/core/**/*.ts", "src/server/**/*.ts", "src/shared/**/*.ts"],
   "exclude": ["node_modules", "dist", "src/ui"]
 }
