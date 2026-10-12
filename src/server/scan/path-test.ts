@@ -101,7 +101,9 @@ export async function testPath(
       // project waits for your approval, then loads only without paths
       // (docs: memory#share-rules-across-projects-with-symlinks).
       const real = await resolvedPath(path);
-      if (excluded(real)) continue;
+      const outside = !isWithin(realCwd, real) && !isWithin(await resolvedPath(folder), real);
+      const linked = text.realPath ?? (outside ? real : undefined);
+      if (linked !== undefined && excluded(linked)) continue;
       const globs = toStringList(parseFrontmatter(text.text).data.paths);
       if (!isWithin(realCwd, real) && (!approved || globs.length > 0)) continue;
       const glob =
