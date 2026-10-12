@@ -222,17 +222,15 @@ export function shownUrl(url: string): string {
 export function redactSecrets(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactSecrets);
   if (!isRecord(value)) return value;
-  const out: Record<string, unknown> = {};
-  for (const [key, inner] of Object.entries(value)) {
-    if ((key === "env" || key === "headers") && isRecord(inner)) {
-      out[key] = Object.fromEntries(Object.keys(inner).map((k) => [k, "•••"]));
-    } else if (key === "url" && typeof inner === "string") {
-      out[key] = shownUrl(inner);
-    } else {
-      out[key] = redactSecrets(inner);
-    }
-  }
-  return out;
+  // Built with fromEntries: assigning a key named __proto__ would set the prototype instead.
+  return Object.fromEntries(
+    Object.entries(value).map(([key, inner]) => {
+      if ((key === "env" || key === "headers") && isRecord(inner))
+        return [key, Object.fromEntries(Object.keys(inner).map((k) => [k, "•••"]))];
+      if (key === "url" && typeof inner === "string") return [key, shownUrl(inner)];
+      return [key, redactSecrets(inner)];
+    })
+  );
 }
 
 interface Frontmatter {

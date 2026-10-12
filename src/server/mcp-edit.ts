@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
-import { stat } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { access, stat } from "node:fs/promises";
+import { delimiter, join, resolve } from "node:path";
 import { type Change, type McpEdit, type SettingsEditPreview } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import {
@@ -19,22 +19,61 @@ import { RefusedError, readIfExists, recordChange, serially, writeAtomic } from 
  */
 export type RunClaude = (args: string[], cwd: string) => Promise<string>;
 
-export const runClaude: RunClaude = (args, cwd) =>
-  new Promise((done, fail) => {
-    execFile("claude", args, { cwd, timeout: 30_000 }, (error, stdout, stderr) => {
+const exists = (path: string) =>
+  access(path).then(
+    () => true,
+    () => false
+  );
+
+/**
+ * The program to run for `claude`. On Windows, npm installs Claude Code as a claude.cmd that starts
+ * the package's claude.exe; Node cannot run a .cmd without a shell, which would read the server's
+ * JSON as shell syntax, so ccdesk runs that claude.exe itself. A claude.exe earlier on PATH, as the
+ * native installer puts there, comes first, as it would in a terminal.
+ */
+export async function claudeProgram(
+  path = process.env.PATH ?? "",
+  platform = process.platform
+): Promise<string> {
+  if (platform !== "win32") return "claude";
+  // Windows reads a PATH entry in quotes as the folder inside them.
+  for (const dir of path
+    .split(delimiter)
+    .map((d) => d.replace(/^"(.*)"$/, "$1"))
+    .filter(Boolean)) {
+    if (await exists(join(dir, "claude.exe"))) return join(dir, "claude.exe");
+    const fromNpm = join(dir, "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe");
+    if ((await exists(join(dir, "claude.cmd"))) && (await exists(fromNpm))) return fromNpm;
+  }
+  return "claude";
+}
+
+export const runClaude: RunClaude = async (args, cwd) => {
+  const program = await claudeProgram();
+  return new Promise((done, fail) => {
+    execFile(program, args, { cwd, timeout: 30_000 }, (error, stdout, stderr) => {
       if ((error as NodeJS.ErrnoException | null)?.code === "ENOENT")
         return fail(
           new RefusedError(
             "ccdesk changes your user and local MCP servers through the claude command, which is not on PATH."
           )
         );
-      if (error)
-        return fail(
-          new RefusedError(`claude ${args[1]} failed: ${stderr.trim() || error.message}`)
-        );
+      // Node's own message repeats the command, with the server's env and header values in it.
+      if (error) {
+        const reason =
+          stderr.trim() ||
+          (error.killed ? "it took longer than 30 seconds" : `it exited with code ${error.code}`);
+        return fail(new RefusedError(`claude ${args[1]} failed: ${reason}`));
+      }
       done(stdout);
     });
   });
+};
+
+/** Quotes a word for a POSIX shell, so a command shown to you can be pasted as it is. */
+function quoted(word: string): string {
+  return `'${word.replaceAll("'", "'\\''")}'`;
+}
 
 function shown(value: unknown): string {
   return `${JSON.stringify(redactSecrets(value), null, 2)}\n`;
@@ -96,13 +135,13 @@ function checked(servers: Record<string, unknown>, edit: McpEdit): void {
 /** The servers after the edit, with a replaced server kept in its place. */
 function edited(servers: Record<string, unknown>, edit: McpEdit): Record<string, unknown> {
   const { remove, add } = edit;
-  const next: Record<string, unknown> = {};
-  for (const [name, config] of Object.entries(servers)) {
-    if (name !== remove?.name) next[name] = config;
-    else if (add) next[add.name] = add.definition;
-  }
-  if (add && !remove) next[add.name] = add.definition;
-  return next;
+  // Built with fromEntries: assigning a server named __proto__ would set the prototype instead.
+  const next = Object.entries(servers).flatMap(([name, config]): Array<[string, unknown]> => {
+    if (name !== remove?.name) return [[name, config]];
+    return add ? [[add.name, add.definition]] : [];
+  });
+  if (add && !remove) next.push([add.name, add.definition]);
+  return Object.fromEntries(next);
 }
 
 /** A project server: ccdesk changes .mcp.json itself, backed up and listed in Recent changes. */
@@ -174,14 +213,18 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
   checked(servers, edit);
   const { remove, add } = edit;
   const errors = add ? entryProblems(add.definition) : [];
+  // Names follow "--", so one such as --help is a name, not an option.
   const addArgs = (name: string, definition: unknown) => [
     "mcp",
     "add-json",
-    name,
-    JSON.stringify(definition),
     "--scope",
     edit.scope,
+    "--",
+    name,
+    JSON.stringify(definition),
   ];
+  const addCommand = (name: string, definition: unknown) =>
+    `claude mcp add-json --scope ${edit.scope} -- ${quoted(name)} ${quoted(JSON.stringify(definition))}`;
   const before = Object.keys(servers).length > 0 ? shown(servers) : null;
   return {
     preview: {
@@ -193,23 +236,27 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
       errors,
       // Shown with secrets hidden; the command that runs has the values you typed.
       commands: [
-        ...(remove ? [`claude mcp remove ${remove.name} --scope ${edit.scope}`] : []),
-        ...(add
-          ? [
-              `claude mcp add-json ${add.name} '${JSON.stringify(redactSecrets(add.definition))}' --scope ${edit.scope}`,
-            ]
-          : []),
+        ...(remove ? [`claude mcp remove --scope ${edit.scope} -- ${quoted(remove.name)}`] : []),
+        ...(add ? [addCommand(add.name, redactSecrets(add.definition))] : []),
       ],
     },
     save: async () => {
-      if (remove) await run(["mcp", "remove", remove.name, "--scope", edit.scope], cwd);
+      if (remove) await run(["mcp", "remove", "--scope", edit.scope, "--", remove.name], cwd);
       if (!add) return { target: env.claudeJson };
       try {
         await run(addArgs(add.name, add.definition), cwd);
       } catch (error) {
-        // A replaced server goes back as it was, so a refused add does not lose it.
-        if (remove)
-          await run(addArgs(remove.name, servers[remove.name]), cwd).catch(() => undefined);
+        if (!remove) throw error;
+        // A replaced server goes back as it was, so a refused add does not lose it. When that
+        // fails too, the error gives the command that puts it back, from the folder a local server
+        // belongs to; a replaced server has no hidden values (see checked), so the command shows
+        // nothing the page does not.
+        const original = servers[remove.name];
+        await run(addArgs(remove.name, original), cwd).catch(() => {
+          throw new RefusedError(
+            `ccdesk removed ${remove.name}, then could not add it back. In bash, zsh or Git Bash, put it back with: ${edit.scope === "local" ? `cd ${quoted(cwd)} && ` : ""}${addCommand(remove.name, original)} (${error instanceof Error ? error.message : String(error)})`
+          );
+        });
         throw error;
       }
       return { target: env.claudeJson };

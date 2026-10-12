@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { type AddressInfo } from "node:net";
 import { join } from "node:path";
@@ -37,9 +38,9 @@ let fixture: Fixture;
 let server: ReturnType<typeof createCcdeskServer>;
 let base: string;
 const opened: string[] = [];
-/** The claude commands ccdesk ran; a command named in failing fails once. */
+/** The claude commands ccdesk ran; each entry in failing makes the next such command fail once. */
 const claudeRuns: Array<{ args: string[]; cwd: string }> = [];
-const failing = new Set<string>();
+const failing: string[] = [];
 
 before(async () => {
   fixture = makeFixture();
@@ -55,7 +56,11 @@ before(async () => {
     runClaude: async (args, cwd) => {
       claudeRuns.push({ args, cwd });
       // As the real runner reports a failed command.
-      if (failing.delete(args[1] ?? "")) throw new RefusedError(`claude ${args[1]} failed`);
+      const fails = failing.indexOf(args[1] ?? "");
+      if (fails >= 0) {
+        failing.splice(fails, 1);
+        throw new RefusedError(`claude ${args[1]} failed`);
+      }
       return "";
     },
   });
@@ -1227,24 +1232,34 @@ test("user and local servers are changed through claude mcp, never by writing ~/
   const added = await saveMcp({
     dir,
     scope: "user",
-    add: { name: "web", definition: { type: "http", url: "https://web.example/mcp" } },
+    // Names go after "--", so claude reads one like --help as a name and not as an option.
+    add: { name: "--help", definition: { type: "http", url: "https://web.example/mcp" } },
   });
   assert.equal(added.status, 200);
 
   assert.deepEqual(claudeRuns, [
-    { args: ["mcp", "remove", "db", "--scope", "local"], cwd: dir },
+    { args: ["mcp", "remove", "--scope", "local", "--", "db"], cwd: dir },
     {
-      args: ["mcp", "add-json", "db", '{"command":"db-mcp","args":["--ro"]}', "--scope", "local"],
+      args: [
+        "mcp",
+        "add-json",
+        "--scope",
+        "local",
+        "--",
+        "db",
+        '{"command":"db-mcp","args":["--ro"]}',
+      ],
       cwd: dir,
     },
     {
       args: [
         "mcp",
         "add-json",
-        "web",
-        '{"type":"http","url":"https://web.example/mcp"}',
         "--scope",
         "user",
+        "--",
+        "--help",
+        '{"type":"http","url":"https://web.example/mcp"}',
       ],
       cwd: fixture.env.home,
     },
@@ -1259,7 +1274,7 @@ test("a replaced server goes back as it was when claude refuses the new one", as
     JSON.stringify({ mcpServers: { notes: { command: "notes-mcp" } } })
   );
   claudeRuns.length = 0;
-  failing.add("add-json");
+  failing.push("add-json");
 
   const refused = await saveMcp({
     dir,
@@ -1269,13 +1284,75 @@ test("a replaced server goes back as it was when claude refuses the new one", as
   });
   assert.equal(refused.status, 409);
   assert.deepEqual(
-    claudeRuns.map((r) => r.args.slice(0, 4)),
+    claudeRuns.map((r) =>
+      r.args.slice(1).filter((a) => a !== "--scope" && a !== "user" && a !== "--")
+    ),
     [
-      ["mcp", "remove", "notes", "--scope"],
-      ["mcp", "add-json", "notes", '{"command":"notes-mcp","args":["--v2"]}'],
-      ["mcp", "add-json", "notes", '{"command":"notes-mcp"}'],
+      ["remove", "notes"],
+      ["add-json", "notes", '{"command":"notes-mcp","args":["--v2"]}'],
+      ["add-json", "notes", '{"command":"notes-mcp"}'],
     ]
   );
+});
+
+// The command is run by sh, with a fake claude that prints where it ran and what it was given.
+test("a replaced server that cannot be put back comes with a command that restores it exactly", {
+  skip: process.platform === "win32",
+}, async () => {
+  const dir = fixture.at("work/mcp-lost");
+  fixture.write("work/mcp-lost/README.md", "x");
+  const original = { command: "node", args: ["-e", "console.log('hi')"] };
+  fixture.write(
+    fixture.env.claudeJson,
+    JSON.stringify({ projects: { [dir]: { mcpServers: { notes: original } } } })
+  );
+  failing.push("add-json", "add-json");
+
+  const refused = await saveMcp({
+    dir,
+    scope: "local",
+    remove: { name: "notes", definition: original },
+    add: { name: "notes", definition: { command: "node", args: ["--v2"] } },
+  });
+  assert.equal(refused.status, 409);
+  const command = /put it back with: (.*) \(/.exec((refused.json as { error: string }).error)?.[1];
+  assert.ok(command);
+
+  chmodSync(fixture.write("bin/claude", '#!/bin/sh\nprintf "%s\\n" "$PWD" "$@"\n'), 0o755);
+  const printed = execFileSync("sh", ["-c", command], {
+    cwd: fixture.env.home,
+    env: { ...process.env, PATH: `${fixture.at("bin")}:${process.env.PATH}` },
+    encoding: "utf8",
+  }).split("\n");
+  // A local server belongs to its folder, so the command runs claude there.
+  assert.equal(printed[0], dir);
+  assert.deepEqual(printed.slice(1, 7), ["mcp", "add-json", "--scope", "local", "--", "notes"]);
+  assert.deepEqual(JSON.parse(printed[7] ?? ""), original);
+});
+
+test("a server named __proto__ is kept when another server in .mcp.json changes", async () => {
+  const dir = fixture.at("work/mcp-proto");
+  // Written as text: an object literal with a __proto__ key would set its prototype instead.
+  const file = fixture.write(
+    "work/mcp-proto/.mcp.json",
+    '{\n  "mcpServers": {\n    "__proto__": {\n      "command": "proto-mcp"\n    }\n  }\n}\n'
+  );
+
+  const preview = await call("/api/mcp/preview", {
+    method: "POST",
+    body: { dir, scope: "project", add: { name: "docs", definition: { command: "docs-mcp" } } },
+  });
+  assert.match((preview.json as Preview).after, /"__proto__"/);
+  const saved = await saveMcp({
+    dir,
+    scope: "project",
+    add: { name: "docs", definition: { command: "docs-mcp" } },
+  });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(file, "utf8")).mcpServers), [
+    "__proto__",
+    "docs",
+  ]);
 });
 
 /** Reviews an agent change, then saves it with the reviewed revision, as the page does. */
