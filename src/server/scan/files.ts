@@ -155,7 +155,9 @@ export function wildcard(pattern: string, flags = ""): RegExp {
 
 export function isWithin(parent: string, child: string): boolean {
   const rel = relative(parent, child);
-  return rel === "" || (!rel.startsWith("..") && !rel.startsWith(sep) && !/^[a-zA-Z]:/.test(rel));
+  // Only the parent segment leads out; a name such as ..cache is inside.
+  const up = rel === ".." || rel.startsWith(`..${sep}`);
+  return rel === "" || (!up && !rel.startsWith(sep) && !/^[a-zA-Z]:/.test(rel));
 }
 
 export async function isDir(path: string): Promise<boolean> {

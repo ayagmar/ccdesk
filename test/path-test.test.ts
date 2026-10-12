@@ -70,6 +70,14 @@ test("a file outside the start directory gets nothing from it", async () => {
   assert.deepEqual(result.matches, []);
 });
 
+test("a folder whose name starts with two dots is inside the start directory", async () => {
+  const f = makeFixture();
+  f.write("app/README.md", "x");
+
+  assert.equal((await testPath(f.env, f.at("app"), "..cache/x.ts")).inside, true);
+  assert.equal((await testPath(f.env, f.at("app"), "../x.ts")).inside, false);
+});
+
 test("an excluded rule and a skill Claude cannot invoke itself do not load for matching files", async () => {
   const f = makeFixture();
   f.write("app/.claude/rules/legacy.md", '---\npaths: ["**/*.ts"]\n---\nOld rule.\n');
