@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { join } from "node:path";
 import { test } from "node:test";
 import { REFERENCE, scanDirectory } from "../src/core/index.ts";
 import { buildRows, formatter, SECTIONS, type ViewContext } from "../src/view/index.ts";
@@ -59,8 +60,10 @@ test("paths in labels are shown from the home folder the caller gives", async ()
       .map((r) => instructions?.label(r, context));
   };
 
-  assert.deepEqual(labels(f.env.home), ["~/.claude/CLAUDE.md"]);
+  // The path keeps the platform's separators after the ~.
+  const mine = join("~", ".claude", "CLAUDE.md");
+  assert.deepEqual(labels(f.env.home), [mine]);
   // A second formatter does not change what the first shows.
   assert.deepEqual(labels(""), [f.at("home/.claude/CLAUDE.md")]);
-  assert.deepEqual(labels(f.env.home), ["~/.claude/CLAUDE.md"]);
+  assert.deepEqual(labels(f.env.home), [mine]);
 });
