@@ -8,7 +8,7 @@ The core stays a folder in this package, reached through `exports` subpaths in `
 
 ## Done
 
-These landed on the `chore/groundwork` branch, after v0.2.2.
+These landed after v0.2.2.
 
 - **The core is importable.** `src/core/index.ts` re-exports the scan, the watcher, every preview and save, backups, the errors and the shared types. The build emits declarations, `package.json` maps `"."` to `dist/core` with its types, and CI imports the packed package. Test: `test/core.test.ts`.
 - **Edit input is checked in the core.** The parsers that were in `server.ts` are `parseSettingsEdit`, `parsePermissionEdit`, `parseHookEdit`, `parseAgentEdit` and `parseMcpEdit` in `src/server/parse-edit.ts`, throwing `InvalidEditError` (400). Planning a hook edit already refused unknown events. Test: `test/core-parse.test.ts`.

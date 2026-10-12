@@ -15,8 +15,9 @@ export { hasHiddenValues, shown } from "../server/secrets.ts";
 export { Watcher } from "../server/watch.ts";
 
 // Edits: the parse functions turn input from outside (JSON, arguments) into an edit, or throw
-// InvalidEditError. Preview returns a revision, save takes it back. Both refuse with RefusedError;
-// a save whose file changed since the preview throws StaleError, a RefusedError.
+// InvalidEditError. Preview returns a revision, save takes it back. Both refuse with RefusedError,
+// also when the file changed since the preview; StaleError, a RefusedError, means it changed while
+// ccdesk was writing it.
 export { previewAgentEdit, saveAgentEdit } from "../server/agent-edit.ts";
 export {
   claudeProgram,
