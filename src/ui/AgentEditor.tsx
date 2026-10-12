@@ -1,8 +1,8 @@
 import { useId, useState } from "react";
 import { type AgentEdit, type DirectoryView, type Entry } from "../shared/types.ts";
+import { lineName } from "../view/lines.ts";
 import { api } from "./api.ts";
 import { Bullet } from "./Bullet.tsx";
-import { lineName } from "./lines.ts";
 import { type Saved } from "./SettingEditor.tsx";
 import { useReviewedChange } from "./useReviewedChange.tsx";
 

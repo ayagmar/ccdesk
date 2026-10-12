@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { EDITABLE_SCOPES } from "../../shared/scopes.ts";
 import { type Permission, type Scope, type Usage } from "../../shared/types.ts";
+import { lineName } from "../../view/lines.ts";
+import { sessionsHere, suggestedRules } from "../../view/usage.ts";
 import { Bullet } from "../Bullet.tsx";
 import { ago, plural, tilde, tildeAll } from "../format.ts";
 import { Icon } from "../Icon.tsx";
-import { lineName } from "../lines.ts";
 import {
   fileFor,
   PermissionEditor,
@@ -12,7 +13,6 @@ import {
   usePermissionChange,
 } from "../PermissionEditor.tsx";
 import { SettingEditor } from "../SettingEditor.tsx";
-import { sessionsHere, suggestedRules } from "../usage.ts";
 import { Field, NameButton, PathValue } from "./kit.tsx";
 import { type Actions, defineSection, type RowOf } from "./types.ts";
 

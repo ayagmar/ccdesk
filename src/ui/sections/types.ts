@@ -15,7 +15,7 @@ import {
   type Permission,
   type Plugin,
 } from "../../shared/types.ts";
-import { type Line } from "../lines.ts";
+import { type Line } from "../../view/lines.ts";
 import { type Saved } from "../SettingEditor.tsx";
 
 export type EntryKind = "agent" | "skill" | "command" | "output style";

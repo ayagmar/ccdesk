@@ -7,19 +7,14 @@ import {
   type SettingsEdit,
   type SettingsEditPreview,
 } from "../shared/types.ts";
+import { lineName } from "../view/lines.ts";
+import { type FieldKind, fieldKind } from "../view/settings.ts";
 import { api } from "./api.ts";
 import { Bullet } from "./Bullet.tsx";
 import { DiffView } from "./DiffView.tsx";
 import { tilde } from "./format.ts";
-import { lineName } from "./lines.ts";
-import {
-  type FieldKind,
-  fieldKind,
-  propertyFor,
-  schemaSource,
-  settingKeys,
-} from "./settingsSchema.ts";
 import { documentedValues } from "./settingsCatalog.ts";
+import { propertyFor, schemaSource, settingKeys } from "./settingsSchema.ts";
 
 /** A saved edit: the change to undo, what to tell you, and the row to show afterwards. */
 export interface Saved {

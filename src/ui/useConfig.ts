@@ -6,8 +6,9 @@ import {
   type SessionProfile,
   type Usage,
 } from "../shared/types.ts";
+import { formatter } from "../view/format.ts";
 import { ApiError, api } from "./api.ts";
-import { setHome } from "./format.ts";
+import { setFormatter } from "./format.ts";
 import { setReference } from "./reference.ts";
 
 export type Load<T> =
@@ -43,7 +44,7 @@ export function useConfig(requested: string | null | undefined, profile: Session
   const refreshOverview = useCallback(() => {
     api.overview().then(
       (data) => {
-        setHome(data.home);
+        setFormatter(formatter(data.home));
         setOverview({ state: "ready", data });
       },
       (error: unknown) => setOverview({ state: "error", message: errorText(error) })

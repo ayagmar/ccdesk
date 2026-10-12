@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { diffLines, withContext } from "../src/ui/diff.ts";
+import { diffLines, withContext } from "../src/view/diff.ts";
 
 const file = (value: string) =>
   `${JSON.stringify(

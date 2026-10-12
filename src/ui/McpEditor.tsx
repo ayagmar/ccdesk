@@ -1,9 +1,9 @@
 import { useId, useState } from "react";
 import { type DirectoryView, type McpEdit, type McpServer } from "../shared/types.ts";
+import { lineName } from "../view/lines.ts";
 import { api } from "./api.ts";
 import { Bullet } from "./Bullet.tsx";
 import { tilde } from "./format.ts";
-import { lineName } from "./lines.ts";
 import { type Saved } from "./SettingEditor.tsx";
 import { useReviewedChange } from "./useReviewedChange.tsx";
 

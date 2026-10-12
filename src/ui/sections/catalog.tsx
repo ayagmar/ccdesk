@@ -1,10 +1,10 @@
 import Markdown from "react-markdown";
 import { EDITABLE_SCOPES, HIGHEST_FIRST } from "../../shared/scopes.ts";
 import { type DirectoryView, type EffectiveSetting } from "../../shared/types.ts";
+import { type Line, lineName } from "../../view/lines.ts";
 import { Bullet } from "../Bullet.tsx";
 import { preview, tildeAll } from "../format.ts";
 import { Icon } from "../Icon.tsx";
-import { type Line, lineName } from "../lines.ts";
 import { reference } from "../reference.ts";
 import { SettingEditor } from "../SettingEditor.tsx";
 import { categories } from "../settingsCatalog.ts";

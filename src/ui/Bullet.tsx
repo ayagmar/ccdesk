@@ -1,4 +1,4 @@
-import { LINES, type Line } from "./lines.ts";
+import { LINES, type Line } from "../view/lines.ts";
 
 /** A route bullet: the letter and colour of the scope something comes from. */
 export function Bullet({ line, hollow = false }: { line: Line; hollow?: boolean }) {

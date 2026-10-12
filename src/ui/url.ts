@@ -1,5 +1,5 @@
 import { type SessionProfile } from "../shared/types.ts";
-import { LINES, type Line } from "./lines.ts";
+import { LINES, type Line } from "../view/lines.ts";
 import { type SectionId } from "./sections/types.ts";
 
 /**

@@ -1,4 +1,4 @@
-import { diffLines, withContext } from "./diff.ts";
+import { diffLines, withContext } from "../view/diff.ts";
 
 /** A line diff with unchanged stretches folded, as the settings review and restore show it. */
 export function DiffView({ before, after }: { before: string; after: string }) {

@@ -1,7 +1,7 @@
 import { type DirectoryView } from "../shared/types.ts";
+import { LINES, type Line } from "../view/lines.ts";
 import { Bullet } from "./Bullet.tsx";
 import { plural } from "./format.ts";
-import { LINES, type Line } from "./lines.ts";
 
 interface Stop {
   line: Line;

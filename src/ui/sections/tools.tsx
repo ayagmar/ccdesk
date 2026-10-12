@@ -7,12 +7,12 @@ import {
   type Scope,
   type Usage,
 } from "../../shared/types.ts";
+import { lineName } from "../../view/lines.ts";
+import { sessionsHere } from "../../view/usage.ts";
 import { Bullet } from "../Bullet.tsx";
 import { plural, tilde } from "../format.ts";
 import { Icon } from "../Icon.tsx";
-import { lineName } from "../lines.ts";
 import { fileFor, ScopePicker, usePermissionChange } from "../PermissionEditor.tsx";
-import { sessionsHere } from "../usage.ts";
 import { Field, NameButton } from "./kit.tsx";
 import { type Actions, defineSection, type RowOf } from "./types.ts";
 

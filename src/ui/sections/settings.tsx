@@ -1,9 +1,9 @@
 import { EDITABLE_SCOPES, HIGHEST_FIRST } from "../../shared/scopes.ts";
 import { type Scope } from "../../shared/types.ts";
+import { type Line, lineName } from "../../view/lines.ts";
 import { Bullet } from "../Bullet.tsx";
 import { preview, tildeAll } from "../format.ts";
 import { Icon } from "../Icon.tsx";
-import { type Line, lineName } from "../lines.ts";
 import { SettingEditor } from "../SettingEditor.tsx";
 import { Field, NameButton, PathValue } from "./kit.tsx";
 import { defineSection, type RowOf } from "./types.ts";
