@@ -105,7 +105,7 @@ npx ccdesk [options]
   -h, --help            Show this help
 ```
 
-ccdesk reads `~/.claude` and `~/.claude.json`, or `$CLAUDE_CONFIG_DIR` when it is set, as Claude Code does. To look at another profile without exporting the variable, pass `--config-dir <path>`. Edits made in another editor or by Claude show up within a second. Changes to `~/.claude.json`, such as trust decisions and MCP approvals, and edits inside installed plugins show up when you return to the tab. Requires Node.js 22.19 or newer. See [Platform notes](https://ayagmar.github.io/ccdesk/platforms/) for Windows, macOS and WSL.
+ccdesk reads `~/.claude` and `~/.claude.json`, or `$CLAUDE_CONFIG_DIR` when it is set, as Claude Code does. To look at another profile without exporting the variable, pass `--config-dir <path>`. Edits made in another editor or by Claude show up within a second. Changes to `~/.claude.json`, such as trust decisions and MCP approvals, show up when you return to the tab. Requires Node.js 22.19 or newer. See [Platform notes](https://ayagmar.github.io/ccdesk/platforms/) for Windows, macOS and WSL.
 
 ## Privacy and safety
 

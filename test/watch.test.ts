@@ -60,6 +60,27 @@ test("creating the missing folder of an import, then the file, wakes a page each
   assert.equal((await file).changed, true);
 });
 
+test("editing a file inside an installed plugin wakes a page waiting for changes", async () => {
+  const f = makeFixture();
+  const plugin = "home/.claude/plugins/cache/market/alpha/1.0.0";
+  f.json("home/.claude/plugins/installed_plugins.json", {
+    plugins: { "alpha@market": [{ scope: "user", installPath: f.at(plugin), version: "1.0.0" }] },
+  });
+  f.json(`${plugin}/.claude-plugin/plugin.json`, { name: "alpha" });
+  f.write(`${plugin}/agents/review.md`, "---\nname: review\ndescription: one\n---\n");
+  f.write("app/README.md", "x");
+  const watcher = watcherFor(f);
+  await watcher.scan(f.at("app"));
+
+  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  setTimeout(
+    () => f.write(`${plugin}/agents/review.md`, "---\nname: review\ndescription: two\n---\n"),
+    100
+  );
+
+  assert.equal((await waiting).changed, true);
+});
+
 test("closing the watcher answers a page still waiting, instead of keeping it until the timeout", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "one\n");

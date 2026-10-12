@@ -62,8 +62,10 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
 }
 
 /**
- * Files a scan read that the fixed list does not cover: a custom memory folder, imports. A missing
- * import is watched too, so creating it shows up, even when its folder is missing as well.
+ * Files a scan read that the fixed list does not cover: a custom memory folder, imports, installed
+ * plugins. A missing import is watched too, so creating it shows up, even when its folder is missing
+ * as well. Each plugin's own folder is watched, not ~/.claude/plugins as a whole, which also holds
+ * marketplace checkouts and caches Claude Code rewrites.
  */
 export function dependencies(view: DirectoryView): Target[] {
   const files = view.instructions.flatMap((i) => [
@@ -79,6 +81,9 @@ export function dependencies(view: DirectoryView): Target[] {
   return [
     ...[...byFolder].map(([path, names]) => ({ path, recursive: false, names: [...names] })),
     ...(view.memory ? [{ path: view.memory.dir, recursive: false }] : []),
+    ...view.inventory.plugins
+      .filter((p) => p.installPath)
+      .map((p) => ({ path: p.installPath, recursive: true })),
   ];
 }
 
