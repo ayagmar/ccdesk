@@ -24,7 +24,7 @@ const QUESTIONS = [
   {
     id: "ask-push",
     question: "Why does Claude ask me before every git push here?",
-    answer: "The ask rule, and the settings file it is in",
+    answer: "The ask rule and its settings file, ready to move or remove",
     shows: "The Bash(git push *) ask rule from user settings, among the other permission rules",
     section: "Permissions",
     key: "3",
@@ -66,7 +66,7 @@ const QUESTIONS = [
   {
     id: "unused-allow",
     question: "Which allow rules have I stopped needing?",
-    answer: "Rules that covered no call in this project's sessions",
+    answer: "Rules that covered no call in this project's sessions, ready to remove",
     shows: "Allow rules flagged covered no call here",
     section: "Permissions",
     key: "3",
@@ -109,7 +109,7 @@ const QUESTIONS = [
 
 <StarlightPage
   frontmatter={{
-    title: "ccdesk: see and change what shapes Claude Code",
+    title: "ccdesk: see and change what Claude Code loads",
     description:
       "A local web app that shows every instruction file, setting, permission rule, hook, MCP server, subagent, skill and memory Claude Code loads in a directory, with the file each comes from, and lets you change them safely.",
     template: "splash",
@@ -122,9 +122,8 @@ const QUESTIONS = [
     <section aria-labelledby="questions">
       <h2 id="questions">Questions it answers</h2>
       <p class="section-lede">
-        Each answer is a row on the directory page, and each row names its source file. Open a
-        question to see its row. The last column names the section of ccdesk it is in, with the key
-        that jumps there in the app.
+        Each answer is a row in ccdesk that names the file it comes from. Open a question to see
+        the row; the last column says where to find it in the app.
       </p>
       <table class="timetable">
         <thead>
@@ -183,6 +182,10 @@ const QUESTIONS = [
         <h2 id="changes">Every change is a diff you review first</h2>
         <ul class="facts-list">
           <li>
+            Settings, permission rules, hooks, MCP servers, subagents and memory can be changed.
+            Instruction files open in your own editor.
+          </li>
+          <li>
             Settings are checked against Claude Code's own settings schema, and can be written only
             to files Claude Code reads that key from.
           </li>
@@ -193,10 +196,6 @@ const QUESTIONS = [
           <li>
             The old file is backed up first. Undo is one click, and <a href={`${base}recent-changes/`}>Recent changes</a> keeps every edit
             restorable.
-          </li>
-          <li>
-            Settings, permission rules, hooks, MCP servers, subagents and memory can be changed.
-            Instruction files open in your own editor.
           </li>
         </ul>
       </div>

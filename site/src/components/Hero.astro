@@ -15,20 +15,21 @@ const landing = Astro.locals.starlightRoute.id === "";
 {landing && (
 <section class="lead">
   <div class="intro">
-    <h1 id="_top">See what Claude Code is told in this directory, and where each piece comes from.</h1>
+    <h1 id="_top">See and change what Claude Code loads in this directory.</h1>
     <p class="lede">
-      ccdesk opens in your browser on the directory you start it in. It lists every instruction
-      file, setting, permission rule, hook, MCP server, subagent, skill and memory that applies
-      there, in the order Claude Code loads them, and names the file each one comes from. When
-      something is wrong, you fix it there: every change is a diff you review first, with a backup
-      and an undo.
+      Claude Code's instruction files, settings, permission rules, hooks, MCP servers, skills and
+      memory each live in their own file, at one of six scopes: managed, user, project, local, auto
+      memory or a plugin. ccdesk opens in your browser on one directory, lists all of it in the
+      order Claude Code loads it, and names the file behind each piece. When something is wrong,
+      change it on the same page: you review the diff first, and every edit has a backup and an
+      undo.
     </p>
     <div class="actions">
       <CommandCopy command="npx ccdesk" />
-      <a class="primary" href={`${base}getting-started/`}>Get started</a>
+      <a class="primary" href={`${base}getting-started/`}>Read the docs</a>
       <a href="https://github.com/ayagmar/ccdesk">Source on GitHub</a>
     </div>
-    <p class="facts">Node.js 22.19 or newer · Linux, macOS and Windows · MIT licence</p>
+    <p class="facts">Local only, no telemetry · Node.js 22.19 or newer · Linux, macOS and Windows · MIT</p>
   </div>
   <div class="strip">
     <h2>The load order, stop by stop</h2>

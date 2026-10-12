@@ -22,7 +22,7 @@ export default defineConfig({
     starlight({
       title: "ccdesk",
       description:
-        "See and change everything that shapes Claude Code on your machine: instruction files, settings, hooks, MCP servers, subagents, skills, plugins and auto memory.",
+        "See and change everything Claude Code loads on your machine: instruction files, settings, hooks, MCP servers, subagents, skills, plugins and auto memory.",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/ayagmar/ccdesk" }],
       editLink: { baseUrl: "https://github.com/ayagmar/ccdesk/edit/master/site/" },
       customCss: [

@@ -10,17 +10,26 @@
 [![node](https://img.shields.io/node/v/ccdesk?style=flat-square&color=141414)](package.json)
 [![license](https://img.shields.io/github/license/ayagmar/ccdesk?style=flat-square&color=141414)](LICENSE)
 
-See and change everything that shapes Claude Code on your machine: instruction files, settings, permissions, hooks, MCP servers, subagents, skills, plugins and auto memory.
+See and change everything Claude Code loads on your machine: instruction files, settings, permissions, hooks, MCP servers, subagents, skills, plugins and auto memory.
 
 ```sh
 npx ccdesk
 ```
 
-ccdesk opens in your browser on the directory you ran it from. It shows what Claude Code is told there, in the order Claude Code loads it and with the file each piece comes from, and lets you change it with a diff to review and an undo. It is not a session viewer or a usage dashboard.
+Each piece lives in its own file, at one of six scopes: managed, user, project, local, auto memory or a plugin. ccdesk opens in your browser on the directory you ran it from, lists everything that applies there in the order Claude Code loads it, and names the file behind each piece. When something is wrong, change it on the same page: you review the diff first, and every edit has a backup and an undo. It is not a session viewer or a usage dashboard.
 
 **Docs:** [ayagmar.github.io/ccdesk](https://ayagmar.github.io/ccdesk/)
 
 <a href="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/directory-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/directory-dark.webp" /><img alt="ccdesk on a made-up project: the load order across the top, then instruction files and settings, each marked with the scope it comes from" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/directory-light.webp" /></picture></a>
+
+## Questions it answers
+
+- Why does Claude ask me before every `git push` here? ([Permissions](https://ayagmar.github.io/ccdesk/permissions/))
+- Which model does this repository use, and which file set it? ([Settings](https://ayagmar.github.io/ccdesk/settings/))
+- Is my `AGENTS.md` loaded at all? ([Instructions](https://ayagmar.github.io/ccdesk/instructions/))
+- How much context does my config take before I type anything? ([What Claude sees](https://ayagmar.github.io/ccdesk/what-claude-sees/))
+- What do I keep approving by hand, and which allow rules have I stopped needing? ([Permissions](https://ayagmar.github.io/ccdesk/permissions/#suggested-rules))
+- Which project MCP servers still wait for approval? ([MCP servers](https://ayagmar.github.io/ccdesk/mcp-servers/))
 
 ## What it covers
 
