@@ -8,8 +8,10 @@ import "./styles.css";
 try {
   const theme = localStorage.getItem("ccdesk-theme");
   if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+  const size = localStorage.getItem("ccdesk-text-size");
+  if (size === "smaller" || size === "larger") document.documentElement.dataset.textSize = size;
 } catch {
-  // Storage blocked: follow the system theme.
+  // Storage blocked: follow the system theme, at the default text size.
 }
 
 const root = document.getElementById("root");

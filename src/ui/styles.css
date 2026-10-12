@@ -128,7 +128,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font: 14px / 1.45 var(--sans);
+  font: 15px / 1.45 var(--sans);
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
@@ -163,7 +163,7 @@ code,
 pre,
 kbd {
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 kbd {
@@ -171,7 +171,7 @@ kbd {
   border-bottom-width: 2px;
   border-radius: 4px;
   padding: 0 5px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   background: var(--panel);
 }
@@ -181,7 +181,7 @@ kbd {
 }
 
 .small {
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .icon {
@@ -194,7 +194,8 @@ kbd {
 .app {
   display: grid;
   grid-template-columns: var(--rail) minmax(0, 1fr);
-  height: 100vh;
+  /* Not 100vh: the text size zoom scales vh too, which would push the page past the window. */
+  height: 100%;
   overflow: hidden;
 }
 
@@ -246,13 +247,37 @@ kbd {
   letter-spacing: -0.01em;
 }
 
-.brand .icon-button {
+.brand .text-size {
   margin-left: auto;
+}
+
+/* The three sizes show as the letter A at three sizes. */
+.brand .text-size button {
+  width: 24px;
+  padding: 0;
+  justify-content: center;
+}
+
+.brand .text-size button.smaller {
+  font-size: 11px;
+}
+
+.brand .text-size button.larger {
+  font-size: 15px;
+}
+
+/* The text size control scales the whole page, layout included, so fixed heights never clip. */
+html[data-text-size="smaller"] #root {
+  zoom: 0.9;
+}
+
+html[data-text-size="larger"] #root {
+  zoom: 1.15;
 }
 
 .rail-group {
   margin: 14px 6px 4px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--muted);
   display: flex;
@@ -288,7 +313,7 @@ kbd {
   border-radius: 6px;
   background: none;
   text-align: left;
-  font-size: 13.5px;
+  font-size: 14.5px;
 }
 
 .rail-item:hover {
@@ -315,7 +340,7 @@ kbd {
 
 .rail-count {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 
@@ -406,7 +431,7 @@ input::placeholder {
   gap: 8px;
   margin: 4px 0 12px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .section-index {
@@ -426,7 +451,7 @@ input::placeholder {
   border-radius: 6px;
   color: var(--ink-2);
   text-decoration: none;
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
@@ -459,13 +484,13 @@ input::placeholder {
 @container (max-width: 560px) {
   .section-index a {
     padding: 0 4px;
-    font-size: 12px;
+    font-size: 13px;
   }
 }
 
 .seg-count {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -518,7 +543,7 @@ input::placeholder {
   border: 1px solid var(--rule);
   border-radius: 6px;
   background: var(--panel);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .palette-button:hover {
@@ -597,12 +622,12 @@ input::placeholder {
 
 .stop-name {
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: 14.5px;
 }
 
 .stop-facts {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 
@@ -710,7 +735,7 @@ input::placeholder {
 
 .tt-count {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 
@@ -732,7 +757,7 @@ input::placeholder {
   z-index: 1;
   background: var(--paper);
   text-align: left;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--muted);
   height: 26px;
@@ -777,7 +802,7 @@ input::placeholder {
 .tt td.num {
   text-align: right;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .tt td.num.used {
@@ -948,7 +973,7 @@ input::placeholder {
   gap: 4px;
   margin-right: 10px;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .beaten s {
@@ -956,7 +981,7 @@ input::placeholder {
 }
 
 .status {
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
 }
 
@@ -971,7 +996,7 @@ input::placeholder {
 }
 
 .vis {
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .vis-tracked {
@@ -990,7 +1015,7 @@ input::placeholder {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 /* Memory types are told apart by shape in ink, so colour keeps meaning scope lines only. */
@@ -1026,7 +1051,7 @@ input::placeholder {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 18px;
   padding: 0 6px;
   border-radius: 4px;
@@ -1075,7 +1100,7 @@ input::placeholder {
   background: var(--panel);
   padding: 0 9px;
   height: 24px;
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .segmented button:last-child {
@@ -1089,7 +1114,7 @@ input::placeholder {
 
 .segmented.small button {
   height: 22px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 /* ---------- inspector ---------- */
@@ -1144,7 +1169,7 @@ input::placeholder {
   grid-template-columns: 104px minmax(0, 1fr);
   gap: 6px 12px;
   margin: 0 0 16px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .fields dt {
@@ -1170,7 +1195,7 @@ input::placeholder {
 
 .copied {
   flex-basis: 100%;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ok);
 }
 
@@ -1208,7 +1233,7 @@ input::placeholder {
 .sub h3,
 .sub-title {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -1269,7 +1294,7 @@ input::placeholder {
   align-items: center;
   padding: 8px 0;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 pre.raw {
@@ -1284,7 +1309,7 @@ pre.raw {
 }
 
 .prose {
-  font-size: 13.5px;
+  font-size: 14.5px;
   line-height: 1.6;
   max-width: 68ch;
   overflow-wrap: anywhere;
@@ -1366,7 +1391,7 @@ pre.raw {
   height: 30px;
   padding: 0 10px;
   color: var(--bad);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .quiet-danger:hover {
@@ -1382,7 +1407,7 @@ pre.raw {
 
 .confirm p {
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .confirm-buttons {
@@ -1396,7 +1421,7 @@ pre.raw {
   border-radius: 6px;
   border: 1px solid var(--rule);
   background: var(--panel);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .confirm-buttons button.danger {
@@ -1526,7 +1551,7 @@ button:disabled {
   padding: 8px 8px 8px 14px;
   box-shadow: 0 12px 32px -10px rgb(0 0 0 / 0.4);
   animation: rise 220ms cubic-bezier(0.16, 1, 0.3, 1);
-  font-size: 13.5px;
+  font-size: 14.5px;
 }
 
 .toast button {
@@ -1588,12 +1613,12 @@ button:disabled {
 /* ---------- permissions, index fixes ---------- */
 
 .tt-note {
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--muted);
 }
 
 .perm {
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
 }
 .perm-allow {
@@ -1726,7 +1751,7 @@ button:disabled {
 
 .context-list summary .num {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   text-align: right;
   color: var(--ink-2);
 }
@@ -1769,7 +1794,7 @@ button:disabled {
   flex-wrap: wrap;
   gap: 6px 24px;
   margin: 0 0 4px;
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .sharing-group {
@@ -1806,7 +1831,7 @@ button:disabled {
   border-radius: 6px;
   background: var(--warn-bg);
   color: var(--warn);
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .problems ul {
@@ -2029,7 +2054,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: 6px;
   background: var(--panel);
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .head-action:hover {
@@ -2048,7 +2073,7 @@ button:disabled {
 
 .hint {
   color: var(--ink-2);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .editor .segmented {
@@ -2059,7 +2084,7 @@ button:disabled {
 .field {
   display: grid;
   gap: 4px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--muted);
 }
 
@@ -2073,7 +2098,7 @@ button:disabled {
   background: var(--paper);
   color: var(--ink);
   padding: 6px 8px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .field input:not([type="checkbox"]),
@@ -2100,7 +2125,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .check input {
@@ -2123,7 +2148,7 @@ button:disabled {
   border-radius: 6px;
   border: 1px solid var(--rule);
   background: var(--panel);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .editor-buttons button:hover,
@@ -2158,7 +2183,7 @@ button:disabled {
   padding: 6px 8px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .key-results [role="option"] .muted {
@@ -2199,7 +2224,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: 4px;
   background: var(--panel);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .suggestions button[aria-pressed="true"] {
@@ -2222,7 +2247,7 @@ button:disabled {
   border-radius: 6px;
   background: var(--panel);
   color: var(--ink);
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .catalog-files {
@@ -2308,7 +2333,7 @@ pre.diff span {
 
 .rail-empty {
   margin: 2px 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -2318,7 +2343,7 @@ pre.diff span {
   padding: 24px 0 0;
   display: grid;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 
@@ -2352,7 +2377,7 @@ pre.diff span {
 
 .sort-mark {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0;
   transition: opacity 120ms;
 }
@@ -2372,7 +2397,7 @@ pre.diff span {
   border-bottom: 1px solid var(--rule);
   background: none;
   text-align: left;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
 }
 
@@ -2388,7 +2413,7 @@ pre.diff span {
 /* ---------- built-in tools ---------- */
 
 .tool-outcome {
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 
 .tool-denied {
@@ -2449,7 +2474,7 @@ pre.diff span {
 
 .cmp-from {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .cmp-from > * + * {
@@ -2467,7 +2492,7 @@ pre.diff span {
   margin: 0 0 4px;
   padding-top: 8px;
   border-top: 2px solid var(--rule-strong);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -2493,7 +2518,7 @@ pre.diff span {
   grid-template-areas: "what file when action";
   gap: 6px 12px;
   align-items: baseline;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .change-what {
@@ -2509,7 +2534,7 @@ pre.diff span {
 }
 
 .change-file .muted {
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 
 .change-row .num {
@@ -2564,7 +2589,7 @@ pre.diff span {
 .path-matches {
   display: grid;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .path-matches li {

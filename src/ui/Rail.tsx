@@ -4,6 +4,14 @@ import { tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
 import { SECTIONS } from "./sections/index.ts";
 
+export type TextSize = "smaller" | "default" | "larger";
+
+const TEXT_SIZES: Array<{ size: TextSize; label: string }> = [
+  { size: "smaller", label: "Smaller text" },
+  { size: "default", label: "Default text size" },
+  { size: "larger", label: "Larger text" },
+];
+
 interface Props {
   overview: Overview | null;
   /** The open directory; null for all directories, undefined when another page is open. */
@@ -13,6 +21,8 @@ interface Props {
   onOpen: (path: string | null) => void;
   onChanges: () => void;
   onToggleTheme: () => void;
+  textSize: TextSize;
+  onTextSize: (size: TextSize) => void;
 }
 
 function label(path: string, home: string): string {
@@ -27,6 +37,8 @@ export function Rail({
   onOpen,
   onChanges,
   onToggleTheme,
+  textSize,
+  onTextSize,
 }: Props) {
   const [query, setQuery] = useState("");
   const [showEphemeral, setShowEphemeral] = useState(false);
@@ -56,6 +68,21 @@ export function Rail({
       <div className="brand">
         <img src="/logo.png" width="26" height="26" alt="" />
         <span>ccdesk</span>
+        <fieldset className="segmented small text-size" aria-label="Text size">
+          {TEXT_SIZES.map(({ size, label }) => (
+            <button
+              key={size}
+              type="button"
+              className={size}
+              aria-label={label}
+              title={label}
+              aria-pressed={textSize === size}
+              onClick={() => onTextSize(size)}
+            >
+              A
+            </button>
+          ))}
+        </fieldset>
         <button
           type="button"
           className="icon-button"

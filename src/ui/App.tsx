@@ -4,7 +4,7 @@ import { ComparePage } from "./ComparePage.tsx";
 import { DirectoryPage } from "./DirectoryPage.tsx";
 import { OverviewPage } from "./OverviewPage.tsx";
 import { Palette } from "./Palette.tsx";
-import { Rail } from "./Rail.tsx";
+import { Rail, type TextSize } from "./Rail.tsx";
 import { buildRows } from "./sections/index.ts";
 import { Toast, type ToastMessage } from "./Toast.tsx";
 import { type SessionProfile } from "../shared/types.ts";
@@ -23,6 +23,9 @@ export function App() {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [jump, setJump] = useState<{ id: string } | null>(null);
   const [dark, setDark] = useState(isDark);
+  const [textSize, setTextSize] = useState<TextSize>(
+    () => (document.documentElement.dataset.textSize as TextSize | undefined) ?? "default"
+  );
   // Counts navigations, so a page opened again, or reached through history, rereads its lists' state.
   const [visit, setVisit] = useState(0);
 
@@ -80,6 +83,17 @@ export function App() {
     }
   };
 
+  const changeTextSize = (next: TextSize) => {
+    if (next === "default") delete document.documentElement.dataset.textSize;
+    else document.documentElement.dataset.textSize = next;
+    setTextSize(next);
+    try {
+      localStorage.setItem("ccdesk-text-size", next);
+    } catch {
+      // The size just won't persist.
+    }
+  };
+
   const clearToast = useCallback(() => setToast(null), []);
   const pickCompared = useCallback((dir: string) => setPalette({ compareFrom: dir }), []);
 
@@ -95,6 +109,8 @@ export function App() {
         onOpen={openDirectory}
         onChanges={() => open({ kind: "changes" })}
         onToggleTheme={toggleTheme}
+        textSize={textSize}
+        onTextSize={changeTextSize}
       />
       <main className="main">
         {config.overview.state === "error" ? (
