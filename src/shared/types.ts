@@ -579,11 +579,12 @@ export interface SettingsEditPreview {
   revision: string;
   /** The file is not laid out as ccdesk writes it (2-space JSON), so saving reformats it. */
   reformats: boolean;
-  /** Schema errors; when present nothing can be saved. */
+  /** Why the edit cannot be saved, such as schema errors; when present nothing can be saved. */
   errors: string[];
   /**
    * For a file ccdesk does not write itself (~/.claude.json): the Claude Code commands it runs
-   * instead, with secrets hidden. Such a change is not backed up or listed in Recent changes.
+   * instead, with secrets hidden. Such a change is listed in Recent changes with the commands that
+   * reverse it, but is not backed up and cannot be undone from ccdesk.
    */
   commands?: string[];
 }
