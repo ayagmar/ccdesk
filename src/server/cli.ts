@@ -1,14 +1,19 @@
 #!/usr/bin/env node
 import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createCore } from "../core/core.ts";
+import { type Core, createCore } from "../core/core.ts";
 import { type Command, HELP, parse, UsageError } from "./args.ts";
+import { explainText, scanJson } from "./commands.ts";
 import { openBrowser } from "../core/open.ts";
 import { scanEnvFromProcess } from "../core/scan/env.ts";
-import { type RunningServer, startServer } from "./start.ts";
 
 const DEV_TOKEN = "dev";
+
+function isFolder(path: string): boolean {
+  return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
+}
 
 async function main() {
   let command: Command;
@@ -25,14 +30,32 @@ async function main() {
     return;
   }
 
-  const { configDir, dev, port } = command;
-  if (configDir !== undefined && !statSync(configDir, { throwIfNoEntry: false })?.isDirectory()) {
+  const { configDir } = command;
+  if (configDir !== undefined && !isFolder(configDir)) {
     console.error(`ccdesk: --config-dir ${configDir} is not a folder`);
     process.exitCode = 2;
     return;
   }
   const core = createCore(scanEnvFromProcess(configDir));
-  let server: RunningServer;
+  if (command.command === "serve") return serve(core, command);
+
+  const dir = resolve(command.dir ?? ".");
+  if (!isFolder(dir)) {
+    console.error(`ccdesk: ${command.dir} is not a folder`);
+    process.exitCode = 2;
+    return;
+  }
+  console.log(
+    command.command === "scan"
+      ? await scanJson(core, dir)
+      : await explainText(core, dir, resolve(command.file))
+  );
+}
+
+async function serve(core: Core, { dev, port, open }: Extract<Command, { command: "serve" }>) {
+  // Loaded here so that the subcommands, which only read, never load the HTTP server.
+  const { startServer } = await import("./start.ts");
+  let server: Awaited<ReturnType<typeof startServer>>;
   try {
     server = await startServer({
       core,
@@ -60,7 +83,7 @@ async function main() {
     return;
   }
   console.log(`ccdesk is running at ${server.url}\nPress Ctrl+C to stop.`);
-  if (command.open && (await openBrowser(server.url, core.env)) !== null)
+  if (open && (await openBrowser(server.url, core.env)) !== null)
     console.log("Could not open a browser; open the URL above.");
 }
 

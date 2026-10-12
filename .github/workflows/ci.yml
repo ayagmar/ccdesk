@@ -44,7 +44,7 @@ jobs:
       - run: pnpm run schema && git diff --exit-code -- src/shared/settings.schema.json src/shared/hook-events.json
       # Install the packed tarball the way npx would, start it in an empty home and load the page
       # and its script, so a file missing from "files" fails here. Importing the package checks
-      # that its "exports" lead to the built core and view.
+      # that its "exports" lead to the built core and view. Then run scan and explain on a project.
       - name: Smoke test the package
         run: |
           npm pack --pack-destination "$RUNNER_TEMP"
@@ -60,3 +60,11 @@ jobs:
           url=$(grep -o 'http://[^ #]*' ccdesk.log) || { cat ccdesk.log; exit 1; }
           script=$(curl -fsS "$url" | grep -o 'src="[^"]*\.js"' | cut -d'"' -f2)
           curl -fsS -o /dev/null "${url%/}$script"
+          # The subcommands load the core only: they still run once the server's files are gone.
+          rm node_modules/ccdesk/dist/server/server.js node_modules/ccdesk/dist/server/start.js
+          mkdir -p "$HOME/app/.claude/rules"
+          printf -- '---\npaths: ["src/**"]\n---\nKeep it small.\n' > "$HOME/app/.claude/rules/src.md"
+          npx --no -- ccdesk scan "$HOME/app" --json > scan.json
+          node -e 'const view = JSON.parse(require("fs").readFileSync("scan.json", "utf8")); if (!view.exists || view.instructions.length === 0) process.exit(1)'
+          npx --no -- ccdesk explain "$HOME/app/src/a.ts" --dir "$HOME/app" | tee explain.txt
+          grep -q "path rule .*matches src/\*\*" explain.txt

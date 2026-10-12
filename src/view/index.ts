@@ -6,6 +6,7 @@ export { diffLines, withContext } from "./diff.ts";
 export { ago, type Formatter, formatter, plural, preview } from "./format.ts";
 export { LINES, type Line, lineName } from "./lines.ts";
 export { valueHere } from "./sections/catalog.ts";
+export { MATCH_KIND } from "./path-test.ts";
 export { buildRows, SECTIONS } from "./sections/index.ts";
 export { isSuggested, unused } from "./sections/permissions.ts";
 export { callsOf, outcome } from "./sections/tools.ts";

@@ -1,5 +1,6 @@
 import { type FormEvent, useId, useState } from "react";
 import { type ContextBlock, type DirectoryView, type PathTest } from "../shared/types.ts";
+import { MATCH_KIND } from "../view/path-test.ts";
 import { api } from "./api.ts";
 import { Bullet } from "./Bullet.tsx";
 import { relativeTo, tilde } from "./format.ts";
@@ -121,8 +122,6 @@ export function ContextView({ view }: { view: DirectoryView }) {
     </section>
   );
 }
-
-const MATCH_KIND = { rule: "path rule", skill: "skill", nested: "folder instructions" } as const;
 
 /** Which rules, skills and folder instructions join the session once Claude touches a file. */
 function PathTester({ view }: { view: DirectoryView }) {
