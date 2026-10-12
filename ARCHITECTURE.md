@@ -6,8 +6,9 @@ ccdesk is one npm package. `src/core` reads and writes Claude Code's configurati
 
 | Path | What it does |
 | --- | --- |
-| `src/server/cli.ts` | The `ccdesk` bin: parses the flags, builds a `ScanEnv` and a core, starts the server, opens the browser, and prints. |
-| `src/server/args.ts` | `parse(argv)`: the flags as a command, or a `UsageError` with the message to print. Reads no files. |
+| `src/server/cli.ts` | The `ccdesk` bin: parses the arguments, builds a `ScanEnv` and a core, then runs a subcommand or starts the server and opens the browser. It loads `start.ts`, and so the server, only to serve the page. |
+| `src/server/args.ts` | `parse(argv)`: the arguments as a command (`serve`, `scan`, `explain` or `help`), or a `UsageError` with the message to print. Reads no files. |
+| `src/server/commands.ts` | What `ccdesk scan --json` and `ccdesk explain` print. Imports only the core and `src/view`. |
 | `src/server/start.ts` | `startServer(options)`: serves a core on 127.0.0.1 and resolves `{ url, close }`. |
 | `src/server/server.ts` | The `/api/*` routes, each a call on the core it is given; the token, Host and Origin checks, security headers, and the built UI. Turns errors into status codes. |
 | `src/core/scan/` | Reads. `index.ts` has `scanOverview` and `scanDirectory`; the other files each read one part (settings, instructions, memory, MCP, plugins, permissions, tools, context, usage, compare, path-test). `env.ts` defines `ScanEnv`, `files.ts` reads files (never the credentials file) and `git.ts` asks git for roots, worktrees and what is tracked. |

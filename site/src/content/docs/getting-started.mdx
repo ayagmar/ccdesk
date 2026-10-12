@@ -31,18 +31,40 @@ The part after `#token=` is a key generated for this run. The page needs it to t
 ## Options
 
 ```
-npx ccdesk [options]
+npx ccdesk [options]                     Open the page in your browser
+npx ccdesk scan [dir] --json             Print what Claude Code loads in dir, as JSON
+npx ccdesk explain <file> [--dir <dir>]  Print what loads once Claude reads or edits file
 
   --port <n>            Port to listen on (default: a free port)
   --no-open             Print the URL instead of opening a browser
   --config-dir <path>   Claude folder to read, as CLAUDE_CONFIG_DIR sets it for Claude Code
                         (wins over $CLAUDE_CONFIG_DIR)
+  --dir <dir>           For explain: the folder the session starts in (default: the current one)
   -h, --help            Show this help
 ```
 
 With `--no-open`, copy the printed address into a browser yourself. If the port you ask for is taken, ccdesk says so and exits.
 
 If you keep several Claude Code profiles, `--config-dir ~/.claude-work` reads that one, as starting Claude Code with `CLAUDE_CONFIG_DIR=~/.claude-work` would. The flag wins over the variable.
+
+### Without the browser
+
+`ccdesk scan` prints, as JSON, everything the page shows for a directory: instruction files, settings layers and the values in effect, permissions, hooks, MCP servers, memory and problems. It reads the directory you run it from, or the one you name. A script or another tool can use it to ask what Claude Code loads there.
+
+```sh
+npx ccdesk scan ~/code/acme-api --json > acme.json
+```
+
+`ccdesk explain` is the [When Claude touches a file](../what-claude-sees/#when-claude-touches-a-file) check in the terminal: it lists the path rules, skills and folder instructions that join the session once Claude reads or edits a file. The session starts in the current directory, or in the one `--dir` names.
+
+```sh
+$ npx ccdesk explain src/api/users.ts
+Once Claude reads or edits src/api/users.ts in ~/code/acme-api, these load:
+  project  path rule            .claude/rules/api.md  matches src/api/**/*.ts
+  project  folder instructions  src/CLAUDE.md
+```
+
+Both only read: they write no file and keep no backup. Values the page hides, such as env values and headers, are hidden in their output too.
 
 ## What it reads
 

@@ -4,9 +4,7 @@ Ideas, not commitments: each one is something the code is already close to suppo
 
 ## On the command line
 
-**`ccdesk scan [dir] --json`** (S). Prints the `DirectoryView` that `scanDirectory` returns. Scripts and other tools could then ask what Claude Code loads in a directory without starting a browser. The view is already redacted, so the output carries no hidden values.
-
-**`ccdesk explain <file>`** (S). Prints what Claude Code adds to context once Claude reads or edits that file: the rules whose `paths` match, the skills, and the nested `CLAUDE.md` files. This is `testPath`, which the page's path test already uses, with a text format.
+`ccdesk scan [dir] --json` and `ccdesk explain <file>` are done (step 6 of the split plan). These would sit beside them.
 
 **`ccdesk check [dir]`** (S). Exits non-zero when the scan reports problems: files ccdesk could not read or parse, and above all the ones marked `blocksStart`, which stop Claude Code from starting. A repository could run it in CI to catch a broken `.claude/settings.json` or `.mcp.json` before anyone pulls it.
 
