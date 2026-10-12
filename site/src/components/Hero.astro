@@ -4,6 +4,7 @@
 import Default from "@astrojs/starlight/components/Hero.astro";
 import CommandCopy from "./CommandCopy.astro";
 import RouteStrip from "./RouteStrip.astro";
+import regions from "../assets/screenshots/regions.json";
 import Screenshot from "./Screenshot.astro";
 
 const base = import.meta.env.BASE_URL;
@@ -31,6 +32,7 @@ const landing = Astro.locals.starlightRoute.id === "";
   </div>
   <div class="strip">
     <h2>The load order, stop by stop</h2>
+    <p class="hint">Pick a stop to light up what it adds in the screenshot below.</p>
     <RouteStrip />
   </div>
 </section>
@@ -41,6 +43,7 @@ const landing = Astro.locals.starlightRoute.id === "";
   caption="A directory page in ccdesk. The project, settings and memories in these screenshots are made up."
   loading="eager"
   sizes="min(76rem, 100vw)"
+  regions={regions.directory}
 />
 )}
 
@@ -120,7 +123,7 @@ const landing = Astro.locals.starlightRoute.id === "";
   }
 
   .strip h2 {
-    margin: 0 0 0.75rem;
+    margin: 0;
     color: var(--ink);
     font-size: 0.9375rem;
     font-weight: 700;
@@ -145,6 +148,12 @@ const landing = Astro.locals.starlightRoute.id === "";
     :global(.lead + .shot img) {
       animation: none;
     }
+  }
+
+  .hint {
+    margin: 0.25rem 0 0.75rem;
+    color: var(--muted);
+    font-size: 0.875rem;
   }
 
   @media (max-width: 64rem) {

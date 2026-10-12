@@ -7,10 +7,10 @@
 // CHROMIUM_PATH picks the browser binary; without it Playwright's own download is used
 // (`pnpm exec playwright-core install chromium`).
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chromium, type Page } from "playwright-core";
+import { chromium, type Locator, type Page } from "playwright-core";
 import sharp from "sharp";
 import { makeDemoHome } from "./demo-home.ts";
 
@@ -28,6 +28,19 @@ interface Shot {
   query?: string;
   /** Capture only this element, such as the inspector, cut to at most `height` pixels. */
   only?: string;
+  /** Also record where each scope's rows are, for the landing page's tour of this shot. */
+  regions?: true;
+}
+
+/** A close crop of what answers one of the landing page's questions. */
+interface Crop {
+  name: string;
+  query?: string;
+  /** Window width; a narrower window keeps a wide table's text readable. */
+  width?: number;
+  /** Gets the page ready and returns a row, framed with the rows around it, or an element, cut off
+   * after `until` when that is given. */
+  target: (page: Page) => Promise<{ row: Locator } | { element: Locator; until?: Locator }>;
 }
 
 const pause = (page: Page) => page.waitForTimeout(400);
@@ -59,8 +72,23 @@ const reviewSetting = (key: string, value: string) => async (page: Page) => {
   await pause(page);
 };
 
+/** Presses a section's number key and selects the first row there with `text`. */
+const rowIn = (key: string, title: string, text: string) => async (page: Page) => {
+  await page.keyboard.press(key);
+  await pause(page);
+  const row = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: title, exact: true }) })
+    .getByRole("row")
+    .filter({ hasText: text })
+    .first();
+  await row.click();
+  await pause(page);
+  return { row };
+};
+
 const SHOTS: Shot[] = [
-  { name: "directory", width: 1600, height: 1000 },
+  { name: "directory", width: 1600, height: 1000, regions: true },
   {
     name: "review",
     width: 1600,
@@ -109,6 +137,87 @@ const SHOTS: Shot[] = [
   },
   { name: "phone", width: 390, height: 844 },
 ];
+
+// One per question on the landing page, named by the question's id there.
+const CROPS: Crop[] = [
+  { name: "ask-push", target: rowIn("3", "Permissions", "git push") },
+  { name: "model", target: rowIn("2", "Settings", "model") },
+  { name: "agents-md", target: rowIn("1", "Instructions", "AGENTS.md") },
+  {
+    name: "context",
+    target: async (page) => {
+      await page.getByRole("button", { name: "What Claude sees" }).click();
+      await pause(page);
+      return {
+        element: page.locator("section.context"),
+        until: page.locator(".context-list > li").nth(4),
+      };
+    },
+  },
+  { name: "unused-allow", target: rowIn("3", "Permissions", "git diff") },
+  { name: "suggested", target: rowIn("3", "Permissions", "suggested") },
+  { name: "mcp-waiting", target: rowIn("7", "MCP servers", "sentry") },
+  {
+    name: "shared-memory",
+    query: "?all",
+    width: 1000,
+    target: async (page) => ({
+      element: page.locator("section").filter({ has: page.locator("#h-shared") }),
+    }),
+  },
+];
+
+/** The part of the page to keep for a crop: a row with two rows either side, or an element. */
+async function cropBox(target: { row: Locator } | { element: Locator; until?: Locator }) {
+  if ("element" in target) {
+    await target.element.scrollIntoViewIfNeeded();
+    const box = await target.element.boundingBox();
+    const until = target.until && (await target.until.boundingBox());
+    if (!box) throw new Error("The crop's element is not on the page.");
+    return until ? { ...box, height: until.y + until.height - box.y } : box;
+  }
+  await target.row.scrollIntoViewIfNeeded();
+  const row = await target.row.boundingBox();
+  const table = await target.row.locator("xpath=ancestor::table[1]").boundingBox();
+  if (!row || !table) throw new Error("The crop's row is not on the page.");
+  // Rows are one height, so two either side end on row edges, without slivers of the next ones.
+  const top = Math.max(table.y, row.y - 2 * row.height);
+  const bottom = Math.min(table.y + table.height, row.y + 3 * row.height);
+  return { x: table.x - 12, y: top, width: table.width + 24, height: bottom - top };
+}
+
+/**
+ * Where each scope shows on the page, as fractions of the viewport: the app's own route stop and
+ * the main column's rows with that scope's bullet. The landing page highlights them on the shot.
+ */
+function regionsOf(page: Page) {
+  return page.evaluate(() => {
+    const lines = ["managed", "user", "project", "local", "memory", "plugin"];
+    const round = (n: number) => Math.round(n * 10000) / 10000;
+    const parts = [...document.querySelectorAll(".route-stops li, tbody tr")].filter(
+      (e) => !e.closest("aside")
+    );
+    return Object.fromEntries(
+      lines.map((line) => [
+        line,
+        parts
+          .filter((e) => e.querySelector(`.bullet-${line}`))
+          .map((e) => e.getBoundingClientRect())
+          .filter((r) => r.bottom > 0 && r.top < innerHeight)
+          .map((r) => {
+            const top = Math.max(r.top, 0);
+            const bottom = Math.min(r.bottom, innerHeight);
+            return [
+              r.left / innerWidth,
+              top / innerHeight,
+              r.width / innerWidth,
+              (bottom - top) / innerHeight,
+            ].map(round);
+          }),
+      ])
+    );
+  });
+}
 
 /** Saves a setting change and deletes a memory, so Recent changes has something to list. */
 async function makeChanges(page: Page) {
@@ -170,6 +279,7 @@ async function main() {
         await page.waitForTimeout(800);
         return page;
       };
+      const regions: Record<string, unknown> = {};
       const first = await open(SHOTS[0] as Shot, "light");
       await makeChanges(first);
       await first.close();
@@ -185,10 +295,29 @@ async function main() {
             .resize({ width: Math.min((box?.width ?? shot.width) * 2, 2400) })
             .webp({ quality: 88 })
             .toFile(join(OUT, `${shot.name}-${theme}.webp`));
+          if (shot.regions && theme === "light") regions[shot.name] = await regionsOf(page);
           await page.close();
           console.log(`${shot.name}-${theme}.webp`);
         }
+        for (const crop of CROPS) {
+          const page = await open(
+            {
+              name: crop.name,
+              width: crop.width ?? 1600,
+              height: 1000,
+              ...(crop.query ? { query: crop.query } : {}),
+            },
+            theme
+          );
+          const clip = await cropBox(await crop.target(page));
+          await sharp(await page.screenshot({ clip }))
+            .webp({ quality: 88 })
+            .toFile(join(OUT, `answer-${crop.name}-${theme}.webp`));
+          await page.close();
+          console.log(`answer-${crop.name}-${theme}.webp`);
+        }
       }
+      writeFileSync(join(OUT, "regions.json"), `${JSON.stringify(regions, null, 2)}\n`);
     } finally {
       await browser.close();
       ccdesk.stop();

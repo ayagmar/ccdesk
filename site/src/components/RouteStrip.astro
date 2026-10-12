@@ -105,8 +105,24 @@ const first = "project";
 <script>
   for (const route of document.querySelectorAll<HTMLElement>("[data-route]")) {
     const stops = [...route.querySelectorAll<HTMLButtonElement>("[data-stop]")];
+    // Tells the page which stop is being looked at, so a screenshot can light up its rows: the one
+    // under the pointer or focus, else the one you picked. Nothing until you pick or point at one.
+    let picked: string | null = null;
+    const announce = (scope: string | null) =>
+      route.dispatchEvent(new CustomEvent("route-stop", { detail: scope, bubbles: true }));
+    route.addEventListener("pointerleave", () => announce(picked));
+    route.addEventListener("focusout", (event) => {
+      if (!route.contains(event.relatedTarget as Node | null)) announce(picked);
+    });
     for (const stop of stops) {
+      const scope = stop.dataset.stop ?? null;
+      stop.addEventListener("pointerenter", (event) => {
+        if (event.pointerType === "mouse") announce(scope);
+      });
+      stop.addEventListener("focus", () => announce(scope));
       stop.addEventListener("click", () => {
+        picked = scope;
+        announce(scope);
         for (const other of stops) {
           const on = other === stop;
           other.setAttribute("aria-pressed", String(on));
@@ -244,7 +260,7 @@ const first = "project";
     margin-top: 0.75rem;
     padding-top: 0.75rem;
     border-top: 1px solid var(--rule);
-    min-height: 4.5rem;
+    min-height: 6.25rem;
   }
 
   .who {

@@ -14,6 +14,11 @@ interface Props {
   loading?: "lazy" | "eager";
   /** How wide it shows; by default the docs column, at most 46rem beside the sidebar. */
   sizes?: string;
+  /**
+   * Where each scope's rows are, as [x, y, width, height] fractions of the shot. A route strip on
+   * the page lights them up: everything else dims and the rows get their scope's colour.
+   */
+  regions?: Record<string, number[][]>;
 }
 
 const shots = import.meta.glob<{ default: ImageMetadata }>("../assets/screenshots/*.webp", {
@@ -26,6 +31,7 @@ const {
   width = 1600,
   loading = "lazy",
   sizes = `(min-width: 50rem) min(${width}px, 46rem), min(${width}px, 100vw)`,
+  regions,
 } = Astro.props;
 const find = (theme: string) => {
   const shot = shots[`../assets/screenshots/${name}-${theme}.webp`];
@@ -41,6 +47,7 @@ const full = {
 ---
 
 <figure class="shot" style={`max-width: ${width}px`}>
+  <div class="frame" data-tour-frame={regions ? "" : undefined}>
   {
     (["light", "dark"] as const).map((theme) => (
       <a class={theme} href={full[theme]} title="View full size">
@@ -56,10 +63,51 @@ const full = {
       </a>
     ))
   }
+  {
+    regions && (
+      <svg class="tour" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          {Object.entries(regions).map(([scope, boxes]) => (
+            <mask id={`tour-${name}-${scope}`}>
+              <rect width="1" height="1" fill="white" />
+              {boxes.map(([x, y, w, h]) => (
+                <rect x={x} y={y} width={w} height={h} fill="black" />
+              ))}
+            </mask>
+          ))}
+        </defs>
+        {Object.entries(regions).map(([scope, boxes]) => (
+          <g data-scope={scope}>
+            <rect class="dim" width="1" height="1" mask={`url(#tour-${name}-${scope})`} />
+            {boxes.map(([x, y, w, h]) => (
+              <rect
+                class={`ring line-${scope}`}
+                x={x}
+                y={y}
+                width={w}
+                height={h}
+                vector-effect="non-scaling-stroke"
+              />
+            ))}
+          </g>
+        ))}
+      </svg>
+    )
+  }
+  </div>
   {caption && <figcaption>{caption}</figcaption>}
 </figure>
 
 <script>
+  // A route strip announces the stop being looked at; a shot with regions lights up its rows.
+  document.addEventListener("route-stop", (event) => {
+    const scope = (event as CustomEvent<string | null>).detail;
+    for (const frame of document.querySelectorAll<HTMLElement>("[data-tour-frame]")) {
+      if (scope) frame.dataset.tour = scope;
+      else delete frame.dataset.tour;
+    }
+  });
+
   // One viewer for the page. It opens on the image already shown, grown from where it sits,
   // and swaps in the full-size file once that has loaded.
   const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";

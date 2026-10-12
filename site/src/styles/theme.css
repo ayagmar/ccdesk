@@ -309,3 +309,60 @@ h1#_top {
 .social-icons a:hover {
   color: var(--muted);
 }
+
+/* The tour on a screenshot with regions: the chosen scope's rows stay lit, the rest dims. */
+.shot .frame {
+  position: relative;
+}
+
+.tour {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.tour g {
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.tour .dim {
+  fill: var(--paper);
+  opacity: 0.62;
+}
+
+.tour .ring {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+}
+
+.tour .line-managed {
+  --line: var(--line-managed);
+}
+.tour .line-user {
+  --line: var(--line-user);
+}
+.tour .line-project {
+  --line: var(--line-project);
+}
+.tour .line-local {
+  --line: var(--line-local);
+}
+.tour .line-memory {
+  --line: var(--line-memory);
+}
+.tour .line-plugin {
+  --line: var(--line-plugin);
+}
+
+.frame[data-tour="managed"] .tour [data-scope="managed"],
+.frame[data-tour="user"] .tour [data-scope="user"],
+.frame[data-tour="project"] .tour [data-scope="project"],
+.frame[data-tour="local"] .tour [data-scope="local"],
+.frame[data-tour="memory"] .tour [data-scope="memory"],
+.frame[data-tour="plugin"] .tour [data-scope="plugin"] {
+  opacity: 1;
+}
