@@ -1,0 +1,195 @@
+{
+  "title": "Choose the visual world for ccdesk",
+  "question": "The roll assigned the Swiss rail timetable. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Timetable & Line Map",
+      "kicker": "THE ROLL",
+      "lineage": "Swiss rail timetables and route strip maps",
+      "thesis": "Every directory is a line: config loads stop by stop, and every value carries the line bullet of the file it came from.",
+      "palette": ["#fbfbf7", "#141414", "#0072b2", "#009e73", "#e69f00", "#cc79a7", "#d55e00"],
+      "materials": ["timetable columns", "flat line colours", "route bullets G P L M"],
+      "viewport": "Left rail of directories; across the top, the current repo's route strip (Global → parent → Project → Local → Memory) with counts at each stop; below, a timetable-ruled table of everything loaded here; right, the raw file with its path.",
+      "risk": "Line colours must stay legible for colour-blind users (you use dark-daltonized), so every colour also carries a letter bullet.",
+      "raised": [
+        {
+          "from": "challenger-ikeda",
+          "raise": "Every key, path and count sits in tabular monospace columns, aligned to the character."
+        },
+        {
+          "from": "challenger-crouwel",
+          "raise": "One strict row grid: every row in every table has the same height, so the page reflows by whole rows."
+        },
+        {
+          "from": "challenger-folio",
+          "raise": "Settings compare view registers User, Project, Local and Managed as aligned columns on one baseline."
+        },
+        {
+          "from": "challenger-doujin",
+          "raise": "The route strip and the list are one space: click a stop to jump to its rows, select a row to light its stop."
+        },
+        {
+          "from": "challenger-zoo",
+          "raise": "Line colours stay flat and unmodulated: no gradients, glows or tints."
+        }
+      ],
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "directories", "x": 0, "y": 0, "w": 2, "h": 10 },
+          { "label": "route strip G → P → L → M", "x": 2, "y": 0, "w": 10, "h": 2, "accent": true },
+          {
+            "label": "timetable: kind · name · value · line · file",
+            "x": 2,
+            "y": 2,
+            "w": 6,
+            "h": 8
+          },
+          { "label": "raw file + path", "x": 8, "y": 2, "w": 4, "h": 8 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/assigned.webp"
+    },
+    {
+      "id": "model-pick",
+      "kicker": "IMPECCABLE’S PICK",
+      "label": "Tracing-Paper Overlays",
+      "lineage": "architectural drafting overlays",
+      "thesis": "Config as stacked drafting sheets: each layer is a translucent sheet, and what Claude sees is the composite.",
+      "palette": ["#f4f6f3", "#1d2a2f", "#2f6f8f", "#c8553d", "#8aa39b"],
+      "materials": ["drafting film", "registration marks", "hairline linework"],
+      "viewport": "Same shell; the main pane shows the composite, and a layer slider peels sheets away to show what each file contributes.",
+      "risk": "Translucent layering fights density and can turn into a costume on a working screen.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "directories", "x": 0, "y": 0, "w": 2, "h": 10 },
+          { "label": "layer peel control", "x": 2, "y": 0, "w": 10, "h": 1, "accent": true },
+          { "label": "composite view", "x": 2, "y": 1, "w": 7, "h": 9 },
+          { "label": "layer list", "x": 9, "y": 1, "w": 3, "h": 9 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/model-pick.webp"
+    },
+    {
+      "id": "challenger-japanese",
+      "label": "High-Density Modules",
+      "verdict": "competitive",
+      "lineage": "Japanese high-density web",
+      "thesis": "Dozens of small ruled modules, each a config source with a coloured tab, packed with no wasted pixel.",
+      "palette": ["#ffffff", "#111111", "#d7261e", "#c9ccd1", "#eef0f3"],
+      "materials": ["hairline module borders", "small header tabs", "compact gothic sans"],
+      "viewport": "A mosaic of modules for the current repo (instructions, settings, hooks, MCP, agents, skills, memory), each with a tab and dense rows.",
+      "case": "Holds product clarity on density, which you asked for; loses on showing load order, since modules have no sequence.",
+      "risk": "Without a load-order spine, 'what wins' becomes guesswork.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "nav rail", "x": 0, "y": 0, "w": 2, "h": 10 },
+          { "label": "instructions", "x": 2, "y": 0, "w": 5, "h": 4, "accent": true },
+          { "label": "settings", "x": 7, "y": 0, "w": 5, "h": 4 },
+          { "label": "memory", "x": 2, "y": 4, "w": 4, "h": 6 },
+          { "label": "hooks · MCP", "x": 6, "y": 4, "w": 3, "h": 6 },
+          { "label": "agents · skills", "x": 9, "y": 4, "w": 3, "h": 6 }
+        ]
+      },
+      "hero": "https://impeccable.style/worlds/cards/japanese-high-density-web-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/japanese-high-density-web.webp"
+    },
+    {
+      "id": "challenger-ikeda",
+      "label": "Datamatics Field",
+      "verdict": "declined",
+      "lineage": "Ryoji Ikeda data fields",
+      "thesis": "Pure black and white monospace data field.",
+      "palette": ["#000000", "#ffffff"],
+      "materials": ["hairline bars", "monospace numerics"],
+      "viewport": "Config as columns of monospace data.",
+      "risk": "No colour means no way to show which scope a value comes from.",
+      "case": "Loses on clarity: scope colour is the product.",
+      "kept": "Tabular monospace alignment for every key, path and count.",
+      "hero": "https://impeccable.style/worlds/cards/ikeda-datamatics-hero.webp"
+    },
+    {
+      "id": "challenger-crouwel",
+      "label": "Grid Specimen",
+      "verdict": "declined",
+      "lineage": "Wim Crouwel grid posters",
+      "thesis": "A visible construction grid as the armature.",
+      "palette": ["#ffffff", "#1a1a1a", "#3d6fd8"],
+      "materials": ["graph-paper grid", "grid-built letterforms"],
+      "viewport": "Config laid on a visible cell grid.",
+      "risk": "Monumental type wastes the density you need.",
+      "case": "Loses both axes for a working screen.",
+      "kept": "Whole-row grid: equal row heights, reflow by whole rows.",
+      "hero": "https://impeccable.style/worlds/cards/crouwel-grid-specimen-hero.webp"
+    },
+    {
+      "id": "challenger-folio",
+      "label": "Botanical Folio",
+      "verdict": "declined",
+      "lineage": "seasonal botanical plates",
+      "thesis": "The same subject registered across fixed plates.",
+      "palette": ["#f3ecdc", "#4f6b3a", "#b8322a"],
+      "materials": ["engraved plates", "sepia rules"],
+      "viewport": "Each layer as a plate on one baseline.",
+      "risk": "Cream-and-serif is a stock AI look and far from developer culture.",
+      "case": "Loses both axes.",
+      "kept": "Registered side-by-side comparison of the same setting across layers.",
+      "hero": "https://impeccable.style/worlds/cards/editorial-sequence-montage-botanical-folio-season-hero.webp"
+    },
+    {
+      "id": "challenger-doujin",
+      "label": "Convention Catalog",
+      "verdict": "declined",
+      "lineage": "doujin event catalogs",
+      "thesis": "A packed numbered grid keyed to a hall map.",
+      "palette": ["#e9e6dc", "#1b1b1b", "#2a7fd4"],
+      "materials": ["newsprint", "biro circles"],
+      "viewport": "Projects as stamp-sized cells keyed to a map.",
+      "risk": "Thumbnails have nothing to show for text config.",
+      "case": "Loses both axes.",
+      "kept": "Map and list are one space, deep-linked both ways.",
+      "hero": "https://impeccable.style/worlds/cards/pop-culture-shelf-doujin-event-catalog-hero.webp"
+    },
+    {
+      "id": "challenger-zoo",
+      "label": "Guide Map Lobes",
+      "verdict": "declined",
+      "lineage": "zoo and gardens guide maps",
+      "thesis": "Flat colour lobes divided by coastline.",
+      "palette": ["#f5f1e4", "#8ed462", "#ff705d", "#2ba0ff"],
+      "materials": ["flat colour", "SVG coastlines"],
+      "viewport": "One swelling lobe per screen.",
+      "risk": "Playful morphing fights a dense working tool.",
+      "case": "Loses both axes.",
+      "kept": "Flat, unmodulated colour with total commitment.",
+      "hero": "https://impeccable.style/worlds/cards/aww2-zoo-gardens-guide-map-hero.webp"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "buildPath": { "value": "code", "toggle": false },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A developer dashboard done well: sidebar, cards, one accent colour.",
+    "palette": ["#0f1115", "#e6e8eb", "#7c5cff"],
+    "materials": ["shadcn-style components", "stat cards"],
+    "viewport": "Sidebar of projects, stat cards on top, tabs for instructions, settings and memory.",
+    "risk": "Looks like every dev dashboard, which you said would feel wrong.",
+    "wireframe": {
+      "cols": 12,
+      "rows": 10,
+      "regions": [
+        { "label": "sidebar", "x": 0, "y": 0, "w": 2, "h": 10 },
+        { "label": "stat cards", "x": 2, "y": 0, "w": 10, "h": 2 },
+        { "label": "tabs + content", "x": 2, "y": 2, "w": 10, "h": 8 }
+      ]
+    }
+  },
+  "steer": true
+}

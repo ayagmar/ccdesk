@@ -1,0 +1,455 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-10T00:00:00Z",
+  "title": "Design System: ccdesk",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "primary",
+        "displayName": "Timetable Ink",
+        "canonical": "#141414",
+        "dark": "board-ink"
+      },
+      "board-ink": {
+        "role": "primary",
+        "displayName": "Warm Board White",
+        "canonical": "#ece8de",
+        "theme": "dark"
+      },
+      "line-managed": {
+        "role": "scope",
+        "displayName": "Managed line (M)",
+        "canonical": "#b84f00",
+        "onColor": "#ffffff",
+        "dark": "board-line-managed"
+      },
+      "line-user": {
+        "role": "scope",
+        "displayName": "User line (U)",
+        "canonical": "#0072b2",
+        "onColor": "#ffffff",
+        "dark": "board-line-user"
+      },
+      "line-project": {
+        "role": "scope",
+        "displayName": "Project line (P)",
+        "canonical": "#007a5a",
+        "onColor": "#ffffff",
+        "dark": "board-line-project"
+      },
+      "line-local": {
+        "role": "scope",
+        "displayName": "Local line (L)",
+        "canonical": "#e69f00",
+        "onColor": "#141414",
+        "dark": "board-line-local"
+      },
+      "line-memory": {
+        "role": "scope",
+        "displayName": "Auto memory line (A)",
+        "canonical": "#cc79a7",
+        "onColor": "#141414",
+        "dark": "board-line-memory"
+      },
+      "line-plugin": {
+        "role": "scope",
+        "displayName": "Plugin line (X)",
+        "canonical": "#5f5f5a",
+        "onColor": "#ffffff",
+        "dark": "board-line-plugin"
+      },
+      "board-line-managed": {
+        "role": "scope",
+        "displayName": "Managed line on the board",
+        "canonical": "#ff7a3d",
+        "onColor": "#131312",
+        "theme": "dark"
+      },
+      "board-line-user": {
+        "role": "scope",
+        "displayName": "User line on the board",
+        "canonical": "#4aa8e8",
+        "onColor": "#131312",
+        "theme": "dark"
+      },
+      "board-line-project": {
+        "role": "scope",
+        "displayName": "Project line on the board",
+        "canonical": "#2fbf8f",
+        "onColor": "#131312",
+        "theme": "dark"
+      },
+      "board-line-local": {
+        "role": "scope",
+        "displayName": "Local line on the board",
+        "canonical": "#f2b233",
+        "onColor": "#141414",
+        "theme": "dark"
+      },
+      "board-line-memory": {
+        "role": "scope",
+        "displayName": "Auto memory line on the board",
+        "canonical": "#e391bd",
+        "onColor": "#141414",
+        "theme": "dark"
+      },
+      "board-line-plugin": {
+        "role": "scope",
+        "displayName": "Plugin line on the board",
+        "canonical": "#8d95a5",
+        "onColor": "#131312",
+        "theme": "dark"
+      },
+      "ok": {
+        "role": "state",
+        "displayName": "Loaded / Committed Green",
+        "canonical": "#1d6b47",
+        "dark": "board-ok"
+      },
+      "warn": {
+        "role": "state",
+        "displayName": "Untracked Amber",
+        "canonical": "#8a5a00",
+        "dark": "#f2c14e"
+      },
+      "bad": {
+        "role": "state",
+        "displayName": "Fault Red",
+        "canonical": "#a3361c",
+        "dark": "board-bad"
+      },
+      "focus": {
+        "role": "state",
+        "displayName": "Focus Blue",
+        "canonical": "#0072b2",
+        "dark": "board-focus"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Timetable Paper",
+        "canonical": "#fbfbf7",
+        "dark": "board"
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Panel White",
+        "canonical": "#ffffff",
+        "dark": "board-panel"
+      },
+      "sunk": {
+        "role": "neutral",
+        "displayName": "Sunk Paper",
+        "canonical": "#f1f0ea",
+        "dark": "board-sunk"
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "Hover Paper",
+        "canonical": "#f4f3ec",
+        "dark": "board-hover"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#dcdad1",
+        "dark": "board-rule"
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Second Ink",
+        "canonical": "#4a4a45",
+        "dark": "board-ink-2"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#6b6a63",
+        "dark": "board-muted"
+      },
+      "selection": {
+        "role": "neutral",
+        "displayName": "Selection Cream",
+        "canonical": "#fff3c4",
+        "dark": "board-selection"
+      }
+    },
+    "themes": [
+      {
+        "name": "light",
+        "displayName": "Timetable paper",
+        "selector": ":root, :root[data-theme=\"light\"]"
+      },
+      {
+        "name": "dark",
+        "displayName": "Departure board",
+        "selector": ":root[data-theme=\"dark\"], or prefers-color-scheme: dark without data-theme=\"light\""
+      }
+    ],
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Full-page titles such as All directories."
+      },
+      "headline": {
+        "displayName": "Directory path",
+        "purpose": "The current directory path at the top of the workspace, set in mono."
+      },
+      "title": {
+        "displayName": "Section title",
+        "purpose": "Timetable section names; 16px in the inspector head, 13px for inspector sub-heads."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Interface text and timetable cells, tabular figures on."
+      },
+      "prose": {
+        "displayName": "Prose",
+        "purpose": "Rendered markdown in the inspector, max 68ch, inner headings capped at 14px."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Column heads and rail group names in muted ink, sentence case."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Paths, keys, values, hook commands, raw file contents."
+      },
+      "mono-count": {
+        "displayName": "Mono count",
+        "purpose": "Counts, stop facts, relative times."
+      },
+      "bullet": {
+        "displayName": "Bullet letter",
+        "purpose": "Scope letter inside a route bullet; 10.5px at table size."
+      }
+    },
+    "rules": [
+      {
+        "name": "section-rule",
+        "value": "2px solid ink",
+        "purpose": "Opens every timetable section, the route strip, the inspector head, the diff review."
+      },
+      {
+        "name": "hairline",
+        "value": "1px solid rule",
+        "purpose": "Row dividers and control borders."
+      },
+      {
+        "name": "column-head-rule",
+        "value": "1px solid ink",
+        "purpose": "Underline of timetable column heads."
+      },
+      {
+        "name": "route-line",
+        "value": "3px ink",
+        "purpose": "The line drawn through route-strip stops."
+      }
+    ],
+    "shadows": [
+      {
+        "name": "palette-lift",
+        "value": "0 18px 48px -12px rgb(0 0 0 / 0.35)",
+        "purpose": "Command palette over a 55% paper scrim."
+      },
+      {
+        "name": "toast-lift",
+        "value": "0 12px 32px -10px rgb(0 0 0 / 0.4)",
+        "purpose": "Undo toast."
+      },
+      {
+        "name": "drawer-edge",
+        "value": "-16px 0 40px -16px rgb(0 0 0 / 0.35)",
+        "purpose": "Inspector as an overlay drawer at 1180px and below."
+      },
+      {
+        "name": "lit-stop-ring",
+        "value": "0 0 0 2px var(--paper), 0 0 0 4px var(--ink)",
+        "purpose": "Ring around the route-strip bullet of the selected row's scope; a highlight, not elevation."
+      }
+    ],
+    "focus": {
+      "value": "outline: 2px solid var(--focus); outline-offset: 2px",
+      "purpose": "Global focus-visible ring; editor fields use offset -1px."
+    },
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "All entrances and highlights."
+      },
+      { "name": "bullet-ring", "value": "160ms", "purpose": "Lit-stop ring transition." },
+      {
+        "name": "palette-rise",
+        "value": "180ms, 6px rise with fade",
+        "purpose": "Command palette entrance."
+      },
+      { "name": "toast-rise", "value": "220ms, 6px rise with fade", "purpose": "Toast entrance." },
+      {
+        "name": "loading-travel",
+        "value": "1.2s cubic-bezier(0.65, 0, 0.35, 1) infinite",
+        "purpose": "Ink segment travelling along the loading line."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation and transition none",
+        "purpose": "prefers-reduced-motion switches every animation off."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide-compact",
+        "value": "1181px to 1400px",
+        "purpose": "Rail 220px, inspector 360px, Instructions Lines column dropped."
+      },
+      {
+        "name": "drawer",
+        "value": "max-width 1180px",
+        "purpose": "Inspector becomes a right-edge overlay drawer; hidden when empty."
+      },
+      {
+        "name": "narrow",
+        "value": "max-width 760px",
+        "purpose": "Rail stacks on top (max 34vh), 16px gutters, vertical route strip, reduced columns, non-sticky column heads, palette button hidden."
+      }
+    ],
+    "memoryTypeShapes": [
+      { "type": "user", "shape": "circle" },
+      { "type": "feedback", "shape": "triangle" },
+      { "type": "project", "shape": "square" },
+      { "type": "reference", "shape": "diamond (square rotated 45deg, scaled 0.85)" },
+      { "type": "unknown", "shape": "hollow square outlined 1.5px in muted ink" }
+    ],
+    "icons": {
+      "grid": "16px",
+      "stroke": "1.5px",
+      "caps": "round",
+      "joins": "round",
+      "color": "currentColor"
+    }
+  },
+  "components": [
+    {
+      "name": "Route Strip",
+      "kind": "custom",
+      "refersTo": "bullet",
+      "description": "Signature element: the directory's load order drawn as a line of stops with bullets, names and mono facts; idle stops are hollow; clicking a stop filters the timetable.",
+      "html": "<ol class=\"ds-route\"><li><span class=\"ds-bullet ds-hollow\" style=\"--b:#b84f00\">M</span><b class=\"ds-idle\">Managed</b><span class=\"ds-facts\">nothing here</span></li><li class=\"ds-lit\"><span class=\"ds-bullet\" style=\"--b:#0072b2\">U</span><b>User</b><span class=\"ds-facts\">2 files · 3 settings</span></li><li><span class=\"ds-bullet\" style=\"--b:#007a5a\">P</span><b>Project</b><span class=\"ds-facts\">1 file · 2 skipped</span></li><li><span class=\"ds-bullet\" style=\"--b:#e69f00;--i:#141414\">L</span><b>Local</b><span class=\"ds-facts\">1 setting</span></li><li><span class=\"ds-bullet\" style=\"--b:#cc79a7;--i:#141414\">A</span><b>Auto memory</b><span class=\"ds-facts\">5 memories</span></li></ol>",
+      "css": ".ds-route{list-style:none;margin:0;padding:0;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;position:relative;border-top:2px solid #141414;border-bottom:1px solid #dcdad1;background:#fbfbf7;font-family:'Hanken Grotesk Variable',Helvetica,Arial,sans-serif;color:#141414}.ds-route::before{content:'';position:absolute;left:22px;right:22px;top:25px;height:3px;background:#141414}.ds-route li{display:grid;grid-template-rows:22px auto auto;gap:4px;padding:14px 8px 12px}.ds-route b{font-size:13.5px;font-weight:700}.ds-route b.ds-idle{color:#6b6a63;font-weight:500}.ds-facts{font-family:'JetBrains Mono Variable',monospace;font-size:11.5px;color:#6b6a63}.ds-bullet{position:relative;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:999px;font:700 11.5px/1 'Hanken Grotesk Variable',sans-serif;background:var(--b);color:var(--i,#fff);border:2px solid var(--b);box-sizing:border-box}.ds-bullet.ds-hollow{background:#fbfbf7;color:var(--b)}.ds-lit .ds-bullet{box-shadow:0 0 0 2px #fbfbf7,0 0 0 4px #141414}"
+    },
+    {
+      "name": "Timetable",
+      "kind": "custom",
+      "refersTo": "timetable-row",
+      "description": "Section opened by a 2px ink rule; 32px rows with bullet, mono name, value and state words; selected row in selection cream.",
+      "html": "<section class=\"ds-tt\"><h2>Settings <span>4</span></h2><table><thead><tr><th></th><th>Key</th><th>Value</th><th>Beat</th></tr></thead><tbody><tr><td><span class=\"ds-b\" style=\"--b:#e69f00;--i:#141414\">L</span></td><td class=\"m\">model</td><td class=\"m v\">haiku</td><td class=\"m\"><s>sonnet</s></td></tr><tr class=\"sel\"><td><span class=\"ds-b\" style=\"--b:#0072b2\">U</span></td><td class=\"m\"><b>theme</b></td><td class=\"m v\">dark</td><td></td></tr></tbody></table></section>",
+      "css": ".ds-tt{font:14px/1.45 'Hanken Grotesk Variable',Helvetica,Arial,sans-serif;color:#141414;background:#fbfbf7;font-variant-numeric:tabular-nums}.ds-tt h2{margin:0;border-top:2px solid #141414;padding:8px 0 6px;font-size:15px;font-weight:700}.ds-tt h2 span{font:12px 'JetBrains Mono Variable',monospace;color:#6b6a63;margin-left:8px}.ds-tt table{width:100%;border-collapse:collapse}.ds-tt th{text-align:left;font-size:12px;font-weight:600;color:#6b6a63;height:26px;padding:0 8px;border-bottom:1px solid #141414}.ds-tt td{height:32px;padding:0 8px;border-bottom:1px solid #dcdad1}.ds-tt .m{font-family:'JetBrains Mono Variable',monospace;font-size:12.5px}.ds-tt .v{color:#4a4a45}.ds-tt s{color:#6b6a63}.ds-tt tr.sel td{background:#fff3c4}.ds-b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:999px;font:700 10.5px/1 'Hanken Grotesk Variable',sans-serif;background:var(--b);color:var(--i,#fff)}"
+    },
+    {
+      "name": "Buttons",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary ink fill, secondary panel with hairline, quiet danger in fault red text.",
+      "html": "<div class=\"ds-btns\"><button class=\"p\">Review change</button><button>Remove from this file</button><button class=\"qd\">Delete memory</button></div>",
+      "css": ".ds-btns{display:flex;gap:8px;font-family:'Hanken Grotesk Variable',Helvetica,Arial,sans-serif}.ds-btns button{height:30px;padding:0 12px;border-radius:6px;border:1px solid #dcdad1;background:#fff;color:#141414;font:13px 'Hanken Grotesk Variable',sans-serif;cursor:pointer}.ds-btns button:hover{border-color:#4a4a45}.ds-btns button.p{background:#141414;border-color:#141414;color:#fbfbf7;font-weight:600}.ds-btns button.qd{color:#a3361c;padding:0 10px}.ds-btns button.qd:hover{border-color:#a3361c}"
+    },
+    {
+      "name": "Flags",
+      "kind": "chip",
+      "refersTo": "flag",
+      "description": "Small 18px state chips that always carry words.",
+      "html": "<span class=\"ds-flag\">outside this project</span> <span class=\"ds-flag w\">1 broken link</span> <span class=\"ds-flag b\">not in index</span>",
+      "css": ".ds-flag{display:inline-flex;align-items:center;font:11.5px/18px 'Hanken Grotesk Variable',sans-serif;padding:0 6px;border-radius:4px;background:#f1f0ea;color:#4a4a45}.ds-flag.w{background:#fff1d6;color:#8a5a00}.ds-flag.b{background:#fde7e0;color:#a3361c}"
+    },
+    {
+      "name": "Diff Review",
+      "kind": "custom",
+      "refersTo": "raw-file",
+      "description": "Unified diff in a sunk mono well before any settings write.",
+      "html": "<pre class=\"ds-diff\"><span class=\"s\">… 4 unchanged lines</span><span class=\"r\">  \"theme\": \"dark\",</span><span class=\"a\">  \"theme\": \"light\",</span><span class=\"c\">  \"hooks\": {</span></pre>",
+      "css": ".ds-diff{margin:0;padding:8px 0;background:#f1f0ea;border-radius:6px;font:12.5px/1.5 'JetBrains Mono Variable',monospace;color:#141414}.ds-diff span{display:block;padding:0 10px;white-space:pre}.ds-diff .a{background:color-mix(in srgb,#1d6b47 16%,transparent)}.ds-diff .r{background:color-mix(in srgb,#a3361c 16%,transparent);text-decoration:line-through;text-decoration-color:color-mix(in srgb,#a3361c 60%,transparent)}.ds-diff .c{color:#6b6a63}.ds-diff .s{color:#6b6a63;font-style:italic}"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "chip",
+      "refersTo": "segmented-option-on",
+      "description": "Joined options; pressed option fills with ink. Memory type filter uses ink shapes.",
+      "html": "<div class=\"ds-seg\"><button aria-pressed=\"true\">All</button><button><i class=\"u\"></i>user</button><button><i class=\"f\"></i>feedback</button><button><i class=\"p\"></i>project</button></div>",
+      "css": ".ds-seg{display:inline-flex;border:1px solid #dcdad1;border-radius:6px;overflow:hidden}.ds-seg button{border:0;border-right:1px solid #dcdad1;background:#fff;color:#141414;height:24px;padding:0 9px;font:12.5px 'Hanken Grotesk Variable',sans-serif}.ds-seg button:last-child{border-right:0}.ds-seg button[aria-pressed=true]{background:#141414;color:#fbfbf7}.ds-seg i{display:inline-block;width:8px;height:8px;margin-right:5px;background:#4a4a45}.ds-seg i.u{border-radius:999px}.ds-seg i.f{clip-path:polygon(50% 0,100% 100%,0 100%)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Timetable & Line Map",
+    "overview": "Every directory is a rail line. Claude Code loads configuration stop by stop, and ccdesk draws that order as a route strip, then lists everything that applies as a printed timetable underneath, each row carrying the route bullet of its scope. Light is Swiss timetable print; dark is a departure board at night. Dense, flat, one 32px row grid, grotesk for the interface and tabular mono for anything compared across rows.",
+    "keyCharacteristics": [
+      "Route bullets (letter in a flat colour circle) on every row, stop and layer.",
+      "One 32px row grid shared by timetables and palette results.",
+      "Grotesk for interface, tabular monospace for keys, paths, values and counts.",
+      "Flat surfaces; 2px ink rules open sections, hairlines divide rows.",
+      "Two themes from one token set: timetable paper and departure board."
+    ],
+    "rules": [
+      {
+        "name": "The Line Colour Rule",
+        "body": "A scope-line colour means 'this came from that scope' and nothing else; it appears only in bullets, the route strip and the brand mark.",
+        "section": "colors"
+      },
+      {
+        "name": "The Letter Rule",
+        "body": "A scope colour is never shown without its letter (M, U, P, L, A, X).",
+        "section": "colors"
+      },
+      {
+        "name": "The State Words Rule",
+        "body": "State inks colour a word that already states the state; never a bare swatch.",
+        "section": "colors"
+      },
+      {
+        "name": "The Character Grid Rule",
+        "body": "Paths, keys, values, counts and times are mono with tabular figures so they align across rows.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Headings, column heads and group labels are sentence case at natural tracking.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Row Rule",
+        "body": "Every list row is 32px; new lists join the grid.",
+        "section": "layout"
+      },
+      {
+        "name": "The Inspector Repeats Rule",
+        "body": "A column may be dropped on smaller screens only if the inspector shows the same fact.",
+        "section": "layout"
+      },
+      {
+        "name": "The Floating-Only Shadow Rule",
+        "body": "Shadows are for the palette, toast and drawer; everything in the layout is flat and ruled.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Shape Not Colour Rule",
+        "body": "Non-scope categories such as memory types are told apart by ink shape.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do put a route bullet at the start of every row, stop and layer that comes from a scope; hollow means present but not in force.",
+      "Do keep every list row at 32px and set comparable values in tabular mono.",
+      "Do open sections with the 2px ink rule and separate rows with hairlines.",
+      "Do tell non-scope categories apart by ink shape.",
+      "Do show the source file path, in mono and copyable, for anything the inspector shows.",
+      "Do preview every write as a diff before Save appears.",
+      "Do keep motion at 160-220ms on cubic-bezier(0.16, 1, 0.3, 1) and off under reduced motion."
+    ],
+    "donts": [
+      "Don't use a scope-line colour for anything other than its scope, or without its letter.",
+      "Don't use colour to separate memory types or other non-scope categories.",
+      "Don't add shadows to anything that lives in the layout.",
+      "Don't put radius on timetable rows or sections, or turn rows into cards.",
+      "Don't use uppercase tracked labels or small caption lines above headings.",
+      "Don't add icons that are text glyphs or emoji; use the drawn 16px icon set."
+    ]
+  }
+}
