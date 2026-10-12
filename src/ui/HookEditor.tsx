@@ -4,7 +4,7 @@ import { EDITABLE_SCOPES } from "../shared/scopes.ts";
 import { type DirectoryView, type Hook, type HookEdit, type Scope } from "../shared/types.ts";
 import { api } from "./api.ts";
 import { tilde } from "./format.ts";
-import { fileFor, ScopePicker } from "./PermissionEditor.tsx";
+import { fileFor, projectOrUser, ScopePicker } from "./PermissionEditor.tsx";
 import { type Saved } from "./SettingEditor.tsx";
 import { useReviewedChange } from "./useReviewedChange.tsx";
 
@@ -26,7 +26,7 @@ export function HookEditor({ view, hook, onSaved }: Props) {
   const [event, setEvent] = useState(hook?.event ?? "PreToolUse");
   const [matcher, setMatcher] = useState(hook?.matcher ?? "");
   const [text, setText] = useState(hook ? JSON.stringify(hook.definition, null, 2) : NEW_HOOK);
-  const [scope, setScope] = useState<Scope>("project");
+  const [scope, setScope] = useState<Scope>(() => projectOrUser(view));
   const ids = { event: useId(), matcher: useId(), hook: useId() };
 
   if (hook && (hook.source === "plugin" || !EDITABLE_SCOPES.includes(hook.source)))
@@ -106,6 +106,7 @@ export function HookEditor({ view, hook, onSaved }: Props) {
       </label>
       {!hook && (
         <ScopePicker
+          view={view}
           scope={scope}
           onPick={(s) => {
             setScope(s);

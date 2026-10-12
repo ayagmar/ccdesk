@@ -166,6 +166,7 @@ function ToolSwitch({ tool, actions }: { tool: BuiltinTool; actions: Actions }) 
             repository; in local settings, only for you here.
           </p>
           <ScopePicker
+            view={view}
             scope={scope}
             onPick={(s) => {
               setScope(s);

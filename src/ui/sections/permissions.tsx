@@ -311,6 +311,7 @@ function SuggestedRule({ row, actions }: { row: Suggested; actions: Actions }) {
           in this repository; in your user settings, in every project.
         </p>
         <ScopePicker
+          view={view}
           scope={scope}
           onPick={(s) => {
             setScope(s);

@@ -50,13 +50,18 @@ export function fileFor(view: DirectoryView, scope: Scope): string | undefined {
   return view.settings.find((l) => l.scope === scope && !l.legacy)?.path;
 }
 
+/** Project settings, or user settings where there is no project file, as in your home folder. */
+export function projectOrUser(view: DirectoryView): Scope {
+  return fileFor(view, "project") ? "project" : "user";
+}
+
 /** Move, remove or add one permission rule, reviewed as a diff of the settings file first. */
 export function PermissionEditor({ view, rule, onSaved }: Props) {
   const change = usePermissionChange(view, onSaved);
   const { busy } = change;
   const [list, setList] = useState<PermissionList>("allow");
   const [text, setText] = useState("");
-  const [scope, setScope] = useState<Scope>("project");
+  const [scope, setScope] = useState<Scope>(() => projectOrUser(view));
   const ruleId = useId();
 
   const fileScope = rule?.scope ?? scope;
@@ -138,6 +143,7 @@ export function PermissionEditor({ view, rule, onSaved }: Props) {
             />
           </label>
           <ScopePicker
+            view={view}
             scope={scope}
             onPick={(s) => {
               setScope(s);
@@ -149,7 +155,7 @@ export function PermissionEditor({ view, rule, onSaved }: Props) {
             <button
               type="button"
               className="primary"
-              disabled={busy || text.trim() === ""}
+              disabled={busy || !file || text.trim() === ""}
               onClick={() =>
                 startReview(
                   undefined,
@@ -169,11 +175,29 @@ export function PermissionEditor({ view, rule, onSaved }: Props) {
 }
 
 /** Which settings file a new rule goes into: user, project or local. */
-export function ScopePicker({ scope, onPick }: { scope: Scope; onPick: (scope: Scope) => void }) {
+export function ScopePicker({
+  view,
+  scope,
+  onPick,
+}: {
+  view: DirectoryView;
+  scope: Scope;
+  onPick: (scope: Scope) => void;
+}) {
   return (
     <fieldset className="segmented" aria-label="File to change">
       {EDITABLE_SCOPES.map((s) => (
-        <button key={s} type="button" aria-pressed={scope === s} onClick={() => onPick(s)}>
+        <button
+          key={s}
+          type="button"
+          aria-pressed={scope === s}
+          // In your home folder .claude/settings.json is your user file, so there is no project file.
+          disabled={!fileFor(view, s)}
+          title={
+            fileFor(view, s) ? undefined : `No ${lineName(s).toLowerCase()} settings file here`
+          }
+          onClick={() => onPick(s)}
+        >
           <Bullet line={s} hollow={scope !== s} /> {lineName(s)}
         </button>
       ))}
