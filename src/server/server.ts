@@ -1,28 +1,26 @@
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
-import HOOK_EVENTS from "../shared/hook-events.json" with { type: "json" };
-import { EVERY_FILE, PERMISSION_LISTS } from "../shared/scopes.ts";
-import {
-  type AgentEdit,
-  type HookEdit,
-  type McpEdit,
-  type PermissionEdit,
-  type PermissionList,
-  SESSION_PROFILES,
-  type Scope,
-  type SessionProfile,
-  type SettingsEdit,
-} from "../shared/types.ts";
+import { PERMISSION_LISTS } from "../shared/scopes.ts";
+import { type PermissionList, SESSION_PROFILES, type SessionProfile } from "../shared/types.ts";
 import { listBackups, previewRestore, restoreBackup } from "./backups.ts";
 import { previewAgentEdit, saveAgentEdit } from "./agent-edit.ts";
 import { previewMcpEdit, type RunClaude, runClaude, saveMcpEdit } from "./mcp-edit.ts";
 import { changeMemory, isMemoryAction, previewMemoryChange } from "./mutations.ts";
 import { openInEditor } from "./open.ts";
+import {
+  InvalidEditError,
+  parseAgentEdit,
+  parseHookEdit,
+  parseMcpEdit,
+  parsePermissionEdit,
+  parseSettingsEdit,
+  stringFields,
+} from "./parse-edit.ts";
 import { REFERENCE } from "./reference.ts";
 import { compareSettings } from "./scan/compare.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isCredentials, isRecord } from "./scan/files.ts";
+import { isCredentials } from "./scan/files.ts";
 import { scanOverview } from "./scan/index.ts";
 import { CountStopped, readUsage } from "./scan/usage.ts";
 import { testPath } from "./scan/path-test.ts";
@@ -94,6 +92,7 @@ export function createCcdeskServer(options: ServerOptions): Server {
 /** The status and message an API request that failed is answered with. */
 function failure(error: unknown): [number, string] {
   if (error instanceof RequestError) return [error.status, error.message];
+  if (error instanceof InvalidEditError) return [400, error.message];
   // A change ccdesk refuses on purpose.
   if (error instanceof RefusedError) return [409, error.message];
   if (error instanceof CountStopped) return [503, error.message];
@@ -177,28 +176,28 @@ function routes(options: ServerOptions, watcher: Watcher): Route[] {
       return { editor: await (options.openFile ?? openInEditor)(path) };
     }),
     post("/api/settings/preview", async ({ body }) =>
-      previewSettingsEdit(env, settingsEditFrom(body))
+      previewSettingsEdit(env, parseSettingsEdit(body))
     ),
     post("/api/settings/save", async ({ body }) =>
-      saveSettingsEdit(env, settingsEditFrom(body), revision(body))
+      saveSettingsEdit(env, parseSettingsEdit(body), revision(body))
     ),
     post("/api/permissions/preview", async ({ body }) =>
-      previewPermissionEdit(env, permissionEditFrom(body))
+      previewPermissionEdit(env, parsePermissionEdit(body))
     ),
     post("/api/permissions/save", async ({ body }) =>
-      savePermissionEdit(env, permissionEditFrom(body), revision(body))
+      savePermissionEdit(env, parsePermissionEdit(body), revision(body))
     ),
-    post("/api/hooks/preview", async ({ body }) => previewHookEdit(env, hookEditFrom(body))),
+    post("/api/hooks/preview", async ({ body }) => previewHookEdit(env, parseHookEdit(body))),
     post("/api/hooks/save", async ({ body }) =>
-      saveHookEdit(env, hookEditFrom(body), revision(body))
+      saveHookEdit(env, parseHookEdit(body), revision(body))
     ),
-    post("/api/agents/preview", async ({ body }) => previewAgentEdit(env, agentEditFrom(body))),
+    post("/api/agents/preview", async ({ body }) => previewAgentEdit(env, parseAgentEdit(body))),
     post("/api/agents/save", async ({ body }) =>
-      saveAgentEdit(env, agentEditFrom(body), revision(body))
+      saveAgentEdit(env, parseAgentEdit(body), revision(body))
     ),
-    post("/api/mcp/preview", async ({ body }) => previewMcpEdit(env, mcpEditFrom(body), run)),
+    post("/api/mcp/preview", async ({ body }) => previewMcpEdit(env, parseMcpEdit(body), run)),
     post("/api/mcp/save", async ({ body }) =>
-      saveMcpEdit(env, mcpEditFrom(body), revision(body), run)
+      saveMcpEdit(env, parseMcpEdit(body), revision(body), run)
     ),
     get("/api/watch", async ({ url, res }) => {
       const dir = url.searchParams.get("dir");
@@ -275,106 +274,6 @@ async function handle(
   if (!route) return send(res, 404, { error: "Not found" });
   const body = route.method === "POST" ? await readBody(req) : undefined;
   return send(res, 200, await route.action({ url, body, res }));
-}
-
-/** The named string fields of a JSON body; anything else is a 400. */
-function stringFields<K extends string>(body: unknown, names: K[]): Record<K, string> {
-  if (!isRecord(body) || names.some((n) => typeof body[n] !== "string"))
-    throw new RequestError(
-      400,
-      `${names.join(", ")} ${names.length === 1 ? "is" : "are"} required`
-    );
-  return body as Record<K, string>;
-}
-
-function settingsEditFrom(body: unknown): SettingsEdit {
-  const { dir, scope, key } = stringFields(body, ["dir", "scope", "key"]);
-  if (!EVERY_FILE.includes(scope as Scope)) throw new RequestError(400, "unknown scope");
-  const value = (body as Record<string, unknown>).value;
-  return { dir, scope: scope as Scope, key, ...(value === undefined ? {} : { value }) };
-}
-
-function permissionEditFrom(body: unknown): PermissionEdit {
-  const { dir, file } = stringFields(body, ["dir", "file"]);
-  const rule = (value: unknown) => {
-    if (value === undefined) return undefined;
-    const { list, rule } = stringFields(value, ["list", "rule"]);
-    if (!PERMISSION_LISTS.includes(list as PermissionList) || rule.trim() === "")
-      throw new RequestError(400, "a rule needs a list (allow, ask or deny) and text");
-    return { list: list as PermissionList, rule };
-  };
-  const { remove, add } = body as Record<string, unknown>;
-  const edit: PermissionEdit = { dir, file };
-  const removed = rule(remove);
-  const added = rule(add);
-  if (removed) edit.remove = removed;
-  if (added) edit.add = added;
-  if (!removed && !added) throw new RequestError(400, "remove or add is required");
-  return edit;
-}
-
-function hookEditFrom(body: unknown): HookEdit {
-  const { dir, file } = stringFields(body, ["dir", "file"]);
-  const { remove, add } = body as Record<string, unknown>;
-  const edit: HookEdit = { dir, file };
-  if (remove !== undefined) {
-    const { event } = stringFields(remove, ["event"]);
-    const { at, definition } = remove as Record<string, unknown>;
-    const index = (n: unknown) => (Number.isInteger(n) && (n as number) >= 0 ? (n as number) : -1);
-    const group = isRecord(at) ? index(at.group) : -1;
-    const hook = isRecord(at) ? index(at.index) : -1;
-    if (group < 0 || hook < 0) throw new RequestError(400, "remove needs the hook's place");
-    edit.remove = { event, at: { group, index: hook }, definition };
-  }
-  if (add !== undefined) {
-    const { event } = stringFields(add, ["event"]);
-    if (!HOOK_EVENTS.includes(event))
-      throw new RequestError(400, `${event} is not a hook event Claude Code knows`);
-    const { matcher, definition } = add as Record<string, unknown>;
-    if (matcher !== undefined && typeof matcher !== "string")
-      throw new RequestError(400, "matcher must be text");
-    if (!isRecord(definition)) throw new RequestError(400, "a hook must be a JSON object");
-    edit.add = { event, ...(matcher ? { matcher } : {}), definition };
-  }
-  if (!edit.remove && !edit.add) throw new RequestError(400, "remove or add is required");
-  return edit;
-}
-
-function agentEditFrom(body: unknown): AgentEdit {
-  const { dir } = stringFields(body, ["dir"]);
-  const { path, create, text } = body as Record<string, unknown>;
-  if (text !== null && typeof text !== "string")
-    throw new RequestError(400, "text must be the agent file, or null to delete it");
-  const edit: AgentEdit = { dir, text };
-  if (typeof path === "string") edit.path = path;
-  else if (create !== undefined) {
-    const { scope, file } = stringFields(create, ["scope", "file"]);
-    if (scope !== "user" && scope !== "project")
-      throw new RequestError(400, "a new agent goes in user or project scope");
-    if (text === null) throw new RequestError(400, "a new agent needs its text");
-    edit.create = { scope, file };
-  } else throw new RequestError(400, "path or create is required");
-  return edit;
-}
-
-function mcpEditFrom(body: unknown): McpEdit {
-  const { dir, scope } = stringFields(body, ["dir", "scope"]);
-  if (scope !== "user" && scope !== "local" && scope !== "project")
-    throw new RequestError(400, "scope must be user, local or project");
-  const { remove, add } = body as Record<string, unknown>;
-  const edit: McpEdit = { dir, scope };
-  if (remove !== undefined) {
-    const { name } = stringFields(remove, ["name"]);
-    edit.remove = { name, definition: (remove as Record<string, unknown>).definition };
-  }
-  if (add !== undefined) {
-    const { name } = stringFields(add, ["name"]);
-    const { definition } = add as Record<string, unknown>;
-    if (!isRecord(definition)) throw new RequestError(400, "a server must be a JSON object");
-    edit.add = { name, definition };
-  }
-  if (!edit.remove && !edit.add) throw new RequestError(400, "remove or add is required");
-  return edit;
 }
 
 const MAX_BODY = 64 * 1024;

@@ -13,8 +13,9 @@ export { CountStopped, readUsage } from "../server/scan/usage.ts";
 export { hasHiddenValues, shown } from "../server/secrets.ts";
 export { Watcher } from "../server/watch.ts";
 
-// Edits: preview returns a revision, save takes it back. Both refuse with RefusedError; a save
-// whose file changed since the preview throws StaleError, a RefusedError.
+// Edits: the parse functions turn input from outside (JSON, arguments) into an edit, or throw
+// InvalidEditError. Preview returns a revision, save takes it back. Both refuse with RefusedError;
+// a save whose file changed since the preview throws StaleError, a RefusedError.
 export { previewAgentEdit, saveAgentEdit } from "../server/agent-edit.ts";
 export {
   claudeProgram,
@@ -24,6 +25,14 @@ export {
   saveMcpEdit,
 } from "../server/mcp-edit.ts";
 export { changeMemory, isMemoryAction, previewMemoryChange } from "../server/mutations.ts";
+export {
+  InvalidEditError,
+  parseAgentEdit,
+  parseHookEdit,
+  parseMcpEdit,
+  parsePermissionEdit,
+  parseSettingsEdit,
+} from "../server/parse-edit.ts";
 export {
   previewHookEdit,
   previewPermissionEdit,
