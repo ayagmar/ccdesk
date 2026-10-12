@@ -856,6 +856,41 @@ test("a restore that would put back an env value changed since the backup is ref
   assert.equal(JSON.parse(readFileSync(file, "utf8")).env.API_KEY, "new");
 });
 
+test("a settings file broken since its backup can be restored from it", async () => {
+  const dir = fixture.at("work/broken");
+  const file = fixture.json("work/broken/.claude/settings.json", { env: { API_KEY: "kept" } });
+  const saved = (await saveSetting({ dir, scope: "project", key: "model", value: "opus" }))
+    .json as Change;
+  fixture.write("work/broken/.claude/settings.json", "{ not json");
+
+  const preview = (await call("/api/backups/preview", { method: "POST", body: { id: saved.id } }))
+    .json as RestorePreview;
+  const res = await call("/api/backups/restore", {
+    method: "POST",
+    body: { id: saved.id, revision: preview.revision },
+  });
+
+  assert.equal(preview.blocked, undefined);
+  assert.equal(res.status, 200);
+  assert.deepEqual(JSON.parse(readFileSync(file, "utf8")), { env: { API_KEY: "kept" } });
+});
+
+test("adding a permission rule the file already has changes nothing", async () => {
+  const dir = fixture.at("work/perms-same");
+  const file = fixture.json("work/perms-same/.claude/settings.json", {
+    permissions: { allow: ["Read"] },
+  });
+  const before = readFileSync(file, "utf8");
+
+  const res = await call("/api/permissions/preview", {
+    method: "POST",
+    body: { dir, file, add: { list: "allow", rule: "Read" } },
+  });
+
+  assert.equal(res.status, 409);
+  assert.equal(readFileSync(file, "utf8"), before);
+});
+
 test("undoing a memory delete is refused when MEMORY.md changed since", async () => {
   const { dir, old } = seedMemory();
   const deleted = (await deleteMemory(old)).json as Change;
@@ -1070,7 +1105,7 @@ test("a hook Claude Code's schema rejects, or an unknown event, is not saved", a
   assert.equal(readFileSync(file, "utf8"), "{}");
 });
 
-test("hooks are not changed in a file whose hooks send hidden header values", async () => {
+test("a hook that sends hidden header values is never rewritten, but others in its file can change", async () => {
   const dir = fixture.at("work/hooks-headers");
   const file = fixture.json("work/hooks-headers/.claude/settings.json", {
     hooks: {
@@ -1088,9 +1123,22 @@ test("hooks are not changed in a file whose hooks send hidden header values", as
     },
   });
 
-  const res = await saveHook({ dir, file, add: { event: "Stop", definition: command("bell") } });
-  assert.equal(res.status, 409);
+  const added = await saveHook({ dir, file, add: { event: "Stop", definition: command("bell") } });
+  assert.equal(added.status, 200);
   assert.match(readFileSync(file, "utf8"), /s3cret/);
+
+  const [http] = await hooksIn(dir);
+  assert.ok(http);
+  assert.equal((http.definition as { type?: string }).type, "http");
+  const changed = await saveHook({
+    dir,
+    file,
+    remove: { event: http.event, at: http.at, definition: http.definition },
+    add: { event: "Stop", definition: { ...(http.definition as object), timeout: 5 } },
+  });
+  assert.equal(changed.status, 409);
+  assert.match(readFileSync(file, "utf8"), /s3cret/);
+  assert.doesNotMatch(readFileSync(file, "utf8"), /•••/);
 });
 
 test("changing the matcher of a hook alone in its group keeps the group where it is", async () => {
@@ -1280,6 +1328,30 @@ test("user and local servers are changed through claude mcp, never by writing ~/
     },
   ]);
   assert.equal(readFileSync(fixture.env.claudeJson, "utf8"), before);
+});
+
+test("removing a user server is refused when its hidden values changed after the review", async () => {
+  const dir = fixture.at("work/mcp-rotated");
+  const servers = (token: string) =>
+    JSON.stringify({ mcpServers: { api: { command: "api-mcp", env: { TOKEN: token } } } });
+  fixture.write(fixture.env.claudeJson, servers("old-token"));
+  claudeRuns.length = 0;
+  const edit = {
+    dir,
+    scope: "user",
+    remove: { name: "api", definition: { command: "api-mcp", env: { TOKEN: "•••" } } },
+  };
+  const preview = await call("/api/mcp/preview", { method: "POST", body: edit });
+  assert.equal(preview.status, 200);
+
+  // Another program rotates the token; the page shows the same server either way.
+  fixture.write(fixture.env.claudeJson, servers("rotated-token"));
+  const saved = await call("/api/mcp/save", {
+    method: "POST",
+    body: { ...edit, revision: (preview.json as Preview).revision },
+  });
+  assert.equal(saved.status, 409);
+  assert.deepEqual(claudeRuns, [], "claude mcp remove did not run");
 });
 
 test("a replaced server goes back as it was when claude refuses the new one", async () => {

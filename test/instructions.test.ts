@@ -95,7 +95,7 @@ test("paths mentioned in code spans or fences are not treated as imports", async
   const f = makeFixture();
   f.write(
     "app/CLAUDE.md",
-    "Use `@docs/a.md` as an example.\n```\n@docs/b.md\n```\nReal: @docs/c.md\n"
+    "Use `@docs/a.md` or `` @docs/d.md `` as an example.\n```\n@docs/b.md\n```\nReal: @docs/c.md\n"
   );
 
   const view = await scanDirectory(f.env, f.at("app"));

@@ -109,9 +109,9 @@ function isAgentFile(env: ScanEnv, path: string): boolean {
 
 /**
  * Every value ccdesk shows hidden and never changes in a settings file: env and headers objects,
- * and URLs with a user, password or query.
+ * and URLs with a user, password or query. Null for a file that is not valid JSON.
  */
-function hiddenValues(text: string | null): string {
+function hiddenValues(text: string | null): string | null {
   const found: unknown[] = [];
   const walk = (value: unknown) => {
     if (Array.isArray(value)) value.forEach(walk);
@@ -126,7 +126,7 @@ function hiddenValues(text: string | null): string {
   try {
     walk(text === null ? null : JSON.parse(text));
   } catch {
-    return text ?? "";
+    return null;
   }
   return JSON.stringify(found);
 }
@@ -231,9 +231,13 @@ function blockedReason(plan: Plan): string | undefined {
   if (saved === null)
     return "ccdesk created this file, so there is no earlier version to put back. Change it in place instead.";
   if (onlyIndexLines(plan)) return undefined;
+  // A file broken since the backup has no values ccdesk could keep; the backup is the way out of it,
+  // and the broken file is itself backed up before the restore replaces it.
+  const now = hiddenValues(current);
   if (
     (manifest.kind === "settings" || manifest.kind === "mcp") &&
-    hiddenValues(current) !== hiddenValues(saved)
+    now !== null &&
+    now !== hiddenValues(saved)
   )
     return "Hidden values in this file (env, headers or a URL's key) changed since the backup. ccdesk does not show or change those, so restore this one by hand.";
   // A retry after a restore that wrote the memory but not MEMORY.md finds the memory already back.
@@ -257,7 +261,9 @@ export async function previewRestore(env: ScanEnv, id: string): Promise<RestoreP
     after,
     revision: planRevision(plan),
     ...(blocked ? { blocked } : {}),
-    ...(index && index.missing.length > 0 ? { indexLines: index.missing } : {}),
+    ...(index && index.missing.length > 0
+      ? { indexLines: index.missing.map((line) => shownText(line) ?? line) }
+      : {}),
   };
 }
 

@@ -1,3 +1,4 @@
+import { lstat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import {
   type AgentsMdMode,
@@ -10,7 +11,7 @@ import {
   type Trust,
 } from "../../shared/types.ts";
 import { buildContext } from "./context.ts";
-import { type ScanEnv } from "./env.ts";
+import { isConfigHome, type ScanEnv } from "./env.ts";
 import {
   gitRoot,
   isDir,
@@ -138,15 +139,30 @@ export async function scanDirectory(env: ScanEnv, dir: string): Promise<Director
     }
   }
 
-  // docs: permissions#when-your-local-settings-file-needs-trust
-  const localFromRepository = settings.some(
-    (l) => l.scope === "local" && l.visibility === "tracked"
-  );
+  // A local file tracked in git, or in a .claude that is a link, counts as the repository's
+  // (docs: permissions#when-your-local-settings-file-needs-trust).
+  const localFromRepository = (
+    await Promise.all(
+      settings
+        .filter((l) => l.scope === "local" && l.exists)
+        .map(
+          async (l) =>
+            l.visibility === "tracked" ||
+            ((await lstat(dirname(l.path)).catch(() => null))?.isSymbolicLink() ?? false)
+        )
+    )
+  ).some(Boolean);
   const trustOptions = { trust, inConfigHome: isConfigHome(env, path), localFromRepository };
   const memory = await readMemory(env, mainRoot, path, effective, trustOptions);
   const permissions = permissionsOf(settings, trustOptions);
 
-  for (const l of settings) if (l.error) problems.push({ path: l.path, error: l.error });
+  for (const l of settings)
+    if (l.error)
+      problems.push({
+        path: l.path,
+        error: l.error,
+        ...(l.blocksStart ? { blocksStart: true } : {}),
+      });
   const mcp = await readJsonObject(mcpJson);
   if (!mcp.ok && !mcp.missing) problems.push({ path: mcpJson, error: mcp.error });
 
@@ -174,11 +190,6 @@ export async function scanDirectory(env: ScanEnv, dir: string): Promise<Director
     problems,
     sharing,
   };
-}
-
-/** Your home directory, or the folder whose .claude is CLAUDE_CONFIG_DIR. */
-function isConfigHome(env: ScanEnv, path: string): boolean {
-  return path === env.home || join(path, ".claude") === env.claudeDir;
 }
 
 /**

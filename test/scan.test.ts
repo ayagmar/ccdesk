@@ -121,6 +121,26 @@ test("an http hook's URL is shown without its user name, password or query", asy
   assert.doesNotMatch(JSON.stringify(view), /hunter2|abc123/);
 });
 
+test("a server Claude Code cannot start is marked invalid, with what it lacks", async () => {
+  const f = makeFixture();
+  f.json("home/.claude.json", {
+    mcpServers: {
+      local: { type: "stdio" },
+      remote: { url: "https://mcp.example/api" },
+      fine: { command: "fine-mcp" },
+    },
+  });
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  const notes = Object.fromEntries(
+    view.inventory.mcpServers.map((s) => [s.name, [s.status, s.note ?? null]])
+  );
+  assert.deepEqual(notes.local, ["invalid", 'A stdio server needs a "command".']);
+  assert.equal(notes.remote?.[0], "invalid");
+  assert.deepEqual(notes.fine, ["active", null]);
+});
+
 test(".mcp.json servers wait for approval, and a server defined twice uses the closer definition", async () => {
   const f = makeFixture();
   f.json("app/.mcp.json", {
@@ -398,4 +418,140 @@ test("an approval in settings.local.json waits until the folder is trusted", asy
 
   f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
   assert.equal(await status(), "active");
+});
+
+test("a project agent file Claude Code skips does not hide your agent of the same name", async () => {
+  const f = makeFixture();
+  f.write(
+    "home/.claude/agents/reviewer.md",
+    "---\nname: reviewer\ndescription: Reviews a diff\n---\nReview.\n"
+  );
+  f.write("work/app/.claude/agents/reviewer.md", "---\nname: reviewer\n---\nNo description.\n");
+  f.write("work/app/.claude/agents/README.md", "Notes about these agents.\n");
+
+  const view = await scanDirectory(f.env, f.at("work/app"));
+
+  const agents = view.inventory.agents.map((a) => [a.scope, a.name, a.skipped ?? null]);
+  assert.deepEqual(agents, [
+    ["project", "README", "The frontmatter needs a name."],
+    [
+      "project",
+      "reviewer",
+      "The frontmatter needs a description: when Claude should use this agent.",
+    ],
+    ["user", "reviewer", null],
+  ]);
+  assert.equal(view.inventory.agents.find((a) => a.scope === "user")?.shadowedBy, undefined);
+  const listing = view.context.find((b) => b.kind === "agents");
+  assert.match(listing?.text ?? "", /- reviewer: Reviews a diff/);
+  assert.doesNotMatch(listing?.text ?? "", /README/);
+});
+
+test("header and env values in an agent's inline MCP servers never reach the page", async () => {
+  const f = makeFixture();
+  f.write(
+    "work/app/.claude/agents/api.md",
+    [
+      "---",
+      "name: api",
+      "description: Calls the API",
+      "mcpServers:",
+      "  - api:",
+      "      type: http",
+      "      url: https://api.example/mcp",
+      "      headers:",
+      "        Authorization: Bearer yaml-header-secret",
+      "---",
+      "Use the api tools.",
+      "",
+    ].join("\n")
+  );
+
+  const view = await scanDirectory(f.env, f.at("work/app"));
+
+  const agent = view.inventory.agents.find((a) => a.name === "api");
+  assert.ok(agent);
+  assert.doesNotMatch(JSON.stringify(view), /yaml-header-secret/);
+  assert.match(agent.text, /Authorization: •••/);
+  assert.match(agent.text, /Use the api tools\./);
+});
+
+test("a managed settings file that is not JSON stops Claude Code from starting; an empty one is {}", async () => {
+  const f = makeFixture();
+  f.write("etc/claude-code/managed-settings.json", "");
+  f.json("home/.claude/settings.json", { model: "sonnet" });
+
+  const empty = await scanDirectory(f.env, f.at("app"));
+  assert.deepEqual(empty.problems, []);
+
+  f.write("etc/claude-code/managed-settings.d/10-model.json", '{"model":');
+  const broken = await scanDirectory(f.env, f.at("app"));
+  assert.equal(broken.problems.length, 1);
+  assert.equal(broken.problems[0]?.blocksStart, true);
+});
+
+test("an MCP rule with parentheses in a settings file is listed as skipped", async () => {
+  const f = makeFixture();
+  f.json("app/.claude/settings.json", {
+    permissions: { deny: ["mcp__db__query(table:users)", "mcp__db__drop"] },
+  });
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  const rules = Object.fromEntries(
+    view.permissions.flatMap((p) => (p.kind === "rule" ? [[p.rule, p.inEffect]] : []))
+  );
+  assert.deepEqual(rules, { "mcp__db__query(table:users)": false, mcp__db__drop: true });
+});
+
+test("in the folder whose .claude is CLAUDE_CONFIG_DIR, local MCP approvals apply without the trust step", async () => {
+  const f = makeFixture();
+  const env = {
+    ...f.env,
+    claudeDir: f.at("cfg/.claude"),
+    claudeJson: f.at("cfg/.claude/.claude.json"),
+  };
+  f.json("cfg/.mcp.json", { mcpServers: { docs: { command: "docs-mcp" } } });
+  f.json("cfg/.claude/settings.local.json", { enableAllProjectMcpServers: true });
+
+  const view = await scanDirectory(env, f.at("cfg"));
+
+  assert.equal(view.inventory.mcpServers.find((s) => s.name === "docs")?.status, "active");
+});
+
+test("your skill wins over a project skill of the same name, and a command is named by its file", async () => {
+  const f = makeFixture();
+  f.write("home/.claude/skills/deploy/SKILL.md", "---\nname: deploy\ndescription: mine\n---\n");
+  f.write("app/.claude/skills/deploy/SKILL.md", "---\nname: deploy\ndescription: theirs\n---\n");
+  f.write("app/.claude/commands/ship.md", "---\nname: not-the-command\ndescription: s\n---\n");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  const project = view.inventory.skills.find((s) => s.scope === "project");
+  assert.equal(project?.shadowedBy, f.at("home/.claude/skills/deploy/SKILL.md"));
+  const listing = view.context.find((b) => b.kind === "skills")?.text ?? "";
+  assert.match(listing, /mine/);
+  assert.doesNotMatch(listing, /theirs/);
+  assert.deepEqual(
+    view.inventory.commands.map((c) => c.name),
+    ["ship"]
+  );
+});
+
+test("under a trusted parent, a local file in a .claude that is a link waits for its own trust", {
+  skip: process.platform === "win32",
+}, async () => {
+  const f = makeFixture();
+  f.json("home/.claude.json", { projects: { [f.at("work")]: { hasTrustDialogAccepted: true } } });
+  f.json("work/own/.claude/settings.local.json", { permissions: { allow: ["Bash"] } });
+  f.json("shared/.claude/settings.local.json", { permissions: { allow: ["Bash"] } });
+  f.link("work/linked/.claude", f.at("shared/.claude"));
+
+  const allowed = async (dir: string) => {
+    const view = await scanDirectory(f.env, f.at(dir));
+    return view.permissions.find((p) => p.kind === "rule" && p.rule === "Bash")?.inEffect;
+  };
+
+  assert.equal(await allowed("work/own"), true);
+  assert.equal(await allowed("work/linked"), false);
 });

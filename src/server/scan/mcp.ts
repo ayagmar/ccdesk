@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { type McpServer, type Plugin, type SettingsLayer, type Trust } from "../../shared/types.ts";
-import { type ScanEnv } from "./env.ts";
+import { isConfigHome, type ScanEnv } from "./env.ts";
 import {
   isRecord,
   readJsonObject,
@@ -12,6 +12,26 @@ import {
 } from "./files.ts";
 import { manifestConfigs } from "./plugins.ts";
 import { readManagedSettings } from "./settings.ts";
+
+/**
+ * What makes a server definition one Claude Code cannot start; it checks the rest when it starts
+ * the server (docs: mcp).
+ */
+export function serverProblems(definition: unknown): string[] {
+  if (!isRecord(definition)) return ["A server must be a JSON object."];
+  const type = typeof definition.type === "string" ? definition.type : "";
+  if (type === "" || type === "stdio")
+    return typeof definition.command === "string" && definition.command.trim() !== ""
+      ? []
+      : [
+          typeof definition.url === "string"
+            ? 'A server with a url needs a "type", such as "http"; without one it is read as a stdio server.'
+            : 'A stdio server needs a "command".',
+        ];
+  return typeof definition.url === "string" && definition.url !== ""
+    ? []
+    : [`A ${type} server needs a "url".`];
+}
 
 /** A server definition with what policy matching needs, which the UI does not. */
 interface Defined {
@@ -48,10 +68,10 @@ function define(
         status: "active",
         definition: redactSecrets(c),
       };
-      if (!type && url) {
+      const [problem] = serverProblems(c);
+      if (problem) {
         server.status = "invalid";
-        server.note =
-          'Has a url but no "type", so Claude Code reads it as a stdio server and it fails';
+        server.note = problem;
       }
       // A ${VAR} in an organisation entry means it still has to pass the allowlist.
       const usesVariables = JSON.stringify(c).includes("${");
@@ -234,12 +254,12 @@ export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<M
 
   const disabledHere = stringsIn(project.disabledMcpServers);
   // A cloned repository cannot approve its own servers: project and local approvals count once the
-  // folder is trusted, local ones in your home directory right away (docs: mcp#project-server-approvals-and-workspace-trust).
+  // folder is trusted, local ones in your configuration home right away (docs: mcp#project-server-approvals-and-workspace-trust).
   const approvalLayers = layers.filter(
     (l) =>
       (l.scope !== "project" && l.scope !== "local") ||
       trust.trusted ||
-      (l.scope === "local" && projectDir === env.home)
+      (l.scope === "local" && isConfigHome(env, projectDir))
   );
   const approveAll = approvalLayers.some((l) => l.data?.enableAllProjectMcpServers === true);
   const approved = new Set([

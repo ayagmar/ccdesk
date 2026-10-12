@@ -12,6 +12,7 @@ import {
   revisionOf,
   shownUrl,
 } from "./scan/files.ts";
+import { serverProblems } from "./scan/mcp.ts";
 import { RefusedError, readIfExists, recordChange, serially, writeAtomic } from "./write.ts";
 
 /**
@@ -120,23 +121,6 @@ function hasHiddenValues(value: unknown): boolean {
   return JSON.stringify(redactSecrets(value)) !== JSON.stringify(value);
 }
 
-/** What ccdesk checks itself; Claude Code checks the rest when it starts the server. */
-function entryProblems(definition: unknown): string[] {
-  if (!isRecord(definition)) return ["A server must be a JSON object."];
-  const type = typeof definition.type === "string" ? definition.type : "";
-  if (type === "" || type === "stdio")
-    return typeof definition.command === "string" && definition.command.trim() !== ""
-      ? []
-      : [
-          typeof definition.url === "string"
-            ? 'A server with a url needs a "type", such as "http"; without one it is read as a stdio server.'
-            : 'A stdio server needs a "command".',
-        ];
-  return typeof definition.url === "string" && definition.url !== ""
-    ? []
-    : [`A ${type} server needs a "url".`];
-}
-
 interface Planned {
   preview: SettingsEditPreview;
   save: () => Promise<Change | { target: string }>;
@@ -203,7 +187,7 @@ async function planProject(env: ScanEnv, edit: McpEdit): Promise<Planned> {
   checked(servers, edit);
   const next = { ...data, mcpServers: edited(servers, edit) };
   const text = `${JSON.stringify(next, null, 2)}\n`;
-  const errors = edit.add ? entryProblems(edit.add.definition) : [];
+  const errors = edit.add ? serverProblems(edit.add.definition) : [];
   const before = raw === null ? null : shown(data);
   return {
     preview: {
@@ -249,7 +233,7 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
   const servers = isRecord(holder) && isRecord(holder.mcpServers) ? holder.mcpServers : {};
   checked(servers, edit);
   const { remove, add } = edit;
-  const errors = add ? entryProblems(add.definition) : [];
+  const errors = add ? serverProblems(add.definition) : [];
   // Names follow "--", so one such as --help is a name, not an option.
   const addArgs = (name: string, definition: unknown) => [
     "mcp",
@@ -268,7 +252,9 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
       path: env.claudeJson,
       before,
       after: errors.length > 0 ? (before ?? "") : shown(edited(servers, edit)),
-      revision: revisionOf(JSON.stringify(redactSecrets(servers))),
+      // Of the servers as stored, so a changed env or header value, which the page never sees,
+      // still makes a reviewed edit stale.
+      revision: revisionOf(JSON.stringify(servers)),
       reformats: false,
       errors,
       // Shown with secrets hidden; the command that runs has the values you typed.

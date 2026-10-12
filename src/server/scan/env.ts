@@ -32,6 +32,11 @@ export function scanEnvFromProcess(): ScanEnv {
   };
 }
 
+/** Your configuration home: your home directory, or the folder whose .claude is CLAUDE_CONFIG_DIR. */
+export function isConfigHome(env: ScanEnv, path: string): boolean {
+  return path === env.home || join(path, ".claude") === env.claudeDir;
+}
+
 function managedDirFor(platform: NodeJS.Platform): string {
   if (platform === "darwin") return "/Library/Application Support/ClaudeCode";
   if (platform === "win32") return "C:\\Program Files\\ClaudeCode";

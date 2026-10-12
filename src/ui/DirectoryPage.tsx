@@ -267,8 +267,10 @@ export function DirectoryPage({
             <ul className="plain">
               {view.problems.map((p) => (
                 <li key={p.path}>
-                  <span className="mono">{tilde(p.path)}</span>: {p.error}. Claude Code may skip
-                  this file.
+                  <span className="mono">{tilde(p.path)}</span>: {p.error}.{" "}
+                  {p.blocksStart
+                    ? "Claude Code refuses to start until your organisation's settings are fixed, so nothing below applies yet."
+                    : "Claude Code may skip this file."}
                 </li>
               ))}
             </ul>

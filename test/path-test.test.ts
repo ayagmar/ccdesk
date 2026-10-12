@@ -84,11 +84,17 @@ test("a subfolder's skills load on demand only when Claude may invoke them itsel
     "---\nname: release\ndescription: r\ndisable-model-invocation: true\n---\n"
   );
   f.write("app/src/.claude/skills/lint/SKILL.md", "---\nname: lint\ndescription: l\n---\n");
-
-  const result = await testPath(f.env, f.at("app"), "src/a.ts");
-
-  assert.deepEqual(
-    result.matches.filter((m) => m.kind === "skill").map((m) => m.name),
-    ["lint"]
+  f.write(
+    "app/src/.claude/skills/css/SKILL.md",
+    '---\nname: css\ndescription: c\npaths: "**/*.css"\n---\n'
   );
+
+  const skills = async (file: string) =>
+    (await testPath(f.env, f.at("app"), file)).matches
+      .filter((m) => m.kind === "skill")
+      .map((m) => m.name)
+      .sort();
+
+  assert.deepEqual(await skills("src/a.ts"), ["lint"]);
+  assert.deepEqual(await skills("src/a.css"), ["css", "lint"]);
 });

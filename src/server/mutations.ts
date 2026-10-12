@@ -130,7 +130,12 @@ async function planDelete(env: ScanEnv, path: string): Promise<Plan> {
             });
         }
         if (!removed) throw reviewAgain();
-        return { target: real, revision: revisionOfBoth(null, next), removedIndexLines };
+        // The lines are kept as they were in the backup; the page gets them as ccdesk shows text.
+        return {
+          target: real,
+          revision: revisionOfBoth(null, next),
+          removedIndexLines: removedIndexLines.map((line) => shownText(line) ?? line),
+        };
       }
     );
   };

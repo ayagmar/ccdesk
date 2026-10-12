@@ -117,6 +117,8 @@ export interface SettingsLayer {
   /** Parsed JSON with `env` and `headers` values redacted. */
   data: Record<string, unknown> | null;
   error?: string;
+  /** For managed settings: a file that is not a JSON object, so Claude Code refuses to start. */
+  blocksStart?: boolean;
 }
 
 export interface EffectiveSetting {
@@ -209,6 +211,8 @@ export interface Entry {
   override?: "name-only" | "user-invocable-only" | "off";
   /** A subagent whose name a higher-priority definition also uses: that definition's file. */
   shadowedBy?: string;
+  /** Why Claude Code skips this subagent file, when its frontmatter falls short. */
+  skipped?: string;
   /** A plugin subagent's scoped name, with its plugin and subfolders, such as `my-plugin:review:security`. */
   id?: string;
   /** A skill's `when_to_use`, appended to its description in the listing. */
@@ -440,6 +444,8 @@ export interface Trust {
 export interface Problem {
   path: string;
   error: string;
+  /** Claude Code refuses to start until this file is fixed, rather than skipping it. */
+  blocksStart?: boolean;
 }
 
 /** Something Claude Code adds to context once Claude reads or edits a file. */

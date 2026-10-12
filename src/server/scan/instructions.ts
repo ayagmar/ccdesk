@@ -362,10 +362,13 @@ function expandImport(raw: string, baseDir: string, home: string): string {
   return isAbsolute(unescaped) ? unescaped : resolve(baseDir, unescaped);
 }
 
-/** `@path` references outside code spans and fences; a backslash keeps a space in the path. */
+/**
+ * `@path` references outside code spans and fences; a backslash keeps a space in the path. A code
+ * span opens with a run of backticks and closes at the next run of the same length.
+ */
 function importPaths(text: string): string[] {
   const withoutFences = text.replace(/^(```|~~~)[\s\S]*?^\1/gm, "");
-  const withoutSpans = withoutFences.replace(/`[^`\n]*`/g, "");
+  const withoutSpans = withoutFences.replace(/(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g, "");
   const found: string[] = [];
   for (const match of withoutSpans.matchAll(/(?:^|\s)@((?:[^\s\\]|\\ )+)/g)) {
     const path = match[1]?.replace(/[.,;:!?)\]]+$/, "");

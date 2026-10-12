@@ -1,8 +1,9 @@
 import { join, resolve } from "node:path";
 import { type AgentEdit, type Change, type SettingsEditPreview } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { gitRoot, parseFrontmatter, revisionOf, shownText, stringField } from "./scan/files.ts";
+import { gitRoot, revisionOf, shownText } from "./scan/files.ts";
 import { scanDirectory } from "./scan/index.ts";
+import { agentProblems } from "./scan/inventory.ts";
 import {
   RefusedError,
   readIfExists,
@@ -12,19 +13,6 @@ import {
   StaleError,
   writeAtomic,
 } from "./write.ts";
-
-/** What Claude Code requires of a subagent file (docs: sub-agents#supported-frontmatter-fields). */
-function agentProblems(text: string): string[] {
-  const { data } = parseFrontmatter(text);
-  const name = stringField(data, "name");
-  const problems: string[] = [];
-  if (!name) problems.push("The frontmatter needs a name.");
-  else if (name.length > 256 || name.includes(":") || name.startsWith("-"))
-    problems.push("A name has at most 256 characters, no ':' and does not start with '-'.");
-  if (!stringField(data, "description"))
-    problems.push("The frontmatter needs a description: when Claude should use this agent.");
-  return problems;
-}
 
 /** The file an edit changes: an agent the scan shows here, or a new one in your or the project's folder. */
 async function targetOf(env: ScanEnv, edit: AgentEdit): Promise<string> {
@@ -67,15 +55,21 @@ async function plan(env: ScanEnv, edit: AgentEdit): Promise<Planned> {
   const raw = await readIfExists(env, path);
   if (!edit.path && raw !== null)
     throw new RefusedError(`${path} already exists; open that agent to change it.`);
-  const errors = edit.text === null ? [] : agentProblems(edit.text);
   const before = shownText(raw);
+  // The page shows the file with env, header and URL values hidden, so a changed file written back
+  // from it would lose them; it can still be deleted, as a whole.
+  if (edit.text !== null && before !== raw)
+    throw new RefusedError(
+      `${path} has env, header or URL values ccdesk does not show; edit it in your editor instead.`
+    );
+  const errors = edit.text === null ? [] : agentProblems(edit.text);
   return {
     path,
     raw,
     preview: {
       path,
       before,
-      after: errors.length > 0 ? (before ?? "") : (edit.text ?? ""),
+      after: errors.length > 0 ? (before ?? "") : (shownText(edit.text) ?? ""),
       revision: revisionOf(raw),
       reformats: false,
       errors,

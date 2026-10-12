@@ -166,3 +166,24 @@ test("skillOverrides hide a skill or command from Claude's listing, or list it b
     "- legacy\n- review: Review the diff"
   );
 });
+
+test("an output style is found in the managed folder and in the repository root above the start directory", async () => {
+  const f = makeFixture();
+  f.write("repo/app/README.md", "x");
+  f.git("repo", "init", "-q");
+  f.write("repo/.claude/output-styles/terse.md", "---\nname: terse\n---\nAnswer briefly.\n");
+  f.write("etc/claude-code/.claude/output-styles/policy.md", "---\nname: policy\n---\nCite.\n");
+  f.json("home/.claude/settings.json", { outputStyle: "terse" });
+
+  const view = await scanDirectory(f.env, f.at("repo/app"));
+
+  assert.deepEqual(
+    view.inventory.outputStyles.map((s) => [s.scope, s.name]),
+    [
+      ["managed", "policy"],
+      ["project", "terse"],
+    ]
+  );
+  const style = view.context.find((b) => b.kind === "output-style");
+  assert.equal(style?.text, "Answer briefly.\n");
+});

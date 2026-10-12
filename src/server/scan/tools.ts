@@ -7,6 +7,7 @@ import {
   type ToolRule,
 } from "../../shared/types.ts";
 import { wildcard } from "./files.ts";
+import { CHECK_ORDER } from "./permissions.ts";
 
 /**
  * The other tools a rule for some uses covers: Bash rules apply to Monitor, Claude Code checks file
@@ -57,8 +58,6 @@ function matcherCovers(matcher: string | undefined, name: string): boolean {
   }
 }
 
-const ORDER: PermissionList[] = ["deny", "ask", "allow"];
-
 /** Every built-in tool, with the rules and hooks that apply to it here. */
 export function builtinTools(permissions: Permission[], hooks: Hook[]): BuiltinTool[] {
   const rules: ToolRule[] = permissions.flatMap((p) =>
@@ -80,7 +79,7 @@ export function builtinTools(permissions: Permission[], hooks: Hook[]): BuiltinT
         scoped.push({ ...r, unchecked: true });
       } else if (tool === name || coveredTools(tool, r.list).includes(name)) scoped.push(r);
     }
-    const decidedBy = ORDER.map((list) => whole.find((r) => r.list === list)).find(Boolean);
+    const decidedBy = CHECK_ORDER.map((list) => whole.find((r) => r.list === list)).find(Boolean);
     const tool: BuiltinTool = {
       name,
       description,
@@ -88,7 +87,7 @@ export function builtinTools(permissions: Permission[], hooks: Hook[]): BuiltinT
       verdict: decidedBy
         ? ({ deny: "denied", ask: "asks", allow: "allowed" } as const)[decidedBy.list]
         : "default",
-      scoped: scoped.sort((a, b) => ORDER.indexOf(a.list) - ORDER.indexOf(b.list)),
+      scoped: scoped.sort((a, b) => CHECK_ORDER.indexOf(a.list) - CHECK_ORDER.indexOf(b.list)),
       hooks: name === EXEMPT ? 0 : preToolUse.filter((h) => matcherCovers(h.matcher, name)).length,
     };
     if (decidedBy) tool.decidedBy = decidedBy;

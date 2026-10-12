@@ -1,6 +1,6 @@
 import { lstat } from "node:fs/promises";
 import { join } from "node:path";
-import { allowedScopes, ignoredReason } from "../../shared/scopes.ts";
+import { allowedScopes, EVERY_FILE, ignoredReason } from "../../shared/scopes.ts";
 import { type EffectiveSetting, type Scope, type SettingsLayer } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
 import { isRecord, listDir, mainWorktreeRoot, readJsonObject, redactSecrets } from "./files.ts";
@@ -12,8 +12,6 @@ const PRECEDENCE: Scope[] = ["user", "project", "local", "managed"];
 const WHOLE_VALUE_KEYS = new Set(["fallbackModel", "modelPicker"]);
 /** Maps whose entries are taken whole from the highest layer that has them, never field by field. */
 const WHOLE_ENTRY_KEYS = new Set(["managedMcpServers", "extraKnownMarketplaces", "modelSettings"]);
-
-const ANY_FILE: Scope[] = ["user", "project", "local", "managed"];
 
 interface Strict {
   /** Least strict value first. */
@@ -29,13 +27,13 @@ interface Strict {
  * a higher file (docs: settings#exceptions-to-managed-settings-precedence).
  */
 const STRICTEST: Record<string, Strict> = {
-  disableClaudeAiConnectors: { ladder: [false, true], from: ANY_FILE },
-  isolatePeerMachines: { ladder: [false, true], from: ANY_FILE },
-  enableArtifact: { ladder: [true, false], from: ANY_FILE },
-  disableArtifact: { ladder: [false, true], from: ANY_FILE },
-  "permissions.blockReadsOutsideWorkingDirectories": { ladder: [false, true], from: ANY_FILE },
+  disableClaudeAiConnectors: { ladder: [false, true], from: EVERY_FILE },
+  isolatePeerMachines: { ladder: [false, true], from: EVERY_FILE },
+  enableArtifact: { ladder: [true, false], from: EVERY_FILE },
+  disableArtifact: { ladder: [false, true], from: EVERY_FILE },
+  "permissions.blockReadsOutsideWorkingDirectories": { ladder: [false, true], from: EVERY_FILE },
   "autoMode.classifyAllShell": { ladder: [false, true], from: ["user"] },
-  maxEffortLevel: { ladder: ["max", "xhigh", "high", "medium", "low"], from: ANY_FILE },
+  maxEffortLevel: { ladder: ["max", "xhigh", "high", "medium", "low"], from: EVERY_FILE },
   useAutoModeDuringPlan: { ladder: [true, false], from: ["managed", "user", "local"] },
   syncClaudeAiSkills: { ladder: [true, false], from: ["managed", "user", "local"] },
   syncClaudeAiPlugins: { ladder: [true, false], from: ["managed", "user", "local"] },
@@ -192,6 +190,8 @@ export async function readManagedSettings(env: ScanEnv): Promise<{
   sources: string[];
   dropIns: string[];
   errors: string[];
+  /** A managed file that is there but not a JSON object: Claude Code refuses to start (docs: managed-settings#find-entries-claude-code-dropped). */
+  blocksStart: boolean;
 }> {
   const dropInDir = join(env.managedDir, "managed-settings.d");
   const dropIns = (await listDir(dropInDir))
@@ -199,26 +199,30 @@ export async function readManagedSettings(env: ScanEnv): Promise<{
     .map((name) => join(dropInDir, name));
   const sources: string[] = [];
   const errors: string[] = [];
+  let blocksStart = false;
   let data: Record<string, unknown> | null = null;
   for (const source of [join(env.managedDir, "managed-settings.json"), ...dropIns]) {
-    const result = await readJsonObject(source);
+    // An empty managed file counts as {}.
+    const result = await readJsonObject(source, { emptyIsObject: true });
     if (!result.ok) {
       if (!result.missing) errors.push(`${source}: ${result.error}`);
+      if (result.unparsed) blocksStart = true;
       continue;
     }
     sources.push(source);
     data = data ? mergeSettings(data, result.data) : result.data;
   }
-  return { data, sources, dropIns, errors };
+  return { data, sources, dropIns, errors, blocksStart };
 }
 
 async function readManagedLayer(env: ScanEnv, path: string): Promise<SettingsLayer> {
-  const { data, sources, dropIns, errors } = await readManagedSettings(env);
+  const { data, sources, dropIns, errors, blocksStart } = await readManagedSettings(env);
   const layer: SettingsLayer = { scope: "managed", path, exists: false, data: null };
   if (data) layer.data = redactSecrets(data) as Record<string, unknown>;
   layer.exists = sources.length > 0 || errors.length > 0;
   if (sources.length > 1 || dropIns.length > 0) layer.sources = sources;
   if (errors.length > 0) layer.error = errors.join("; ");
+  if (blocksStart) layer.blocksStart = true;
   return layer;
 }
 

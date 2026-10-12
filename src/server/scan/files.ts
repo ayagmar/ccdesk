@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { lstat, open, readdir, readFile, readlink, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join, normalize, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
-import { parse as parseYaml } from "yaml";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { type TextFile, type Visibility } from "../../shared/types.ts";
 
 const run = promisify(execFile);
@@ -40,9 +40,11 @@ export function jsonSyntaxError(error: unknown): string {
 }
 
 /**
- * The text ccdesk shows for a file reached as an instruction, import, memory or memory backup. A
+ * The text ccdesk shows for a file reached as an instruction, import, memory, agent or skill. A
  * settings or MCP file read this way, whatever it is named, would otherwise show its env and
- * headers values, so anything that parses as JSON is shown parsed with them hidden.
+ * headers values, so anything that parses as JSON is shown parsed with them hidden. Frontmatter can
+ * hold the same values, in a subagent's inline MCP servers (docs: sub-agents#scope-mcp-servers-to-a-subagent),
+ * so frontmatter that holds any is shown re-written with them hidden.
  */
 export function shownText(text: string | null): string | null {
   if (text === null) return null;
@@ -50,11 +52,25 @@ export function shownText(text: string | null): string | null {
   try {
     data = JSON.parse(text);
   } catch {
-    return text;
+    return shownFrontmatter(text);
   }
   return typeof data === "object" && data !== null
     ? `${JSON.stringify(redactSecrets(data), null, 2)}\n`
     : text;
+}
+
+function shownFrontmatter(text: string): string {
+  const match = FRONTMATTER.exec(text);
+  if (!match) return text;
+  let data: unknown;
+  try {
+    data = parseYaml(match[1] ?? "");
+  } catch {
+    return text;
+  }
+  const redacted = redactSecrets(data);
+  if (JSON.stringify(redacted) === JSON.stringify(data)) return text;
+  return `---\n${stringifyYaml(redacted)}---\n${text.slice(match[0].length)}`;
 }
 
 /** A file named .json that does not parse is not shown: its text could still hold a secret. */
@@ -171,9 +187,14 @@ export async function resolvedPath(path: string): Promise<string> {
 
 type JsonResult =
   | { ok: true; data: Record<string, unknown> }
-  | { ok: false; missing: boolean; error: string };
+  /** `unparsed`: the file was read, but is not a JSON object. */
+  | { ok: false; missing: boolean; unparsed?: boolean; error: string };
 
-export async function readJsonObject(path: string): Promise<JsonResult> {
+/** A JSON object file; `emptyIsObject` reads an empty file as `{}`. */
+export async function readJsonObject(
+  path: string,
+  { emptyIsObject = false } = {}
+): Promise<JsonResult> {
   let raw: string;
   try {
     if (await leadsToSecret(path))
@@ -183,12 +204,14 @@ export async function readJsonObject(path: string): Promise<JsonResult> {
     const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
     return { ok: false, missing, error: String(error) };
   }
+  if (emptyIsObject && raw.trim() === "") return { ok: true, data: {} };
   try {
     const data: unknown = JSON.parse(raw);
-    if (!isRecord(data)) return { ok: false, missing: false, error: "not a JSON object" };
+    if (!isRecord(data))
+      return { ok: false, missing: false, unparsed: true, error: "not a JSON object" };
     return { ok: true, data };
   } catch (error) {
-    return { ok: false, missing: false, error: jsonSyntaxError(error) };
+    return { ok: false, missing: false, unparsed: true, error: jsonSyntaxError(error) };
   }
 }
 
@@ -238,8 +261,10 @@ interface Frontmatter {
   body: string;
 }
 
+const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+
 export function parseFrontmatter(text: string): Frontmatter {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
+  const match = FRONTMATTER.exec(text);
   if (!match) return { data: {}, body: text };
   try {
     const data: unknown = parseYaml(match[1] ?? "");

@@ -1,7 +1,7 @@
 import scopeTable from "./settings-scopes.json" with { type: "json" };
 import { type Scope } from "./types.ts";
 
-const EVERY_FILE: Scope[] = ["user", "project", "local", "managed"];
+export const EVERY_FILE: Scope[] = ["user", "project", "local", "managed"];
 
 /** Settings files by precedence: managed beats local beats project beats user. */
 export const HIGHEST_FIRST: Scope[] = ["managed", "local", "project", "user"];

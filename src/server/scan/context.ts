@@ -165,7 +165,9 @@ export async function buildContext(input: ContextInput): Promise<ContextBlock[]>
     );
   }
 
-  const listed = [...inventory.skills, ...inventory.commands].filter((s) => s.listed !== false);
+  const listed = [...inventory.skills, ...inventory.commands].filter(
+    (s) => s.listed !== false && !s.shadowedBy
+  );
   const listing = skillListing(listed);
   if (listing)
     blocks.push(
@@ -180,7 +182,7 @@ export async function buildContext(input: ContextInput): Promise<ContextBlock[]>
       )
     );
   const agents = inventory.agents
-    .filter((a) => !a.shadowedBy)
+    .filter((a) => !a.shadowedBy && !a.skipped)
     .map((a) => `- ${a.id ?? a.name}: ${a.description}`)
     .join("\n");
   if (agents)

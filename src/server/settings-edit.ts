@@ -12,6 +12,7 @@ import {
 } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isRecord, jsonSyntaxError, redactSecrets, revisionOf } from "./scan/files.ts";
+import { isSkippedMcpRule } from "./scan/permissions.ts";
 import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
 import { RefusedError, readIfExists, recordChange, serially, writeAtomic } from "./write.ts";
 
@@ -77,12 +78,17 @@ async function readSettings(
   return { raw, data: parsed };
 }
 
-/** Works out the file change that sets or removes one key, refusing what ccdesk cannot do safely. */
+/**
+ * Works out the file change that sets or removes one key, refusing what ccdesk cannot do safely.
+ * `checksHiddenValues` is for a key whose edit checks the part it changes itself, so values it
+ * leaves alone are written back exactly as they were.
+ */
 async function planKey(
   env: ScanEnv,
   file: SettingsFile,
   key: string,
-  value: (data: Record<string, unknown>) => unknown
+  value: (data: Record<string, unknown>) => unknown,
+  checksHiddenValues = false
 ): Promise<PlannedEdit> {
   if (!allowedScopes(key).includes(file.scope))
     throw new RefusedError(`${ignoredReason(key)}, so a ${file.scope} value would do nothing.`);
@@ -94,8 +100,13 @@ async function planKey(
   const { raw, data } = await readSettings(env, path);
   const nextValue = value(data);
   // ccdesk never shows env or header values, so it must not write them either.
-  if (hasHiddenValues({ [key]: data[key] }) || hasHiddenValues({ [key]: nextValue }))
+  if (
+    !checksHiddenValues &&
+    (hasHiddenValues({ [key]: data[key] }) || hasHiddenValues({ [key]: nextValue }))
+  )
     throw new RefusedError(`${key} holds hidden values; edit it in the file instead.`);
+  if (raw !== null && JSON.stringify(nextValue) === JSON.stringify(data[key]))
+    throw new RefusedError("This file already says that; there is nothing to change.");
 
   const before = raw === null ? null : shown(data);
   // The diff is rendered from the parsed file, so a file in another layout is reported as
@@ -158,6 +169,10 @@ async function planPermissionEdit(env: ScanEnv, edit: PermissionEdit): Promise<P
       else delete permissions[remove.list];
     }
     if (add) {
+      if (isSkippedMcpRule(add.rule))
+        throw new RefusedError(
+          "Claude Code skips an MCP rule with parentheses in a settings file. To match a parameter of an MCP tool, pass a deny rule with --disallowedTools."
+        );
       const list = Array.isArray(permissions[add.list]) ? (permissions[add.list] as unknown[]) : [];
       if (!list.includes(add.rule)) permissions[add.list] = [...list, add.rule];
     }
@@ -173,51 +188,68 @@ function matcherOf(group: unknown): string {
 /** One hook taken out, replaced or added, applied to the file as it is on disk. */
 async function planHookEdit(env: ScanEnv, edit: HookEdit): Promise<PlannedEdit> {
   const file = await editableFile(env, edit.dir, (f) => f.path === edit.file);
-  return planKey(env, file, "hooks", (data) => {
-    const hooks: Record<string, unknown> = isRecord(data.hooks) ? structuredClone(data.hooks) : {};
-    const groupsOf = (event: string): unknown[] => {
-      const groups = hooks[event];
-      return Array.isArray(groups) ? groups : [];
-    };
-    const { remove, add } = edit;
-    if (remove) {
-      const groups = groupsOf(remove.event);
-      const group = groups[remove.at.group];
-      const list = isRecord(group) && Array.isArray(group.hooks) ? group.hooks : null;
-      const hook = list?.[remove.at.index];
-      if (!list || JSON.stringify(redactSecrets(hook)) !== JSON.stringify(remove.definition))
-        throw new RefusedError(
-          "This hook changed in the file since ccdesk read it; review it again."
-        );
-      const matcher = add?.matcher ?? "";
-      // A hook alone in its group keeps the group when only its matcher changes, unless another
-      // group already has that matcher.
-      const inPlace =
-        add?.event === remove.event &&
-        (matcher === matcherOf(group) ||
-          (list.length === 1 && !groups.some((g) => g !== group && matcherOf(g) === matcher)));
-      if (add && inPlace && isRecord(group)) {
-        list[remove.at.index] = add.definition;
-        if (matcher) group.matcher = matcher;
-        else delete group.matcher;
-        return hooks;
+  return planKey(
+    env,
+    file,
+    "hooks",
+    (data) => {
+      const hooks: Record<string, unknown> = isRecord(data.hooks)
+        ? structuredClone(data.hooks)
+        : {};
+      const groupsOf = (event: string): unknown[] => {
+        const groups = hooks[event];
+        return Array.isArray(groups) ? groups : [];
+      };
+      const { remove, add } = edit;
+      if (remove) {
+        const groups = groupsOf(remove.event);
+        const group = groups[remove.at.group];
+        const list = isRecord(group) && Array.isArray(group.hooks) ? group.hooks : null;
+        const hook = list?.[remove.at.index];
+        if (!list || JSON.stringify(redactSecrets(hook)) !== JSON.stringify(remove.definition))
+          throw new RefusedError(
+            "This hook changed in the file since ccdesk read it; review it again."
+          );
+        // The page saw this hook with its header values hidden, so a changed copy would lose them.
+        if (add && hasHiddenValues(hook))
+          throw new RefusedError(
+            "This hook sends header values ccdesk does not show; edit it in the file, or remove it and add it again."
+          );
+        const matcher = add?.matcher ?? "";
+        // A hook alone in its group keeps the group when only its matcher changes, unless another
+        // group already has that matcher.
+        const inPlace =
+          add?.event === remove.event &&
+          (matcher === matcherOf(group) ||
+            (list.length === 1 && !groups.some((g) => g !== group && matcherOf(g) === matcher)));
+        if (add && inPlace && isRecord(group)) {
+          list[remove.at.index] = add.definition;
+          if (matcher) group.matcher = matcher;
+          else delete group.matcher;
+          return hooks;
+        }
+        list.splice(remove.at.index, 1);
+        if (list.length === 0) groups.splice(remove.at.group, 1);
+        if (groups.length === 0 && add?.event !== remove.event) delete hooks[remove.event];
       }
-      list.splice(remove.at.index, 1);
-      if (list.length === 0) groups.splice(remove.at.group, 1);
-      if (groups.length === 0 && add?.event !== remove.event) delete hooks[remove.event];
-    }
-    if (add) {
-      const groups = groupsOf(add.event);
-      const matcher = add.matcher ?? "";
-      const group = groups.find(
-        (g) => matcherOf(g) === matcher && isRecord(g) && Array.isArray(g.hooks)
-      );
-      if (isRecord(group) && Array.isArray(group.hooks)) group.hooks.push(add.definition);
-      else groups.push({ ...(matcher ? { matcher } : {}), hooks: [add.definition] });
-      hooks[add.event] = groups;
-    }
-    return Object.keys(hooks).length > 0 ? hooks : undefined;
-  });
+      if (add) {
+        if (hasHiddenValues(add.definition))
+          throw new RefusedError(
+            "ccdesk does not write header values it would then hide; add this hook in the file instead."
+          );
+        const groups = groupsOf(add.event);
+        const matcher = add.matcher ?? "";
+        const group = groups.find(
+          (g) => matcherOf(g) === matcher && isRecord(g) && Array.isArray(g.hooks)
+        );
+        if (isRecord(group) && Array.isArray(group.hooks)) group.hooks.push(add.definition);
+        else groups.push({ ...(matcher ? { matcher } : {}), hooks: [add.definition] });
+        hooks[add.event] = groups;
+      }
+      return Object.keys(hooks).length > 0 ? hooks : undefined;
+    },
+    true
+  );
 }
 
 /** Writes a planned edit, but only if the file is still the revision the preview was made from. */

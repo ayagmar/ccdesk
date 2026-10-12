@@ -12,6 +12,7 @@ const KINDS = ["agent", "skill", "command", "output style", "plugin"];
 
 /** Why an agent, skill or command is not offered to Claude as usual, if it is not. */
 function notOffered(e: Entry): string | null {
+  if (e.skipped) return `skipped by Claude Code: ${e.skipped}`;
   if (e.shadowedBy)
     return `not used: ${tilde(e.shadowedBy)} defines this name with higher priority`;
   if (e.override === "off") return "hidden by skillOverrides";
@@ -101,7 +102,7 @@ export const extensions = defineSection<R>({
   dimmed: (row) =>
     row.kind === "plugin"
       ? !row.item.enabled
-      : Boolean(row.item.shadowedBy) || row.item.override === "off",
+      : Boolean(row.item.shadowedBy || row.item.skipped) || row.item.override === "off",
   text: (row) =>
     row.kind === "plugin"
       ? `plugin ${row.item.id}`

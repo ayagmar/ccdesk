@@ -87,19 +87,28 @@ export async function testPath(env: ScanEnv, dir: string, file: string): Promise
       if (globs.length === 0 || glob)
         matches.push({ kind: "nested", path, scope: "project", ...(glob ? { glob } : {}) });
     }
-    // Only skills Claude may pick itself: not off, user-invocable-only or disable-model-invocation.
+    // Only skills Claude may pick itself: not off, user-invocable-only or disable-model-invocation;
+    // one with paths only for a matching file, its globs read from its folder like a rule's.
     for (const name of await listDir(join(folder, ".claude", "skills"))) {
       const skill = await readSkill(join(folder, ".claude", "skills", name), "project");
       if (!skill) continue;
       applySkillOverrides([skill], overrides);
-      if (skill.listed !== false)
-        matches.push({ kind: "skill", path: skill.path, scope: "project", name: skill.name });
+      if (skill.listed === false) continue;
+      const glob = skill.paths && firstMatch(skill.paths, slashed(relative(folder, target)));
+      if (skill.paths && !glob) continue;
+      matches.push({
+        kind: "skill",
+        path: skill.path,
+        scope: "project",
+        name: skill.name,
+        ...(glob ? { glob } : {}),
+      });
     }
   }
 
   // Skills Claude can pick on its own; one with disable-model-invocation only runs when you call it.
   for (const skill of view.inventory.skills) {
-    if (!skill.paths || skill.listed === false) continue;
+    if (!skill.paths || skill.listed === false || skill.shadowedBy) continue;
     const glob = firstMatch(skill.paths, slashed(relative(projectRoot, target)));
     if (glob)
       matches.push({ kind: "skill", path: skill.path, scope: skill.scope, glob, name: skill.name });

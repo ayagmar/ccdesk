@@ -10,7 +10,7 @@ import { isRecord, stringsIn } from "./files.ts";
 import { ignoredModeReason } from "./settings.ts";
 
 /**
- * Whether a file's trust-gated settings (permission grants, hooks, autoMemoryDirectory) wait for
+ * Whether a file's trust-gated settings (permission grants, autoMemoryDirectory) wait for
  * the workspace trust dialog. Claude Code runs git to tell a private local file from a committed one
  * only once the folder or a parent is trusted, so until then the local file waits too, except in
  * your configuration home; a committed local file waits like project settings.
@@ -25,8 +25,16 @@ export function trustWaits({
   return (scope) => (scope === "project" && !trust.trusted) || (scope === "local" && localWaits);
 }
 
+/**
+ * An MCP rule with a parameter, which Claude Code skips when it reads a settings file; such a rule
+ * works only from --disallowedTools (docs: permissions#match-specific-tool-uses).
+ */
+export function isSkippedMcpRule(rule: string): boolean {
+  return /^mcp__[^(]*\(/.test(rule);
+}
+
 /** Claude Code checks every file's rules together: deny, then ask, then allow (docs: permissions). */
-const CHECK_ORDER: PermissionList[] = ["deny", "ask", "allow"];
+export const CHECK_ORDER: PermissionList[] = ["deny", "ask", "allow"];
 
 export interface Options {
   trust: Trust;
@@ -62,6 +70,12 @@ export function permissionsOf(layers: SettingsLayer[], options: Options): Permis
     CHECK_ORDER.flatMap((list) =>
       stringsIn(permissions[list]).map((rule): Permission & { kind: "rule" } => {
         const base = { kind: "rule" as const, list, rule, scope, path };
+        if (isSkippedMcpRule(rule))
+          return {
+            ...base,
+            inEffect: false,
+            note: "Claude Code skips an MCP rule with parentheses in a settings file; pass it with --disallowedTools",
+          };
         if (managedOnly && scope !== "managed")
           return {
             ...base,
