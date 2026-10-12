@@ -85,6 +85,12 @@ jobs:
           [ "$INCREMENT" != "auto" ] && args+=(--increment "$INCREMENT")
           [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
           pnpm exec release-it "${args[@]}"
+          # A dry run leaves package.json at the released version, which npm refuses to publish
+          # again; check the publish of the version this release would make instead.
+          if [ "$DRY_RUN" = "true" ]; then
+            next=$(pnpm exec release-it "${args[@]}" --release-version | tail -n 1)
+            npm version "$next" --no-git-tag-version
+          fi
 
       - name: Verify tagged version is unpublished
         id: version
@@ -98,12 +104,8 @@ jobs:
             exit 1
           fi
           if npm view "$name@$version" version >/dev/null 2>&1; then
-            if [ "$DRY_RUN" = "true" ]; then
-              echo "::notice::$name@$version is already on npm (expected for a dry run)"
-            else
-              echo "::error::$name@$version is already published"
-              exit 1
-            fi
+            echo "::error::$name@$version is already published"
+            exit 1
           fi
 
       - name: Publish to npm
