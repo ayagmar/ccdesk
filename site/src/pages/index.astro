@@ -17,7 +17,8 @@ const cropWidth = (id: string) => {
   return crop.default.width / 2;
 };
 
-// Questions people open ccdesk with; the key is the one that jumps to the section that answers.
+// Questions people open ccdesk with, and the section of the app that answers each, with the key
+// that jumps to it there (What Claude sees is a view, so it has none).
 // Each opens to a crop of the rows that answer it (`pnpm screenshots` makes answer-<id>-*.webp).
 const QUESTIONS = [
   {
@@ -25,6 +26,7 @@ const QUESTIONS = [
     question: "Why does Claude ask me before every git push here?",
     answer: "The ask rule, and the settings file it is in",
     shows: "The Bash(git push *) ask rule from user settings, among the other permission rules",
+    section: "Permissions",
     key: "3",
     page: "permissions/",
     title: "Permissions",
@@ -35,6 +37,7 @@ const QUESTIONS = [
     answer: "The value that wins, and the ones it beats",
     shows:
       "The model setting: sonnet from project settings, with user settings' opus struck through",
+    section: "Settings",
     key: "2",
     page: "settings/",
     title: "Settings",
@@ -44,6 +47,7 @@ const QUESTIONS = [
     question: "Is my AGENTS.md loaded at all?",
     answer: "Loaded, on match or skipped, with the reason",
     shows: "AGENTS.md marked skipped, because CLAUDE.md already imports it",
+    section: "Instructions",
     key: "1",
     page: "instructions/",
     title: "Instructions",
@@ -54,6 +58,7 @@ const QUESTIONS = [
     answer: "Each part in load order, with estimated tokens",
     shows:
       "What Claude sees: about 401 tokens from 9 parts, listed in load order with lines and tokens",
+    section: "What Claude sees",
     key: "",
     page: "what-claude-sees/",
     title: "What Claude sees",
@@ -63,6 +68,7 @@ const QUESTIONS = [
     question: "Which allow rules have I stopped needing?",
     answer: "Rules that covered no call in this project's sessions",
     shows: "Allow rules flagged covered no call here",
+    section: "Permissions",
     key: "3",
     page: "permissions/",
     title: "Permissions",
@@ -72,6 +78,7 @@ const QUESTIONS = [
     question: "What do I keep approving by hand?",
     answer: "Suggested allow rules, with how often you said yes",
     shows: "Suggested rules such as Bash(gh pr view *), which you allowed 2 times",
+    section: "Permissions",
     key: "3",
     page: "permissions/#suggested-rules",
     title: "Suggested rules",
@@ -82,6 +89,7 @@ const QUESTIONS = [
     answer: "Each server's status, scope and target",
     shows:
       "The sentry server from .mcp.json marked needs approval, beside servers that are configured",
+    section: "MCP servers",
     key: "7",
     page: "mcp-servers/",
     title: "MCP servers",
@@ -91,6 +99,7 @@ const QUESTIONS = [
     question: "Did Claude save the same memory in two projects?",
     answer: "Memories found under more than one directory",
     shows: "The review-style memory, saved in acme-api and acme-web and drifted apart",
+    section: "Memory",
     key: "5",
     page: "memory/",
     title: "Memory",
@@ -114,14 +123,15 @@ const QUESTIONS = [
       <h2 id="questions">Questions it answers</h2>
       <p class="section-lede">
         Each answer is a row on the directory page, and each row names its source file. Open a
-        question to see its row. Numbers are the keys that jump to that section.
+        question to see its row. The last column names the section of ccdesk it is in, with the key
+        that jumps there in the app.
       </p>
       <table class="timetable">
         <thead>
           <tr>
             <th scope="col">You want to know</th>
             <th scope="col">ccdesk shows</th>
-            <th scope="col" class="key-col">Key</th>
+            <th scope="col" class="key-col">In ccdesk</th>
           </tr>
         </thead>
         <tbody>
@@ -144,7 +154,8 @@ const QUESTIONS = [
                   </td>
                   <td class="answer">{q.answer}</td>
                   <td class="key-col">
-                    {q.key ? <kbd>{q.key}</kbd> : <span class="view">view</span>}
+                    <span class="section">{q.section}</span>
+                    {q.key && <kbd title={`Press ${q.key} in ccdesk to jump here`}>{q.key}</kbd>}
                   </td>
                 </tr>
                 <tr class="reveal" id={`answer-${q.id}`} hidden>
@@ -392,8 +403,17 @@ const QUESTIONS = [
   }
 
   .key-col {
-    width: 4rem;
+    color: var(--sl-color-gray-3);
     text-align: right;
+    white-space: nowrap;
+  }
+
+  .timetable th.key-col {
+    text-align: right;
+  }
+
+  .key-col kbd {
+    margin-left: 0.5rem;
   }
 
   kbd {
@@ -411,10 +431,6 @@ const QUESTIONS = [
     font-size: 0.75rem;
   }
 
-  .view {
-    color: var(--muted);
-    font-size: 0.8125rem;
-  }
 
   .split {
     display: grid;
@@ -501,7 +517,7 @@ const QUESTIONS = [
 
     .timetable tr {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: minmax(0, 1fr);
       padding: 0.625rem 0;
       border-bottom: 1px solid var(--rule);
     }
@@ -518,10 +534,10 @@ const QUESTIONS = [
     }
 
     .timetable .key-col {
-      grid-row: 1 / span 2;
-      grid-column: 2;
-      align-self: center;
-      padding-left: 0.75rem;
+      margin-top: 0.375rem;
+      padding-left: 1.375rem;
+      font-size: 0.8125rem;
+      text-align: left;
     }
 
     .timetable .answer {
