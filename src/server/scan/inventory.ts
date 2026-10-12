@@ -19,6 +19,7 @@ import {
   parseFrontmatter,
   readJsonObject,
   redactSecrets,
+  shownUrl,
   readTextFile,
   resolvedPath,
   stringField,
@@ -386,7 +387,8 @@ function hooksFrom(config: unknown, source: Source, sourcePath: string, plugin?:
         const entry: Hook = {
           event,
           type: stringField(h, "type") || "command",
-          command: stringField(h, "command") || stringField(h, "prompt") || stringField(h, "url"),
+          command:
+            stringField(h, "command") || stringField(h, "prompt") || shownUrl(stringField(h, "url")),
           source,
           sourcePath,
           active: true,

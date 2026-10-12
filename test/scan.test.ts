@@ -107,6 +107,20 @@ test("disableAllHooks outside managed settings stops every hook except managed o
   );
 });
 
+test("an http hook's URL is shown without its user name, password or query", async () => {
+  const f = makeFixture();
+  const url = "https://bot:hunter2@hooks.example.com/stop?token=abc123";
+  f.json("home/.claude/settings.json", {
+    hooks: { Stop: [{ hooks: [{ type: "http", url }] }] },
+  });
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.equal(view.inventory.hooks[0]?.command, "https://•••@hooks.example.com/stop?•••");
+  assert.doesNotMatch(JSON.stringify(view), /hunter2|abc123/);
+});
+
 test(".mcp.json servers wait for approval, and a server defined twice uses the closer definition", async () => {
   const f = makeFixture();
   f.json("app/.mcp.json", {
