@@ -388,7 +388,9 @@ function hooksFrom(config: unknown, source: Source, sourcePath: string, plugin?:
           event,
           type: stringField(h, "type") || "command",
           command:
-            stringField(h, "command") || stringField(h, "prompt") || shownUrl(stringField(h, "url")),
+            stringField(h, "command") ||
+            stringField(h, "prompt") ||
+            shownUrl(stringField(h, "url")),
           source,
           sourcePath,
           active: true,
