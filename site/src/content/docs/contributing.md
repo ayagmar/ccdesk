@@ -18,6 +18,18 @@ pnpm check      # typecheck, lint, format check, tests, build
 
 Tests never touch your real `~/.claude`. Each test process gets a throwaway home folder, git configuration and environment, network access is blocked, and each test builds its own fixture.
 
+## How the code fits together
+
+- `src/server/cli.ts` parses the flags, builds a `ScanEnv` with `scanEnvFromProcess` and starts the server from `server.ts`, which answers the `/api/*` routes and serves the built UI. Every `/api/` request needs the per-run token in the `x-ccdesk-token` header.
+- `src/server/scan/` reads. Every function takes the `ScanEnv` (home, Claude folder, `.claude.json`, managed folder, platform), so tests point it at a fixture instead of your machine. `scanDirectory` returns the `DirectoryView` a page shows, and `scanOverview` the start page.
+- The edit modules (`settings-edit.ts`, `agent-edit.ts`, `mcp-edit.ts`, `mutations.ts` for memory) and `backups.ts` write. `write.ts` holds what they share: atomic writes through links, the backup folder and its manifest, and the queue that runs changes one at a time.
+- `watch.ts` watches the files a scan read and wakes the page's long poll on `/api/watch` when one changes. `~/.claude.json` is not watched; the page reloads when you return to the tab.
+- `src/shared` holds the types and generated data both sides use, and imports neither Node nor the DOM. `src/ui` imports only `src/shared` and talks to the server through `src/ui/api.ts`.
+
+Every edit goes through the same steps. The UI sends the edit to a `preview` route, which returns the diff and the `revision` of what it read. The save route takes the same edit with that revision, plans it again from the file on disk and writes only if the revision still matches; otherwise it throws `RefusedError` (409), and the page asks you to review again. A save returns a `Change` whose `id` is its backup folder, which is what Undo and Recent changes restore. User and local MCP edits are the exception: they run `claude mcp`, keep no backup and return no `Change`.
+
+Values ccdesk hides on the page (env values, headers, keys in URLs and arguments) are redacted in the scan, so they never reach the browser. An edit that would write a value the page hides is refused.
+
 ## Claude Code data
 
 Several files in `src/shared` are generated from Claude Code's own sources:
