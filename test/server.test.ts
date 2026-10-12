@@ -726,6 +726,22 @@ test("comparing two directories lists each key's value in both, with the files t
   assert.equal(relative.status, 400);
 });
 
+test("settings that differ only in the order of their keys compare the same", async () => {
+  const a = fixture.at("work/compare-order-a");
+  const b = fixture.at("work/compare-order-b");
+  fixture.json("work/compare-order-a/.claude/settings.json", {
+    permissions: { allow: ["Bash"], deny: ["Read"] },
+  });
+  fixture.json("work/compare-order-b/.claude/settings.json", {
+    permissions: { deny: ["Read"], allow: ["Bash"] },
+  });
+
+  const res = await call(`/api/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
+  const { settings } = res.json as { settings: Array<{ key: string; same: boolean }> };
+
+  assert.equal(settings.find((s) => s.key === "permissions")?.same, true);
+});
+
 test("a permission rule is moved in the file it is in, and a rule that is gone is not", async () => {
   const dir = fixture.at("work/perms");
   const file = fixture.json("work/perms/.claude/settings.json", {

@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import {
   type ComparedSetting,
   type ComparedValue,
@@ -37,7 +38,8 @@ export async function compareSettings(
   const settings = keys.map((key): ComparedSetting => {
     const x = left.get(key) ?? null;
     const y = right.get(key) ?? null;
-    return { key, a: x, b: y, same: JSON.stringify(x?.value) === JSON.stringify(y?.value) };
+    // The order keys are written in does not change a setting.
+    return { key, a: x, b: y, same: isDeepStrictEqual(x?.value, y?.value) };
   });
   return { a: resolve(a), b: resolve(b), settings };
 }
