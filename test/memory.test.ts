@@ -40,6 +40,18 @@ test("MEMORY.md past 200 lines is flagged as partly unread", async () => {
   assert.equal(view.memory?.index?.loadedLines, 200);
 });
 
+test("MEMORY.md of exactly 200 lines, ending in a newline, loads in full", async () => {
+  const f = makeFixture();
+  const lines = Array.from({ length: 200 }, (_, i) => `- [m${i}](m${i}.md) — note`);
+  f.write(`${memoryDirFor(f, f.at("app"))}/MEMORY.md`, `${lines.join("\n")}\n`);
+  mkdirSync(f.at("app"));
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.equal(view.memory?.index?.truncated, false);
+  assert.equal(view.memory?.index?.loadedLines, 200);
+});
+
 test("upkeep problems are reported: unindexed memory, broken links, index entries without a file", async () => {
   const f = makeFixture();
   mkdirSync(f.at("app"));

@@ -83,7 +83,8 @@ export async function readMemoryStore(
 }
 
 function summarizeIndex(file: TextFile, files: string[]): MemoryIndex {
-  const lines = file.text.split("\n");
+  // A file's last newline ends its last line; it does not start another one.
+  const lines = file.text.replace(/\n$/, "").split("\n");
   let loadedLines = 0;
   let bytes = 0;
   for (const line of lines) {
