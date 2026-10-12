@@ -1241,6 +1241,7 @@ async function saveMcp(edit: Record<string, unknown>) {
 interface ScannedServer {
   name: string;
   scope: string;
+  target: string;
   definition: unknown;
 }
 
@@ -1325,6 +1326,45 @@ test("a server with hidden env values is not rewritten, but can be removed", asy
   });
   assert.equal(removed.status, 200);
   assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).mcpServers, { keep: { command: "k" } });
+});
+
+test("keys in a server's args are hidden, and such a server is not rewritten", async () => {
+  const dir = fixture.at("work/mcp-args");
+  const args = [
+    "-y",
+    "some-mcp",
+    "--api-key",
+    "plain-flag-secret",
+    "--token=equals-secret",
+    "ghp_prefixsecret123",
+    "--port",
+    "8080",
+  ];
+  const file = fixture.json("work/mcp-args/.mcp.json", {
+    mcpServers: { api: { command: "npx", args } },
+  });
+  const before = readFileSync(file, "utf8");
+
+  const view = await call(`/api/directory?path=${encodeURIComponent(dir)}`);
+  const api = (await serversIn(dir)).find((s) => s.name === "api");
+  assert.ok(api);
+  const rewritten = await saveMcp({
+    dir,
+    scope: "project",
+    remove: { name: "api", definition: api.definition },
+    add: { name: "api", definition: api.definition },
+  });
+  const userAdd = await call("/api/mcp/preview", {
+    method: "POST",
+    body: { dir, scope: "user", add: { name: "new", definition: { command: "npx", args } } },
+  });
+
+  assert.doesNotMatch(JSON.stringify(view.json), /secret/);
+  assert.equal(api.target, "npx -y some-mcp --api-key ••• --token=••• ••• --port 8080");
+  assert.equal(rewritten.status, 409);
+  assert.equal(readFileSync(file, "utf8"), before);
+  assert.equal(userAdd.status, 200);
+  assert.doesNotMatch(JSON.stringify(userAdd.json), /secret/);
 });
 
 test("user and local servers are changed through claude mcp, never by writing ~/.claude.json", async () => {

@@ -279,9 +279,36 @@ export function shownUrl(url: string): string {
   }
 }
 
+/** A flag whose value is a secret, such as `--token` or `--api-key`. */
+const SECRET_FLAG = /^--(token|api[-_]?key|apikey|password|secret|auth|key)$/i;
+/** A value that starts like a common API key or token. */
+const KEY_PREFIX = /^(sk-|ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|xox[bp]-|glpat-|AKIA[0-9A-Z]{16})/;
+
+/**
+ * A server's command-line arguments as ccdesk shows them: the value after a secret flag, given as
+ * `--token value` or `--token=value`, a value that starts like a known key, and the credentials in
+ * a URL are hidden.
+ */
+export function shownArgs(args: unknown[]): unknown[] {
+  return args.map((arg, i) => {
+    if (typeof arg !== "string") return arg;
+    const previous = args[i - 1];
+    if (typeof previous === "string" && SECRET_FLAG.test(previous) && !arg.startsWith("-"))
+      return "•••";
+    const equals = arg.indexOf("=");
+    if (equals > 0) {
+      const name = arg.slice(0, equals);
+      if (SECRET_FLAG.test(name) || KEY_PREFIX.test(arg.slice(equals + 1))) return `${name}=•••`;
+    }
+    if (KEY_PREFIX.test(arg)) return "•••";
+    if (/^https?:\/\//i.test(arg)) return shownUrl(arg);
+    return arg;
+  });
+}
+
 /**
  * Replace values that commonly hold secrets with a placeholder, keeping the keys: env and headers
- * values, and the user, password and query of a `url`.
+ * values, the user, password and query of a `url`, and secret values in the `args` of a command.
  */
 export function redactSecrets(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactSecrets);
@@ -292,6 +319,8 @@ export function redactSecrets(value: unknown): unknown {
       if ((key === "env" || key === "headers") && isRecord(inner))
         return [key, Object.fromEntries(Object.keys(inner).map((k) => [k, "•••"]))];
       if (key === "url" && typeof inner === "string") return [key, shownUrl(inner)];
+      if (key === "args" && "command" in value && Array.isArray(inner))
+        return [key, shownArgs(inner)];
       return [key, redactSecrets(inner)];
     })
   );

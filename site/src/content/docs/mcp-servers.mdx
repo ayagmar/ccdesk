@@ -34,7 +34,7 @@ When two scopes define a server with the same name, the first one wins and the o
 - **overridden**: another scope defines a server with this name first (see above).
 - **invalid**: Claude Code cannot use the definition as written, for example a `url` without a `type`, which Claude Code reads as a stdio server.
 
-Values under `env` and `headers`, and the user name, password and query string of a `url`, are shown as `•••`.
+Values under `env` and `headers`, and the user name, password and query string of a `url`, are shown as `•••`. So are secrets in `args`: the value after `--token`, `--api-key`, `--apikey`, `--password`, `--secret`, `--auth` or `--key` (as `--token value` or `--token=value`), a value that starts like a common key (`sk-`, `ghp_`, `github_pat_`, `xoxb-`, `glpat-`, `AKIA`), and the credentials in a URL. The Target column hides them the same way.
 
 ## Changing servers
 
@@ -47,4 +47,4 @@ How the change is made depends on the scope:
 
 Changing a user or local server removes it and adds it again. If adding fails, ccdesk puts the old definition back; if that fails too, the error message includes a command you can run to restore it.
 
-A server with hidden values (in `env`, `headers` or its `url`) can be removed but not changed, because ccdesk would have to write values it never shows. Change those in Claude Code or in the file. Plugin and managed servers are read-only.
+A server with hidden values (in `env`, `headers`, its `url` or its `args`) can be removed but not changed, because ccdesk would have to write values it never shows. Change those in Claude Code or in the file. Plugin and managed servers are read-only.

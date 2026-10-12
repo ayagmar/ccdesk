@@ -58,15 +58,20 @@ function define(
       const command = stringField(c, "command")
         ? [stringField(c, "command"), ...stringsIn(c.args)]
         : null;
+      const definition = redactSecrets(c) as Record<string, unknown>;
       const server: McpServer = {
         name,
         scope,
         // An entry without a type is read as stdio, even one with a url (docs: mcp).
         transport: type || "stdio",
-        target: url ? shownUrl(url) : (command?.join(" ") ?? ""),
+        target: url
+          ? shownUrl(url)
+          : command
+            ? [command[0], ...stringsIn(definition.args)].join(" ")
+            : "",
         sourcePath,
         status: "active",
-        definition: redactSecrets(c),
+        definition,
       };
       const [problem] = serverProblems(c);
       if (problem) {
