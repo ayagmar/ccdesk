@@ -443,6 +443,12 @@ export function Review({
               {c}
             </p>
           ))}
+          {preview.commands.some((c) => c.includes(" add-json ")) && (
+            <p>
+              The real values are passed to claude on its command line, where other programs on this
+              computer can see them while it runs.
+            </p>
+          )}
           <p>This change is not listed in Recent changes, so undo it the same way.</p>
         </div>
       )}
