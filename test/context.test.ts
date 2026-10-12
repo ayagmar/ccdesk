@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { buildContext } from "../src/server/scan/context.ts";
 import { scanDirectory } from "../src/server/scan/index.ts";
 import { type ContextBlock } from "../src/shared/types.ts";
 import { makeFixture, memoryDirFor } from "./helpers/fixture.ts";
@@ -62,6 +64,27 @@ test("a linked rule that CLAUDE.md imports by its target's path is counted once"
 
   assert.deepEqual(
     counted(view.context).map((b) => [b.kind, b.path]),
+    [
+      ["instruction", f.at("app/CLAUDE.md")],
+      ["instruction", f.at("app/.claude/rules/shared.md")],
+    ]
+  );
+});
+
+test("a linked rule is counted once by the target the scan read, even if the link changed since", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "@docs/shared.md\n");
+  const target = f.write("app/docs/shared.md", "Shared rules.\n");
+  f.write("app/docs/other.md", "Other rules.\n");
+  f.link("app/.claude/rules/shared.md", target);
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  rmSync(f.at("app/.claude/rules/shared.md"));
+  f.link("app/.claude/rules/shared.md", f.at("app/docs/other.md"));
+  const context = await buildContext({ ...view, env: f.env, projectRoot: f.at("app") });
+
+  assert.deepEqual(
+    counted(context).map((b) => [b.kind, b.path]),
     [
       ["instruction", f.at("app/CLAUDE.md")],
       ["instruction", f.at("app/.claude/rules/shared.md")],
