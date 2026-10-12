@@ -131,7 +131,14 @@ export async function writeAtomic(
 export async function removeExactly(path: string, expected: string): Promise<boolean> {
   const aside = join(dirname(path), `.${basename(path)}.ccdesk-${randomBytes(6).toString("hex")}`);
   await rename(path, aside);
-  if (revisionOf(await readFile(aside, "utf8")) === expected) {
+  let text: string;
+  try {
+    text = await readFile(aside, "utf8");
+  } catch (error) {
+    await rename(aside, path);
+    throw error;
+  }
+  if (revisionOf(text) === expected) {
     await rm(aside);
     return true;
   }
