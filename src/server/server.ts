@@ -1,13 +1,10 @@
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
+import { type Core } from "../core/core.ts";
 import { PERMISSION_LISTS } from "../shared/scopes.ts";
 import { type PermissionList, SESSION_PROFILES, type SessionProfile } from "../shared/types.ts";
-import { listBackups, previewRestore, restoreBackup } from "./backups.ts";
-import { previewAgentEdit, saveAgentEdit } from "./agent-edit.ts";
-import { previewMcpEdit, type RunClaude, runClaude, saveMcpEdit } from "./mcp-edit.ts";
-import { changeMemory, isMemoryAction, previewMemoryChange } from "./mutations.ts";
-import { openInEditor } from "./open.ts";
+import { isMemoryAction } from "./mutations.ts";
 import {
   InvalidEditError,
   parseAgentEdit,
@@ -18,34 +15,19 @@ import {
   stringFields,
 } from "./parse-edit.ts";
 import { REFERENCE } from "./reference.ts";
-import { compareSettings } from "./scan/compare.ts";
-import { type ScanEnv } from "./scan/env.ts";
 import { isCredentials } from "./scan/files.ts";
-import { scanOverview } from "./scan/index.ts";
-import { CountStopped, readUsage } from "./scan/usage.ts";
-import { testPath } from "./scan/path-test.ts";
-import {
-  previewHookEdit,
-  previewPermissionEdit,
-  previewSettingsEdit,
-  saveHookEdit,
-  savePermissionEdit,
-  saveSettingsEdit,
-} from "./settings-edit.ts";
+import { CountStopped } from "./scan/usage.ts";
 import { Watcher } from "./watch.ts";
 import { RefusedError } from "./write.ts";
 
 interface ServerOptions {
-  env: ScanEnv;
+  /** What the routes read and change; tests make one with fakes so nothing is launched. */
+  core: Core;
   launchDir: string;
   /** Required on every API request; the browser gets it once, in the URL fragment. */
   token: string;
   /** Built UI directory; null serves the API only (the Vite dev server serves the UI). */
   uiDir: string | null;
-  /** Opens a file in the user's editor; replaced in tests so nothing is launched. */
-  openFile?: (path: string) => Promise<string>;
-  /** Runs `claude`, for MCP servers in ~/.claude.json; replaced in tests so nothing changes. */
-  runClaude?: RunClaude;
 }
 
 const MIME: Record<string, string> = {
@@ -77,8 +59,8 @@ class RequestError extends Error {
 }
 
 export function createCcdeskServer(options: ServerOptions): Server {
-  const watcher = new Watcher(options.env);
-  const table = routes(options, watcher);
+  const watcher = new Watcher(options.core.env);
+  const table = routes(options.core, watcher, options.launchDir);
   const server = createServer((req, res) => {
     handle(options, table, server, req, res).catch((error: unknown) => {
       const [status, message] = failure(error);
@@ -127,14 +109,12 @@ function stopOnClose(res: ServerResponse): AbortSignal {
   return stop.signal;
 }
 
-function routes(options: ServerOptions, watcher: Watcher): Route[] {
-  const { env, launchDir } = options;
-  const run = options.runClaude ?? runClaude;
+function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
   const revision = (body: unknown) => stringFields(body, ["revision"]).revision;
   const get = (path: string, action: Route["action"]): Route => ({ method: "GET", path, action });
   const post = (path: string, action: Route["action"]): Route => ({ method: "POST", path, action });
   return [
-    get("/api/overview", () => scanOverview(env, launchDir)),
+    get("/api/overview", () => core.scanOverview(launchDir)),
     // Sent instead of bundled with the page: the catalog and schema are most of its size.
     get("/api/reference", async () => REFERENCE),
     get("/api/directory", ({ url }) => {
@@ -153,17 +133,17 @@ function routes(options: ServerOptions, watcher: Watcher): Route[] {
           throw new RequestError(400, "a rule needs a list: allow, ask or deny");
         return { list: list as PermissionList, rule };
       });
-      return readUsage(env, path, inEffect, { signal: stopOnClose(res) });
+      return core.readUsage(path, inEffect, { signal: stopOnClose(res) });
     }),
     post("/api/memory/preview", async ({ body }) => {
       const { action, path } = stringFields(body, ["action", "path"]);
       if (!isMemoryAction(action)) throw new RequestError(400, "unknown memory action");
-      return previewMemoryChange(env, action, path);
+      return core.previewMemoryChange(action, path);
     }),
     post("/api/memory/change", async ({ body }) => {
       const { action, path, revision } = stringFields(body, ["action", "path", "revision"]);
       if (!isMemoryAction(action)) throw new RequestError(400, "unknown memory action");
-      return changeMemory(env, action, path, revision);
+      return core.changeMemory(action, path, revision);
     }),
     post("/api/open", async ({ body }) => {
       const { path } = stringFields(body, ["path"]);
@@ -171,34 +151,32 @@ function routes(options: ServerOptions, watcher: Watcher): Route[] {
       const info = await stat(path).catch(() => null);
       if (!info?.isFile() && !info?.isDirectory())
         throw new RefusedError("That file or folder no longer exists.");
-      if (await isCredentials(env, path))
+      if (await isCredentials(core.env, path))
         throw new RefusedError("ccdesk does not open credentials.");
-      return { editor: await (options.openFile ?? openInEditor)(path) };
+      return { editor: await core.openFile(path) };
     }),
     post("/api/settings/preview", async ({ body }) =>
-      previewSettingsEdit(env, parseSettingsEdit(body))
+      core.previewSettingsEdit(parseSettingsEdit(body))
     ),
     post("/api/settings/save", async ({ body }) =>
-      saveSettingsEdit(env, parseSettingsEdit(body), revision(body))
+      core.saveSettingsEdit(parseSettingsEdit(body), revision(body))
     ),
     post("/api/permissions/preview", async ({ body }) =>
-      previewPermissionEdit(env, parsePermissionEdit(body))
+      core.previewPermissionEdit(parsePermissionEdit(body))
     ),
     post("/api/permissions/save", async ({ body }) =>
-      savePermissionEdit(env, parsePermissionEdit(body), revision(body))
+      core.savePermissionEdit(parsePermissionEdit(body), revision(body))
     ),
-    post("/api/hooks/preview", async ({ body }) => previewHookEdit(env, parseHookEdit(body))),
+    post("/api/hooks/preview", async ({ body }) => core.previewHookEdit(parseHookEdit(body))),
     post("/api/hooks/save", async ({ body }) =>
-      saveHookEdit(env, parseHookEdit(body), revision(body))
+      core.saveHookEdit(parseHookEdit(body), revision(body))
     ),
-    post("/api/agents/preview", async ({ body }) => previewAgentEdit(env, parseAgentEdit(body))),
+    post("/api/agents/preview", async ({ body }) => core.previewAgentEdit(parseAgentEdit(body))),
     post("/api/agents/save", async ({ body }) =>
-      saveAgentEdit(env, parseAgentEdit(body), revision(body))
+      core.saveAgentEdit(parseAgentEdit(body), revision(body))
     ),
-    post("/api/mcp/preview", async ({ body }) => previewMcpEdit(env, parseMcpEdit(body), run)),
-    post("/api/mcp/save", async ({ body }) =>
-      saveMcpEdit(env, parseMcpEdit(body), revision(body), run)
-    ),
+    post("/api/mcp/preview", async ({ body }) => core.previewMcpEdit(parseMcpEdit(body))),
+    post("/api/mcp/save", async ({ body }) => core.saveMcpEdit(parseMcpEdit(body), revision(body))),
     get("/api/watch", async ({ url, res }) => {
       const dir = url.searchParams.get("dir");
       const since = Number(url.searchParams.get("since") ?? "0");
@@ -211,28 +189,28 @@ function routes(options: ServerOptions, watcher: Watcher): Route[] {
       const b = url.searchParams.get("b");
       if (!a || !b || !isAbsolute(a) || !isAbsolute(b))
         throw new RequestError(400, "a and b must be absolute paths");
-      return compareSettings(env, a, b);
+      return core.compareSettings(a, b);
     }),
     get("/api/path-test", async ({ url }) => {
       const dir = url.searchParams.get("dir");
       const file = url.searchParams.get("file");
       if (!dir || !isAbsolute(dir) || !file)
         throw new RequestError(400, "dir and file are required");
-      return testPath(env, dir, file, (cwd) => watcher.view(cwd));
+      return core.testPath(dir, file, (cwd) => watcher.view(cwd));
     }),
     get("/api/backups", async ({ url }) => {
       const before = url.searchParams.get("before") ?? undefined;
       const limit = Number(url.searchParams.get("limit") ?? "50");
       if (!Number.isInteger(limit) || limit < 1 || limit > 200)
         throw new RequestError(400, "limit must be 1 to 200");
-      return listBackups(env, { ...(before ? { before } : {}), limit });
+      return core.listBackups({ ...(before ? { before } : {}), limit });
     }),
     post("/api/backups/preview", async ({ body }) =>
-      previewRestore(env, stringFields(body, ["id"]).id)
+      core.previewRestore(stringFields(body, ["id"]).id)
     ),
     post("/api/backups/restore", async ({ body }) => {
       const { id, revision } = stringFields(body, ["id", "revision"]);
-      return restoreBackup(env, id, revision);
+      return core.restoreBackup(id, revision);
     }),
   ];
 }

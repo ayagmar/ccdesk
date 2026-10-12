@@ -2,7 +2,12 @@
 // HTTP. It re-exports the modules in src/server and src/shared where they live today; see
 // ARCHITECTURE.md for how they fit together and docs/split-plan.md for where they are going.
 
-// Environment: every function below takes the ScanEnv first.
+// The core for one machine: createCore(env) returns the reads and changes below with the env
+// already passed, its own change queue and usage cache, and the editor and claude its env names.
+export { type Core, type CoreOptions, createCore } from "./core.ts";
+
+// Environment: every function below takes the ScanEnv first. Called directly, they share one
+// change queue and one usage cache across the process; they stay for one release beside createCore.
 export { isConfigHome, type ScanEnv, scanEnvFromProcess } from "../server/scan/env.ts";
 
 // Read.
@@ -21,6 +26,7 @@ export { Watcher } from "../server/watch.ts";
 export { previewAgentEdit, saveAgentEdit } from "../server/agent-edit.ts";
 export {
   claudeProgram,
+  claudeRunner,
   previewMcpEdit,
   type RunClaude,
   runClaude,

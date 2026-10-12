@@ -17,7 +17,14 @@ import { isSkippedMcpRule } from "./scan/permissions.ts";
 import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
 import { ajv, schemaErrors } from "./schema.ts";
 import { hasHiddenValues, shown } from "./secrets.ts";
-import { RefusedError, readIfExists, recordChange, serially, writeAtomic } from "./write.ts";
+import {
+  RefusedError,
+  readIfExists,
+  recordChange,
+  type Serially,
+  serially,
+  writeAtomic,
+} from "./write.ts";
 
 const properties: Record<string, object> = schema.definitions.ClaudeCodeSettings.properties;
 const validators = new Map<string, ValidateFunction>();
@@ -279,9 +286,10 @@ export async function previewSettingsEdit(
 export function saveSettingsEdit(
   env: ScanEnv,
   edit: SettingsEdit,
-  expectedRevision: string
+  expectedRevision: string,
+  queue: Serially = serially
 ): Promise<Change> {
-  return serially(async () => commit(env, await planSettingsEdit(env, edit), expectedRevision));
+  return queue(async () => commit(env, await planSettingsEdit(env, edit), expectedRevision));
 }
 
 export async function previewPermissionEdit(
@@ -294,9 +302,10 @@ export async function previewPermissionEdit(
 export function savePermissionEdit(
   env: ScanEnv,
   edit: PermissionEdit,
-  expectedRevision: string
+  expectedRevision: string,
+  queue: Serially = serially
 ): Promise<Change> {
-  return serially(async () => commit(env, await planPermissionEdit(env, edit), expectedRevision));
+  return queue(async () => commit(env, await planPermissionEdit(env, edit), expectedRevision));
 }
 
 export async function previewHookEdit(env: ScanEnv, edit: HookEdit): Promise<SettingsEditPreview> {
@@ -306,7 +315,8 @@ export async function previewHookEdit(env: ScanEnv, edit: HookEdit): Promise<Set
 export function saveHookEdit(
   env: ScanEnv,
   edit: HookEdit,
-  expectedRevision: string
+  expectedRevision: string,
+  queue: Serially = serially
 ): Promise<Change> {
-  return serially(async () => commit(env, await planHookEdit(env, edit), expectedRevision));
+  return queue(async () => commit(env, await planHookEdit(env, edit), expectedRevision));
 }

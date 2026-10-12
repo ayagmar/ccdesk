@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { createCore } from "../core/core.ts";
 import { scanEnvFromProcess } from "./scan/env.ts";
 import { createCcdeskServer } from "./server.ts";
 
@@ -65,7 +66,7 @@ function main() {
   }
   const token = dev ? DEV_TOKEN : randomBytes(18).toString("base64url");
   const server = createCcdeskServer({
-    env: scanEnvFromProcess(configDir),
+    core: createCore(scanEnvFromProcess(configDir)),
     launchDir: process.cwd(),
     token,
     uiDir: dev ? null : fileURLToPath(new URL("../ui", import.meta.url)),

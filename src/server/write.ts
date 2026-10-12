@@ -25,17 +25,24 @@ export class StaleError extends RefusedError {}
 const CREDENTIALS = "ccdesk does not read or change Claude Code's credentials.";
 const STATE_FILE = "ccdesk does not change ~/.claude.json; Claude Code rewrites it all the time.";
 
-let queue: Promise<unknown> = Promise.resolve();
-
 /**
  * Runs changes one at a time, so two of them can never both pass a revision check before either
- * writes. Every exported change goes through here; helpers it calls must not.
+ * writes. Every exported change goes through one; helpers it calls must not.
  */
-export function serially<T>(change: () => Promise<T>): Promise<T> {
-  const run = queue.then(change);
-  queue = run.catch(() => undefined);
-  return run;
+export type Serially = <T>(change: () => Promise<T>) => Promise<T>;
+
+/** A new, empty queue of changes. Each core has its own. */
+export function changeQueue(): Serially {
+  let queue: Promise<unknown> = Promise.resolve();
+  return (change) => {
+    const run = queue.then(change);
+    queue = run.catch(() => undefined);
+    return run;
+  };
 }
+
+/** The queue the save functions use when they are called without a core's. */
+export const serially = changeQueue();
 
 export function backupRoot(env: ScanEnv): string {
   return join(env.claudeDir, "backups", "ccdesk");

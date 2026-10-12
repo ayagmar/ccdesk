@@ -9,6 +9,7 @@ import {
   readIfExists,
   recordChange,
   removeExactly,
+  type Serially,
   serially,
   writeAtomic,
 } from "./write.ts";
@@ -73,8 +74,12 @@ const reviewAgain = () =>
   new RefusedError("The memory or MEMORY.md changed since you reviewed this; review it again.");
 
 /** Runs a plan only while everything it was worked out from is as reviewed. */
-function saveReviewed(plan: () => Promise<Plan>, expectedRevision: string): Promise<Change> {
-  return serially(async () => {
+function saveReviewed(
+  plan: () => Promise<Plan>,
+  expectedRevision: string,
+  queue: Serially
+): Promise<Change> {
+  return queue(async () => {
     const planned = await plan();
     if (planned.preview.revision !== expectedRevision) throw reviewAgain();
     return planned.save();
@@ -240,7 +245,8 @@ export function changeMemory(
   env: ScanEnv,
   action: MemoryAction,
   path: string,
-  expectedRevision: string
+  expectedRevision: string,
+  queue: Serially = serially
 ): Promise<Change> {
-  return saveReviewed(() => PLANS[action](env, path), expectedRevision);
+  return saveReviewed(() => PLANS[action](env, path), expectedRevision, queue);
 }

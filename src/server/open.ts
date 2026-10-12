@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { delimiter, join, posix, win32 } from "node:path";
+import { type ScanEnv } from "./scan/env.ts";
 
 /** Editors that need a terminal; started from a background server they would have none. */
 const TERMINAL_EDITORS = new Set([
@@ -32,6 +33,9 @@ const GUI_EDITORS = [
 const START_MS = 1500;
 
 type Command = [string, string[]];
+
+/** The machine an editor is looked for and started on. */
+type Host = Pick<ScanEnv, "platform" | "processEnv">;
 
 /** Whether `name` is an executable on PATH. */
 function onPath(env: NodeJS.ProcessEnv, platform: NodeJS.Platform, name: string): boolean {
@@ -115,15 +119,16 @@ export function spawnPlan(
 }
 
 /** Starts one command; resolves null once it is running or exited cleanly, else why it failed. */
-function launch([command, args]: Command, path: string): Promise<string | null> {
+function launch([command, args]: Command, path: string, host: Host): Promise<string | null> {
   return new Promise((resolve) => {
     let plan: ReturnType<typeof spawnPlan>;
     try {
-      plan = spawnPlan(command, args, path, process.platform);
+      plan = spawnPlan(command, args, path, host.platform);
     } catch (error) {
       return resolve((error as Error).message);
     }
     const child = spawn(plan.file, plan.args, {
+      env: host.processEnv,
       detached: true,
       stdio: "ignore",
       windowsVerbatimArguments: plan.verbatim,
@@ -143,11 +148,17 @@ function launch([command, args]: Command, path: string): Promise<string | null> 
   });
 }
 
-/** Opens a file or folder in the first editor that starts; resolves with the command used. */
-export async function openInEditor(path: string): Promise<string> {
+/**
+ * Opens a file or folder in the first editor that starts on `host`; resolves with the command
+ * used. Without `host` it uses this process's platform and environment; use a core's instead.
+ */
+export async function openInEditor(
+  path: string,
+  host: Host = { platform: process.platform, processEnv: process.env }
+): Promise<string> {
   const failures: string[] = [];
-  for (const command of editorCommands(process.env, process.platform)) {
-    const failure = await launch(command, path);
+  for (const command of editorCommands(host.processEnv, host.platform)) {
+    const failure = await launch(command, path, host);
     if (failure === null) return command[0];
     failures.push(failure);
   }

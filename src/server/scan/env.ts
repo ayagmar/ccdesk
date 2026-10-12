@@ -13,6 +13,11 @@ export interface ScanEnv {
   /** System directory for organisation-managed CLAUDE.md and managed-settings.json. */
   managedDir: string;
   platform: NodeJS.Platform;
+  /**
+   * The environment ccdesk runs in: where it finds an editor and `claude` (PATH, VISUAL, EDITOR,
+   * CCDESK_EDITOR), and what the programs it starts inherit.
+   */
+  processEnv: NodeJS.ProcessEnv;
   /** CLAUDE_CODE_DISABLE_AUTO_MEMORY from the shell ccdesk runs in; it outranks autoMemoryEnabled. */
   disableAutoMemory?: string | undefined;
   /** CLAUDE_CODE_PROJECT_DIR_NAME, read only beside CLAUDE_CONFIG_DIR: one memory store for every project. */
@@ -33,6 +38,8 @@ export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
     claudeJson: configDir ? join(configDir, ".claude.json") : join(home, ".claude.json"),
     managedDir: managedDirFor(process.platform),
     platform: process.platform,
+    // Kept as the object itself: on Windows it reads PATH and Path alike, which a copy would not.
+    processEnv: process.env,
     disableAutoMemory: process.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY,
     projectDirName: configDir ? process.env.CLAUDE_CODE_PROJECT_DIR_NAME || undefined : undefined,
   };

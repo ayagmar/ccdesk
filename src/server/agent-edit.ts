@@ -9,8 +9,9 @@ import {
   readIfExists,
   recordChange,
   removeExactly,
-  serially,
+  type Serially,
   StaleError,
+  serially,
   writeAtomic,
 } from "./write.ts";
 
@@ -93,9 +94,10 @@ export async function previewAgentEdit(
 export function saveAgentEdit(
   env: ScanEnv,
   edit: AgentEdit,
-  expectedRevision: string
+  expectedRevision: string,
+  queue: Serially = serially
 ): Promise<Change> {
-  return serially(async () => {
+  return queue(async () => {
     const { path, raw, preview } = await plan(env, edit);
     if (preview.errors.length > 0) throw new RefusedError(preview.errors.join(" "));
     if (preview.revision !== expectedRevision)

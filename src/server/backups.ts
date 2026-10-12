@@ -14,6 +14,7 @@ import {
   readIfExists,
   recordChange,
   removeExactly,
+  type Serially,
   SHOWN_AFTER,
   SNAPSHOT,
   StaleError,
@@ -299,9 +300,10 @@ export async function previewRestore(env: ScanEnv, id: string): Promise<RestoreP
 export function restoreBackup(
   env: ScanEnv,
   id: string,
-  expectedRevision: string
+  expectedRevision: string,
+  queue: Serially = serially
 ): Promise<{ target: string }> {
-  return serially(async () => {
+  return queue(async () => {
     const plan = await planRestore(env, id);
     const { manifest, current, saved, index } = plan;
     const blocked = blockedReason(plan);

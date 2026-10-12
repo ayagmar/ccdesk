@@ -1,0 +1,143 @@
+import assert from "node:assert/strict";
+import { chmodSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { test } from "node:test";
+import { createCore, storeDirName } from "../src/core/index.ts";
+import { type Fixture, makeFixture } from "./helpers/fixture.ts";
+
+// What createCore promises a front end beside the web server: each core keeps its own queue and
+// cache, and finds editors and claude the way its env's platform does, not the test machine's.
+
+const addServer = (f: Fixture) => ({
+  dir: f.env.home,
+  scope: "user" as const,
+  add: { name: "api", definition: { command: "api-mcp" } },
+});
+
+test("a change on one core does not wait for a change on another", {
+  timeout: 10_000,
+}, async () => {
+  // Catches cores sharing one change queue: the second save would wait behind the first, which
+  // waits for the second, until the time limit fails the test.
+  const a = makeFixture();
+  const b = makeFixture();
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const first = createCore(a.env, {
+    runClaude: async () => {
+      await released;
+      return "";
+    },
+  });
+  const second = createCore(b.env);
+
+  const add = addServer(a);
+  const slow = first.saveMcpEdit(add, (await first.previewMcpEdit(add)).revision);
+  const file = b.write("app/.claude/settings.json", '{ "permissions": { "allow": ["Read"] } }\n');
+  const edit = { dir: b.at("app"), file, add: { list: "deny" as const, rule: "Read" } };
+  await second.savePermissionEdit(edit, (await second.previewPermissionEdit(edit)).revision);
+  release();
+  await slow;
+
+  assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).permissions.deny, ["Read"]);
+});
+
+/** One Bash call, as a transcript line. */
+function transcriptOf(tool: string): string {
+  const content = [{ type: "tool_use", id: "toolu_1", name: tool, input: { command: "ls" } }];
+  return `${JSON.stringify({ type: "assistant", timestamp: "2026-10-01T00:00:00.000Z", message: { role: "assistant", content } })}\n`;
+}
+
+test("one core's usage counts do not evict another core's cache", async () => {
+  // Catches cores sharing one transcript cache: the second core's small limit would drop the
+  // first core's transcripts, which are then read again from disk.
+  const a = makeFixture();
+  const b = makeFixture();
+  const first = createCore(a.env);
+  const second = createCore(b.env);
+  const app = a.at("app");
+  const file = a.write(
+    join(a.env.claudeDir, "projects", storeDirName(app), "one.jsonl"),
+    transcriptOf("Bash")
+  );
+  b.write(
+    join(b.env.claudeDir, "projects", storeDirName(b.at("app")), "one.jsonl"),
+    transcriptOf("Bash")
+  );
+  assert.equal((await first.readUsage(app, [])).tools[0]?.tool, "Bash");
+  await second.readUsage(b.at("app"), [], { maxCachedCalls: 1 });
+
+  // Rewritten in place with the same size and time, which only a fresh read notices.
+  const { atime, mtime } = statSync(file);
+  writeFileSync(file, transcriptOf("Read"));
+  utimesSync(file, atime, mtime);
+
+  assert.equal((await first.readUsage(app, [])).tools[0]?.tool, "Bash");
+});
+
+// The fake programs are shell scripts.
+const notOnWindows = { skip: process.platform === "win32" };
+
+/** A program that writes the arguments it got, one per line, after `$MARKER`, to `out`. */
+function fakeProgram(f: Fixture, path: string, out: string): void {
+  chmodSync(f.write(path, `#!/bin/sh\nprintf '%s\\n' "$MARKER" "$@" > '${out}'\n`), 0o755);
+}
+
+test("a core for a Windows machine opens a .cmd editor through cmd.exe", notOnWindows, async () => {
+  // Catches opening files with the test machine's platform or environment instead of the env's:
+  // on Linux, code would be started directly and not be found.
+  const f = makeFixture();
+  const out = f.at("opened.txt");
+  fakeProgram(f, "bin/cmd.exe", out);
+  const env = {
+    ...f.env,
+    platform: "win32" as const,
+    processEnv: { PATH: f.at("bin"), VISUAL: "code", MARKER: "from env" },
+  };
+  const target = f.write("app/CLAUDE.md", "# Rules\n");
+
+  assert.equal(await createCore(env).openFile(target), "code");
+  assert.deepEqual(readFileSync(out, "utf8").split("\n"), [
+    "from env",
+    "/d",
+    "/s",
+    "/c",
+    `""code" "${target}""`,
+    "",
+  ]);
+});
+
+test(
+  "a core for a Windows machine runs the claude.exe behind npm's claude.cmd",
+  notOnWindows,
+  async () => {
+    // Catches running claude with the test machine's platform or environment instead of the env's:
+    // on Linux it would look for a program named claude, which is not there.
+    const f = makeFixture();
+    const out = f.at("ran.txt");
+    f.write("npm/claude.cmd", "");
+    fakeProgram(f, "npm/node_modules/@anthropic-ai/claude-code/bin/claude.exe", out);
+    const env = {
+      ...f.env,
+      platform: "win32" as const,
+      processEnv: { PATH: f.at("npm"), MARKER: "from env" },
+    };
+    const core = createCore(env);
+    const add = addServer(f);
+
+    await core.saveMcpEdit(add, (await core.previewMcpEdit(add)).revision);
+    assert.deepEqual(readFileSync(out, "utf8").split("\n"), [
+      "from env",
+      "mcp",
+      "add-json",
+      "--scope",
+      "user",
+      "--",
+      "api",
+      '{"command":"api-mcp"}',
+      "",
+    ]);
+  }
+);

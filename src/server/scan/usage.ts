@@ -40,7 +40,7 @@ interface Transcript {
 }
 
 /** A rule in effect here, as the scan found it. */
-interface RuleInEffect {
+export interface RuleInEffect {
   list: PermissionList;
   rule: string;
 }
@@ -50,15 +50,13 @@ interface RuleInEffect {
  * in memory only, least recently counted first; once they hold more than MAX_CACHED_CALLS calls,
  * the oldest are dropped and read again when needed.
  */
-const transcripts = new Map<string, Transcript>();
+type Cache = Map<string, Transcript>;
 
 /** Roughly how many calls the cache keeps, beyond those of the directory counted last. */
 export const MAX_CACHED_CALLS = 100_000;
 
 /** A transcript is read in parts this size, so one huge file never becomes one huge string. */
 const CHUNK = 8 * 1024 * 1024;
-
-let queue: Promise<unknown> = Promise.resolve();
 
 interface Run {
   promise: Promise<Usage>;
@@ -67,9 +65,6 @@ interface Run {
   waiters: number;
 }
 
-/** Requests waiting their turn, so a burst of the same request runs once. */
-const waiting = new Map<string, Run>();
-
 /** How long one count may take before it stops; what it read by then stays counted. */
 const TIME_LIMIT_MS = 60_000;
 
@@ -77,59 +72,76 @@ const TIME_LIMIT_MS = 60_000;
 export class CountStopped extends Error {}
 
 /**
- * Counts the tool calls in the sessions started in `dir`, or anywhere in its repository and its
- * worktrees, since rules at a repository's root apply there too (docs: permissions#permission-system).
- * Subagents are included. It also counts the calls you approved or refused by hand, which Claude
- * Code records on each call's result as `permissionDecision` (not documented; older transcripts
- * lack it), and how many calls each rule covers. Requests run one at a time, since they share the
- * cache. A count stops when every `signal` it was asked with aborts, or after `timeLimitMs`: it
- * rejects with CountStopped and the next one starts, even if a read of the stopped count never
- * returns.
+ * A counter with its own cache of transcripts and its own queue: counts made through it run one at
+ * a time and reuse what earlier ones read. Each core has one.
  */
-export function readUsage(
-  env: ScanEnv,
-  dir: string,
-  rules: RuleInEffect[],
-  {
-    signal,
-    timeLimitMs = TIME_LIMIT_MS,
-    maxCachedCalls = MAX_CACHED_CALLS,
-  }: { signal?: AbortSignal; timeLimitMs?: number; maxCachedCalls?: number } = {}
-): Promise<Usage> {
-  const key = JSON.stringify([env.claudeDir, resolve(dir), rules, timeLimitMs, maxCachedCalls]);
-  let run = waiting.get(key);
-  // Nobody would wait for a new count, so none starts to hold up the queue.
-  if (!run && signal?.aborted) return Promise.reject(stoppedBecause(signal));
-  if (!run) {
-    const stop = new AbortController();
-    const promise = queue.then(() => {
-      waiting.delete(key);
-      const during = AbortSignal.any([stop.signal, AbortSignal.timeout(timeLimitMs)]);
-      // A stopped count answers right away, even while one of its reads never returns.
-      const stopped = new Promise<never>((_, fail) => {
-        const onStop = () => fail(stoppedBecause(during));
-        if (during.aborted) onStop();
-        else during.addEventListener("abort", onStop, { once: true });
+export function usageCounter() {
+  const transcripts: Cache = new Map();
+  let queue: Promise<unknown> = Promise.resolve();
+  /** Requests waiting their turn, so a burst of the same request runs once. */
+  const waiting = new Map<string, Run>();
+
+  /**
+   * Counts the tool calls in the sessions started in `dir`, or anywhere in its repository and its
+   * worktrees, since rules at a repository's root apply there too (docs: permissions#permission-system).
+   * Subagents are included. It also counts the calls you approved or refused by hand, which Claude
+   * Code records on each call's result as `permissionDecision` (not documented; older transcripts
+   * lack it), and how many calls each rule covers. Requests run one at a time, since they share the
+   * cache. A count stops when every `signal` it was asked with aborts, or after `timeLimitMs`: it
+   * rejects with CountStopped and the next one starts, even if a read of the stopped count never
+   * returns.
+   */
+  return function readUsage(
+    env: ScanEnv,
+    dir: string,
+    rules: RuleInEffect[],
+    {
+      signal,
+      timeLimitMs = TIME_LIMIT_MS,
+      maxCachedCalls = MAX_CACHED_CALLS,
+    }: { signal?: AbortSignal; timeLimitMs?: number; maxCachedCalls?: number } = {}
+  ): Promise<Usage> {
+    const key = JSON.stringify([env.claudeDir, resolve(dir), rules, timeLimitMs, maxCachedCalls]);
+    let run = waiting.get(key);
+    // Nobody would wait for a new count, so none starts to hold up the queue.
+    if (!run && signal?.aborted) return Promise.reject(stoppedBecause(signal));
+    if (!run) {
+      const stop = new AbortController();
+      const promise = queue.then(() => {
+        waiting.delete(key);
+        const during = AbortSignal.any([stop.signal, AbortSignal.timeout(timeLimitMs)]);
+        // A stopped count answers right away, even while one of its reads never returns.
+        const stopped = new Promise<never>((_, fail) => {
+          const onStop = () => fail(stoppedBecause(during));
+          if (during.aborted) onStop();
+          else during.addEventListener("abort", onStop, { once: true });
+        });
+        return Promise.race([
+          count(transcripts, env, resolve(dir), rules, during, maxCachedCalls),
+          stopped,
+        ]);
       });
-      return Promise.race([count(env, resolve(dir), rules, during, maxCachedCalls), stopped]);
-    });
-    run = { promise, stop, waiters: 0 };
-    waiting.set(key, run);
-    // The queue moves on when the count settles or stops: a stopped count changes nothing more.
-    queue = promise.catch(() => undefined);
-  }
-  const current = run;
-  if (signal?.aborted) return current.promise;
-  current.waiters++;
-  signal?.addEventListener(
-    "abort",
-    () => {
-      if (--current.waiters === 0) current.stop.abort();
-    },
-    { once: true }
-  );
-  return current.promise;
+      run = { promise, stop, waiters: 0 };
+      waiting.set(key, run);
+      // The queue moves on when the count settles or stops: a stopped count changes nothing more.
+      queue = promise.catch(() => undefined);
+    }
+    const current = run;
+    if (signal?.aborted) return current.promise;
+    current.waiters++;
+    signal?.addEventListener(
+      "abort",
+      () => {
+        if (--current.waiters === 0) current.stop.abort();
+      },
+      { once: true }
+    );
+    return current.promise;
+  };
 }
+
+/** Counts with a cache and queue shared by every caller in the process; use a core's instead. */
+export const readUsage = usageCounter();
 
 function stoppedBecause(signal: AbortSignal): CountStopped {
   return new CountStopped(
@@ -145,6 +157,7 @@ function checkStopped(signal: AbortSignal): void {
 }
 
 async function count(
+  transcripts: Cache,
   env: ScanEnv,
   dir: string,
   rules: RuleInEffect[],
@@ -184,12 +197,12 @@ async function count(
         if (taken.has(file)) continue;
         // A subagent's session decides; one whose session file is gone goes by its own start.
         const start =
-          (await transcript(env, session, signal))?.startCwd ??
-          (await transcript(env, file, signal))?.startCwd;
+          (await transcript(transcripts, env, session, signal))?.startCwd ??
+          (await transcript(transcripts, env, file, signal))?.startCwd;
         if (start ? !isWithin(folder, start) : name !== own) continue;
         taken.add(file);
         counted.add(file);
-        calls.push(...((await transcript(env, file, signal))?.calls ?? []));
+        calls.push(...((await transcript(transcripts, env, file, signal))?.calls ?? []));
         if (file === session) sessions++;
       }
       checkStopped(signal);
@@ -197,7 +210,7 @@ async function count(
         if (path.startsWith(store + sep) && !files.has(path)) transcripts.delete(path);
     }
   }
-  trimCache(counted, maxCachedCalls);
+  trimCache(transcripts, counted, maxCachedCalls);
   return {
     sessions,
     repository,
@@ -209,7 +222,7 @@ async function count(
 }
 
 /** Drops the least recently counted transcripts over the limit, keeping those just counted. */
-function trimCache(counted: Set<string>, maxCalls: number): void {
+function trimCache(transcripts: Cache, counted: Set<string>, maxCalls: number): void {
   let total = 0;
   for (const known of transcripts.values()) total += known.calls.length;
   for (const [path, known] of transcripts) {
@@ -237,6 +250,7 @@ async function transcriptsIn(store: string): Promise<Map<string, string>> {
  * whose count stops keeps the whole lines read so far.
  */
 async function transcript(
+  transcripts: Cache,
   env: ScanEnv,
   file: string,
   signal: AbortSignal

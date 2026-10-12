@@ -31,6 +31,7 @@ export function makeFixture(): Fixture {
     claudeJson: join(home, ".claude.json"),
     managedDir: join(root, "etc", "claude-code"),
     platform: "linux",
+    processEnv: {},
   };
   const at = (...parts: string[]) => join(root, ...parts);
   const write = (path: string, content: string) => {

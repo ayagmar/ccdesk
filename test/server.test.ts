@@ -13,6 +13,7 @@ import {
 import { type AddressInfo } from "node:net";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
+import { createCore } from "../src/core/index.ts";
 import { revisionOf } from "../src/server/scan/files.ts";
 import { createCcdeskServer } from "../src/server/server.ts";
 import { RefusedError } from "../src/server/write.ts";
@@ -56,11 +57,7 @@ const failing: string[] = [];
 
 before(async () => {
   fixture = makeFixture();
-  server = createCcdeskServer({
-    env: fixture.env,
-    launchDir: fixture.at("home"),
-    token: TOKEN,
-    uiDir: null,
+  const core = createCore(fixture.env, {
     openFile: async (path) => {
       opened.push(path);
       return "fake-editor";
@@ -76,6 +73,7 @@ before(async () => {
       return "";
     },
   });
+  server = createCcdeskServer({ core, launchDir: fixture.at("home"), token: TOKEN, uiDir: null });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });

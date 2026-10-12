@@ -18,6 +18,7 @@ import {
   readIfExists,
   recordChange,
   recordClaudeMcpChange,
+  type Serially,
   serially,
   writeAtomic,
 } from "./write.ts";
@@ -45,10 +46,7 @@ const exists = (path: string) =>
  * JSON as shell syntax, so ccdesk runs that claude.exe itself. A claude.exe earlier on PATH, as the
  * native installer puts there, comes first, as it would in a terminal.
  */
-export async function claudeProgram(
-  path = process.env.PATH ?? "",
-  platform = process.platform
-): Promise<string> {
+export async function claudeProgram(path: string, platform: NodeJS.Platform): Promise<string> {
   if (platform !== "win32") return "claude";
   // Windows reads a PATH entry in quotes as the folder inside them.
   for (const dir of path
@@ -75,35 +73,44 @@ function secretsIn(args: string[]): string[] {
   });
 }
 
-export const runClaude: RunClaude = async (args, cwd, configDir) => {
-  const program = await claudeProgram();
-  // Set only for a chosen profile: Claude Code also moves .claude.json into a CLAUDE_CONFIG_DIR.
-  const env =
-    configDir === undefined ? process.env : { ...process.env, CLAUDE_CONFIG_DIR: configDir };
-  return new Promise((done, fail) => {
-    execFile(program, args, { cwd, env, timeout: 30_000 }, (error, stdout, stderr) => {
-      if ((error as NodeJS.ErrnoException | null)?.code === "ENOENT")
-        return fail(
-          new RefusedError(
-            "ccdesk changes your user and local MCP servers through the claude command, which is not on PATH."
-          )
-        );
-      // Node's own message repeats the command, with the server's env and header values in it.
-      if (error) {
-        // claude's own message may quote the definition it was given.
-        const said = secretsIn(args).reduce(
-          (text, secret) => text.replaceAll(secret, "•••"),
-          stderr
-        );
-        const reason =
-          said.trim() ||
-          (error.killed ? "it took longer than 30 seconds" : `it exited with code ${error.code}`);
-        return fail(new RefusedError(`claude ${args[1]} failed: ${reason}`));
-      }
-      done(stdout);
+/** Runs the claude on `host`'s PATH, with `host`'s environment. */
+export function claudeRunner(host: Pick<ScanEnv, "platform" | "processEnv">): RunClaude {
+  return async (args, cwd, configDir) => {
+    const program = await claudeProgram(host.processEnv.PATH ?? "", host.platform);
+    // Set only for a chosen profile: Claude Code also moves .claude.json into a CLAUDE_CONFIG_DIR.
+    const env =
+      configDir === undefined
+        ? host.processEnv
+        : { ...host.processEnv, CLAUDE_CONFIG_DIR: configDir };
+    return new Promise((done, fail) => {
+      execFile(program, args, { cwd, env, timeout: 30_000 }, (error, stdout, stderr) => {
+        if ((error as NodeJS.ErrnoException | null)?.code === "ENOENT")
+          return fail(
+            new RefusedError(
+              "ccdesk changes your user and local MCP servers through the claude command, which is not on PATH."
+            )
+          );
+        // Node's own message repeats the command, with the server's env and header values in it.
+        if (error) {
+          // claude's own message may quote the definition it was given.
+          const said = secretsIn(args).reduce(
+            (text, secret) => text.replaceAll(secret, "•••"),
+            stderr
+          );
+          const reason =
+            said.trim() ||
+            (error.killed ? "it took longer than 30 seconds" : `it exited with code ${error.code}`);
+          return fail(new RefusedError(`claude ${args[1]} failed: ${reason}`));
+        }
+        done(stdout);
+      });
     });
-  });
-};
+  };
+}
+
+/** claudeRunner for this process's PATH and environment, read on each run; use a core's instead. */
+export const runClaude: RunClaude = (args, cwd, configDir) =>
+  claudeRunner({ platform: process.platform, processEnv: process.env })(args, cwd, configDir);
 
 /** Quotes a word for a POSIX shell, so a command shown to you can be pasted as it is. */
 function quoted(word: string): string {
@@ -318,9 +325,10 @@ export function saveMcpEdit(
   env: ScanEnv,
   edit: McpEdit,
   expectedRevision: string,
-  run: RunClaude
+  run: RunClaude,
+  queue: Serially = serially
 ): Promise<Change | { target: string }> {
-  return serially(async () => {
+  return queue(async () => {
     const planned = await plan(env, edit, run);
     if (planned.preview.errors.length > 0) throw new RefusedError(planned.preview.errors.join(" "));
     if (planned.preview.revision !== expectedRevision)
