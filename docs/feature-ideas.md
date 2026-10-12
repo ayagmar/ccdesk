@@ -18,7 +18,7 @@ Ideas, not commitments: each one is something the code is already close to suppo
 
 ## On the page
 
-**Push changes instead of long polling** (M). The page now holds a request open on `/api/watch` and asks again after each answer. With `Watcher.subscribe` (split plan step 5), the server could push a message over server-sent events when a watched file changes. A TUI would subscribe the same way.
+**Push changes instead of long polling** (M). The page now holds a request open on `/api/watch` and asks again after each answer. With `Watcher.subscribe`, the server could push a message over server-sent events when a watched file changes. A TUI would subscribe the same way.
 
 **Watch `~/.claude.json`** (M). Trust decisions and user MCP servers show up only when you return to the tab, because Claude Code rewrites the file constantly. Watching it and rescanning only when the parts ccdesk shows change would make those updates live too.
 

@@ -17,7 +17,7 @@ ccdesk is one npm package. `src/core` reads and writes Claude Code's configurati
 | `src/core/write.ts` | What every write shares: atomic writes through links, the backup folder and its manifest, the queue that runs changes one at a time, `RefusedError` and `StaleError`. |
 | `src/core/backups.ts` | Lists, previews and restores backups (Recent changes and Undo). |
 | `src/core/secrets.ts` | What the page may see: `redactSecrets`, `shownText`, `shown`, `hasHiddenValues`. |
-| `src/core/watch.ts` | `Watcher`: scans a directory, watches the files the scan read, and answers the page's long poll. |
+| `src/core/watch.ts` | `Watcher`: scans a directory, watches the files the scan read, answers the page's long poll, and calls subscribers when one of them changes. |
 | `src/core/reference.ts` | The settings schema, settings catalog and hook events, served by `/api/reference`. |
 | `src/core/open.ts` | Opens a file in the editor the `ScanEnv`'s environment names, or a URL in the default browser, the way its platform starts one. |
 | `src/core/core.ts` | `createCore(env, options)`: every read and change with `env` bound, its own change queue and usage cache, and the editor and `claude` it starts. |
