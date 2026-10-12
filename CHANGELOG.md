@@ -1,5 +1,80 @@
 # Changelog
 
+## [0.2.0](https://github.com/ayagmar/ccdesk/compare/v0.1.0...v0.2.0) (2026-10-12)
+
+### Features
+
+* **agents:** create, change and delete subagent files ([1d8d011](https://github.com/ayagmar/ccdesk/commit/1d8d011c93c08dc8435ad304f5061378e8c4c1b7)), references [sub-agents#supported-frontmatter-fields](https://github.com/sub-agents/issues/supported-frontmatter-fields)
+* **cli:** add --config-dir to read another Claude folder ([777712a](https://github.com/ayagmar/ccdesk/commit/777712aeb91da62f3f323292c8050b600ff59f5a))
+* compare the settings of two directories ([9ec5e56](https://github.com/ayagmar/ccdesk/commit/9ec5e56b0d4f1cfc85b48accaea00ac59cf592c2))
+* describe a claude -p or SDK session as well as an interactive one ([45c0ad1](https://github.com/ayagmar/ccdesk/commit/45c0ad180c1a26074d151375f99b80ddb20dd99e)), references [permissions#what-runs-before-you-trust-a-folder](https://github.com/permissions/issues/what-runs-before-you-trust-a-folder) [#when-your-local-settings-file-needs-trust](https://github.com/ayagmar/ccdesk/issues/when-your-local-settings-file-needs-trust) [hooks#workspace-trust](https://github.com/hooks/issues/workspace-trust)
+* **hooks:** add, change and remove hooks in settings files ([7307b6b](https://github.com/ayagmar/ccdesk/commit/7307b6b1f3b7baa1ced8db4be6695e8456c87ef8))
+* list claude mcp edits in Recent changes ([bfc153c](https://github.com/ayagmar/ccdesk/commit/bfc153c5f3489143d73c2cfcc75a5fc2c1175e93))
+* **mcp:** add, change and remove MCP servers ([40f88a6](https://github.com/ayagmar/ccdesk/commit/40f88a6cce41f4c04d3816dfbd540cb2435482e9))
+* **mcp:** check server entries against a schema of the documented fields ([3bfac6c](https://github.com/ayagmar/ccdesk/commit/3bfac6c884c07c03430fd896fe5ec2ba558cbc43))
+* **mcp:** say what approved, rejected or holds a .mcp.json server ([1a42288](https://github.com/ayagmar/ccdesk/commit/1a4228880a81a24468caebab84aa27e85fdbde62))
+* **site:** add the documentation site with llms.txt ([25148e4](https://github.com/ayagmar/ccdesk/commit/25148e43f4f5190c000f0e3f4aaeb98872c9ef53))
+* **site:** capture frames for a video with screenshots --video ([e754f1f](https://github.com/ayagmar/ccdesk/commit/e754f1fd910834044158ca3c2125d706e3ca5d1c))
+* **site:** light up each scope's rows in the hero screenshot ([af20413](https://github.com/ayagmar/ccdesk/commit/af204130ea0e1eee8cd428ba7a67df10bb0a6ffa))
+* **site:** open each landing page question to the rows that answer it ([29d6815](https://github.com/ayagmar/ccdesk/commit/29d6815b628e68751d9de91d10c07a5805d27bc1))
+* **site:** open screenshots in place, add motion and load faster ([340ee81](https://github.com/ayagmar/ccdesk/commit/340ee817449d06910fbc3ae3f6f2003c804014d9))
+* **ui:** say that the page describes an interactive session ([c618a77](https://github.com/ayagmar/ccdesk/commit/c618a776a1313d44f8b88c05c9a660e64e55bb38))
+* undo a change that created its file by removing the file ([e6297e3](https://github.com/ayagmar/ccdesk/commit/e6297e35296b0c2a9f4fd222bfff71f78216211e))
+
+### Bug Fixes
+
+* **agents:** save a new agent typed as reviewer.md as reviewer.md, not reviewer.md.md ([2d07508](https://github.com/ayagmar/ccdesk/commit/2d07508eeb50dd9fff98e9816e58c1eaa25abc21))
+* **backups:** record restored memories and restore halfway deletes ([3bfcbcf](https://github.com/ayagmar/ccdesk/commit/3bfcbcfd487956dd9eddd9f7252c9093887f95d9))
+* hide keys in MCP server args ([922475c](https://github.com/ayagmar/ccdesk/commit/922475c067b313f75aee2332f01066bc4739ab55))
+* **hooks:** hide the user name, password and query of an http hook's URL ([8b40d25](https://github.com/ayagmar/ccdesk/commit/8b40d25867ca6cbf76164a27584a15309803bb44))
+* **instructions:** head your user CLAUDE.md as ~/.claude/CLAUDE.md, not .claude/CLAUDE.md ([683b1c8](https://github.com/ayagmar/ccdesk/commit/683b1c88bd244f1b033b3f546f7944599a0327de))
+* **instructions:** say why a linked rule with paths does not load ([922788d](https://github.com/ayagmar/ccdesk/commit/922788d34fdc9333679d8792eb1865aa70acd831))
+* match what Claude Code loads and keep hidden values out of edits ([9997c26](https://github.com/ayagmar/ccdesk/commit/9997c2652be271f1c6b3326f84218cfbe27f031d))
+* **mcp:** count a "use all servers" answer to the .mcp.json prompt ([3008f9c](https://github.com/ayagmar/ccdesk/commit/3008f9c9792174d2334ce641555167962b7f67e3))
+* **mcp:** hide a server's secrets in claude's own error message ([2b7882b](https://github.com/ayagmar/ccdesk/commit/2b7882b5e1df3d3540c06a5c8d7c559ec6ce4328))
+* **mcp:** pass names safely to claude mcp and keep servers when it fails ([69b9353](https://github.com/ayagmar/ccdesk/commit/69b9353be3ecd96de2c29ed91183bfce0dfc6274))
+* **mcp:** read and add local servers under the repository root only ([c536737](https://github.com/ayagmar/ccdesk/commit/c536737a8e8d05946d43b0bbe74364a890141cd8))
+* **memory:** remove a [[name]] index line when its memory is deleted ([a08fbdf](https://github.com/ayagmar/ccdesk/commit/a08fbdf899c17e958c0ac98678d44e4b9b259dd5))
+* **memory:** stop flagging a 200-line MEMORY.md that ends in a newline as cut off ([07a670b](https://github.com/ayagmar/ccdesk/commit/07a670b209593d315e7850e6145e8443b5c01554))
+* **permissions:** say that ccdesk reads commands and addresses to match rules ([ca60592](https://github.com/ayagmar/ccdesk/commit/ca605920235512d041b03b0fbea57c4967f1ac70))
+* **readme:** link each screenshot to its full-size image ([18837fc](https://github.com/ayagmar/ccdesk/commit/18837fc055aede576926f15d90b031c3b6a19fa9))
+* **scan:** hold back settings-file hooks until the folder is trusted ([ab9ea97](https://github.com/ayagmar/ccdesk/commit/ab9ea973e153b343530ae5c945b8f71a28dd7895)), references [hooks#workspace-trust](https://github.com/hooks/issues/workspace-trust)
+* **scan:** name plugin skills and commands with their plugin ([43d178a](https://github.com/ayagmar/ccdesk/commit/43d178a0f14c9479b576c6260eea1541f5fb6d53)), references [skills#how-a-skill-gets-its-command-name](https://github.com/skills/issues/how-a-skill-gets-its-command-name) [plugins-reference#name](https://github.com/plugins-reference/issues/name)
+* **server:** put a file back when ccdesk cannot read it while removing it ([bfa4931](https://github.com/ayagmar/ccdesk/commit/bfa49318dc4df99605cc570e004cf6ed0b41543e))
+* **server:** refuse a hard link to the credentials file ([8689378](https://github.com/ayagmar/ccdesk/commit/86893788ee20e1c0fc53464306167a5329968d6e))
+* **server:** refuse a restore that would change hidden keys in args ([5ab6b40](https://github.com/ayagmar/ccdesk/commit/5ab6b409db633d82ac2cea37833639eff1d88c8d))
+* **server:** refuse to save a file that has other hard links ([4fe7445](https://github.com/ayagmar/ccdesk/commit/4fe7445daba710babba8e5bc3826060389857f24))
+* **server:** stop on SIGTERM and answer a malformed URL with 400 ([a519fcb](https://github.com/ayagmar/ccdesk/commit/a519fcb7b0f34c21ac35b81b606ec0bc350119d6))
+* **server:** watch what a scan read even when the watch starts after it ([554a3d5](https://github.com/ayagmar/ccdesk/commit/554a3d58e9361c209313d258f665b54a09792757))
+* **settings:** leave out sandbox fields Claude Code ignores from a file ([97bf3a9](https://github.com/ayagmar/ccdesk/commit/97bf3a95407a21682b0579482bd558071698f40a))
+* **settings:** say why a value that may only tighten a key is ignored ([6e01ce8](https://github.com/ayagmar/ccdesk/commit/6e01ce882f08d3a34d1a2725f5371852e6c5b9ce))
+* **settings:** show a value set only in the older local file in the details ([57cbc45](https://github.com/ayagmar/ccdesk/commit/57cbc453449eb1b3562062817091f8baa449ccef))
+* **site:** draw the GitHub icon in the text colour ([f8dce1c](https://github.com/ayagmar/ccdesk/commit/f8dce1c184b98ed168e3f516f040ce22269a4dd3))
+* **site:** line the header search up with the landing page's wider column ([95a1762](https://github.com/ayagmar/ccdesk/commit/95a176252a28e8f98253bd816212af0f8f54111e))
+* **site:** name the app section each landing page question is answered in ([977a65c](https://github.com/ayagmar/ccdesk/commit/977a65c41b43fe03320a9181cbb02e1011c3be64))
+* **tools:** list a whole-Bash rule under Monitor, whose commands it covers ([52e09b5](https://github.com/ayagmar/ccdesk/commit/52e09b5ead6570c620d0ef9ba9ba5cb8a880ac28))
+* **tools:** show a failed count as unknown instead of counting forever ([b7b628d](https://github.com/ayagmar/ccdesk/commit/b7b628d2d6d672a245d9940d51edcfbc42f29f3a))
+* **ui:** give the session switch its own line so the directory name keeps its room ([c43db64](https://github.com/ayagmar/ccdesk/commit/c43db642f6d980f8efea19387d09f11d3082272c))
+* **ui:** give the tables the room until a row is picked and keep the directory name whole ([8059bea](https://github.com/ayagmar/ccdesk/commit/8059bea410755683637338814413fcc7f1b7844a))
+* **ui:** keep an edited draft when the file changes underneath it ([5f72626](https://github.com/ayagmar/ccdesk/commit/5f726268c96160ba703fcec684fd420b0c7a9d3d))
+* **ui:** keep the save toast above sticky table headers ([711c670](https://github.com/ayagmar/ccdesk/commit/711c6706fa276511ebe4968f05d105f7244722cf))
+* **ui:** line up the columns on Recent changes ([112e732](https://github.com/ayagmar/ccdesk/commit/112e732a3eb776ce121e479538521c2f078551cc))
+* **ui:** offer no undo for a change that created its file ([8103ddc](https://github.com/ayagmar/ccdesk/commit/8103ddc8c78ac323039a778be83c3d89f830851a))
+* **ui:** offer only settings files that exist here when adding a rule or hook ([34bc591](https://github.com/ayagmar/ccdesk/commit/34bc5914cd23d87da8b2574bf7e4a5402a1571f8))
+* **ui:** say that claude mcp edits pass values on claude's command line ([06d971e](https://github.com/ayagmar/ccdesk/commit/06d971e3ff9c7af693bbf9b1d9226b82dcf16100))
+* **ui:** ship the small font files instead of inlining them past the CSP ([166ad6a](https://github.com/ayagmar/ccdesk/commit/166ad6a29df96b5df8c6b043e6ed23654226e978))
+* **usage:** answer a stopped count even while one of its reads hangs ([9495017](https://github.com/ayagmar/ccdesk/commit/9495017641d050f15ba33d19e13db0b2fc9c0ed9))
+* **usage:** stop tool-call counts nobody waits for or that run too long ([cc89847](https://github.com/ayagmar/ccdesk/commit/cc898474b3588c5a64c38fca1635e9bed20f1a27))
+
+### Performance Improvements
+
+* **server:** cap the usage cache and keep only what matching reads ([6e5eeea](https://github.com/ayagmar/ccdesk/commit/6e5eeea66ce209c9598a417540ae0eb3415986b9))
+* **server:** reuse a current scan for the path tester ([cb48481](https://github.com/ayagmar/ccdesk/commit/cb484810daa5a5469cef5688d740ba7a418a3756))
+
+### Reverts
+
+* **site:** drop screenshots --video ([0009af4](https://github.com/ayagmar/ccdesk/commit/0009af451f02da3a2d41847e1ce21fbda2d6e892))
+
 ## 0.1.0 (2026-10-11)
 
 ### Features
