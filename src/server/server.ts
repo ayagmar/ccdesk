@@ -19,7 +19,7 @@ import { changeMemory, isMemoryAction, previewMemoryChange } from "./mutations.t
 import { openInEditor } from "./open.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isCredentials, isRecord } from "./scan/files.ts";
-import { scanDirectory, scanOverview } from "./scan/index.ts";
+import { scanOverview } from "./scan/index.ts";
 import { CountStopped, readUsage } from "./scan/usage.ts";
 import { testPath } from "./scan/path-test.ts";
 import {
@@ -121,9 +121,7 @@ async function handle(
   if (req.method === "GET" && url.pathname === "/api/directory") {
     const path = url.searchParams.get("path");
     if (!path) return send(res, 400, { error: "path is required" });
-    const view = await scanDirectory(env, path);
-    watcher.track(view.path, view);
-    return send(res, 200, view);
+    return send(res, 200, await watcher.scan(path));
   }
   if (req.method === "POST" && url.pathname === "/api/usage") {
     const body = await readBody(req);
@@ -232,7 +230,7 @@ async function handle(
     const file = url.searchParams.get("file");
     if (!dir || !isAbsolute(dir) || !file)
       return send(res, 400, { error: "dir and file are required" });
-    return answer(res, () => testPath(env, dir, file));
+    return answer(res, () => testPath(env, dir, file, (cwd) => watcher.view(cwd)));
   }
   if (req.method === "GET" && url.pathname === "/api/backups") {
     const before = url.searchParams.get("before") ?? undefined;

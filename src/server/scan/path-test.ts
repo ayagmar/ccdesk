@@ -1,5 +1,5 @@
 import { dirname, isAbsolute, join, matchesGlob, relative, resolve, sep } from "node:path";
-import { type PathMatch, type PathTest } from "../../shared/types.ts";
+import { type DirectoryView, type PathMatch, type PathTest } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
 import {
   isFile,
@@ -34,13 +34,19 @@ function firstMatch(globs: string[], path: string): string | undefined {
  * What Claude Code adds to context once Claude reads or edits `file` in a session started in `dir`:
  * path-scoped rules, skills with matching `paths`, and CLAUDE.md files in the folders between.
  */
-export async function testPath(env: ScanEnv, dir: string, file: string): Promise<PathTest> {
+export async function testPath(
+  env: ScanEnv,
+  dir: string,
+  file: string,
+  /** The view of the start directory; a server passes one that reuses a current scan. */
+  viewOf: (cwd: string) => Promise<DirectoryView> = (cwd) => scanDirectory(env, cwd)
+): Promise<PathTest> {
   const cwd = resolve(dir);
   const target = isAbsolute(file) ? resolve(file) : resolve(cwd, file);
   if (target === cwd || !isWithin(cwd, target))
     return { file: target, inside: false, exists: false, matches: [] };
 
-  const view = await scanDirectory(env, cwd);
+  const view = await viewOf(cwd);
   const projectRoot = view.gitRoot ?? cwd;
   const matches: PathMatch[] = [];
 
