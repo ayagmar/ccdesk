@@ -1,10 +1,10 @@
 import { useId, useState } from "react";
-import HOOK_EVENTS from "../shared/hook-events.json" with { type: "json" };
 import { EDITABLE_SCOPES } from "../shared/scopes.ts";
 import { type DirectoryView, type Hook, type HookEdit, type Scope } from "../shared/types.ts";
 import { api } from "./api.ts";
 import { tilde } from "./format.ts";
 import { fileFor, projectOrUser, ScopePicker } from "./PermissionEditor.tsx";
+import { reference } from "./reference.ts";
 import { type Saved } from "./SettingEditor.tsx";
 import { useReviewedChange } from "./useReviewedChange.tsx";
 
@@ -69,7 +69,7 @@ export function HookEditor({ view, hook, onSaved }: Props) {
             change.cancel();
           }}
         >
-          {HOOK_EVENTS.map((name) => (
+          {reference().hookEvents.map((name) => (
             <option key={name} value={name}>
               {name}
             </option>

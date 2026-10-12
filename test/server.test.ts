@@ -166,6 +166,24 @@ test("requests addressed to another host name are refused (DNS rebinding)", asyn
   assert.equal(res.status, 421);
 });
 
+test("the page gets the settings schema, catalog and hook events from the server, behind the token", async () => {
+  assert.equal(
+    (await call("/api/reference", { headers: { "x-ccdesk-token": "wrong" } })).status,
+    401
+  );
+  const res = await call("/api/reference");
+  assert.equal(res.status, 200);
+  const { settings, catalog, hookEvents } = res.json as {
+    settings: Record<string, { type?: string }>;
+    catalog: Array<{ key: string; scopes: string[] }>;
+    hookEvents: string[];
+  };
+  // The editor reads a key's type from the schema; the catalog lists it under its own name.
+  assert.equal(settings.cleanupPeriodDays?.type, "number");
+  assert.ok(catalog.some((s) => s.key === "cleanupPeriodDays" && s.scopes.includes("user")));
+  assert.ok(hookEvents.includes("PreToolUse"));
+});
+
 test("deleting a memory removes its file and index line, and undo puts both back", async () => {
   const { dir, old } = seedMemory();
 

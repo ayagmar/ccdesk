@@ -3,15 +3,20 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import HOOK_EVENTS from "../shared/hook-events.json" with { type: "json" };
 import { EVERY_FILE, PERMISSION_LISTS } from "../shared/scopes.ts";
+import schema from "../shared/settings.schema.json" with { type: "json" };
+import catalog from "../shared/settings-catalog.json" with { type: "json" };
 import {
   type AgentEdit,
+  type CatalogSetting,
   type HookEdit,
   type McpEdit,
   type PermissionEdit,
   type PermissionList,
+  type Reference,
   SESSION_PROFILES,
   type Scope,
   type SessionProfile,
+  type SettingSchema,
   type SettingsEdit,
 } from "../shared/types.ts";
 import { listBackups, previewRestore, restoreBackup } from "./backups.ts";
@@ -65,6 +70,16 @@ const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "Cache-Control": "no-store",
+};
+
+/** Sent to the page instead of bundled with it: the catalog and schema are most of its size. */
+const REFERENCE: Reference = {
+  schemaSource: schema.$comment,
+  settings: schema.definitions.ClaudeCodeSettings.properties as Record<string, SettingSchema>,
+  catalog: Object.entries(catalog.keys as Record<string, Omit<CatalogSetting, "key">>).map(
+    ([key, entry]) => ({ key, ...entry })
+  ),
+  hookEvents: HOOK_EVENTS,
 };
 
 /** A request ccdesk will not take, answered with `status`. */
@@ -135,6 +150,7 @@ function routes(options: ServerOptions, watcher: Watcher): Route[] {
   const post = (path: string, action: Route["action"]): Route => ({ method: "POST", path, action });
   return [
     get("/api/overview", () => scanOverview(env, launchDir)),
+    get("/api/reference", async () => REFERENCE),
     get("/api/directory", ({ url }) => {
       const profile = url.searchParams.get("profile") ?? "interactive";
       if (!SESSION_PROFILES.includes(profile as SessionProfile))

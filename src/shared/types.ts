@@ -611,3 +611,36 @@ export interface McpEdit {
   remove?: { name: string; definition: unknown };
   add?: { name: string; definition: unknown };
 }
+
+/** A setting's entry in Claude Code's settings schema, as far as the editor reads it. */
+export interface SettingSchema {
+  type?: string | string[];
+  enum?: unknown[];
+  items?: SettingSchema;
+  description?: string;
+  deprecated?: boolean;
+}
+
+/** A setting as Claude Code's settings reference documents it. */
+export interface CatalogSetting {
+  key: string;
+  summary: string;
+  category: string;
+  /** The files Claude Code reads it from; none for a key kept in ~/.claude.json. */
+  scopes: Scope[];
+  about?: string;
+  type?: string;
+  default?: string;
+  docs: string;
+}
+
+/** The Claude Code data the page edits against, generated into src/shared and served once. */
+export interface Reference {
+  /** Where the settings schema came from, such as the SDK version. */
+  schemaSource: string;
+  /** The settings schema's top-level keys. */
+  settings: Record<string, SettingSchema>;
+  /** Every documented setting, in the order the settings reference lists them. */
+  catalog: CatalogSetting[];
+  hookEvents: string[];
+}

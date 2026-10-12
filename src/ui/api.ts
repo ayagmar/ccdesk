@@ -12,6 +12,7 @@ import {
   type McpEdit,
   type PermissionEdit,
   type PermissionList,
+  type Reference,
   type RestorePreview,
   type SessionProfile,
   type SettingsEdit,
@@ -78,6 +79,8 @@ async function request<T>(
 
 export const api = {
   overview: () => request<Overview>("/api/overview"),
+  /** Claude Code's settings schema, settings catalog and hook events. */
+  reference: () => request<Reference>("/api/reference"),
   directory: (path: string, profile: SessionProfile) =>
     request<DirectoryView>(
       `/api/directory?path=${encodeURIComponent(path)}${profile === "interactive" ? "" : `&profile=${profile}`}`

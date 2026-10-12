@@ -5,9 +5,10 @@ import { Bullet } from "../Bullet.tsx";
 import { preview, tildeAll } from "../format.ts";
 import { Icon } from "../Icon.tsx";
 import { type Line, lineName } from "../lines.ts";
+import { reference } from "../reference.ts";
 import { SettingEditor } from "../SettingEditor.tsx";
+import { categories } from "../settingsCatalog.ts";
 import { propertyFor } from "../settingsSchema.ts";
-import { CATALOG, CATEGORIES } from "../settingsCatalog.ts";
 import { Field, NameButton } from "./kit.tsx";
 import { defineSection, type RowOf } from "./types.ts";
 
@@ -61,7 +62,7 @@ export const catalog = defineSection<R>({
   id: "catalog",
   title: "All settings",
   rows: (view) =>
-    CATALOG.map((item) => {
+    reference().catalog.map((item) => {
       const { set } = valueHere(view, item.key);
       const line = (set?.from.at(-1) as Line | undefined) ?? null;
       return { id: `cat:${item.key}`, section: "catalog", line, item, ...(set ? { set } : {}) };
@@ -105,7 +106,10 @@ export const catalog = defineSection<R>({
   facet: {
     label: "Filter settings by area",
     of: (row) => row.item.category,
-    order: CATEGORIES,
+    // A getter: the catalog arrives from the server after this module loads.
+    get order() {
+      return categories();
+    },
   },
   Head: () => (
     <span className="tt-note">

@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type DirectoryView,
   type Overview,
+  type Reference,
   type SessionProfile,
   type Usage,
 } from "../shared/types.ts";
 import { ApiError, api } from "./api.ts";
 import { setHome } from "./format.ts";
+import { setReference } from "./reference.ts";
 
 export type Load<T> =
   | { state: "loading" }
@@ -48,6 +50,18 @@ export function useConfig(requested: string | null | undefined, profile: Session
     );
   }, []);
   useEffect(refreshOverview, [refreshOverview]);
+
+  // The settings catalog and editors read it, so no directory is shown before it arrives.
+  const [reference, setLoadedReference] = useState<Load<Reference>>({ state: "loading" });
+  useEffect(() => {
+    api.reference().then(
+      (data) => {
+        setReference(data);
+        setLoadedReference({ state: "ready", data });
+      },
+      (error: unknown) => setLoadedReference({ state: "error", message: errorText(error) })
+    );
+  }, []);
 
   // Only the latest request may land, so a slow answer for a folder you left cannot replace the new one.
   const generation = useRef(0);
@@ -117,7 +131,12 @@ export function useConfig(requested: string | null | undefined, profile: Session
 
   /** The open directory's view, once the one asked for has arrived. */
   const scanned =
-    view.state === "ready" && viewFor === dir && view.data.profile === profile ? view.data : null;
+    reference.state === "ready" &&
+    view.state === "ready" &&
+    viewFor === dir &&
+    view.data.profile === profile
+      ? view.data
+      : null;
 
   // Counted after each scan, since the rules to match come from it; the last counts stay shown
   // until new ones arrive, so a reload does not flicker.
@@ -140,5 +159,5 @@ export function useConfig(requested: string | null | undefined, profile: Session
     () => (scanned && usage?.path === scanned.path ? { ...scanned, usage: usage.data } : scanned),
     [scanned, usage]
   );
-  return { overview, view, data, dir, reload };
+  return { overview, view: reference.state === "error" ? reference : view, data, dir, reload };
 }

@@ -1,30 +1,22 @@
-import schema from "../shared/settings.schema.json" with { type: "json" };
-
-interface PropertySchema {
-  type?: string | string[];
-  enum?: unknown[];
-  items?: PropertySchema;
-  description?: string;
-  deprecated?: boolean;
-}
+import { type SettingSchema } from "../shared/types.ts";
+import { reference } from "./reference.ts";
 
 /** How a setting is edited: typed controls where the schema allows it, JSON otherwise. */
 export type FieldKind = "boolean" | "enum" | "number" | "string" | "lines" | "json";
 
-const properties = schema.definitions.ClaudeCodeSettings.properties as Record<
-  string,
-  PropertySchema
->;
-
-export const SCHEMA_SOURCE = schema.$comment;
-
-export const SETTING_KEYS = Object.keys(properties).sort();
-
-export function propertyFor(key: string): PropertySchema | undefined {
-  return properties[key];
+export function schemaSource(): string {
+  return reference().schemaSource;
 }
 
-export function fieldKind(property: PropertySchema | undefined): FieldKind {
+export function settingKeys(): string[] {
+  return Object.keys(reference().settings).sort();
+}
+
+export function propertyFor(key: string): SettingSchema | undefined {
+  return reference().settings[key];
+}
+
+export function fieldKind(property: SettingSchema | undefined): FieldKind {
   if (!property) return "json";
   if (property.enum?.every((v) => typeof v === "string")) return "enum";
   if (property.type === "boolean") return "boolean";

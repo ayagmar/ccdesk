@@ -16,8 +16,8 @@ import {
   type FieldKind,
   fieldKind,
   propertyFor,
-  SCHEMA_SOURCE,
-  SETTING_KEYS,
+  schemaSource,
+  settingKeys,
 } from "./settingsSchema.ts";
 import { documentedValues } from "./settingsCatalog.ts";
 
@@ -169,7 +169,7 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
       {settingKey === null && <KeyPicker value={key} onChange={setKey} />}
       {key !== "" && !known && (
         <p className="flag bad">
-          {key} is not in Claude Code's settings schema ({SCHEMA_SOURCE}).
+          {key} is not in Claude Code's settings schema ({schemaSource()}).
         </p>
       )}
       {known && (
@@ -332,7 +332,9 @@ function KeyPicker({ value, onChange }: { value: string; onChange: (key: string)
   const listId = useId();
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return SETTING_KEYS.filter((k) => k.toLowerCase().includes(q)).slice(0, 30);
+    return settingKeys()
+      .filter((k) => k.toLowerCase().includes(q))
+      .slice(0, 30);
   }, [query]);
   const pick = (key: string | undefined) => {
     if (!key) return;
@@ -350,7 +352,7 @@ function KeyPicker({ value, onChange }: { value: string; onChange: (key: string)
           aria-expanded={open}
           aria-controls={listId}
           aria-activedescendant={open && matches[active] ? `${listId}-${active}` : undefined}
-          placeholder={`Search ${SETTING_KEYS.length} settings`}
+          placeholder={`Search ${settingKeys().length} settings`}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);

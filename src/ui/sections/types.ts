@@ -2,6 +2,7 @@ import { type ComponentType, type ReactNode } from "react";
 import {
   type Approval,
   type BuiltinTool,
+  type CatalogSetting,
   type Change,
   type DirectoryView,
   type EffectiveSetting,
@@ -16,7 +17,6 @@ import {
 } from "../../shared/types.ts";
 import { type Line } from "../lines.ts";
 import { type Saved } from "../SettingEditor.tsx";
-import { type CatalogSetting } from "../settingsCatalog.ts";
 
 export type EntryKind = "agent" | "skill" | "command" | "output style";
 
