@@ -111,7 +111,10 @@ const first = "project";
           const on = other === stop;
           other.setAttribute("aria-pressed", String(on));
           const detail = route.querySelector<HTMLElement>(`#stop-${other.dataset.stop}`);
-          if (detail) detail.hidden = !on;
+          if (!detail) continue;
+          detail.hidden = !on;
+          // Shown again, its files board one after another; not on the first paint.
+          if (on) detail.dataset.switched = "";
         }
       });
     }
@@ -170,6 +173,13 @@ const first = "project";
 
   .stop:hover {
     background: var(--sunk);
+  }
+
+  .stop,
+  .stop .bullet {
+    transition:
+      background-color 150ms ease,
+      box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .stop[aria-pressed="true"] {
@@ -262,8 +272,32 @@ const first = "project";
     margin: 0;
   }
 
+  .detail[data-switched] .who,
+  .detail[data-switched] .files li {
+    animation: board 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .detail[data-switched] .files li:nth-child(1) { animation-delay: 40ms; }
+  .detail[data-switched] .files li:nth-child(2) { animation-delay: 70ms; }
+  .detail[data-switched] .files li:nth-child(3) { animation-delay: 100ms; }
+  .detail[data-switched] .files li:nth-child(4) { animation-delay: 130ms; }
+  .detail[data-switched] .files li:nth-child(n + 5) { animation-delay: 160ms; }
+
+  @keyframes board {
+    from {
+      opacity: 0;
+      transform: translateX(-6px);
+    }
+  }
+
   @keyframes draw {
     from { transform: scaleX(0); }
+  }
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
   }
 
   @keyframes arrive {
@@ -274,6 +308,12 @@ const first = "project";
     .stops::before,
     .bullet {
       animation: none;
+    }
+
+    .detail[data-switched] .who,
+    .detail[data-switched] .files li {
+      animation-name: fade;
+      animation-delay: 0ms;
     }
   }
 

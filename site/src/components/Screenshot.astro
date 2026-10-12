@@ -1,6 +1,7 @@
 ---
 // A screenshot from src/assets/screenshots in both themes; CSS shows the one matching the page.
-// Regenerate them with `pnpm screenshots`. Each image links to its full-size original.
+// Regenerate them with `pnpm screenshots`. Each image links to its full-size original, which the
+// script below opens in place; without script, or with a modifier key, the link opens it as a page.
 import { getImage, Image } from "astro:assets";
 import { type ImageMetadata } from "astro";
 
@@ -11,19 +12,27 @@ interface Props {
   /** Rendered width in CSS pixels at most; phone shots are narrower. */
   width?: number;
   loading?: "lazy" | "eager";
+  /** How wide it shows; by default the docs column, at most 46rem beside the sidebar. */
+  sizes?: string;
 }
 
 const shots = import.meta.glob<{ default: ImageMetadata }>("../assets/screenshots/*.webp", {
   eager: true,
 });
-const { name, alt, caption, width = 1600, loading = "lazy" } = Astro.props;
+const {
+  name,
+  alt,
+  caption,
+  width = 1600,
+  loading = "lazy",
+  sizes = `(min-width: 50rem) min(${width}px, 46rem), min(${width}px, 100vw)`,
+} = Astro.props;
 const find = (theme: string) => {
   const shot = shots[`../assets/screenshots/${name}-${theme}.webp`];
   if (!shot) throw new Error(`No screenshot ${name}-${theme}.webp; run pnpm screenshots`);
   return shot.default;
 };
 const widths = [Math.round(width / 2), width, Math.min(width * 2, find("light").width)];
-const sizes = `(min-width: 72rem) ${Math.min(width, 1100)}px, 100vw`;
 // The original's own URL works in a build but not as a page in `astro dev`, so link to a copy.
 const full = {
   light: (await getImage({ src: find("light"), format: "webp", quality: 80 })).src,
@@ -34,7 +43,7 @@ const full = {
 <figure class="shot" style={`max-width: ${width}px`}>
   {
     (["light", "dark"] as const).map((theme) => (
-      <a class={theme} href={full[theme]} title="Open the full-size image">
+      <a class={theme} href={full[theme]} title="View full size">
         <Image
           src={find(theme)}
           alt={alt}
@@ -49,3 +58,102 @@ const full = {
   }
   {caption && <figcaption>{caption}</figcaption>}
 </figure>
+
+<script>
+  // One viewer for the page. It opens on the image already shown, grown from where it sits,
+  // and swaps in the full-size file once that has loaded.
+  const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  let viewer: { dialog: HTMLDialogElement; image: HTMLImageElement } | undefined;
+  let from: HTMLImageElement | undefined;
+
+  function build() {
+    const dialog = document.createElement("dialog");
+    dialog.className = "lightbox";
+    dialog.setAttribute("aria-label", "Screenshot");
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "lightbox-close";
+    close.setAttribute("aria-label", "Close");
+    close.innerHTML =
+      '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3.5 3.5l9 9m0-9-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    const image = document.createElement("img");
+    image.decoding = "async";
+    dialog.append(close, image);
+    // Any click closes it: there is nothing in the viewer to interact with.
+    dialog.addEventListener("click", () => void hide());
+    dialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      void hide();
+    });
+    document.body.append(dialog);
+    return { dialog, image };
+  }
+
+  /** The transform that puts the viewer's image over the thumbnail. */
+  function over(thumb: HTMLImageElement, image: HTMLImageElement): string {
+    const a = thumb.getBoundingClientRect();
+    const b = image.getBoundingClientRect();
+    if (b.width === 0 || b.height === 0) return "none";
+    return `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${a.width / b.width}, ${a.height / b.height})`;
+  }
+
+  function show(link: HTMLAnchorElement, thumb: HTMLImageElement) {
+    viewer ??= build();
+    const { dialog, image } = viewer;
+    from = thumb;
+    image.src = thumb.currentSrc || thumb.src;
+    image.alt = thumb.alt;
+    // Sized by the shape alone, so the full-size file replaces it without a jump.
+    image.style.setProperty("--ratio", String(thumb.naturalWidth / thumb.naturalHeight || 1.6));
+    dialog.showModal();
+    const full = new Image();
+    full.src = link.href;
+    full
+      .decode()
+      .then(() => {
+        if (dialog.open && from === thumb) image.src = full.src;
+      })
+      .catch(() => undefined);
+    if (reduced.matches) {
+      dialog.animate({ opacity: [0, 1] }, { duration: 150 });
+      return;
+    }
+    dialog.animate({ opacity: [0, 1] }, { duration: 200, easing: "linear" });
+    image.animate(
+      { transform: [over(thumb, image), "none"], borderRadius: ["6px", "8px"] },
+      { duration: 380, easing: EASE }
+    );
+  }
+
+  async function hide() {
+    if (!viewer?.dialog.open) return;
+    const { dialog, image } = viewer;
+    const thumb = from;
+    from = undefined;
+    const fade = dialog.animate(
+      { opacity: [1, 0] },
+      { duration: reduced.matches ? 120 : 220, easing: "linear", fill: "forwards" }
+    );
+    if (!reduced.matches && thumb)
+      image.animate(
+        { transform: ["none", over(thumb, image)] },
+        { duration: 240, easing: EASE, fill: "forwards" }
+      );
+    await fade.finished.catch(() => undefined);
+    dialog.close();
+    for (const animation of [...dialog.getAnimations(), ...image.getAnimations()])
+      animation.cancel();
+    thumb?.closest("a")?.focus({ preventScroll: true });
+  }
+
+  document.addEventListener("click", (event) => {
+    const link = (event.target as Element | null)?.closest<HTMLAnchorElement>(".shot a");
+    const thumb = link?.querySelector("img");
+    // A modifier key or another button keeps the link's own behaviour: a new tab or window.
+    if (!link || !thumb || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    show(link, thumb);
+  });
+</script>

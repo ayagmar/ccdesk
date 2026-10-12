@@ -15,13 +15,14 @@ export default defineConfig({
   site,
   base,
   trailingSlash: "always",
+  // The pages share one small stylesheet; inlined, it no longer holds up the first paint.
+  build: { inlineStylesheets: "always" },
   integrations: [
     readmeLinksToSite(),
     starlight({
       title: "ccdesk",
       description:
         "See and change everything that shapes Claude Code on your machine: instruction files, settings, hooks, MCP servers, subagents, skills, plugins and auto memory.",
-      logo: { src: "../assets/brand/logo.png", alt: "" },
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/ayagmar/ccdesk" }],
       editLink: { baseUrl: "https://github.com/ayagmar/ccdesk/edit/master/site/" },
       customCss: [
@@ -32,6 +33,7 @@ export default defineConfig({
       components: {
         Head: "./src/components/Head.astro",
         Hero: "./src/components/Hero.astro",
+        SiteTitle: "./src/components/SiteTitle.astro",
       },
       sidebar: DOC_GROUPS,
     }),

@@ -40,6 +40,7 @@ const landing = Astro.locals.starlightRoute.id === "";
   alt="ccdesk on a project called acme-api: the route strip of scopes, which files git shares, the instruction files in load order and the settings with the file each value comes from"
   caption="A directory page in ccdesk. The project, settings and memories in these screenshots are made up."
   loading="eager"
+  sizes="min(76rem, 100vw)"
 />
 )}
 
@@ -123,6 +124,27 @@ const landing = Astro.locals.starlightRoute.id === "";
     color: var(--ink);
     font-size: 0.9375rem;
     font-weight: 700;
+  }
+
+  /* The page's one entrance: as the route line draws its stops, the directory page behind it is
+     uncovered in the same direction, left to right. */
+  :global(.lead + .shot img) {
+    animation: uncover 720ms 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes uncover {
+    from {
+      clip-path: inset(0 100% 0 0 round 6px);
+    }
+    to {
+      clip-path: inset(0 0 0 0 round 6px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.lead + .shot img) {
+      animation: none;
+    }
   }
 
   @media (max-width: 64rem) {

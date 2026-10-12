@@ -200,10 +200,6 @@ h1#_top {
   letter-spacing: -0.015em;
 }
 
-.site-title {
-  color: var(--ink);
-}
-
 /* The current page in the sidebar is inverted, like the app's rail. */
 .sidebar-content a[aria-current="page"],
 .sidebar-content a[aria-current="page"]:hover,
@@ -244,4 +240,63 @@ h1#_top {
 
 .shot a {
   display: block;
+}
+
+/* The screenshot viewer: the image on a dimmed page, as large as the window allows. */
+.shot a {
+  cursor: zoom-in;
+}
+
+.lightbox {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  --pad: clamp(0.75rem, 3vw, 2.5rem);
+  padding: var(--pad);
+  border: 0;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(6px);
+  cursor: zoom-out;
+  overflow: hidden;
+}
+
+.lightbox[open] {
+  display: grid;
+  place-items: center;
+}
+
+.lightbox::backdrop {
+  background: transparent;
+}
+
+.lightbox img {
+  display: block;
+  width: min(100%, 1600px, (100dvh - 2 * var(--pad)) * var(--ratio));
+  height: auto;
+  aspect-ratio: var(--ratio);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.35);
+  transform-origin: top left;
+}
+
+.lightbox-close {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.lightbox-close:hover {
+  border-color: var(--ink);
 }
