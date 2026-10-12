@@ -4,9 +4,6 @@
 //
 //   pnpm --dir .. build && pnpm screenshots
 //
-// With --video it captures the frames of the announcement video instead: 1920x1080 at twice the
-// pixels, dark, as PNG into ../video/shots.
-//
 // CHROMIUM_PATH picks the browser binary; without it Playwright's own download is used
 // (`pnpm exec playwright-core install chromium`).
 import { spawn } from "node:child_process";
@@ -20,8 +17,6 @@ import { makeDemoHome } from "./demo-home.ts";
 const SITE = join(import.meta.dirname, "..");
 const CLI = join(SITE, "..", "dist", "server", "cli.js");
 const OUT = join(SITE, "src", "assets", "screenshots");
-const VIDEO = process.argv.includes("--video");
-const VIDEO_OUT = join(SITE, "..", "video", "shots");
 
 interface Shot {
   name: string;
@@ -35,8 +30,6 @@ interface Shot {
   only?: string;
   /** Also record where each scope's rows are, for the landing page's tour of this shot. */
   regions?: true;
-  /** For the video: parts of the shot whose boxes are printed, for its camera and highlights. */
-  marks?: (page: Page) => Record<string, Locator>;
 }
 
 /** A close crop of what answers one of the landing page's questions. */
@@ -143,82 +136,6 @@ const SHOTS: Shot[] = [
     },
   },
   { name: "phone", width: 390, height: 844 },
-];
-
-// The video's frames, in the order it shows them. "saved" saves a change, so it comes last.
-const selected = (page: Page) => page.locator("main tr.selected");
-const VIDEO_SHOTS: Shot[] = [
-  {
-    name: "directory",
-    width: 1920,
-    height: 1080,
-    marks: (page) => ({ route: page.locator(".route-stops"), main: page.locator("main") }),
-  },
-  {
-    name: "ask-push",
-    width: 1920,
-    height: 1080,
-    setup: section("3", "Permissions", "git push"),
-    marks: (page) => ({ row: selected(page), inspector: page.locator("aside.inspector") }),
-  },
-  {
-    name: "all-settings",
-    width: 1920,
-    height: 1080,
-    setup: section("9", "All settings", "cleanupPeriodDays"),
-    marks: (page) => ({
-      row: selected(page),
-      table: page.locator("main section").filter({ has: page.locator("tr.selected") }),
-      inspector: page.locator("aside.inspector"),
-    }),
-  },
-  { name: "memory", width: 1920, height: 1080, setup: section("5", "Memory", "test-database") },
-  {
-    name: "shared-memory",
-    width: 1920,
-    height: 1080,
-    query: "?all",
-    marks: (page) => ({
-      shared: page.locator("section").filter({ has: page.locator("#h-shared") }),
-    }),
-  },
-  {
-    name: "changes",
-    width: 1920,
-    height: 1080,
-    query: "?changes",
-    setup: async (page) => {
-      await page.getByRole("button", { name: "Review restore" }).last().click();
-      await pause(page);
-    },
-    marks: (page) => ({
-      diff: page.locator("main pre, main .diff").first(),
-      restore: page.getByRole("button", { name: "Restore this version" }),
-    }),
-  },
-  {
-    name: "review",
-    width: 1920,
-    height: 1080,
-    setup: reviewSetting("model", "opus"),
-    marks: (page) => ({
-      row: selected(page),
-      inspector: page.locator("aside.inspector"),
-      save: page.getByRole("button", { name: "Save", exact: true }),
-    }),
-  },
-  {
-    name: "saved",
-    width: 1920,
-    height: 1080,
-    setup: async (page) => {
-      await reviewSetting("model", "opus")(page);
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-      // The toast slides up from the bottom; wait until it is all there.
-      await page.waitForTimeout(1500);
-    },
-    marks: (page) => ({ toast: page.getByRole("button", { name: "Undo" }).locator("..") }),
-  },
 ];
 
 // One per question on the landing page, named by the question's id there.
@@ -343,9 +260,8 @@ async function main() {
       process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}
     );
     // Start from an empty folder, so a shot dropped from SHOTS does not leave a stale image.
-    const out = VIDEO ? VIDEO_OUT : OUT;
-    rmSync(out, { recursive: true, force: true });
-    mkdirSync(out, { recursive: true });
+    rmSync(OUT, { recursive: true, force: true });
+    mkdirSync(OUT, { recursive: true });
     try {
       const open = async (shot: Shot, theme: "light" | "dark") => {
         const page = await browser.newPage({
@@ -367,21 +283,6 @@ async function main() {
       const first = await open(SHOTS[0] as Shot, "light");
       await makeChanges(first);
       await first.close();
-      if (VIDEO) {
-        for (const shot of VIDEO_SHOTS) {
-          const page = await open(shot, "dark");
-          await shot.setup?.(page);
-          await page.screenshot({ path: join(VIDEO_OUT, `${shot.name}.png`) });
-          for (const [mark, locator] of Object.entries(shot.marks?.(page) ?? {})) {
-            const box = await locator.boundingBox();
-            if (!box) throw new Error(`No ${mark} in the ${shot.name} shot.`);
-            console.log(`  ${mark}: x ${box.x} y ${box.y} w ${box.width} h ${box.height}`);
-          }
-          await page.close();
-          console.log(`${shot.name}.png`);
-        }
-        return;
-      }
       for (const theme of ["light", "dark"] as const) {
         for (const shot of SHOTS) {
           const page = await open(shot, theme);
