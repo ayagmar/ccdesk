@@ -73,6 +73,9 @@ export function builtinTools(permissions: Permission[], hooks: Hook[]): BuiltinT
       const { tool, specifier } = parseRule(r.rule);
       if (specifier === null) {
         if (namesTool(r.list, tool, name)) whole.push(r);
+        // Monitor's commands follow the Bash rules; its WebSocket watches do not
+        // (docs: tools-reference#monitor-tool).
+        else if (name === "Monitor" && namesTool(r.list, tool, "Bash")) scoped.push(r);
       } else if (tool === name && UNCHECKED_PATH_RULE_TOOLS.has(tool)) {
         scoped.push({ ...r, unchecked: true });
       } else if (tool === name || coveredTools(tool, r.list).includes(name)) scoped.push(r);

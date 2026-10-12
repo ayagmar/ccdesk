@@ -60,6 +60,18 @@ test("rules for some uses are listed under the tools they cover, Edit paths unde
   );
 });
 
+test("a rule for the whole of Bash covers Monitor's commands but does not remove Monitor", async () => {
+  const tools = await toolsFor({ permissions: { deny: ["Bash"] } });
+
+  assert.equal(tools.Bash?.verdict, "denied");
+  assert.equal(tools.Monitor?.verdict, "default");
+  assert.equal(tools.Monitor?.removedBy, undefined);
+  assert.deepEqual(
+    tools.Monitor?.scoped.map((r) => [r.list, r.rule]),
+    [["deny", "Bash"]]
+  );
+});
+
 test("a path rule on Write is marked as one Claude Code never checks", async () => {
   const tools = await toolsFor({ permissions: { deny: ["Write(docs/**)"] } });
 

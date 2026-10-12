@@ -34,5 +34,6 @@
   "sub-agents#choose-the-subagent-scope": "a4991f236c26b1a8",
   "sub-agents#supported-frontmatter-fields": "42f3a453fcfd0bed",
   "tools-reference#configure-tools-with-permission-rules-and-hooks": "7d4f07f8310d3bf6",
-  "tools-reference#endconversation-tool-behavior": "dcf0fcd72dd58459"
+  "tools-reference#endconversation-tool-behavior": "dcf0fcd72dd58459",
+  "tools-reference#monitor-tool": "f5e1d8b659f23176"
 }
