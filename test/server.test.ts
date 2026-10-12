@@ -1330,6 +1330,30 @@ test("user and local servers are changed through claude mcp, never by writing ~/
   assert.equal(readFileSync(fixture.env.claudeJson, "utf8"), before);
 });
 
+test("a local server added from a repository subdirectory is added from the repository root", async () => {
+  const root = fixture.at("work/mcp-monorepo");
+  const dir = fixture.at("work/mcp-monorepo/apps/web");
+  fixture.write("work/mcp-monorepo/apps/web/README.md", "x");
+  fixture.git("work/mcp-monorepo", "init", "-q");
+  fixture.write(
+    fixture.env.claudeJson,
+    JSON.stringify({ projects: { [dir]: { mcpServers: { stale: { command: "stale" } } } } })
+  );
+  claudeRuns.length = 0;
+
+  const added = await saveMcp({
+    dir,
+    scope: "local",
+    add: { name: "db", definition: { command: "db" } },
+  });
+
+  assert.equal(added.status, 200);
+  assert.deepEqual(
+    claudeRuns.map((r) => r.cwd),
+    [root]
+  );
+});
+
 test("removing a user server is refused when its hidden values changed after the review", async () => {
   const dir = fixture.at("work/mcp-rotated");
   const servers = (token: string) =>

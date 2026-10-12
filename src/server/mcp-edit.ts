@@ -220,13 +220,12 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
   } catch (error) {
     throw new RefusedError(`${env.claudeJson} is ${jsonSyntaxError(error)}; fix it by hand first.`);
   }
-  // Local servers are kept per project, under the same key the scan reads them from: the
-  // repository root, or this folder. Claude Code files them under the folder it runs in.
+  // Local servers are kept per project, under the key the scan reads them from: the main
+  // checkout's root, or this folder outside git. Claude Code files them there from any folder below.
   const projects = isRecord(data.projects) ? data.projects : {};
   const root = (await mainWorktreeRoot(dir)) ?? (await gitRoot(dir)) ?? dir;
   // User servers do not depend on the folder, so claude runs in your home directory for them.
-  const cwd =
-    edit.scope === "user" ? env.home : ([root, dir].find((k) => isRecord(projects[k])) ?? root);
+  const cwd = edit.scope === "user" ? env.home : root;
   if (!(await stat(cwd).catch(() => null))?.isDirectory())
     throw new RefusedError(`${cwd} is not a directory on this machine.`);
   const holder = edit.scope === "user" ? data : projects[cwd];

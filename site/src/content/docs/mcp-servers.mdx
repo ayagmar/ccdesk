@@ -17,7 +17,7 @@ The MCP servers section lists every MCP server defined for the open directory, w
 In the order Claude Code gives them precedence:
 
 1. Managed: `managed-mcp.json` in the managed folder, or `managedMcpServers` in managed settings. If `managed-mcp.json` exists, it is the only source.
-2. Local: your servers for this project, in `~/.claude.json`.
+2. Local: your servers for this project, in `~/.claude.json`. In a git repository they belong to the main checkout's root, so every subdirectory and worktree shares them.
 3. Project: `.mcp.json` in the open directory, shared through the repository.
 4. User: your servers for every project, in `~/.claude.json`.
 5. Enabled plugins.

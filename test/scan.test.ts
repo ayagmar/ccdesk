@@ -338,6 +338,25 @@ test("an interactive session holds back every settings file's hooks until the fo
   assert.equal(bashHooks(underTrustedParent), 3);
 });
 
+test("in a subdirectory of a repository, local servers come from the repository root's entry only", async () => {
+  const f = makeFixture();
+  f.write("repo/apps/web/README.md", "x");
+  f.git("repo", "init", "-q");
+  const local = (name: string) => ({ mcpServers: { [name]: { command: name } } });
+  const localNames = async () =>
+    (await scanDirectory(f.env, f.at("repo/apps/web"))).inventory.mcpServers
+      .filter((s) => s.scope === "local")
+      .map((s) => s.name);
+
+  f.json("home/.claude.json", { projects: { [f.at("repo/apps/web")]: local("web-db") } });
+  assert.deepEqual(await localNames(), []);
+
+  f.json("home/.claude.json", {
+    projects: { [f.at("repo")]: local("root-db"), [f.at("repo/apps/web")]: local("web-db") },
+  });
+  assert.deepEqual(await localNames(), ["root-db"]);
+});
+
 test("MCP policy: denied servers are blocked, an allowlist blocks the rest, managed-mcp.json takes over", async () => {
   const f = makeFixture();
   f.json("home/.claude.json", {
