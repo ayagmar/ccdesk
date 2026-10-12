@@ -20,7 +20,7 @@ import { CountStopped } from "./scan/usage.ts";
 import { Watcher } from "./watch.ts";
 import { RefusedError } from "./write.ts";
 
-interface ServerOptions {
+export interface ServerOptions {
   /** What the routes read and change; tests make one with fakes so nothing is launched. */
   core: Core;
   launchDir: string;

@@ -149,6 +149,20 @@ function launch([command, args]: Command, path: string, host: Host): Promise<str
 }
 
 /**
+ * Opens `url` in the default browser on `host`; resolves null once the opener started, else why it
+ * failed. On Windows `start` is a cmd.exe builtin, so cmd.exe is the command.
+ */
+export function openBrowser(url: string, host: Host): Promise<string | null> {
+  const command: Command =
+    host.platform === "darwin"
+      ? ["open", []]
+      : host.platform === "win32"
+        ? ["cmd.exe", ["/c", "start", ""]]
+        : ["xdg-open", []];
+  return launch(command, url, host);
+}
+
+/**
  * Opens a file or folder in the first editor that starts on `host`; resolves with the command
  * used. Without `host` it uses this process's platform and environment; use a core's instead.
  */
