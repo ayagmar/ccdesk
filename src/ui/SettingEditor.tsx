@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { allowedScopes, EDITABLE_SCOPES } from "../shared/scopes.ts";
 import {
   type Change,
@@ -94,13 +94,25 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
   const [busy, setBusy] = useState(false);
   const fieldId = useId();
 
-  // Picking another key or file starts from what that file holds. Compared as text, so
-  // re-reading an unchanged file (the page refreshes on focus) keeps an unsaved draft.
+  // Picking another key starts from what the file holds. Compared as text, so re-reading an
+  // unchanged file (the page refreshes on focus) keeps an unsaved draft. When Claude Code or an
+  // editor changes this value meanwhile, a draft you have not touched follows the file, and one
+  // you have is kept, to be reviewed against the file as it is now.
   const currentText = JSON.stringify(current);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new key starts a new draft too.
+  const base = useRef({ key, kind, text: currentText });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the draft is read, not a trigger.
   useEffect(() => {
-    setDraft(toDraft(kind, currentText === undefined ? undefined : JSON.parse(currentText)));
+    const was = base.current;
+    base.current = { key, kind, text: currentText };
+    if (was.key === key && was.kind === kind && was.text === currentText) return;
     setReview(null);
+    const parse = (text: string | undefined) => (text === undefined ? undefined : JSON.parse(text));
+    const edited = JSON.stringify(draft) !== JSON.stringify(toDraft(kind, parse(was.text)));
+    if (was.key === key && was.kind === kind && edited) {
+      setProblem("The file changed while you were editing. Your value is kept; review it again.");
+      return;
+    }
+    setDraft(toDraft(kind, parse(currentText)));
     setProblem(null);
   }, [key, kind, currentText]);
 
