@@ -20,6 +20,7 @@ interface Change {
   id: string;
   target: string;
   revision: string;
+  created: boolean;
 }
 interface Backup {
   id: string;
@@ -617,8 +618,10 @@ test("a setting saved into a new file is listed as created, with nothing earlier
   fixture.write("work/fresh/README.md", "x");
 
   const saved = await saveSetting({ dir, scope: "project", key: "model", value: "opus" });
-  const { id } = saved.json as Change;
+  const { id, created } = saved.json as Change;
 
+  // The save says so too, so the page offers no undo that the restore would refuse.
+  assert.equal(created, true);
   assert.equal((await backups()).find((b) => b.id === id)?.created, true);
   const preview = (await call("/api/backups/preview", { method: "POST", body: { id } }))
     .json as RestorePreview;

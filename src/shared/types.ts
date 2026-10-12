@@ -160,6 +160,8 @@ export interface Change {
   target: string;
   /** The file's revision right after the change, which an undo requires. */
   revision: string;
+  /** The change created the file, so there is nothing to undo it to. */
+  created: boolean;
 }
 
 /** What ccdesk can change in auto memory: delete a memory, add one to MEMORY.md, or drop dead index lines. */

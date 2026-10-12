@@ -194,7 +194,7 @@ export async function recordChange<T extends { revision: string }>(
     unchanged?: () => Promise<boolean>;
   },
   change: () => Promise<T>
-): Promise<T & { id: string }> {
+): Promise<T & { id: string; created: boolean }> {
   const createdAt = new Date().toISOString();
   const id = `${createdAt.replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}-${record.kind}`;
   const root = backupRoot(env);
@@ -243,5 +243,5 @@ export async function recordChange<T extends { revision: string }>(
   }
   manifest.after = result.revision;
   await writeManifest();
-  return { ...result, id };
+  return { ...result, id, created: record.before === null };
 }

@@ -144,7 +144,11 @@ export function DirectoryPage({
     ({ change, message, select }: Saved) => {
       setAdding(null);
       if (select !== undefined) setSelected(select);
-      onToast({ text: message, ...(change ? { undo: () => undo(change) } : {}) });
+      // A change that created its file has no earlier version to put back.
+      onToast({
+        text: message,
+        ...(change && !change.created ? { undo: () => undo(change) } : {}),
+      });
       reload();
     },
     [onToast, reload, undo]
