@@ -201,7 +201,7 @@ export function DirectoryPage({
               !trust.trusted && (
                 <span
                   className="flag warn"
-                  title={`Until you accept Claude Code's trust dialog for ${tilde(trust.root)}, its allow rules, extra folders and .mcp.json approvals wait.${trust.inheritedFrom ? ` You trusted ${tilde(trust.inheritedFrom)}, which covers some of this but not those grants.` : ""}`}
+                  title={`Until you accept Claude Code's trust dialog for ${tilde(trust.root)}, ${trust.inheritedFrom ? `its allow rules, extra folders and .mcp.json approvals wait. You trusted ${tilde(trust.inheritedFrom)}, which covers hooks but not those grants.` : "hooks from every settings file, its allow rules, extra folders and .mcp.json approvals wait."}`}
                 >
                   not trusted yet
                 </span>

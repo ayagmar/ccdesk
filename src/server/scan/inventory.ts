@@ -381,13 +381,17 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
       ...(await readOutputStyles(env, projectDir, gitRoot)),
       ...fromPlugins.flatMap((p) => p.outputStyles),
     ],
-    hooks: await readHooks(layers, active),
+    hooks: await readHooks(layers, active, input.trust),
     mcpServers: await readMcpServers(input, active),
     plugins,
   };
 }
 
-async function readHooks(layers: SettingsLayer[], plugins: Plugin[]): Promise<Hook[]> {
+async function readHooks(
+  layers: SettingsLayer[],
+  plugins: Plugin[],
+  trust: Trust
+): Promise<Hook[]> {
   const out: Hook[] = [];
   for (const layer of layers) {
     if (layer.data) out.push(...hooksFrom(layer.data.hooks, layer.scope, layer.path));
@@ -412,6 +416,11 @@ async function readHooks(layers: SettingsLayer[], plugins: Plugin[]): Promise<Ho
   const forcedByManaged = new Set(
     plugins.filter((p) => p.enabledIn === "managed").map((p) => p.id)
   );
+  // An interactive session holds back hooks from every settings file, managed and yours included,
+  // until the folder or a parent covering it is trusted; -p and the SDK do not (docs:
+  // hooks#workspace-trust, permissions#what-runs-before-you-trust-a-folder). The docs say nothing
+  // of plugin hooks, so those are left as they are.
+  const heldBack = !trust.trusted && !trust.inheritedFrom;
   for (const hook of out) {
     const organisation =
       hook.source === "managed" || (hook.plugin !== undefined && forcedByManaged.has(hook.plugin));
@@ -424,6 +433,9 @@ async function readHooks(layers: SettingsLayer[], plugins: Plugin[]): Promise<Ho
     } else if (!organisation && managedOnly) {
       hook.active = false;
       hook.note = "Managed settings allow only managed hooks (allowManagedHooksOnly)";
+    } else if (hook.source !== "plugin" && heldBack) {
+      hook.active = false;
+      hook.note = "Waits until you accept Claude Code's trust dialog for this folder";
     }
   }
   return out;

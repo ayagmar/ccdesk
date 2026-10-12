@@ -234,7 +234,7 @@ export interface Hook {
   source: Scope | "plugin";
   sourcePath: string;
   plugin?: string;
-  /** False when disableAllHooks or allowManagedHooksOnly turns it off. */
+  /** False when disableAllHooks or allowManagedHooksOnly turns it off, or it waits for workspace trust. */
   active: boolean;
   note?: string;
   /** Where it is in its file: the matcher group under `event`, and the hook within the group. */
