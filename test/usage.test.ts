@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { appendFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { appendFileSync, closeSync, openSync } from "node:fs";
+import { open } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import { storeDirName } from "../src/server/scan/memory.ts";
@@ -404,6 +406,7 @@ test("a count nobody waits for any more stops without holding up the next one", 
   assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 4);
 });
 
+// FIFOs stand in for a hung disk, such as a network mount; Windows has no mkfifo.
 test("a count shared by two pages keeps going when one of them leaves", async () => {
   const f = makeFixture();
   const dir = f.at("work", "app");
@@ -416,6 +419,34 @@ test("a count shared by two pages keeps going when one of them leaves", async ()
   assert.equal((await second).tools[0]?.calls, 3);
   assert.equal((await first).tools[0]?.calls, 3);
 });
+
+// FIFOs stand in for a hung disk, such as a network mount; Windows has no mkfifo.
+const notOnWindows = { skip: process.platform === "win32" };
+
+test(
+  "a count stuck on a read that never returns still stops at its time limit",
+  notOnWindows,
+  async () => {
+    const f = makeFixture();
+    const dir = f.at("work", "app");
+    f.write(join(storeOf(f, dir), "one.jsonl"), bash("ls"));
+    // Opening a FIFO nobody writes to blocks one of Node's file system threads; with all of them
+    // blocked, every read the count makes waits.
+    const fifos = Array.from({ length: Number(process.env.UV_THREADPOOL_SIZE ?? 4) }, (_, i) => {
+      const path = f.at(`stuck-${i}`);
+      execFileSync("mkfifo", [path]);
+      return path;
+    });
+    const stuck = fifos.map((path) => open(path, "r"));
+    try {
+      await assert.rejects(readUsage(f.env, dir, [], { timeLimitMs: 50 }), CountStopped);
+    } finally {
+      for (const path of fifos) closeSync(openSync(path, "w"));
+      for (const handle of await Promise.all(stuck)) await handle.close();
+    }
+    assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 1);
+  }
+);
 
 test("only counts and rule patterns are returned, never commands or results", async () => {
   const f = makeFixture();

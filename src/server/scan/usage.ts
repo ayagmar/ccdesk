@@ -76,8 +76,9 @@ export class CountStopped extends Error {}
  * Subagents are included. It also counts the calls you approved or refused by hand, which Claude
  * Code records on each call's result as `permissionDecision` (not documented; older transcripts
  * lack it), and how many calls each rule covers. Requests run one at a time, since they share the
- * cache. A count stops when every `signal` it was asked with aborts, or after `timeLimitMs`; the
- * next one then starts, even if a read of the stopped count never returns.
+ * cache. A count stops when every `signal` it was asked with aborts, or after `timeLimitMs`: it
+ * rejects with CountStopped and the next one starts, even if a read of the stopped count never
+ * returns.
  */
 export function readUsage(
   env: ScanEnv,
@@ -89,26 +90,21 @@ export function readUsage(
   let run = waiting.get(key);
   if (!run) {
     const stop = new AbortController();
-    let stopped: AbortSignal = stop.signal;
-    const started = queue.then(() => {
+    const promise = queue.then(() => {
       waiting.delete(key);
-      stopped = AbortSignal.any([stop.signal, AbortSignal.timeout(timeLimitMs)]);
-      return stopped;
+      const during = AbortSignal.any([stop.signal, AbortSignal.timeout(timeLimitMs)]);
+      // A stopped count answers right away, even while one of its reads never returns.
+      const stopped = new Promise<never>((_, fail) => {
+        const onStop = () => fail(stoppedBecause(during));
+        if (during.aborted) onStop();
+        else during.addEventListener("abort", onStop, { once: true });
+      });
+      return Promise.race([count(env, resolve(dir), rules, during), stopped]);
     });
-    const promise = started.then((during) => count(env, resolve(dir), rules, during));
     run = { promise, stop, waiters: 0 };
     waiting.set(key, run);
     // The queue moves on when the count settles or stops: a stopped count changes nothing more.
-    queue = started
-      .then(() =>
-        Promise.race([
-          promise,
-          new Promise((done) =>
-            stopped.aborted ? done(null) : stopped.addEventListener("abort", done)
-          ),
-        ])
-      )
-      .catch(() => undefined);
+    queue = promise.catch(() => undefined);
   }
   const current = run;
   if (signal?.aborted) return current.promise;
@@ -123,14 +119,17 @@ export function readUsage(
   return current.promise;
 }
 
-/** Throws once a count has to stop, before it changes anything else. */
-function checkStopped(signal: AbortSignal): void {
-  if (!signal.aborted) return;
-  throw new CountStopped(
+function stoppedBecause(signal: AbortSignal): CountStopped {
+  return new CountStopped(
     signal.reason instanceof DOMException && signal.reason.name === "TimeoutError"
       ? "Counting tool calls took too long and stopped; what was read is kept, so the next count continues."
       : "The count was no longer wanted."
   );
+}
+
+/** Throws once a count has to stop, before it changes anything else. */
+function checkStopped(signal: AbortSignal): void {
+  if (signal.aborted) throw stoppedBecause(signal);
 }
 
 async function count(
