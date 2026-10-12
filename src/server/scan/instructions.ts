@@ -64,7 +64,7 @@ interface ResolveOptions {
 interface Ctx {
   /** The start directory after links; "outside the project" is measured from here. */
   realCwd: string;
-  home: string;
+  env: ScanEnv;
   approved: boolean;
 }
 
@@ -77,7 +77,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
   const { env, cwd, mode, excludes, externalImports, managedClaudeMd, problems } = options;
   /** A file that exists but cannot be read is reported, not taken for a missing one. */
   const readInstruction = async (path: string) => {
-    const file = await readTextFile(path);
+    const file = await readTextFile(env, path);
     if (file || !(await stat(path).catch(() => null))?.isFile()) return file;
     const denied = await access(path, constants.R_OK).then(
       () => null,
@@ -88,7 +88,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
   };
   const ctx: Ctx = {
     realCwd: await resolvedPath(resolve(cwd)),
-    home: env.home,
+    env,
     approved: externalImports === "approved",
   };
   const managedOnly = mode === "managed-only";
@@ -333,13 +333,13 @@ async function collectImports(
   const visit = async (source: TextFile, via: string, hop: number) => {
     if (hop >= MAX_IMPORT_HOPS) return;
     for (const raw of importPaths(source.text)) {
-      const target = expandImport(raw, dirname(source.path), ctx.home);
+      const target = expandImport(raw, dirname(source.path), ctx.env.home);
       if (isNetworkPath(target)) continue;
       const real = await resolvedPath(target);
       if (seen.has(real)) continue;
       seen.add(real);
       const external = !isWithin(ctx.realCwd, real);
-      const imported = !external || readExternal ? await readTextFile(target) : null;
+      const imported = !external || readExternal ? await readTextFile(ctx.env, target) : null;
       const ref: ImportRef = {
         raw,
         resolved: real,

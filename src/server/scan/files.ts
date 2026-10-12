@@ -1,10 +1,12 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstat, open, readdir, readFile, readlink, realpath, stat } from "node:fs/promises";
+import { type BigIntStats } from "node:fs";
+import { type FileHandle, lstat, open, readdir, readlink, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join, normalize, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { type TextFile, type Visibility } from "../../shared/types.ts";
+import { type ScanEnv } from "./env.ts";
 
 const run = promisify(execFile);
 /** Claude Code skips a CLAUDE.md larger than this (docs: memory#auto-memory), so ccdesk reads no more. */
@@ -19,7 +21,7 @@ export function isSecretPath(path: string): boolean {
  * Whether a path, any link on the way, or the file it finally leads to is the credentials file, so
  * a credentials file that is itself a link is caught too. Checked before opening.
  */
-export async function leadsToSecret(path: string): Promise<boolean> {
+async function leadsToSecret(path: string): Promise<boolean> {
   let current = path;
   for (let hop = 0; hop < 40; hop++) {
     if (isSecretPath(current)) return true;
@@ -28,6 +30,40 @@ export async function leadsToSecret(path: string): Promise<boolean> {
     current = resolve(dirname(current), await readlink(current));
   }
   return isSecretPath(await realpath(path).catch(() => path));
+}
+
+/** The identity of `<config>/.credentials.json`, or null when there is none. */
+function credentialsIdentity(env: ScanEnv): Promise<BigIntStats | null> {
+  return stat(join(env.claudeDir, ".credentials.json"), { bigint: true }).catch(() => null);
+}
+
+function sameFile(a: BigIntStats, b: BigIntStats | null): boolean {
+  return b !== null && a.dev === b.dev && a.ino === b.ino;
+}
+
+/**
+ * Whether a path is Claude Code's credentials file: by name, through any link on the way, or by
+ * being the same file as `<config>/.credentials.json`, so a copy kept under another name or a hard
+ * link to it counts too.
+ */
+export async function isCredentials(env: ScanEnv, path: string): Promise<boolean> {
+  if (await leadsToSecret(path)) return true;
+  const info = await stat(path, { bigint: true }).catch(() => null);
+  return info !== null && sameFile(info, await credentialsIdentity(env));
+}
+
+/**
+ * Opens a file to read, or null for the credentials file. The open file is checked again, so a
+ * file swapped in after the first check is not read either.
+ */
+async function openUnlessCredentials(env: ScanEnv, path: string): Promise<FileHandle | null> {
+  if (await isCredentials(env, path)) return null;
+  const handle = await open(path, "r");
+  if (sameFile(await handle.stat({ bigint: true }), await credentialsIdentity(env))) {
+    await handle.close();
+    return null;
+  }
+  return handle;
 }
 
 /**
@@ -146,14 +182,14 @@ export async function listDir(path: string): Promise<string[]> {
   }
 }
 
-export async function readTextFile(path: string): Promise<TextFile | null> {
+export async function readTextFile(env: ScanEnv, path: string): Promise<TextFile | null> {
   try {
     if (await linksToNetwork(path)) return null;
-    if (await leadsToSecret(path)) return null;
     const real = await realpath(path);
     const info = await stat(path);
     if (!info.isFile()) return null;
-    const handle = await open(path, "r");
+    const handle = await openUnlessCredentials(env, path);
+    if (!handle) return null;
     let text: string;
     try {
       const buffer = Buffer.alloc(Math.min(info.size, MAX_TEXT_BYTES));
@@ -192,14 +228,19 @@ type JsonResult =
 
 /** A JSON object file; `emptyIsObject` reads an empty file as `{}`. */
 export async function readJsonObject(
+  env: ScanEnv,
   path: string,
   { emptyIsObject = false } = {}
 ): Promise<JsonResult> {
   let raw: string;
   try {
-    if (await leadsToSecret(path))
-      return { ok: false, missing: false, error: "ccdesk does not read credentials" };
-    raw = await readFile(path, "utf8");
+    const handle = await openUnlessCredentials(env, path);
+    if (!handle) return { ok: false, missing: false, error: "ccdesk does not read credentials" };
+    try {
+      raw = await handle.readFile("utf8");
+    } finally {
+      await handle.close();
+    }
   } catch (error) {
     const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
     return { ok: false, missing, error: String(error) };

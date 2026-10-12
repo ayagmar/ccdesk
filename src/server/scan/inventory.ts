@@ -18,10 +18,10 @@ import {
   listDir,
   parseFrontmatter,
   readJsonObject,
-  redactSecrets,
-  shownUrl,
   readTextFile,
+  redactSecrets,
   resolvedPath,
+  shownUrl,
   stringField,
   toStringList,
 } from "./files.ts";
@@ -41,12 +41,13 @@ function isTrue(value: unknown): boolean {
  * frontmatter `name` replaces, except for a command (docs: skills#how-a-skill-gets-its-command-name).
  */
 async function readEntry(
+  env: ScanEnv,
   path: string,
   fileName: string,
   scope: Source,
   { plugin, isCommand = false }: { plugin?: string | undefined; isCommand?: boolean } = {}
 ): Promise<Entry | null> {
-  const file = await readTextFile(path);
+  const file = await readTextFile(env, path);
   if (!file) return null;
   const { data } = parseFrontmatter(file.text);
   const entry: Entry = {
@@ -69,6 +70,7 @@ async function readEntry(
  * with `separator`: commands use ":" (`frontend/component.md` is `/frontend:component`).
  */
 async function readFileEntries(
+  env: ScanEnv,
   dir: string,
   scope: Source,
   { plugin, separator = "/" }: { plugin?: string | undefined; separator?: string } = {},
@@ -81,13 +83,18 @@ async function readFileEntries(
     const path = join(dir, name);
     if (await isDir(path)) {
       if (depth < 4)
-        out.push(...(await readFileEntries(path, scope, { plugin, separator }, base, depth + 1)));
+        out.push(
+          ...(await readFileEntries(env, path, scope, { plugin, separator }, base, depth + 1))
+        );
       continue;
     }
     if (!name.endsWith(".md")) continue;
     const fileName = relative(base, path).replace(/\.md$/, "").split(/[/\\]/).join(separator);
     // Commands are the entries joined with ":".
-    const entry = await readEntry(path, fileName, scope, { plugin, isCommand: separator === ":" });
+    const entry = await readEntry(env, path, fileName, scope, {
+      plugin,
+      isCommand: separator === ":",
+    });
     if (entry) out.push(entry);
   }
   return out;
@@ -95,15 +102,16 @@ async function readFileEntries(
 
 /** Files or folders of `.md` files. */
 async function readPaths(
+  env: ScanEnv,
   paths: string[],
   scope: Source,
   options: { plugin?: string | undefined; separator?: string }
 ) {
   const out: Entry[] = [];
   for (const path of paths) {
-    if (await isDir(path)) out.push(...(await readFileEntries(path, scope, options)));
+    if (await isDir(path)) out.push(...(await readFileEntries(env, path, scope, options)));
     else if (path.endsWith(".md")) {
-      const entry = await readEntry(path, basename(path, ".md"), scope, {
+      const entry = await readEntry(env, path, basename(path, ".md"), scope, {
         plugin: options.plugin,
         isCommand: options.separator === ":",
       });
@@ -114,12 +122,13 @@ async function readPaths(
 }
 
 export async function readSkill(
+  env: ScanEnv,
   folder: string,
   scope: Source,
   plugin?: string
 ): Promise<Entry | null> {
   const path = join(folder, "SKILL.md");
-  const file = await readTextFile(path);
+  const file = await readTextFile(env, path);
   if (!file) return null;
   const { data, body } = parseFrontmatter(file.text);
   const entry: Entry = {
@@ -147,40 +156,48 @@ export async function readSkill(
 }
 
 /** `<name>/SKILL.md` folders, or one folder holding SKILL.md itself. */
-async function readSkills(dir: string, scope: Source, plugin?: string): Promise<Entry[]> {
+async function readSkills(
+  env: ScanEnv,
+  dir: string,
+  scope: Source,
+  plugin?: string
+): Promise<Entry[]> {
   if (plugin && (await isFile(join(dir, "SKILL.md")))) {
-    const skill = await readSkill(dir, scope, plugin);
+    const skill = await readSkill(env, dir, scope, plugin);
     return skill ? [skill] : [];
   }
   const out: Entry[] = [];
   for (const name of await listDir(dir)) {
     if (name.startsWith(".") || (scope === "user" && name === "synced")) continue;
-    const skill = await readSkill(join(dir, name), scope, plugin);
+    const skill = await readSkill(env, join(dir, name), scope, plugin);
     if (skill) out.push(skill);
   }
   return out;
 }
 
 /** A plugin's skills, agents, commands and output styles, from its folders and its manifest. */
-async function pluginEntries(plugin: Plugin) {
+async function pluginEntries(env: ScanEnv, plugin: Plugin) {
   const root = plugin.installPath;
   const options = { plugin: plugin.id };
   // `skills` adds to the default folder; the other keys replace theirs (docs: plugins-reference).
-  const extraSkills = await manifestPaths(plugin, "skills");
+  const extraSkills = await manifestPaths(env, plugin, "skills");
   const skillDirs = [join(root, "skills"), ...(extraSkills ?? [])];
   const rootSkill = extraSkills === null && !(await isDir(join(root, "skills")));
-  const skills = rootSkill ? await readSkills(root, "plugin", plugin.id) : [];
-  for (const dir of skillDirs) skills.push(...(await readSkills(dir, "plugin", plugin.id)));
+  const skills = rootSkill ? await readSkills(env, root, "plugin", plugin.id) : [];
+  for (const dir of skillDirs) skills.push(...(await readSkills(env, dir, "plugin", plugin.id)));
   const listed = async (key: string, folder: string, separator = "/") =>
-    readPaths((await manifestPaths(plugin, key)) ?? [join(root, folder)], "plugin", {
+    readPaths(env, (await manifestPaths(env, plugin, key)) ?? [join(root, folder)], "plugin", {
       ...options,
       separator,
     });
   const commands = await listed("commands", "commands", ":");
-  for (const c of await manifestCommandMap(plugin))
+  for (const c of await manifestCommandMap(env, plugin))
     commands.push(
       c.text === null
-        ? ((await readEntry(c.path, c.name, "plugin", { plugin: plugin.id, isCommand: true })) ?? {
+        ? ((await readEntry(env, c.path, c.name, "plugin", {
+            plugin: plugin.id,
+            isCommand: true,
+          })) ?? {
             name: c.name,
             description: c.description,
             path: c.path,
@@ -199,9 +216,9 @@ async function pluginEntries(plugin: Plugin) {
     );
   // A plugin subagent is named with the plugin and its subfolders (docs: sub-agents#choose-the-subagent-scope).
   const agents: Entry[] = [];
-  for (const path of (await manifestPaths(plugin, "agents")) ?? [join(root, "agents")]) {
+  for (const path of (await manifestPaths(env, plugin, "agents")) ?? [join(root, "agents")]) {
     const folder = (await isDir(path)) ? path : null;
-    for (const agent of await readPaths([path], "plugin", options)) {
+    for (const agent of await readPaths(env, [path], "plugin", options)) {
       const subfolders = folder ? relative(folder, dirname(agent.path)).split(/[/\\]/) : [];
       const own = agent.name.split("/").at(-1) ?? agent.name;
       agent.id = [plugin.id.split("@")[0], ...subfolders.filter(Boolean), own].join(":");
@@ -270,7 +287,7 @@ async function readAgents(env: ScanEnv, projectDir: string, gitRoot: string | nu
   const agents: Entry[] = [];
   const winners = new Map<string, Entry>();
   for (const [dir, scope] of sources)
-    for (const agent of await readFileEntries(dir, scope)) {
+    for (const agent of await readFileEntries(env, dir, scope)) {
       const [problem] = agentProblems(agent.text);
       if (problem) {
         agent.skipped = problem;
@@ -299,7 +316,7 @@ async function readOutputStyles(env: ScanEnv, projectDir: string, gitRoot: strin
     [join(env.claudeDir, "output-styles"), "user"],
   ];
   const styles: Entry[] = [];
-  for (const [dir, scope] of sources) styles.push(...(await readFileEntries(dir, scope)));
+  for (const [dir, scope] of sources) styles.push(...(await readFileEntries(env, dir, scope)));
   return styles;
 }
 
@@ -322,13 +339,13 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
   const { env, projectDir, gitRoot, layers } = input;
   const plugins = await readPlugins(env, layers, projectDir, gitRoot);
   const active = plugins.filter((p) => p.enabled);
-  const fromPlugins = await Promise.all(active.map(pluginEntries));
+  const fromPlugins = await Promise.all(active.map((plugin) => pluginEntries(env, plugin)));
   const projectClaude = join(projectDir, ".claude");
   const hasProjectDir = projectClaude !== env.claudeDir;
   const files = async (sub: string, separator = "/") => [
-    ...(await readFileEntries(join(env.claudeDir, sub), "user", { separator })),
+    ...(await readFileEntries(env, join(env.claudeDir, sub), "user", { separator })),
     ...(hasProjectDir
-      ? await readFileEntries(join(projectClaude, sub), "project", { separator })
+      ? await readFileEntries(env, join(projectClaude, sub), "project", { separator })
       : []),
   ];
 
@@ -350,7 +367,7 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
   // (docs: skills#resolve-skills-that-share-a-name).
   const winners = new Map<string, Entry>();
   for (const [dir, scope] of skillDirs) {
-    for (const skill of await readSkills(dir, scope)) {
+    for (const skill of await readSkills(env, dir, scope)) {
       // A folder that several locations link to loads once.
       const real = skill.realPath ?? skill.folder ?? skill.path;
       if (seenFolders.has(real)) continue;
@@ -381,22 +398,26 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
       ...(await readOutputStyles(env, projectDir, gitRoot)),
       ...fromPlugins.flatMap((p) => p.outputStyles),
     ],
-    hooks: await readHooks(layers, active),
+    hooks: await readHooks(env, layers, active),
     mcpServers: await readMcpServers(input, active),
     plugins,
   };
 }
 
-async function readHooks(layers: SettingsLayer[], plugins: Plugin[]): Promise<Hook[]> {
+async function readHooks(
+  env: ScanEnv,
+  layers: SettingsLayer[],
+  plugins: Plugin[]
+): Promise<Hook[]> {
   const out: Hook[] = [];
   for (const layer of layers) {
     if (layer.data) out.push(...hooksFrom(layer.data.hooks, layer.scope, layer.path));
   }
   for (const plugin of plugins) {
     const path = join(plugin.installPath, "hooks", "hooks.json");
-    const file = await readJsonObject(path);
+    const file = await readJsonObject(env, path);
     if (file.ok) out.push(...hooksFrom(file.data.hooks, "plugin", path, plugin));
-    for (const part of await manifestConfigs(plugin, "hooks"))
+    for (const part of await manifestConfigs(env, plugin, "hooks"))
       out.push(...hooksFrom(part.value, "plugin", part.path, plugin));
   }
 

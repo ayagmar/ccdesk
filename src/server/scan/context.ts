@@ -142,7 +142,7 @@ export async function buildContext(input: ContextInput): Promise<ContextBlock[]>
           )
         );
       else {
-        const text = await readTextFile(ref.resolved);
+        const text = await readTextFile(env, ref.resolved);
         blocks.push(block(fields, text ? injectedText(text.text) : null));
       }
     }

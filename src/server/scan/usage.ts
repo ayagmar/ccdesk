@@ -7,7 +7,7 @@ import {
   type Usage,
 } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isDir, isRecord, isWithin, leadsToSecret, listDir, wildcard, worktrees } from "./files.ts";
+import { isCredentials, isDir, isRecord, isWithin, listDir, wildcard, worktrees } from "./files.ts";
 import { storeDirName } from "./memory.ts";
 import { namesTool, parseRule } from "./tools.ts";
 
@@ -170,11 +170,11 @@ async function count(
         if (taken.has(file)) continue;
         // A subagent's session decides; one whose session file is gone goes by its own start.
         const start =
-          (await transcript(session, signal))?.startCwd ??
-          (await transcript(file, signal))?.startCwd;
+          (await transcript(env, session, signal))?.startCwd ??
+          (await transcript(env, file, signal))?.startCwd;
         if (start ? !isWithin(folder, start) : name !== own) continue;
         taken.add(file);
-        calls.push(...((await transcript(file, signal))?.calls ?? []));
+        calls.push(...((await transcript(env, file, signal))?.calls ?? []));
         if (file === session) sessions++;
       }
       checkStopped(signal);
@@ -209,8 +209,12 @@ async function transcriptsIn(store: string): Promise<Map<string, string>> {
  * One transcript, read up to its end; one that cannot be read keeps what was read before, and one
  * whose count stops keeps the whole lines read so far.
  */
-async function transcript(file: string, signal: AbortSignal): Promise<Transcript | null> {
-  if (await leadsToSecret(file)) return null;
+async function transcript(
+  env: ScanEnv,
+  file: string,
+  signal: AbortSignal
+): Promise<Transcript | null> {
+  if (await isCredentials(env, file)) return null;
   const info = await stat(file).catch(() => null);
   checkStopped(signal);
   if (!info?.isFile()) return null;

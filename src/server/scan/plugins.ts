@@ -8,8 +8,8 @@ function manifestPath(plugin: Plugin): string {
   return join(plugin.installPath, ".claude-plugin", "plugin.json");
 }
 
-async function manifest(plugin: Plugin): Promise<Record<string, unknown>> {
-  const result = await readJsonObject(manifestPath(plugin));
+async function manifest(env: ScanEnv, plugin: Plugin): Promise<Record<string, unknown>> {
+  const result = await readJsonObject(env, manifestPath(plugin));
   return result.ok ? result.data : {};
 }
 
@@ -20,7 +20,10 @@ export async function readPlugins(
   projectDir: string,
   gitRoot: string | null
 ): Promise<Plugin[]> {
-  const installed = await readJsonObject(join(env.claudeDir, "plugins", "installed_plugins.json"));
+  const installed = await readJsonObject(
+    env,
+    join(env.claudeDir, "plugins", "installed_plugins.json")
+  );
   if (!installed.ok || !isRecord(installed.data.plugins)) return [];
   const out: Plugin[] = [];
   for (const [id, installs] of Object.entries(installed.data.plugins)) {
@@ -53,7 +56,7 @@ export async function readPlugins(
       plugin.enabledIn = setting.scope;
       plugin.note = `${plugin.enabled ? "Enabled" : "Turned off"} in ${setting.scope} settings`;
     } else {
-      plugin.enabled = (await manifest(plugin)).defaultEnabled !== false;
+      plugin.enabled = (await manifest(env, plugin)).defaultEnabled !== false;
       plugin.note = plugin.enabled
         ? "On by default (no enabledPlugins entry)"
         : "Off by default (no enabledPlugins entry)";
@@ -71,8 +74,12 @@ async function inside(plugin: Plugin, path: string): Promise<string | null> {
 }
 
 /** The paths a manifest key names (one path or a list), inside the plugin; null when unset. */
-export async function manifestPaths(plugin: Plugin, key: string): Promise<string[] | null> {
-  const value = (await manifest(plugin))[key];
+export async function manifestPaths(
+  env: ScanEnv,
+  plugin: Plugin,
+  key: string
+): Promise<string[] | null> {
+  const value = (await manifest(env, plugin))[key];
   const list = typeof value === "string" ? [value] : Array.isArray(value) ? value : null;
   if (!list) return null;
   const out: string[] = [];
@@ -86,16 +93,17 @@ export async function manifestPaths(plugin: Plugin, key: string): Promise<string
 
 /** The value of a manifest key that is a path, an inline object, or a list of either. */
 export async function manifestConfigs(
+  env: ScanEnv,
   plugin: Plugin,
   key: string
 ): Promise<Array<{ value: unknown; path: string }>> {
-  const value = (await manifest(plugin))[key];
+  const value = (await manifest(env, plugin))[key];
   const out: Array<{ value: unknown; path: string }> = [];
   for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) {
     if (isRecord(item)) out.push({ value: item, path: manifestPath(plugin) });
     if (typeof item !== "string") continue;
     const path = await inside(plugin, item);
-    const file = path ? await readJsonObject(path) : null;
+    const file = path ? await readJsonObject(env, path) : null;
     if (path && file?.ok) out.push({ value: file.data[key] ?? file.data, path });
   }
   return out;
@@ -103,9 +111,10 @@ export async function manifestConfigs(
 
 /** The manifest's `commands` object form: command name to a file or inline content. */
 export async function manifestCommandMap(
+  env: ScanEnv,
   plugin: Plugin
 ): Promise<Array<{ name: string; path: string; description: string; text: string | null }>> {
-  const value = (await manifest(plugin)).commands;
+  const value = (await manifest(env, plugin)).commands;
   if (!isRecord(value)) return [];
   const out = [];
   for (const [name, entry] of Object.entries(value)) {

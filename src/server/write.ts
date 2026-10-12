@@ -14,7 +14,7 @@ import {
 import { basename, dirname, join } from "node:path";
 import { type BackupKind } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isSecretPath, leadsToSecret, revisionOf } from "./scan/files.ts";
+import { isCredentials, isSecretPath, revisionOf } from "./scan/files.ts";
 
 /** A change ccdesk refuses on purpose; the server answers 409 with the message. */
 export class RefusedError extends Error {}
@@ -44,16 +44,6 @@ export function backupRoot(env: ScanEnv): string {
 /** Where a path leads after links, or null when it does not exist. */
 function realOrNull(path: string): Promise<string | null> {
   return realpath(path).catch(() => null);
-}
-
-/**
- * Whether a path is Claude Code's credentials file: by name, through any link on the way, or by
- * ending at the same file as `<config>/.credentials.json`, so one kept under another name counts.
- */
-export async function isCredentials(env: ScanEnv, path: string): Promise<boolean> {
-  if (await leadsToSecret(path)) return true;
-  const real = await realOrNull(path);
-  return real !== null && real === (await realOrNull(join(env.claudeDir, ".credentials.json")));
 }
 
 /** The file a path leads to after links; a missing file keeps its own path. */

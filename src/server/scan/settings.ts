@@ -168,7 +168,7 @@ export async function readSettingsLayers(env: ScanEnv, dir: string): Promise<Set
       layers.push(await readManagedLayer(env, file.path));
       continue;
     }
-    const result = await readJsonObject(file.path);
+    const result = await readJsonObject(env, file.path);
     if (file.legacy && !result.ok && result.missing) continue;
     const layer: SettingsLayer = { scope: file.scope, path: file.path, exists: true, data: null };
     if (file.legacy) layer.legacy = true;
@@ -203,7 +203,7 @@ export async function readManagedSettings(env: ScanEnv): Promise<{
   let data: Record<string, unknown> | null = null;
   for (const source of [join(env.managedDir, "managed-settings.json"), ...dropIns]) {
     // An empty managed file counts as {}.
-    const result = await readJsonObject(source, { emptyIsObject: true });
+    const result = await readJsonObject(env, source, { emptyIsObject: true });
     if (!result.ok) {
       if (!result.missing) errors.push(`${source}: ${result.error}`);
       if (result.unparsed) blocksStart = true;

@@ -65,7 +65,7 @@ export async function testPath(env: ScanEnv, dir: string, file: string): Promise
   for (const folder of between) {
     const nested = async (name: string, scope: PathMatch["scope"]) => {
       const path = join(folder, name);
-      if (excluded(path) || !(await readTextFile(path))) return false;
+      if (excluded(path) || !(await readTextFile(env, path))) return false;
       matches.push({ kind: "nested", path, scope });
       return true;
     };
@@ -79,7 +79,7 @@ export async function testPath(env: ScanEnv, dir: string, file: string): Promise
       mode === "claude-md-and-agents-md" || (mode === "claude-md-or-agents-md" && !hasClaudeMd);
     if (agents) await nested("AGENTS.md", "project");
     for (const path of await walkMarkdown(join(folder, ".claude", "rules"))) {
-      const text = await readTextFile(path);
+      const text = await readTextFile(env, path);
       if (!text || excluded(path)) continue;
       const globs = toStringList(parseFrontmatter(text.text).data.paths);
       const glob =
@@ -90,7 +90,7 @@ export async function testPath(env: ScanEnv, dir: string, file: string): Promise
     // Only skills Claude may pick itself: not off, user-invocable-only or disable-model-invocation;
     // one with paths only for a matching file, its globs read from its folder like a rule's.
     for (const name of await listDir(join(folder, ".claude", "skills"))) {
-      const skill = await readSkill(join(folder, ".claude", "skills", name), "project");
+      const skill = await readSkill(env, join(folder, ".claude", "skills", name), "project");
       if (!skill) continue;
       applySkillOverrides([skill], overrides);
       if (skill.listed === false) continue;

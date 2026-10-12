@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  lstatSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { type AddressInfo } from "node:net";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
@@ -962,6 +970,38 @@ test("credentials that are themselves a link are never read through another link
 
   assert.equal(view.status, 200);
   assert.doesNotMatch(JSON.stringify(view.json), /oauth-secret/);
+});
+
+test("credentials hard-linked under another name are never read, changed or removed", async () => {
+  const token = '{"accessToken":"hardlinked-secret"}';
+  rmSync(join(fixture.env.claudeDir, ".credentials.json"), { force: true });
+  const credentials = fixture.write("home/.claude/.credentials.json", token);
+  const claudeMd = fixture.at("work/hardlinked/CLAUDE.md");
+  const settings = fixture.at("work/hardlinked/.claude/settings.json");
+  const memory = join(memoryDirFor(fixture, fixture.at("work/hardlinked")), "notes.md");
+  fixture.write(join(memoryDirFor(fixture, fixture.at("work/hardlinked")), "MEMORY.md"), "");
+  fixture.write("work/hardlinked/.claude/.keep", "");
+  for (const path of [claudeMd, settings, memory]) linkSync(credentials, path);
+
+  const view = await call(
+    `/api/directory?path=${encodeURIComponent(fixture.at("work/hardlinked"))}`
+  );
+  const edit = { dir: fixture.at("work/hardlinked"), scope: "project", key: "model", value: "x" };
+  const save = await call("/api/settings/save", {
+    method: "POST",
+    body: { ...edit, revision: revisionOf(token) },
+  });
+  const removal = await call("/api/memory/change", {
+    method: "POST",
+    body: { action: "delete", path: memory, revision: revisionOf(token) },
+  });
+  const opening = await call("/api/open", { method: "POST", body: { path: claudeMd } });
+
+  assert.equal(view.status, 200);
+  assert.doesNotMatch(JSON.stringify(view.json), /hardlinked-secret/);
+  for (const res of [save, removal, opening]) assert.equal(res.status, 409);
+  for (const path of [credentials, claudeMd, settings, memory])
+    assert.equal(readFileSync(path, "utf8"), token);
 });
 
 interface ScannedHook {

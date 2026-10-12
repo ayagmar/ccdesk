@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { type MemoryStore, type ProjectSummary } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isDir, isRecord, leadsToSecret, listDir } from "./files.ts";
+import { isCredentials, isDir, isRecord, listDir } from "./files.ts";
 import { readMemoryStore, storeDirName } from "./memory.ts";
 
 interface KnownProject extends ProjectSummary {
@@ -31,10 +31,10 @@ export async function listProjects(
     );
     const path =
       knownPaths.find((p) => storeDirName(p) === name) ??
-      (await sessionCwd(storeDir, sessions)) ??
+      (await sessionCwd(env, storeDir, sessions)) ??
       null;
     if (!path) continue;
-    const store = await readMemoryStore(join(storeDir, "memory"), path);
+    const store = await readMemoryStore(env, join(storeDir, "memory"), path);
     byPath.set(path, {
       path,
       store,
@@ -94,9 +94,13 @@ async function newestFirst(dir: string, files: string[]): Promise<Transcript[]> 
 }
 
 /** The `cwd` recorded in the newest transcripts, for store names that do not map back cleanly. */
-async function sessionCwd(storeDir: string, sessions: Transcript[]): Promise<string | null> {
+async function sessionCwd(
+  env: ScanEnv,
+  storeDir: string,
+  sessions: Transcript[]
+): Promise<string | null> {
   for (const { file } of sessions.slice(0, 3)) {
-    if (await leadsToSecret(join(storeDir, file))) continue;
+    if (await isCredentials(env, join(storeDir, file))) continue;
     const input = createReadStream(join(storeDir, file), { encoding: "utf8" });
     const lines = createInterface({ input });
     let read = 0;
