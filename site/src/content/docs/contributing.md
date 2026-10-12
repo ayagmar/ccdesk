@@ -28,7 +28,7 @@ Tests never touch your real `~/.claude`. Each test process gets a throwaway home
 
 Every edit goes through the same steps. The UI sends the edit to a `preview` route, which returns the diff and the `revision` of what it read. The save route takes the same edit with that revision, plans it again from the file on disk and writes only if the revision still matches; otherwise it throws `RefusedError` (409), and the page asks you to review again. The same error also refuses edits ccdesk never makes, such as to managed settings or credentials, so its message says which case it is. A save returns a `Change` whose `id` is its backup folder, which is what Undo and Recent changes restore. User and local MCP edits are the exception: they run `claude mcp`, keep no backup and return no `Change`.
 
-Values ccdesk hides on the page (env values, headers, keys in URLs and arguments) are redacted in the scan, so they never reach the browser. An edit that would write a value the page hides is refused.
+Values ccdesk hides on the page (env values, headers, keys in URLs and arguments) are redacted in the scan, so they never reach the browser. ccdesk never writes back a value the page saw as `•••`, so a setting, server, hook or agent that holds one is edited in its file instead. Settings, hooks and agents also refuse new values the review would hide; a new MCP server may hold the env values and headers you type for it.
 
 ## Claude Code data
 
