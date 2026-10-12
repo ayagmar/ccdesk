@@ -6,8 +6,8 @@ ccdesk is one npm package: a Node server in `src/server` that reads and writes C
 
 | Path | What it does |
 | --- | --- |
-| `src/server/cli.ts` | Parses the flags, builds a `ScanEnv`, starts the server, opens the browser. |
-| `src/server/server.ts` | The `/api/*` routes, the token, Host and Origin checks, security headers, and the built UI. Turns errors into status codes. |
+| `src/server/cli.ts` | Parses the flags, builds a `ScanEnv` and a core, starts the server, opens the browser. |
+| `src/server/server.ts` | The `/api/*` routes, each a call on the core it is given; the token, Host and Origin checks, security headers, and the built UI. Turns errors into status codes. |
 | `src/server/scan/` | Reads. `index.ts` has `scanOverview` and `scanDirectory`; the other files each read one part (settings, instructions, memory, MCP, plugins, permissions, tools, context, usage, compare, path-test). `env.ts` defines `ScanEnv`. |
 | `src/server/settings-edit.ts` | Settings, permission and hook edits, all in settings files. |
 | `src/server/agent-edit.ts`, `mcp-edit.ts`, `mutations.ts` | Subagent files, MCP servers, and auto memory. |
@@ -17,8 +17,9 @@ ccdesk is one npm package: a Node server in `src/server` that reads and writes C
 | `src/server/secrets.ts`, `scan/files.ts` | What the page may see: `redactSecrets`, `shownText`, `shown`, `hasHiddenValues`. |
 | `src/server/watch.ts` | `Watcher`: scans a directory, watches the files the scan read, and answers the page's long poll. |
 | `src/server/reference.ts` | The settings schema, settings catalog and hook events, served by `/api/reference`. |
-| `src/server/open.ts` | Opens a file in your editor. |
-| `src/core/index.ts` | The import entry point; re-exports, moves nothing. |
+| `src/server/open.ts` | Opens a file in the editor the `ScanEnv`'s environment names, the way its platform starts one. |
+| `src/core/core.ts` | `createCore(env, options)`: every read and change with `env` bound, its own change queue and usage cache, and the editor and `claude` it starts. |
+| `src/core/index.ts` | The import entry point; re-exports `createCore` and the free functions. |
 | `src/shared/` | Types (`types.ts`), scope lists, and the JSON generated from Claude Code's SDK and docs. No Node or DOM imports. |
 | `src/ui/` | The page. Imports only `src/shared` and calls the server through `api.ts`. `sections/` defines each table on the directory page. |
 
@@ -28,7 +29,9 @@ ccdesk is one npm package: a Node server in `src/server` that reads and writes C
 ScanEnv → scanDirectory(env, dir, profile) → DirectoryView → /api/directory → sections → rows
 ```
 
-`ScanEnv` holds every location ccdesk reads: home, the Claude folder, `.claude.json`, the managed folder, and the platform. `scanEnvFromProcess` builds it from the real machine; tests build one around a throwaway folder with `makeFixture()`. Every read and write takes it as its first argument, so nothing in the core reads `homedir()` itself.
+`ScanEnv` holds every location ccdesk reads: home, the Claude folder, `.claude.json`, the managed folder, the platform, and `processEnv`, the environment ccdesk finds an editor and `claude` in and passes to them. `scanEnvFromProcess` builds it from the real machine; tests build one around a throwaway folder with `makeFixture()`, whose `processEnv` is empty. Every read and write takes it as its first argument, so nothing in the core reads `homedir()`, `process.platform` or `process.env` itself; only the free `openInEditor` and `runClaude` still default to them.
+
+`createCore(env, { runClaude?, openFile? })` binds `env` to every read and change and returns them as methods, such as `core.scanDirectory(dir)` and `core.saveSettingsEdit(edit, revision)`. The server takes a core; tests pass `runClaude` and `openFile` fakes so nothing is started.
 
 `scanDirectory` returns one `DirectoryView`: the instruction files, settings layers and effective settings, permissions, built-in tools, memory, hooks, MCP servers, extensions, context, trust, sharing and problems for one directory and session profile. The page fetches it through `Watcher.scan`, which also records the files the scan read so a change to any of them wakes `/api/watch`. On the page, `useConfig` holds the view, `sections/index.ts` lists the sections in page order, and each section turns the view into rows.
 
@@ -70,16 +73,21 @@ Each change gets a folder in `<Claude folder>/backups/ccdesk/<id>/`, readable on
 
 The manifest and `before` are written before the change, so an interrupted change can still be restored. A change that fails without changing the file removes its folder.
 
-## Process-wide state
+## Shared state
 
-These live in module scope, so every caller in one process shares them:
+Each core has its own:
 
-- `write.ts`: the queue behind `serially`, which runs every change one at a time so two saves cannot both pass the revision check.
-- `scan/usage.ts`: the transcript cache, its queue, and the requests waiting on a count.
-- `settings-edit.ts`: compiled schema validators. `schema.ts`: the shared Ajv instance.
+- change queue (`changeQueue()` in `write.ts`), which runs its changes one at a time so two saves cannot both pass the revision check. Two cores on the same Claude folder do not wait for each other, so make one per folder.
+- usage counter (`usageCounter()` in `scan/usage.ts`): the transcript cache, its queue, and the requests waiting on a count.
+
+The free save functions and `readUsage`, kept for one release beside `createCore`, share one process-wide queue and counter. Calling them alongside a core on the same folder skips the core's queue.
+
+Still in module scope, and shared by every core:
+
+- `settings-edit.ts`: compiled schema validators, and `schema.ts`: the Ajv instance. Both are compiled from the bundled schema and never change, so sharing them changes no result.
 - In the page: `format.ts` keeps the home folder for `tilde()`, and `reference.ts` keeps the data from `/api/reference`.
 
-`Watcher` is per instance; the server makes one. `openFile` and `runClaude` are passed to `createCcdeskServer` so tests replace them.
+`Watcher` is per instance; the server makes one from its core's `env`.
 
 ## Docs citations
 
