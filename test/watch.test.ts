@@ -56,6 +56,21 @@ test("closing the watcher answers a page still waiting, instead of keeping it un
   assert.equal(answered, true);
 });
 
+test("closing the watcher while a wait is still starting answers it too", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "one\n");
+  const watcher = watcherFor(f);
+
+  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  watcher.close();
+  const answered = await Promise.race([
+    waiting.then(() => true),
+    new Promise((resolve) => setTimeout(() => resolve(false), 1000)),
+  ]);
+
+  assert.equal(answered, true);
+});
+
 test("a change between two polls is reported to the next poll", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "one\n");

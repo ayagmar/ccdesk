@@ -170,8 +170,10 @@ export class Watcher {
   ): Promise<{ changed: boolean; at: number }> {
     const subscription = await this.subscribe(dir);
     clearTimeout(subscription.idle);
+    // Closed while its watchers were starting: there is nothing left to wait on.
+    const closed = this.subscriptions.get(dir) !== subscription;
     try {
-      if (subscription.changedAt <= since && !signal.aborted)
+      if (!closed && subscription.changedAt <= since && !signal.aborted)
         await new Promise<void>((resolve) => {
           const done = () => {
             clearTimeout(timer);
