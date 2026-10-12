@@ -63,6 +63,8 @@ export interface Actions {
   /** Memory names saved in other directories too. */
   sharedNames: Set<string>;
   onOpenDirectory: (path: string) => void;
+  /** Asks for another directory to compare this one's settings with. */
+  onCompare: () => void;
   onAdd: (what: Adding) => void;
   onSaved: (saved: Saved) => void;
   /** Runs one change and reports it; `select` is the row to show afterwards, null for none. */

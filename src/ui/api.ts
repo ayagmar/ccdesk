@@ -1,3 +1,4 @@
+import { type SettingsComparison } from "../shared/compare.ts";
 import {
   type BackupSummary,
   type Change,
@@ -123,6 +124,11 @@ export const api = {
       `/api/watch?dir=${encodeURIComponent(dir)}&since=${since}`,
       undefined,
       signal
+    ),
+  /** The effective settings of two directories, key by key. */
+  compare: (a: string, b: string) =>
+    request<SettingsComparison>(
+      `/api/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`
     ),
   pathTest: (dir: string, file: string) =>
     request<PathTest>(

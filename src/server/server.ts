@@ -17,6 +17,7 @@ import { previewAgentEdit, saveAgentEdit } from "./agent-edit.ts";
 import { previewMcpEdit, type RunClaude, runClaude, saveMcpEdit } from "./mcp-edit.ts";
 import { changeMemory, isMemoryAction, previewMemoryChange } from "./mutations.ts";
 import { openInEditor } from "./open.ts";
+import { compareSettings } from "./scan/compare.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isCredentials, isRecord } from "./scan/files.ts";
 import { scanOverview } from "./scan/index.ts";
@@ -195,6 +196,13 @@ function routes(options: ServerOptions, watcher: Watcher): Route[] {
       if (!dir || !isAbsolute(dir) || !Number.isInteger(since))
         throw new RequestError(400, "dir is required");
       return watcher.wait(resolve(dir), since, stopOnClose(res));
+    }),
+    get("/api/compare", async ({ url }) => {
+      const a = url.searchParams.get("a");
+      const b = url.searchParams.get("b");
+      if (!a || !b || !isAbsolute(a) || !isAbsolute(b))
+        throw new RequestError(400, "a and b must be absolute paths");
+      return compareSettings(env, a, b);
     }),
     get("/api/path-test", async ({ url }) => {
       const dir = url.searchParams.get("dir");

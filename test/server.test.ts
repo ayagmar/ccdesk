@@ -686,6 +686,46 @@ test("a file ccdesk created is not removed once something else changed it", asyn
   assert.equal(readFileSync(file, "utf8"), '{ "model": "opus", "effortLevel": "high" }\n');
 });
 
+test("comparing two directories lists each key's value in both, with the files they come from", async () => {
+  const a = fixture.at("work/compare-a");
+  const b = fixture.at("work/compare-b");
+  const aProject = fixture.json("work/compare-a/.claude/settings.json", {
+    model: "opus",
+    effortLevel: "high",
+  });
+  fixture.json("work/compare-b/.claude/settings.json", {
+    model: "haiku",
+    effortLevel: "high",
+    env: { TOKEN: "compare-secret" },
+  });
+  const bLocal = fixture.json("work/compare-b/.claude/settings.local.json", { model: "sonnet" });
+
+  const res = await call(`/api/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
+  const { settings } = res.json as {
+    settings: Array<{
+      key: string;
+      same: boolean;
+      a: { value: unknown; sources: Array<{ scope: string; path: string }> } | null;
+      b: { value: unknown; sources: Array<{ scope: string; path: string }> } | null;
+    }>;
+  };
+  const byKey = new Map(settings.map((s) => [s.key, s]));
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(byKey.get("model"), {
+    key: "model",
+    same: false,
+    a: { value: "opus", sources: [{ scope: "project", path: aProject }] },
+    b: { value: "sonnet", sources: [{ scope: "local", path: bLocal }] },
+  });
+  assert.equal(byKey.get("effortLevel")?.same, true);
+  assert.equal(byKey.get("env")?.same, false);
+  assert.equal(byKey.get("env")?.a, null);
+  assert.doesNotMatch(JSON.stringify(res.json), /compare-secret/);
+  const relative = await call("/api/compare?a=work&b=other");
+  assert.equal(relative.status, 400);
+});
+
 test("a permission rule is moved in the file it is in, and a rule that is gone is not", async () => {
   const dir = fixture.at("work/perms");
   const file = fixture.json("work/perms/.claude/settings.json", {

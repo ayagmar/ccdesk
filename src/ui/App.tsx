@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChangesPage } from "./ChangesPage.tsx";
+import { ComparePage } from "./ComparePage.tsx";
 import { DirectoryPage } from "./DirectoryPage.tsx";
 import { OverviewPage } from "./OverviewPage.tsx";
 import { Palette } from "./Palette.tsx";
@@ -16,7 +17,8 @@ function isDark(): boolean {
 
 export function App() {
   const [page, setPage] = useState<Page>(readPage);
-  const [palette, setPalette] = useState(false);
+  // Open to jump, or with `compareFrom` to pick a directory to compare that one's settings with.
+  const [palette, setPalette] = useState<{ compareFrom?: string } | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [jump, setJump] = useState<{ id: string } | null>(null);
   const [dark, setDark] = useState(isDark);
@@ -52,7 +54,7 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPalette((p) => !p);
+        setPalette((p) => (p ? null : {}));
       }
     };
     addEventListener("keydown", onKey);
@@ -71,6 +73,7 @@ export function App() {
   };
 
   const clearToast = useCallback(() => setToast(null), []);
+  const pickCompared = useCallback((dir: string) => setPalette({ compareFrom: dir }), []);
 
   return (
     <div className="app">
@@ -95,6 +98,14 @@ export function App() {
               reload();
             }}
           />
+        ) : page.kind === "compare" ? (
+          <ComparePage
+            key={visit}
+            dir={page.dir}
+            other={page.other}
+            onOpen={openDirectory}
+            onPickOther={() => pickCompared(page.dir)}
+          />
         ) : page.kind === "all" ? (
           overview ? (
             <OverviewPage key={visit} overview={overview} onOpen={openDirectory} />
@@ -116,7 +127,8 @@ export function App() {
             reload={reload}
             onToast={setToast}
             onOpenDirectory={openDirectory}
-            onOpenPalette={() => setPalette(true)}
+            onOpenPalette={() => setPalette({})}
+            onCompare={pickCompared}
           />
         )}
       </main>
@@ -124,7 +136,9 @@ export function App() {
         <Palette
           overview={overview}
           rows={rows}
-          onClose={() => setPalette(false)}
+          compareFrom={palette.compareFrom}
+          onClose={() => setPalette(null)}
+          onCompare={(from, to) => open({ kind: "compare", dir: from, other: to })}
           onOpenDirectory={openDirectory}
           onSelectRow={(id) => setJump({ id })}
           onOpenMemory={(projectPath, path) => {
