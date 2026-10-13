@@ -240,7 +240,7 @@ export function stringsIn(value: unknown): string[] {
  * Claude Code, it splits a string and each list item at commas outside braces, so
  * `src/*.{ts,tsx}` stays one glob (docs: memory#rules-frontmatter-reference).
  */
-export function toStringList(value: unknown): string[] {
+function toStringList(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(toStringList);
   if (typeof value !== "string") return [];
   const out: string[] = [];
@@ -256,6 +256,18 @@ export function toStringList(value: unknown): string[] {
   }
   out.push(current.trim());
   return out.filter(Boolean);
+}
+
+/**
+ * A rule's or skill's `paths` globs, or none when it applies everywhere: without the field, or
+ * when each glob, once a trailing `/**` is cut, is empty or `**` (observed in v2.1.296; the docs
+ * do not say). The globs are kept as written, since the cut ones match differently (docs:
+ * memory#path-specific-rules).
+ */
+export function pathsField(value: unknown): string[] {
+  const paths = toStringList(value);
+  const cut = paths.map((p) => (p.endsWith("/**") ? p.slice(0, -3) : p)).filter(Boolean);
+  return cut.every((p) => p === "**") ? [] : paths;
 }
 
 export function stringField(data: Record<string, unknown>, key: string): string {

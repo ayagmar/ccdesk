@@ -280,9 +280,13 @@ test("skillOverrides hide a skill or command from Claude's listing, or list it b
   );
 });
 
-test("a skill with paths is left out of the listing at session start", async () => {
+test("a skill with paths is left out of the listing at session start, unless they match everything", async () => {
   const f = makeFixture();
   f.write("app/.claude/skills/deploy/SKILL.md", "---\nname: deploy\ndescription: Ship it\n---\n");
+  f.write(
+    "app/.claude/skills/everywhere/SKILL.md",
+    '---\nname: everywhere\ndescription: Always\npaths: ["**", "**/**"]\n---\n'
+  );
   f.write(
     "app/.claude/skills/api/SKILL.md",
     '---\nname: api\ndescription: API work\npaths: ["src/api/**"]\n---\n'
@@ -290,7 +294,10 @@ test("a skill with paths is left out of the listing at session start", async () 
 
   const view = await scanDirectory(f.env, f.at("app"));
 
-  assert.equal(view.context.find((b) => b.kind === "skills")?.text, "- deploy: Ship it");
+  assert.equal(
+    view.context.find((b) => b.kind === "skills")?.text,
+    "- deploy: Ship it\n- everywhere: Always"
+  );
 });
 
 test("the skill listing names plugin skills and commands with their plugin, and leaves out a command a skill replaces", async () => {
