@@ -1,4 +1,3 @@
-import Markdown from "react-markdown";
 import { EDITABLE_SCOPES, HIGHEST_FIRST } from "../../shared/scopes.ts";
 import { plain, valueHere } from "../../view/sections/catalog.ts";
 import { type RowOf } from "../../view/sections/types.ts";
@@ -8,28 +7,14 @@ import { preview, tildeAll } from "../format.ts";
 import { Icon } from "../Icon.tsx";
 import { SettingEditor } from "../SettingEditor.tsx";
 import { propertyFor } from "../settingsSchema.ts";
-import { Field, NameButton } from "./kit.tsx";
+import { Field, NameButton, Prose } from "./kit.tsx";
 import { type Actions, type SectionUi } from "./types.ts";
 
 type R = RowOf<"catalog">;
 
-/** Docs Markdown: links open the docs in a new tab; react-markdown never renders raw HTML. */
+/** Docs Markdown: links open the docs in a new tab. */
 function Docs({ text }: { text: string }) {
-  return (
-    <div className="prose docs-text">
-      <Markdown
-        components={{
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noreferrer">
-              {children}
-            </a>
-          ),
-        }}
-      >
-        {text}
-      </Markdown>
-    </div>
-  );
+  return <Prose className="prose docs-text" text={text} linksInNewTab />;
 }
 
 function filesText(scopes: Line[]): string {
