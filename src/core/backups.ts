@@ -1,13 +1,14 @@
 import { lstat, readdir, readFile, realpath } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { Compile } from "typebox/compile";
 import { type BackupSummary, type RestorePreview } from "../shared/types.ts";
 import { assertMemoryDir, indexPathIn, revisionOfBoth } from "./mutations.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isWithin, revisionOf } from "./scan/files.ts";
-import { isRecord } from "./scan/data.ts";
 import { hiddenValues, shown, shownText } from "./secrets.ts";
 import {
   type BackupManifest,
+  BackupManifestSchema,
   backupRoot,
   forgetChange,
   MANIFEST,
@@ -23,19 +24,7 @@ import {
   writeAtomic,
 } from "./write.ts";
 
-const KINDS = new Set([
-  "settings",
-  "mcp",
-  "agent",
-  "memory-index",
-  "memory-delete",
-  "memory-restore",
-  "mcp-claude",
-]);
-
-function strings(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((v) => typeof v === "string");
-}
+const backupManifest = Compile(BackupManifestSchema);
 
 /** A backup folder's manifest; anything that does not look like one ccdesk wrote is skipped. */
 async function readManifest(env: ScanEnv, id: string): Promise<BackupManifest | null> {
@@ -49,19 +38,7 @@ async function readManifest(env: ScanEnv, id: string): Promise<BackupManifest | 
   } catch {
     return null;
   }
-  if (
-    !isRecord(data) ||
-    typeof data.kind !== "string" ||
-    !KINDS.has(data.kind) ||
-    typeof data.target !== "string" ||
-    typeof data.createdAt !== "string" ||
-    typeof data.before !== "string" ||
-    typeof data.after !== "string" ||
-    (data.removedIndexLines !== undefined && !strings(data.removedIndexLines)) ||
-    (data.undoCommands !== undefined && !strings(data.undoCommands))
-  )
-    return null;
-  return data as unknown as BackupManifest;
+  return backupManifest.Check(data) ? data : null;
 }
 
 /** The changes ccdesk made, newest first, a page at a time. */
@@ -69,7 +46,7 @@ export async function listBackups(
   env: ScanEnv,
   { before, limit }: { before?: string; limit: number }
 ): Promise<{ changes: BackupSummary[]; more: boolean }> {
-  const ids = (await readdir(backupRoot(env)).catch(() => [] as string[])).sort().reverse();
+  const ids = (await readdir(backupRoot(env)).catch((): string[] => [])).sort().reverse();
   const changes: BackupSummary[] = [];
   for (const id of ids) {
     if (before !== undefined && id >= before) continue;
@@ -171,28 +148,38 @@ async function claudeMcpPreview(
 
 async function planRestore(env: ScanEnv, id: string): Promise<Plan> {
   const { manifest, dir } = await backupAt(env, id);
-  if (manifest.kind === "mcp-claude") throw new RefusedError(MADE_BY_CLAUDE);
-
   let target = manifest.target;
-  if (manifest.kind === "settings" && !isSettingsFile(env, target))
-    throw new RefusedError("This backup does not point at a settings file.");
-  if (manifest.kind === "mcp" && basename(target) !== ".mcp.json")
-    throw new RefusedError("This backup does not point at a .mcp.json.");
-  if (manifest.kind === "agent" && !isAgentFile(env, target))
-    throw new RefusedError("This backup does not point at a subagent file.");
-  if (manifest.kind === "memory-index" && basename(target) !== "MEMORY.md")
-    throw new RefusedError("This backup does not point at a MEMORY.md.");
-  if (manifest.kind !== "settings" && manifest.kind !== "mcp" && manifest.kind !== "agent") {
-    const store = await assertMemoryDir(env, dirname(target));
+  switch (manifest.kind) {
+    case "mcp-claude":
+      throw new RefusedError(MADE_BY_CLAUDE);
+    case "settings":
+      if (!isSettingsFile(env, target))
+        throw new RefusedError("This backup does not point at a settings file.");
+      break;
+    case "mcp":
+      if (basename(target) !== ".mcp.json")
+        throw new RefusedError("This backup does not point at a .mcp.json.");
+      break;
+    case "agent":
+      if (!isAgentFile(env, target))
+        throw new RefusedError("This backup does not point at a subagent file.");
+      break;
     // The same confinement as any other MEMORY.md change: a link out of the folder is refused.
-    target =
-      manifest.kind === "memory-index" ? await indexPathIn(store) : join(store, basename(target));
+    case "memory-index": {
+      if (basename(target) !== "MEMORY.md")
+        throw new RefusedError("This backup does not point at a MEMORY.md.");
+      target = await indexPathIn(await assertMemoryDir(env, dirname(target)));
+      break;
+    }
     // A deleted memory comes back only as a topic file, as ccdesk deletes only those.
-    if (
-      manifest.kind !== "memory-index" &&
-      (!target.endsWith(".md") || basename(target) === "MEMORY.md")
-    )
-      throw new RefusedError("This backup does not point at a memory file.");
+    case "memory-delete":
+    case "memory-restore": {
+      const store = await assertMemoryDir(env, dirname(target));
+      target = join(store, basename(target));
+      if (!target.endsWith(".md") || basename(target) === "MEMORY.md")
+        throw new RefusedError("This backup does not point at a memory file.");
+      break;
+    }
   }
 
   let saved: string | null = null;
