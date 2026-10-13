@@ -13,7 +13,7 @@ import {
   type Trust,
 } from "../../shared/types.ts";
 import { redactSecrets, shownUrl } from "../secrets.ts";
-import { type ScanEnv } from "./env.ts";
+import { isUserClaudeFolder, type ScanEnv } from "./env.ts";
 import {
   isDir,
   isFile,
@@ -307,12 +307,19 @@ interface InventoryInput {
  * The `.claude/<sub>` folders of the start directory and every parent up to the repository root
  * (only the start directory outside git), root first, leaving out the user folder.
  */
-function projectFolders(env: ScanEnv, projectDir: string, gitRoot: string | null, sub: string) {
-  return ancestorsRootFirst(projectDir)
+async function projectFolders(
+  env: ScanEnv,
+  projectDir: string,
+  gitRoot: string | null,
+  sub: string
+): Promise<string[]> {
+  const dirs = ancestorsRootFirst(projectDir)
     .filter((dir) => !gitRoot || isWithin(gitRoot, dir))
-    .slice(gitRoot ? 0 : -1)
-    .map((dir) => join(dir, ".claude", sub))
-    .filter((dir) => dir !== join(env.claudeDir, sub));
+    .slice(gitRoot ? 0 : -1);
+  const folders: string[] = [];
+  for (const dir of dirs)
+    if (!(await isUserClaudeFolder(env, dir))) folders.push(join(dir, ".claude", sub));
+  return folders;
 }
 
 /**
@@ -344,7 +351,7 @@ async function readAgents(
 ) {
   const sources: [string, Source][] = [
     [join(env.managedDir, ".claude", "agents"), "managed"],
-    ...projectFolders(env, projectDir, gitRoot, "agents")
+    ...(await projectFolders(env, projectDir, gitRoot, "agents"))
       .reverse()
       .map((dir): [string, Source] => [dir, "project"]),
     [join(env.claudeDir, "agents"), "user"],
@@ -380,7 +387,7 @@ async function readOutputStyles(
 ) {
   const sources: [string, Source][] = [
     [join(env.managedDir, ".claude", "output-styles"), "managed"],
-    ...projectFolders(env, projectDir, gitRoot, "output-styles")
+    ...(await projectFolders(env, projectDir, gitRoot, "output-styles"))
       .reverse()
       .map((dir): [string, Source] => [dir, "project"]),
     [join(env.claudeDir, "output-styles"), "user"],
@@ -414,7 +421,7 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
     active.map((plugin) => pluginEntries(env, plugin, problems))
   );
   const projectClaude = join(projectDir, ".claude");
-  const hasProjectDir = projectClaude !== env.claudeDir;
+  const hasProjectDir = !(await isUserClaudeFolder(env, projectDir));
   const files = async (sub: string, separator = "/") => [
     ...(await readFileEntries(env, join(env.claudeDir, sub), "user", { separator, problems })),
     ...(hasProjectDir
@@ -429,7 +436,7 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
     ...(await listDir(join(env.claudeDir, "skills", "synced")))
       .filter((bucket) => !bucket.startsWith("."))
       .map((bucket): [string, Source] => [join(env.claudeDir, "skills", "synced", bucket), "user"]),
-    ...projectFolders(env, projectDir, gitRoot, "skills").map((dir): [string, Source] => [
+    ...(await projectFolders(env, projectDir, gitRoot, "skills")).map((dir): [string, Source] => [
       dir,
       "project",
     ]),

@@ -1,5 +1,6 @@
 import { homedir, userInfo } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { resolvedPath } from "./files.ts";
 
 /** Every location ccdesk reads, resolved once so tests can point it at a sandbox. */
 export interface ScanEnv {
@@ -66,4 +67,14 @@ function managedDirFor(platform: NodeJS.Platform): string {
   if (platform === "darwin") return "/Library/Application Support/ClaudeCode";
   if (platform === "win32") return "C:\\Program Files\\ClaudeCode";
   return "/etc/claude-code";
+}
+
+/**
+ * Whether `dir/.claude` is the user's Claude folder, as it is in the home folder. Compared by where
+ * `dir` and the Claude folder's parent really are, which exist even before `.claude` does, so a
+ * link to the home folder counts as the home folder and a Project change there is not one.
+ */
+export async function isUserClaudeFolder(env: ScanEnv, dir: string): Promise<boolean> {
+  if (basename(env.claudeDir) !== ".claude") return false;
+  return (await resolvedPath(dir)) === (await resolvedPath(dirname(env.claudeDir)));
 }
