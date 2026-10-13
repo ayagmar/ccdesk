@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import { type Core } from "../core/core.ts";
@@ -15,7 +15,6 @@ import {
   stringFields,
 } from "../core/parse-edit.ts";
 import { REFERENCE } from "../core/reference.ts";
-import { isCredentials } from "../core/scan/files.ts";
 import { CountStopped } from "../core/scan/usage.ts";
 import { Watcher } from "../core/watch.ts";
 import { RefusedError } from "../core/write.ts";
@@ -148,11 +147,6 @@ function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
     post("/api/open", async ({ body }) => {
       const { path } = stringFields(body, ["path"]);
       if (!isAbsolute(path)) throw new RequestError(400, "an absolute path is required");
-      const info = await stat(path).catch(() => null);
-      if (!info?.isFile() && !info?.isDirectory())
-        throw new RefusedError("That file or folder no longer exists.");
-      if (await isCredentials(core.env, path))
-        throw new RefusedError("ccdesk does not open credentials.");
       return { editor: await core.openFile(path) };
     }),
     post("/api/settings/preview", async ({ body }) =>
