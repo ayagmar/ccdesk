@@ -1,10 +1,8 @@
 import { useId, useState } from "react";
 import { type AgentEdit, type DirectoryView, type Entry } from "../shared/types.ts";
-import { lineName } from "../view/lines.ts";
 import { api } from "./api.ts";
-import { Bullet } from "./Bullet.tsx";
-import { type Saved } from "./SettingEditor.tsx";
-import { useReviewedChange } from "./useReviewedChange.tsx";
+import { ScopeButtons } from "./editorKit.tsx";
+import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
 
 type AgentScope = "project" | "user";
 
@@ -75,21 +73,15 @@ export function AgentEditor({ view, agent, onSaved }: Props) {
       </label>
       {!agent && (
         <>
-          <fieldset className="segmented" aria-label="Where the agent goes">
-            {(["project", "user"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                aria-pressed={scope === s}
-                onClick={() => {
-                  setScope(s);
-                  change.cancel();
-                }}
-              >
-                <Bullet line={s} hollow={scope !== s} /> {lineName(s)}
-              </button>
-            ))}
-          </fieldset>
+          <ScopeButtons
+            label="Where the agent goes"
+            scopes={["project", "user"] as const}
+            scope={scope}
+            onPick={(s) => {
+              setScope(s);
+              change.cancel();
+            }}
+          />
           <p className="muted small">{WHERE[scope]}</p>
         </>
       )}

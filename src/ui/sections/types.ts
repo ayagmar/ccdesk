@@ -1,7 +1,7 @@
 import { type ComponentType, type ReactNode } from "react";
 import { type Change, type DirectoryView, type Overview } from "../../shared/types.ts";
 import { type Row, type ViewSection } from "../../view/sections/types.ts";
-import { type Saved } from "../SettingEditor.tsx";
+import { type Saved } from "../useReviewedChange.tsx";
 
 /** What the inspector's add form adds. */
 export type Adding = "setting" | "permission" | "hook" | "mcp" | "agent";

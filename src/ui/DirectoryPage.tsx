@@ -12,7 +12,7 @@ import { Icon } from "./Icon.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { groupRows, isFiltered, PAGE } from "./list.ts";
 import { RouteStrip, SharingStrip } from "./RouteStrip.tsx";
-import { type Saved } from "./SettingEditor.tsx";
+import { type Saved } from "./useReviewedChange.tsx";
 import { SECTIONS } from "./sections/index.ts";
 import { type Row, type SectionId } from "../view/sections/types.ts";
 import { type Actions, type Adding } from "./sections/types.ts";

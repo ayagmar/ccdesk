@@ -1,11 +1,9 @@
 import { useId, useState } from "react";
 import { type DirectoryView, type McpEdit, type McpServer } from "../shared/types.ts";
-import { lineName } from "../view/lines.ts";
 import { api } from "./api.ts";
-import { Bullet } from "./Bullet.tsx";
+import { parseJson, ScopeButtons } from "./editorKit.tsx";
 import { tilde } from "./format.ts";
-import { type Saved } from "./SettingEditor.tsx";
-import { useReviewedChange } from "./useReviewedChange.tsx";
+import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
 
 type EditableScope = McpEdit["scope"];
 
@@ -55,21 +53,14 @@ export function McpEditor({ view, server, onSaved }: Props) {
   const target: EditableScope = server && isEditable(server.scope) ? server.scope : scope;
   const remove = server ? { name: server.name, definition: server.definition } : undefined;
   const review = () => {
-    let definition: unknown;
-    try {
-      definition = JSON.parse(text);
-    } catch (error) {
-      change.fail(
-        `The server is not valid JSON: ${error instanceof Error ? error.message : error}`
-      );
-      return;
-    }
+    const parsed = parseJson(text);
+    if ("error" in parsed) return change.fail(`The server is not valid JSON: ${parsed.error}`);
     void change.start(
       {
         dir: view.path,
         scope: target,
         ...(remove ? { remove } : {}),
-        add: { name: name.trim(), definition },
+        add: { name: name.trim(), definition: parsed.value },
       },
       server ? `Changed the ${name.trim()} server` : `Added the ${name.trim()} server`
     );
@@ -106,21 +97,15 @@ export function McpEditor({ view, server, onSaved }: Props) {
         />
       </label>
       {!server && (
-        <fieldset className="segmented" aria-label="Where the server goes">
-          {SCOPES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={scope === s}
-              onClick={() => {
-                setScope(s);
-                change.cancel();
-              }}
-            >
-              <Bullet line={s} hollow={scope !== s} /> {lineName(s)}
-            </button>
-          ))}
-        </fieldset>
+        <ScopeButtons
+          label="Where the server goes"
+          scopes={SCOPES}
+          scope={scope}
+          onPick={(s) => {
+            setScope(s);
+            change.cancel();
+          }}
+        />
       )}
       <p className="muted small">
         {target === "project" ? tilde(`${view.path}/.mcp.json`) : WHERE[target]}

@@ -3,7 +3,7 @@ import { type Overview, type ProjectSummary } from "../shared/types.ts";
 import { Bullet } from "./Bullet.tsx";
 import { ago, tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
-import { PAGE } from "./list.ts";
+import { compare, PAGE } from "./list.ts";
 import { ShowMore, SortHeaders } from "./SortHeaders.tsx";
 import { type Column } from "../view/sections/types.ts";
 import { NO_LIST_STATE, readListState, replaceListState, type Sort } from "./url.ts";
@@ -39,15 +39,7 @@ export function OverviewPage({
     const q = query.trim().toLowerCase();
     const list = projects.filter((p) => !q || p.path.toLowerCase().includes(q));
     const key = sort && COLUMNS[sort.column]?.sort;
-    if (sort && key)
-      list.sort((a, b) => {
-        const [x, y] = [key(a), key(b)];
-        const order =
-          typeof x === "number" && typeof y === "number"
-            ? x - y
-            : String(x).localeCompare(String(y));
-        return sort.descending ? -order : order;
-      });
+    if (sort && key) list.sort((a, b) => compare(key(a), key(b)) * (sort.descending ? -1 : 1));
     return list;
   }, [projects, query, sort]);
   return (
