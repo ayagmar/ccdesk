@@ -621,7 +621,9 @@ function isTextImport(path: string): boolean {
  * observed in v2.1.296): in the Markdown text after the frontmatter, never in code blocks, inline
  * code or HTML other than comments, and in an HTML comment block only outside the comments. A
  * `#` and what follows is cut, a backslash keeps a space in the path, and only a path that
- * starts like one counts.
+ * starts like one counts. marked is the lexer Claude Code uses for this; its version is pinned
+ * for the API read here (Lexer with gfm off, and the type, raw, text, tokens and items of each
+ * token), which need not be the version Claude Code bundles.
  */
 function importPaths(text: string): string[] {
   const body = parseFrontmatter(text).body;

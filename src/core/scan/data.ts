@@ -30,7 +30,9 @@ const NEEDS_QUOTES = /[{}[\]*&#!|>%@`]|: /;
  * Frontmatter YAML as Claude Code reads it: when it does not parse, it quotes each top-level value
  * that holds a character YAML treats specially, such as `description: Use when: asked`, turns
  * leading tabs into two spaces each, and parses again (observed in v2.1.296; the docs say only
- * that a file whose YAML does not parse is skipped). Throws when that fails too.
+ * that a file whose YAML does not parse is skipped). Throws when that fails too. Claude Code
+ * parses with Bun's YAML parser, not the yaml package, and finds the closing --- even mid-line, so
+ * a document only one of them accepts can still read differently; that is known and left as is.
  */
 export function parseFrontmatterYaml(yaml: string): unknown {
   try {
