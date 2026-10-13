@@ -10,9 +10,9 @@ import {
   type SettingsEdit,
   type SettingsEditPreview,
 } from "../shared/types.ts";
+import { isRecord } from "./scan/data.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { revisionOf } from "./scan/files.ts";
-import { isRecord } from "./scan/data.ts";
 import { isSkippedMcpRule } from "./scan/permissions.ts";
 import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
 import { schemaErrors } from "./schema.ts";
@@ -22,6 +22,7 @@ import {
   RefusedError,
   readJsonObject,
   recordChange,
+  reviewRevision,
   type Serially,
   saveReviewed,
   writeAtomic,
@@ -101,7 +102,7 @@ async function planKey(
       path,
       before,
       after: errors.length > 0 ? (before ?? "") : shown(next),
-      revision: revisionOf(raw),
+      revision: await reviewRevision(path, raw),
       reformats,
       errors,
     },

@@ -87,6 +87,16 @@ function realOrNull(path: string): Promise<string | null> {
   return realpath(path).catch(() => null);
 }
 
+/**
+ * The revision a review of one file is saved against: its content, the path, and the file the path
+ * leads to. Saving works the change out again, so without the path a file that moved after the
+ * review (a local settings file once its folder becomes a git repository, a link pointed elsewhere)
+ * would be written instead of the one reviewed; two missing files have the same content.
+ */
+export async function reviewRevision(path: string, raw: string | null): Promise<string> {
+  return revisionOf(`${path}\0${(await realOrNull(path)) ?? ""}\0${revisionOf(raw)}`);
+}
+
 /** The file a path leads to after links; a missing file keeps its own path. */
 async function target(env: ScanEnv, path: string): Promise<string> {
   if (await isCredentials(env, path)) throw new RefusedError(CREDENTIALS);

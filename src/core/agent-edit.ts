@@ -3,15 +3,16 @@ import { type AgentEdit, type Change, type SettingsEditPreview } from "../shared
 import { type ScanEnv } from "./scan/env.ts";
 import { revisionOf } from "./scan/files.ts";
 import { gitRoot } from "./scan/git.ts";
-import { shownText } from "./secrets.ts";
 import { scanDirectory } from "./scan/index.ts";
 import { agentProblems } from "./scan/inventory.ts";
+import { shownText } from "./secrets.ts";
 import {
   type Planned,
   RefusedError,
   readIfExists,
   recordChange,
   removeExactly,
+  reviewRevision,
   type Serially,
   StaleError,
   saveReviewed,
@@ -72,7 +73,7 @@ async function plan(env: ScanEnv, edit: AgentEdit): Promise<Planned<SettingsEdit
       path,
       before,
       after: errors.length > 0 ? (before ?? "") : (shownText(text) ?? ""),
-      revision: revisionOf(raw),
+      revision: await reviewRevision(path, raw),
       reformats: false,
       errors,
     },
