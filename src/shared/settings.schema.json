@@ -4614,10 +4614,138 @@
             "transcript"
           ],
           "description": "Default transcript view: chat (SendUserMessage checkpoints only) or transcript (full)"
+        },
+        "autoConnectIde": {
+          "type": "boolean",
+          "description": "Automatically connect to a running IDE when Claude Code starts from an external terminal (default: false). Appears in /config as Auto-connect to IDE (external terminal) when running outside a VS Code or JetBrains terminal. Also configurable via the CLAUDE_CODE_AUTO_CONNECT_IDE environment variable, which overrides this when set. See https://code.claude.com/docs/en/settings#global-config-settings",
+          "default": false,
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "autoInstallIdeExtension": {
+          "type": "boolean",
+          "description": "Automatically install the Claude Code IDE extension when running from a VS Code terminal (default: true). Appears in /config as Auto-install IDE extension when running inside a VS Code or JetBrains terminal. You can also set the CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL environment variable to 1. See https://code.claude.com/docs/en/settings#global-config-settings",
+          "default": true,
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "autoMode": {
+          "type": "object",
+          "description": "Customization for the auto mode classifier prompt. Typically configured in managed settings to tune the allow/deny rules used when permissions.defaultMode is \"auto\". By default, allow, soft_deny, and environment REPLACE the corresponding built-in classifier section entirely. Include the literal string \"$defaults\" as an array entry (added in v2.1.118) to splice the built-in defaults in at that position alongside your custom rules. See https://code.claude.com/docs/en/permissions",
+          "additionalProperties": false,
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Rules for the auto mode classifier allow section. Replaces the built-in allow rules entirely unless the literal string \"$defaults\" is included as an entry, which splices the built-in defaults in at that position."
+            },
+            "soft_deny": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Rules for the auto mode classifier soft-deny section. Replaces the built-in soft-deny rules entirely unless the literal string \"$defaults\" is included as an entry, which splices the built-in defaults in at that position."
+            },
+            "environment": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Entries for the auto mode classifier environment section. Replaces the built-in environment context entirely unless the literal string \"$defaults\" is included as an entry, which splices the built-in defaults in at that position."
+            },
+            "hard_deny": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Rules for the auto mode classifier hard-deny section. Hard-deny rules block unconditionally regardless of user intent. Replaces the built-in hard-deny rules entirely unless the literal string \"$defaults\" is included as an entry, which splices the built-in defaults in at that position. See https://code.claude.com/docs/en/permissions"
+            },
+            "classifyAllShell": {
+              "type": "boolean",
+              "description": "UNDOCUMENTED. Route all Bash/PowerShell commands through the auto mode classifier instead of only arbitrary-code-execution patterns (added in v2.1.193).",
+              "default": false
+            }
+          },
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "awaySummaryEnabled": {
+          "type": "boolean",
+          "description": "Show a one-line session recap when you return to the terminal after a few minutes away. Set to false (or turn off Session recap in /config) to disable. See https://code.claude.com/docs/en/settings#available-settings",
+          "default": true,
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "axScreenReader": {
+          "type": "boolean",
+          "description": "Render screen-reader-friendly output: flat text without decorative borders or animations screen-reader mode always uses the classic renderer, so the tui setting has no effect while it is active. The CLAUDE_AX_SCREEN_READER environment variable and --ax-screen-reader flag take precedence. Requires Claude Code v2.1.181 or later. See https://code.claude.com/docs/en/settings#available-settings",
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "browserExternalPageTools": {
+          "type": "string",
+          "description": "(Managed settings only) Set to \"disabled\" to prevent Claude from using tools to read or act on external pages in the desktop app's Browser pane. Users can still navigate to external sites themselves, and local dev server previews are unaffected. See https://code.claude.com/docs/en/desktop#browse-external-sites",
+          "enum": [
+            "disabled"
+          ],
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "diffTool": {
+          "type": "string",
+          "description": "Where to display file diffs when an IDE is connected: \"auto\" (default) opens diffs in the IDE's diff viewer, \"terminal\" keeps them in the terminal. Appears in /config as Diff tool only when Claude Code is connected to a VS Code or JetBrains IDE. See https://code.claude.com/docs/en/settings#global-config-settings",
+          "enum": [
+            "auto",
+            "terminal"
+          ],
+          "default": "auto",
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "disableBrowserExternalNavigation": {
+          "type": "boolean",
+          "description": "(Managed settings only) Set to true to turn off external browsing in the desktop app's Browser pane. Neither users nor Claude can navigate to external sites, and localhost dev server previews are unaffected. The value must be the JSON boolean true; the string \"true\" is ignored. See https://code.claude.com/docs/en/desktop#browse-external-sites",
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "disableMobileSimulatorTools": {
+          "type": "boolean",
+          "description": "(Managed settings only) Set to true to block Claude's tools for the desktop app's iOS Simulator pane. Users keep manual use of the pane; only Claude's access is removed. The value must be the JSON boolean true; any other value is ignored, and a malformed value such as \"true\" or 1 logs a warning. See https://code.claude.com/docs/en/desktop-ios-simulator#turn-off-simulator-access",
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "externalEditorContext": {
+          "type": "boolean",
+          "description": "Prepend Claude's previous response as #-commented context when you open the external editor with Ctrl+G (default: false). Appears in /config as Show last response in external editor. See https://code.claude.com/docs/en/settings#global-config-settings",
+          "default": false,
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "permissionExplainerEnabled": {
+          "type": "boolean",
+          "description": "Show a model-generated explanation of the command when you press Ctrl+E on a Bash or PowerShell permission prompt (default: true). Set to false to turn the shortcut off. See https://code.claude.com/docs/en/permissions#permission-system",
+          "default": true,
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "sshHostAllowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "(Managed settings only) Allowlist restricting Desktop SSH sessions to approved hosts. Patterns are case-insensitive; * matches any host and *.example.com matches example.com and any subdomain. See https://code.claude.com/docs/en/desktop#ssh-sessions",
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "teammateDefaultModel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Default model for agent team teammates when the spawn prompt does not specify one. Set to a model alias such as \"sonnet\", or null to inherit the lead's current /model selection. Appears in /config as Default teammate model. See https://code.claude.com/docs/en/agent-teams",
+          "examples": [
+            "sonnet"
+          ],
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
+        },
+        "useAutoModeDuringPlan": {
+          "type": "boolean",
+          "description": "When true, apply the auto mode classifier during plan mode to auto-approve safe read-only tool calls while planning. Has no effect unless permissions.defaultMode allows auto. See https://code.claude.com/docs/en/permissions",
+          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         }
       },
       "description": "A uniquely named alias: `Settings` alone also matches Node's http2 type."
     }
   },
-  "$comment": "claude-agent-sdk 0.3.296"
+  "$comment": "claude-agent-sdk 0.3.296, with SchemaStore for keys it lacks"
 }

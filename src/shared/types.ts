@@ -578,6 +578,8 @@ export interface SettingSchema {
   items?: SettingSchema;
   description?: string;
   deprecated?: boolean;
+  /** Set on a key whose schema comes from SchemaStore, saying so. */
+  $comment?: string;
 }
 
 /** A setting as Claude Code's settings reference documents it. */

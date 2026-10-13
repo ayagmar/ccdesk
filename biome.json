@@ -12,6 +12,7 @@
       "!dist",
       "!.impeccable",
       "!src/shared/settings.schema.json",
+      "!scripts/schemastore-claude-code-settings.json",
       "!src/shared/settings-scopes.json"
     ]
   },

@@ -40,17 +40,18 @@ Values ccdesk hides on the page (env values, headers, keys in URLs and arguments
 Several files in `src/shared` are generated from Claude Code's own sources:
 
 ```sh
-pnpm schema     # settings.schema.json and hook-events.json, from @anthropic-ai/claude-agent-sdk
+pnpm schemastore  # scripts/schemastore-claude-code-settings.json, a copy of SchemaStore's schema
 pnpm scopes     # settings-scopes.json and settings-catalog.json, from the settings reference
+pnpm schema     # settings.schema.json and hook-events.json, from @anthropic-ai/claude-agent-sdk and the SchemaStore copy
 pnpm tools      # builtin-tools.json, from the tools reference
 pnpm docs:fingerprints  # fingerprint the docs sections the code cites; prints the ones that changed
 ```
 
-The settings schema comes from the `Settings` type in the SDK, which is published with each Claude Code release; CI fails if the committed schema does not match the pinned SDK. Which files each key is read from, the settings catalog and the built-in tools come from the [settings reference](https://code.claude.com/docs/en/settings-reference) and the [tools reference](https://code.claude.com/docs/en/tools-reference).
+The settings schema comes from the `Settings` type in the SDK, which is published with each Claude Code release. Some documented keys are missing from that type; for those, `pnpm schema` copies the definition from [SchemaStore's schema](https://json.schemastore.org/claude-code-settings.json), which is community maintained. It never replaces a key the SDK defines, and it only copies keys the settings reference lists, so run `pnpm scopes` first. Because it reads the committed copy instead of fetching, CI regenerates the schema and fails if it differs from the committed one. SchemaStore is under the Apache License 2.0; `THIRD_PARTY_NOTICES.md` carries its notice. Which files each key is read from, the settings catalog and the built-in tools come from the [settings reference](https://code.claude.com/docs/en/settings-reference) and the [tools reference](https://code.claude.com/docs/en/tools-reference).
 
 Some of Claude Code's behaviour, such as how rules match commands, is only described in prose, so ccdesk follows it by hand and cites the docs section in a `docs: page#anchor` comment. `pnpm docs:fingerprints` hashes each cited section.
 
-A scheduled workflow runs every day: it updates the SDK to the latest version, runs all four commands, and when anything changed, runs `pnpm check` and opens a pull request that lists the docs sections whose text changed, so someone can check the code that follows them. Pull requests opened by the workflow do not start CI by themselves; close and reopen the pull request, or push to it, to run CI.
+A scheduled workflow runs every day: it updates the SDK to the latest version, runs all five commands, and when anything changed, runs `pnpm check` and opens a pull request. The pull request lists the docs sections whose text changed, so someone can check the code that follows them, and the documented keys that neither the SDK nor SchemaStore defines. Pull requests opened by the workflow do not start CI by themselves; close and reopen the pull request, or push to it, to run CI.
 
 ## Docs site
 

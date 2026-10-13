@@ -5,7 +5,7 @@ description: Short answers to common questions about ccdesk.
 
 ## Is ccdesk made by Anthropic?
 
-No. It is an independent open-source tool that reads the files Claude Code documents. It follows Claude Code's settings schema, which Anthropic publishes in `@anthropic-ai/claude-agent-sdk`, and its documentation.
+No. It is an independent open-source tool that reads the files Claude Code documents. It follows Claude Code's settings schema, which Anthropic publishes in `@anthropic-ai/claude-agent-sdk`, and its documentation. For the few documented keys that schema leaves out, it uses SchemaStore's community schema.
 
 ## Does it show my sessions or what Claude did?
 

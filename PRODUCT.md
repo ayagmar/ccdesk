@@ -40,7 +40,7 @@ Runs on the user's own machine against `~/.claude` (or `CLAUDE_CONFIG_DIR`), `~/
 - Editing hooks (in settings files), MCP servers and subagent files, including removing a hook or server and deleting an agent, each reviewed and backed up. Deferred: token/cost stats (possibly via llm-usage-metrics).
 - Never deletes sessions. ccdesk never writes `~/.claude.json` (Claude Code rewrites it constantly); user and local MCP servers are changed through `claude mcp`; Recent changes lists those edits with the commands that reverse them, but keeps no backup and offers no undo for them.
 - Writes are validated against the settings schema, preview a diff, save exactly the reviewed revision (refusing if the file changed since), preserve keys the user did not touch, write atomically through symlinks and keep a backup with a manifest that Recent changes can restore.
-- The settings schema comes from the `Settings` type in `@anthropic-ai/claude-agent-sdk`, which is generated from Claude Code's own settings schema; CI tracks new releases.
+- The settings schema comes from the `Settings` type in `@anthropic-ai/claude-agent-sdk`, which is generated from Claude Code's own settings schema; CI tracks new releases. Documented keys that type lacks take their definition from SchemaStore's schema, which never overrides the SDK.
 - Security: localhost only, per-run token for mutations, no raw HTML from rendered markdown (a cloned repo's AGENTS.md must not be able to run script on a page that can edit settings or hooks). Never reads credentials; redacts `env`/`headers` values.
 - Terminology: "memory" = auto memory files under `~/.claude/projects/<dir>/memory`; "instruction files" = CLAUDE.md, CLAUDE.local.md, AGENTS.md; "layers" = user / project / local / managed settings.
 
