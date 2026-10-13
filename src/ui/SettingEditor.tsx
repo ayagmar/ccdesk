@@ -102,12 +102,15 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
     if (was.key === key && was.kind === kind && was.text === currentText) return;
     setReview(null);
     const parse = (text: string | undefined) => (text === undefined ? undefined : JSON.parse(text));
+    const now = toDraft(kind, parse(currentText));
     const edited = JSON.stringify(draft) !== JSON.stringify(toDraft(kind, parse(was.text)));
-    if (was.key === key && was.kind === kind && edited) {
+    // A draft that matches the file, as after saving it, is in step with it, not edited.
+    const differs = JSON.stringify(draft) !== JSON.stringify(now);
+    if (was.key === key && was.kind === kind && edited && differs) {
       setProblem("The file changed while you were editing. Your value is kept; review it again.");
       return;
     }
-    setDraft(toDraft(kind, parse(currentText)));
+    setDraft(now);
     setProblem(null);
   }, [key, kind, currentText]);
 
