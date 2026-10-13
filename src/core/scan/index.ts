@@ -79,13 +79,15 @@ export async function scanDirectory(
 
   const managed = await readManagedSettings(env);
   const settings = await readSettingsLayers(env, path, managed);
-  for (const l of settings)
+  for (const l of settings) {
     if (l.error)
       problems.push({
         path: l.path,
         error: l.error,
         ...(l.blocksStart ? { blocksStart: true } : {}),
       });
+    else if (l.warning) problems.push({ path: l.path, error: l.warning, partial: true });
+  }
   const effective = effectiveSettings(settings);
   const agentsMdOff = agentsMdPluginOff(settings);
   // Without the plugin, Claude Code reads CLAUDE.md files only (docs: memory#when-agents-md-support-is-unavailable).

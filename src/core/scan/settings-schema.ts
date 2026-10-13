@@ -40,3 +40,25 @@ export function validatorAt(path: string[]): Validator | null {
 export function validatorFor(key: string): Validator | null {
   return validatorAt([key]);
 }
+
+/** The JSON type of a parsed value, as a schema names it. */
+function jsonType(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value === "object" ? "object" : typeof value;
+}
+
+/**
+ * Whether `value` is of a type the schema at `path` allows, from its `type` or its anyOf branches;
+ * true where the schema names no type.
+ */
+export function hasSchemaType(path: string[], value: unknown): boolean {
+  const at = schemaAt(path);
+  const branches = Array.isArray(at?.anyOf) ? at.anyOf : [at];
+  const types = branches.flatMap((b) =>
+    isRecord(b) && typeof b.type === "string" ? [b.type] : []
+  );
+  if (types.length === 0 || types.length < branches.length) return true;
+  const actual = jsonType(value);
+  return types.includes(actual) || (actual === "number" && types.includes("integer"));
+}

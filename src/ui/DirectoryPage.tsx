@@ -525,6 +525,15 @@ function ManagedRepairs({ view }: { view: DirectoryView }) {
   );
 }
 
+/** What a problem means for the file, after its own message. */
+function problemOutcome(p: DirectoryView["problems"][number]): string {
+  if (p.blocksStart)
+    return "Claude Code refuses to start until your organisation's settings are fixed, so nothing below applies yet.";
+  // The message already says the rest of the file applies.
+  if (p.partial) return "";
+  return "Claude Code may skip this file.";
+}
+
 /** The files ccdesk could not read or parse here. */
 function Problems({ problems }: { problems: DirectoryView["problems"] }) {
   if (problems.length === 0) return null;
@@ -534,10 +543,7 @@ function Problems({ problems }: { problems: DirectoryView["problems"] }) {
       <ul className="plain">
         {problems.map((p) => (
           <li key={p.path}>
-            <span className="mono">{tilde(p.path)}</span>: {p.error}.{" "}
-            {p.blocksStart
-              ? "Claude Code refuses to start until your organisation's settings are fixed, so nothing below applies yet."
-              : "Claude Code may skip this file."}
+            <span className="mono">{tilde(p.path)}</span>: {p.error}. {problemOutcome(p)}
           </li>
         ))}
       </ul>
