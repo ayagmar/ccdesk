@@ -20,7 +20,7 @@ In the order Claude Code gives them precedence:
 2. Local: your servers for this project, in `~/.claude.json`. In a git repository they belong to the main checkout's root, so every subdirectory and worktree shares them.
 3. Project: `.mcp.json` in the open directory, shared through the repository.
 4. User: your servers for every project, in `~/.claude.json`.
-5. Enabled plugins.
+5. Enabled plugins. A plugin's server is listed under the name Claude Code registers it as, `plugin:<plugin>:<server>`, which is the name `deniedMcpServers`, `allowedMcpServers` and `/mcp` use for it.
 
 When two scopes define a server with the same name, the first one wins and the others are marked **overridden**. A plugin server that points at the same command or URL as one above it is overridden the same way.
 

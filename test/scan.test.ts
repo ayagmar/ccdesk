@@ -957,3 +957,33 @@ test("a project autoMemoryDirectory applies under a trusted parent folder, as ho
   assert.equal(view.memory.dir, f.at("custom-memory"));
   assert.equal(view.memory.custom, true);
 });
+
+test("a plugin's MCP server goes by its registered name plugin:<plugin>:<key> in policy and /mcp", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/plugins/installed_plugins.json", {
+    plugins: { "kit@market": [{ scope: "user", installPath: f.at("plugins/kit") }] },
+  });
+  f.json("plugins/kit/.claude-plugin/plugin.json", { name: "kit-tools" });
+  f.json("plugins/kit/.mcp.json", {
+    mcpServers: { db: { command: "db-mcp" }, cache: { command: "cache-mcp" } },
+  });
+  f.json("home/.claude/settings.json", {
+    deniedMcpServers: [{ serverName: "plugin:kit-tools:db" }],
+  });
+  f.json("home/.claude.json", {
+    mcpServers: { db: { command: "my-db-mcp" } },
+    projects: { [f.at("app")]: { disabledMcpServers: ["plugin:kit-tools:cache"] } },
+  });
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    view.inventory.mcpServers.map((s) => [s.name, s.status]),
+    [
+      ["db", "active"],
+      ["plugin:kit-tools:db", "blocked"],
+      ["plugin:kit-tools:cache", "disabled"],
+    ]
+  );
+});

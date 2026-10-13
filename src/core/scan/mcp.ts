@@ -14,7 +14,7 @@ import { isConfigHome, type ScanEnv } from "./env.ts";
 import { readJsonOrReport, stringField, stringsIn, wildcard } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { claudeJsonKey } from "./git.ts";
-import { type LoadedPlugin, manifestConfigs } from "./plugins.ts";
+import { type LoadedPlugin, manifestConfigs, pluginNamespace } from "./plugins.ts";
 import { unredactedData } from "./settings.ts";
 import serverSchema from "../../shared/mcp-server.schema.json" with { type: "json" };
 import { schemaErrors } from "../schema.ts";
@@ -321,7 +321,7 @@ async function configuredServers(
   ];
 }
 
-/** The servers each enabled plugin brings, from its .mcp.json and its manifest. */
+/** The servers each enabled plugin brings, from its .mcp.json and its manifest, by registered name. */
 async function pluginServers(
   env: ScanEnv,
   plugins: LoadedPlugin[],
@@ -340,7 +340,12 @@ async function pluginServers(
     if (file) add(define(file.mcpServers ?? file, "plugin", path));
     for (const part of await manifestConfigs(env, loaded, "mcpServers", problems))
       add(define(part.value, "plugin", part.path));
-    for (const d of own.values()) d.server.plugin = plugin.id;
+    // Claude Code registers each under plugin:<plugin>:<key>, the name policy entries and /mcp use
+    // (docs: mcp#plugin-provided-mcp-servers).
+    for (const [key, d] of own) {
+      d.server.name = `plugin:${pluginNamespace(loaded)}:${key}`;
+      d.server.plugin = plugin.id;
+    }
     defined.push(...own.values());
   }
   return defined;
