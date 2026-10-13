@@ -5,8 +5,16 @@ import { isRecord } from "./data.ts";
 const root: unknown = schema.definitions.ClaudeCodeSettings;
 const validators = new Map<string, Validator>();
 
-/** The schema one step below `node`: a list's entries for `"[]"`, else a named field or a map's entry. */
+/**
+ * The schema one step below `node`: a list's entries for `"[]"`, else a named field or a map's
+ * entry. Of an anyOf, the list branch or the object branch, whichever the step steps into.
+ */
 function child(node: Record<string, unknown>, step: string): unknown {
+  if (Array.isArray(node.anyOf)) {
+    const wanted = step === "[]" ? "array" : "object";
+    const branch = node.anyOf.find((b) => isRecord(b) && b.type === wanted);
+    return isRecord(branch) ? child(branch, step) : null;
+  }
   if (step === "[]") return node.items;
   const { properties } = node;
   // Own properties only: a key such as __proto__ names no setting.

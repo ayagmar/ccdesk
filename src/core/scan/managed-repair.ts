@@ -13,6 +13,13 @@ type Report = (path: Path, written: unknown, note: string) => void;
 
 const QUOTED = "a quoted Boolean, which Claude Code reads as that Boolean; remove the quotes";
 const DROPPED = "fails the settings schema, so Claude Code drops it";
+// The docs name the fail-closed Booleans only by example, so any other may be one.
+const MAYBE_FAIL_CLOSED =
+  'fails validation: Claude Code drops it, or, if it treats this key as fail-closed, reads it as its restrictive value (a quoted "true" or "false" as that Boolean)';
+
+function stripped(count: number): string {
+  return `Claude Code strips the ${count} invalid ${count === 1 ? "entry" : "entries"}`;
+}
 
 /**
  * Top-level keys whose invalid value reads as their one restrictive value: the ones the docs name,
@@ -66,10 +73,14 @@ const SANDBOX_OFF = new Set([
   "credentials.allowPlaintextInject",
 ]);
 
-/** Whether `value` passes the schema at `path`; a field the schema does not name passes unless its object is closed. */
+/**
+ * Whether `value` passes the schema at `path`. A field the schema does not name passes unless its
+ * object is closed; a list entry where the schema has no list fails.
+ */
 function passes(path: Path, value: unknown): boolean {
   const validate = validatorAt(path);
   if (validate) return validate.Check(value);
+  if (path.at(-1) === "[]") return false;
   return schemaAt(path.slice(0, -1))?.additionalProperties !== false;
 }
 
@@ -83,8 +94,7 @@ function quoted(value: unknown): boolean | undefined {
 function validEntries(path: Path, value: unknown, report: Report): unknown[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const kept = value.filter((entry) => passes([...path, "[]"], entry));
-  if (kept.length < value.length)
-    report(path, value, `Claude Code strips the ${value.length - kept.length} invalid entries`);
+  if (kept.length < value.length) report(path, value, stripped(value.length - kept.length));
   return kept;
 }
 
@@ -200,7 +210,7 @@ function fixSandboxField(
     if (Array.isArray(value)) {
       const kept = value.filter((entry) => passes([...path, "[]"], entry));
       if (kept.length > 0) {
-        report(path, value, `Claude Code strips the ${value.length - kept.length} invalid entries`);
+        report(path, value, stripped(value.length - kept.length));
         return kept;
       }
     }
@@ -295,13 +305,13 @@ function repairKey(key: string, value: unknown, report: Report): unknown {
   // Anything else: Claude Code skips each entry of a list or map that fails, and drops a value
   // that still fails, such as deniedMcpServers when it is not a list.
   const perField = key === "worktree" || key === "attribution";
-  if (Array.isArray(value)) return validEntries(path, value, report);
+  if (Array.isArray(value) && schemaAt([...path, "[]"])) return validEntries(path, value, report);
   if (isRecord(value) && (perField || isRecord(schemaAt(path)?.additionalProperties))) {
     const out = repairFields(path, value, (at, inner) => report(at, inner, DROPPED));
     if (out === undefined) report(path, value, "has no valid entry, so Claude Code drops it");
     return out;
   }
-  report(path, value, DROPPED);
+  report(path, value, schemaAt(path)?.type === "boolean" ? MAYBE_FAIL_CLOSED : DROPPED);
   return undefined;
 }
 
