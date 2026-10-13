@@ -178,3 +178,19 @@ test(
     ]);
   }
 );
+
+test("on Windows, a claude.cmd that npm did not install is named as the reason claude did not start", async () => {
+  // Scoop, Volta and pnpm put a claude.cmd on PATH; Node cannot run one without a shell.
+  const f = makeFixture();
+  f.write("scoop/shims/claude.cmd", "");
+  const env = { ...f.env, platform: "win32" as const, processEnv: { PATH: f.at("scoop/shims") } };
+  const core = createCore(env);
+  const add = addServer(f);
+
+  await assert.rejects(
+    core.saveMcpEdit(add, (await core.previewMcpEdit(add)).revision),
+    (error) =>
+      error instanceof RefusedError &&
+      /could not start it from PATH.*claude\.cmd or claude\.ps1/.test(error.message)
+  );
+});
