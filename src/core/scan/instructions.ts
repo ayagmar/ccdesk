@@ -232,7 +232,8 @@ async function readOwnFiles(
     out.push(entry);
   }
   // Like a project's, the managed folder's .claude/rules load next (observed in v2.1.296; the
-  // docs do not say), and as managed files cannot be excluded.
+  // docs do not say). As managed files they cannot be excluded, and managed-only mode keeps them:
+  // it drops only user, project and local files (also observed in v2.1.296).
   for (const path of await walkMarkdown(join(env.managedDir, ".claude", "rules"), ctx.problems)) {
     const file = await readInstruction(ctx, path);
     if (file) out.push(await rule(file, "managed", env.managedDir, ctx));

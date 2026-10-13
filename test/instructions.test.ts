@@ -243,6 +243,21 @@ test("a managed CLAUDE.md over 4 MiB does not load either; the claudeMd setting 
   );
 });
 
+test("instruction mode managed-only keeps the managed folder's rules", async () => {
+  const f = makeFixture();
+  f.json("etc/claude-code/managed-settings.json", {
+    pluginConfigs: {
+      "cc-plugin-agents-md@builtin": { options: { instructionFiles: "managed-only" } },
+    },
+  });
+  f.write("etc/claude-code/.claude/rules/security.md", "never commit secrets");
+  f.write("app/CLAUDE.md", "project");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(loadedPaths(view, f.root), ["etc/claude-code/.claude/rules/security.md"]);
+});
+
 test("paths mentioned in code spans or fences are not treated as imports", async () => {
   const f = makeFixture();
   f.write(
