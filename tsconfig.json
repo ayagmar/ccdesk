@@ -19,6 +19,7 @@
     "allowUnusedLabels": false,
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
     "rewriteRelativeImportExtensions": true,
     "noEmit": true,
     "types": ["node"],

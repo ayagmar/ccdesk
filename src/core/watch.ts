@@ -176,11 +176,13 @@ export class Watcher {
   /** What the latest scan of each directory read, kept for a watch that starts after the scan. */
   private readonly scanned = new Map<string, Target[]>();
   private readonly latest = new Map<string, Scanned>();
+  private readonly env: ScanEnv;
+  private readonly scanOf: typeof scanDirectory;
 
-  constructor(
-    private readonly env: ScanEnv,
-    private readonly scanOf: typeof scanDirectory = scanDirectory
-  ) {}
+  constructor(env: ScanEnv, scanOf: typeof scanDirectory = scanDirectory) {
+    this.env = env;
+    this.scanOf = scanOf;
+  }
 
   /** Scans `dir` and remembers what the scan read, so those files are watched too. */
   async scan(dir: string, profile: SessionProfile = "interactive"): Promise<DirectoryView> {

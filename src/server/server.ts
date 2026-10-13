@@ -53,11 +53,11 @@ const SECURITY_HEADERS = {
 
 /** A request ccdesk will not take, answered with `status`. */
 class RequestError extends Error {
-  constructor(
-    readonly status: number,
-    message: string
-  ) {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
     super(message);
+    this.status = status;
   }
 }
 
