@@ -1,4 +1,4 @@
-import { homedir } from "node:os";
+import { homedir, userInfo } from "node:os";
 import { join, resolve } from "node:path";
 
 /** Every location ccdesk reads, resolved once so tests can point it at a sandbox. */
@@ -12,6 +12,8 @@ export interface ScanEnv {
   claudeJson: string;
   /** System directory for organisation-managed CLAUDE.md and managed-settings.json. */
   managedDir: string;
+  /** macOS configuration profiles that deliver managed settings (MDM), which outrank managedDir's files. */
+  managedProfiles?: string[] | undefined;
   platform: NodeJS.Platform;
   /**
    * The environment ccdesk runs in: where it finds an editor and `claude` (PATH, VISUAL, EDITOR,
@@ -40,6 +42,7 @@ export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
     // Claude Code keeps .claude.json beside the config dir it was given.
     claudeJson: configDir ? join(configDir, ".claude.json") : join(home, ".claude.json"),
     managedDir: managedDirFor(process.platform),
+    managedProfiles: process.platform === "darwin" ? managedProfiles() : undefined,
     platform: process.platform,
     processEnv,
     disableAutoMemory: processEnv.CLAUDE_CODE_DISABLE_AUTO_MEMORY,
@@ -50,6 +53,13 @@ export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
 /** Your configuration home: your home directory, or the folder whose .claude is CLAUDE_CONFIG_DIR. */
 export function isConfigHome(env: ScanEnv, path: string): boolean {
   return path === env.home || join(path, ".claude") === env.claudeDir;
+}
+
+/** Where macOS puts the com.anthropic.claudecode profile: for this user, then for the device. */
+function managedProfiles(): string[] {
+  const dir = "/Library/Managed Preferences";
+  const profile = "com.anthropic.claudecode.plist";
+  return [join(dir, userInfo().username, profile), join(dir, profile)];
 }
 
 function managedDirFor(platform: NodeJS.Platform): string {

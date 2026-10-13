@@ -4,7 +4,7 @@ import { allowedScopes, EVERY_FILE, ignoredReason } from "../../shared/scopes.ts
 import { type EffectiveSetting, type Scope, type SettingsLayer } from "../../shared/types.ts";
 import { redactSecrets } from "../secrets.ts";
 import { type ScanEnv } from "./env.ts";
-import { listDir, readJsonObject } from "./files.ts";
+import { isFile, listDir, readJsonObject } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { mainWorktreeRoot } from "./git.ts";
 import { type Dropped, sandboxFilter } from "./sandbox.ts";
@@ -197,6 +197,8 @@ export interface ManagedSettings {
   data: Record<string, unknown> | null;
   sources: string[];
   dropIns: string[];
+  /** Managed sources ccdesk does not read that rank above the files (higherSources). */
+  higher: string[];
   errors: string[];
   /** A managed file that is there but not a JSON object: Claude Code refuses to start (docs: managed-settings#find-entries-claude-code-dropped). */
   blocksStart: boolean;
@@ -227,17 +229,23 @@ export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings
     sources.push(source);
     data = data ? mergeSettings(data, result.data) : result.data;
   }
-  return { data, sources, dropIns, errors, blocksStart };
+  // Server-managed settings, then MDM, outrank the files; by default Claude Code uses the first
+  // source that sets a policy key and skips the rest (docs: managed-settings#how-claude-code-combines-managed-sources).
+  const candidates = [join(env.claudeDir, "remote-settings.json"), ...(env.managedProfiles ?? [])];
+  const higher: string[] = [];
+  for (const source of candidates) if (await isFile(source)) higher.push(source);
+  return { data, sources, dropIns, higher, errors, blocksStart };
 }
 
 function managedLayer(path: string, managed: ManagedSettings): SettingsLayer {
-  const { data, sources, dropIns, errors, blocksStart } = managed;
+  const { data, sources, dropIns, higher, errors, blocksStart } = managed;
   const layer: SettingsLayer = { scope: "managed", path, exists: false, data: null };
   if (data) layer.data = redactSecrets(data);
   layer.exists = sources.length > 0 || errors.length > 0;
   if (sources.length > 1 || dropIns.length > 0) layer.sources = sources;
   if (errors.length > 0) layer.error = errors.join("; ");
   if (blocksStart) layer.blocksStart = true;
+  if (higher.length > 0) layer.higherSources = higher;
   return layer;
 }
 

@@ -16,6 +16,8 @@ From highest precedence to lowest:
 3. **Project**: `.claude/settings.json` in the open directory.
 4. **User**: `~/.claude/settings.json`, or `settings.json` in `$CLAUDE_CONFIG_DIR`.
 
+Your organisation can also deliver managed settings from the claude.ai admin console (server-managed settings), through a macOS configuration profile, or in the Windows registry. ccdesk does not read those. Claude Code ranks the console's settings first, then the profile or the `HKLM` registry key, then the files above, and by default uses the first source that sets a policy. When the server-managed settings Claude Code keeps in `~/.claude/remote-settings.json` or a macOS profile is on disk, the page warns that the managed values it shows may not apply. Run `/status` in Claude Code to see which source it uses.
+
 ## How a value is decided
 
 - For most keys the highest file wins. Lower values are listed in **Overrides**, struck through, with their own bullets.

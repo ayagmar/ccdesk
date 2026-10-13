@@ -344,3 +344,20 @@ test("under blockReadsOutsideWorkingDirectories, repository allowRead and allowW
   });
   assert.deepEqual(off.ignored, []);
 });
+
+test("server-managed settings or a macOS profile on disk are named above the managed files ccdesk reads", async () => {
+  const f = makeFixture();
+  const profile = f.at("Library/Managed Preferences/com.anthropic.claudecode.plist");
+  const env = { ...f.env, managedProfiles: [profile] };
+  f.json("etc/claude-code/managed-settings.json", { model: "opus" });
+  const higher = async () =>
+    (await scanDirectory(env, f.at("app"))).settings.find((l) => l.scope === "managed")
+      ?.higherSources;
+
+  assert.equal(await higher(), undefined);
+
+  // Claude Code keeps the server-managed settings it fetched in the Claude folder.
+  f.json("home/.claude/remote-settings.json", { permissions: { deny: ["Bash(curl:*)"] } });
+  f.write(profile, "<plist/>");
+  assert.deepEqual(await higher(), [f.at("home/.claude/remote-settings.json"), profile]);
+});
