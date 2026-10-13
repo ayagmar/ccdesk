@@ -282,10 +282,17 @@ function takesText(schema: SettingSchema): boolean {
 /** JSON typed into a form, or why it does not parse. */
 export function parseJson(text: string): { value: unknown } | { error: string } {
   try {
-    return { value: JSON.parse(text) };
+    return { value: JSON.parse(text, finiteNumbers) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+/** JSON.parse reads 1e400 as Infinity, which JSON.stringify writes as null. */
+function finiteNumbers(_key: string, value: unknown): unknown {
+  if (typeof value === "number" && !Number.isFinite(value))
+    throw new Error("a number is too large to save");
+  return value;
 }
 
 /**
