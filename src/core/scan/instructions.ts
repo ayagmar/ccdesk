@@ -51,9 +51,11 @@ export type ExcludeMatcher = (path: string, realPath?: string) => boolean;
 /**
  * claudeMdExcludes globs matched against absolute paths (docs: memory#exclude-specific-claude-md-files)
  * the way Claude Code matches them: with forward slashes, `*` and `**` also matching folders such
- * as .claude, and each absolute glob also written from where the folder before its first wildcard
- * really is, so a glob through a link matches the files it leads to (observed in v2.1.296). An
- * invalid glob matches nothing.
+ * as .claude, and each glob that starts with / also written from where the folder before its
+ * first wildcard really is, so a glob through a link matches the files it leads to (observed in
+ * v2.1.296). Claude Code does not do that for a glob that starts with a drive letter, so on
+ * Windows a glob through a link matches only paths written through the link. An invalid glob
+ * matches nothing.
  */
 export async function excludeMatcher(excludes: string[]): Promise<ExcludeMatcher> {
   const globs = excludes.map((glob) => glob.replaceAll("\\", "/")).filter(Boolean);
