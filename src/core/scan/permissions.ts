@@ -12,22 +12,33 @@ import { isRecord } from "./data.ts";
 import { ignoredModeReason } from "./settings.ts";
 
 /**
- * Whether a file's trust-gated settings (permission grants, autoMemoryDirectory) wait for
- * the workspace trust dialog. Claude Code runs git to tell a private local file from a committed one
- * only once the folder or a parent is trusted, or in claude -p and the SDK, which count as accepted;
- * until then the local file waits too, except in your configuration home. A committed local file
- * waits like project settings, which -p and the SDK never apply in a folder you have not trusted
- * (docs: permissions#when-your-local-settings-file-needs-trust, #what-runs-before-you-trust-a-folder).
+ * Whether a file's permission grants wait for the workspace trust dialog. Claude Code runs git to
+ * tell a private local file from a committed one only once the folder or a parent is trusted, or in
+ * claude -p and the SDK, which count as accepted; until then the local file waits too, except the
+ * one in your configuration home, not a local file kept at the root of a repository around it. A
+ * committed local file waits like project settings, which -p and the SDK never apply in a folder you
+ * have not trusted (docs: permissions#when-your-local-settings-file-needs-trust, #what-runs-before-you-trust-a-folder).
  */
 export function trustWaits({
   trust,
   inConfigHome,
   localFromRepository,
   profile,
-}: Options): (scope: Scope) => boolean {
+}: Options): (scope: Scope, path: string) => boolean {
   const gitChecked = profile === "print" || trust.inheritedFrom !== undefined;
-  const localWaits = !inConfigHome && !trust.trusted && (!gitChecked || localFromRepository);
-  return (scope) => (scope === "project" && !trust.trusted) || (scope === "local" && localWaits);
+  const localWaits = !trust.trusted && (!gitChecked || localFromRepository);
+  return (scope, path) =>
+    (scope === "project" && !trust.trusted) ||
+    (scope === "local" && localWaits && !inConfigHome(path));
+}
+
+/**
+ * Whether hooks, and the settings that follow their trust rule such as autoMemoryDirectory, wait
+ * for the trust dialog: in an interactive session until the folder or a parent covering it is
+ * trusted; -p and the SDK do not wait (docs: hooks#workspace-trust, permissions#what-runs-before-you-trust-a-folder).
+ */
+export function hooksWait(trust: Trust, profile: SessionProfile): boolean {
+  return profile === "interactive" && !trust.trusted && !trust.inheritedFrom;
 }
 
 /**
@@ -43,8 +54,8 @@ export const CHECK_ORDER: PermissionList[] = ["deny", "ask", "allow"];
 
 export interface Options {
   trust: Trust;
-  /** Claude Code started in your configuration home, where the local file applies without the trust step. */
-  inConfigHome: boolean;
+  /** Whether a local settings file is the one in your configuration home, which applies without the trust step. */
+  inConfigHome: (path: string) => boolean;
   /** The local settings file is tracked in git, so Claude Code treats it like repository settings. */
   localFromRepository: boolean;
   profile: SessionProfile;
@@ -86,7 +97,7 @@ export function permissionsOf(layers: SettingsLayer[], options: Options): Permis
             inEffect: false,
             note: "Managed settings allow only their own permission rules",
           };
-        if (list === "allow" && waitsForTrust(scope))
+        if (list === "allow" && waitsForTrust(scope, path))
           return { ...base, inEffect: false, note: notTrusted };
         return { ...base, inEffect: true };
       })
@@ -116,9 +127,9 @@ export function permissionsOf(layers: SettingsLayer[], options: Options): Permis
     });
     if (!note) modeTaken = true;
   }
-  for (const { scope, permissions } of sources) {
+  for (const { scope, path, permissions } of sources) {
     for (const dir of stringsIn(permissions.additionalDirectories)) {
-      const note = waitsForTrust(scope) ? notTrusted : undefined;
+      const note = waitsForTrust(scope, path) ? notTrusted : undefined;
       out.push({
         kind: "additionalDirectories",
         value: dir,

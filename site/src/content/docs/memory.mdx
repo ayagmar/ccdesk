@@ -16,7 +16,7 @@ Claude Code's auto memory is a folder of Markdown files per project, with a `MEM
 
 By default the folder is `~/.claude/projects/<project path with every character other than letters and digits turned into ->/memory`. When that name is longer than 200 characters, Claude Code keeps the first 200 and adds `-` and a short hash of the path, and ccdesk does the same. Every worktree and subfolder of a repository shares the main checkout's folder. ccdesk also follows:
 
-- `autoMemoryDirectory`, an absolute path or one starting with `~/`. Set in a project or local file, it takes effect only once you trust the folder. ccdesk shows a memory folder set this way but does not change it.
+- `autoMemoryDirectory`, an absolute path or one starting with `~/`. Set in a project or local file, it follows the trust rule for hooks: an interactive session uses it once you trust the folder or a parent folder covering it, and a `claude -p` or SDK run uses it at once. ccdesk shows a memory folder set this way but does not change it.
 - `CLAUDE_CODE_PROJECT_DIR_NAME`, when you use it with `CLAUDE_CONFIG_DIR`.
 
 Memory is off, and `MEMORY.md` drops out of [What Claude sees](../what-claude-sees/), when `CLAUDE_CODE_DISABLE_AUTO_MEMORY` is `1` or `true`, or when `autoMemoryEnabled` is `false` and that variable is not set. The section says so.
