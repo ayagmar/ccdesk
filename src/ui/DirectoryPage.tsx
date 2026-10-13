@@ -509,13 +509,15 @@ function ManagedRepairs({ view }: { view: DirectoryView }) {
       <ul className="plain">
         <li>
           Some managed settings in <span className="mono">{tilde(managed.path)}</span> fail
-          validation. The page shows them as Claude Code applies them:
+          validation. ccdesk checks them after merging the drop-in files, and the page shows them as
+          Claude Code applies them:
           <ul className="plain">
             {managed.repairs.map((r, i) => (
               // A field can be repaired twice, such as a list that lost an entry and was then withheld.
               // biome-ignore lint/suspicious/noArrayIndexKey: the list never reorders.
-              <li key={`${r.field}:${i}`} title={JSON.stringify(r.written)}>
-                <span className="mono">{r.field}</span> {r.note}.
+              <li key={`${r.field}:${i}`}>
+                <span className="mono">{r.field}</span> (written as{" "}
+                <code>{JSON.stringify(r.written)}</code>) {r.note}.
               </li>
             ))}
           </ul>

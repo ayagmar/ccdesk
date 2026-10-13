@@ -385,6 +385,7 @@ function withModelEffort(
   };
   const value: Record<string, unknown> = {};
   const overridden = [...setting.overridden];
+  let capped = false;
   for (const [model, merged] of Object.entries(setting.value)) {
     if (!isRecord(merged)) {
       value[model] = merged;
@@ -401,6 +402,7 @@ function withModelEffort(
         level !== undefined || (scope !== "user" && valueIn("effortLevel", scope) !== undefined);
     }
     if (PRECEDENCE.some((scope) => entryIn(scope, model).maxEffortLevel !== undefined)) {
+      capped = true;
       const caps = PRECEDENCE.map(
         (scope) => entryIn(scope, model).maxEffortLevel ?? valueIn("maxEffortLevel", scope)
       );
@@ -412,6 +414,8 @@ function withModelEffort(
     }
     value[model] = entry;
   }
+  // A single file with no cap to resolve has nothing to explain.
+  if (setting.from.length < 2 && !capped) return { ...setting, value, overridden };
   return {
     ...setting,
     value,

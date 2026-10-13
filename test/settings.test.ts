@@ -474,6 +474,7 @@ test("managed settings that fail validation are read as Claude Code repairs them
     model: null,
     cleanupPeriodDays: "forever",
     forceLoginOrgUUID: 7,
+    env: "FAKE_TOKEN=fake-secret-value",
     permissions: { deny: "Bash", allow: ["Read", 3], defaultMode: "careful" },
     autoMode: { soft_deny: ["force push", 1], allow: ["tests"], environment: ["ci"] },
     sandbox: {
@@ -512,6 +513,7 @@ test("managed settings that fail validation are read as Claude Code repairs them
       "model",
       "cleanupPeriodDays",
       "forceLoginOrgUUID",
+      "env",
       "permissions.deny",
       "permissions.allow",
       "permissions.defaultMode",
@@ -530,6 +532,7 @@ test("managed settings that fail validation are read as Claude Code repairs them
   // What the file says stays visible beside each repair.
   assert.deepEqual(managed?.repairs?.[0]?.written, { allowedMcpServers: "mistyped" });
   assert.match(managed?.repairs?.[1]?.note ?? "", /quotes/);
+  assert.ok(!JSON.stringify(view).includes("fake-secret-value"));
 
   assert.equal(setting(view, "model")?.value, "opus");
   assert.equal(view.inventory.mcpServers.find((s) => s.name === "db")?.status, "blocked");
@@ -596,4 +599,25 @@ test("a nested field Claude Code tolerates or may skip leaves the rest of the fi
     [[f.at("app/.claude/settings.json"), true]]
   );
   assert.match(view.problems[0]?.error ?? "", /permissions\.defaultMode/);
+});
+
+test("a managed value of the wrong shape is dropped, and attribution is repaired field by field", async () => {
+  const f = makeFixture();
+  f.json("etc/claude-code/managed-settings.json", {
+    env: ["FAKE_TOKEN=fake-list-secret"],
+    attribution: { commit: 5, pr: "Reviewed" },
+    disableSideloadFlags: "true",
+  });
+
+  const view = await scanDirectory(f.env, f.at("app"));
+  const managed = view.settings.find((l) => l.scope === "managed");
+
+  assert.deepEqual(managed?.data, { attribution: { pr: "Reviewed" } });
+  assert.deepEqual(
+    managed?.repairs?.map((r) => r.field),
+    ["env", "attribution.commit", "disableSideloadFlags"]
+  );
+  // The docs name fail-closed Booleans only by example, so the page cannot say it is simply dropped.
+  assert.match(managed?.repairs?.at(-1)?.note ?? "", /fail-closed/);
+  assert.ok(!JSON.stringify(view).includes("fake-list-secret"));
 });
