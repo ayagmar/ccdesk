@@ -2148,6 +2148,22 @@ fieldset.field {
   gap: 4px;
 }
 
+/* A warning that comes with its fix: the sentence, then the button that makes it true. */
+.object-field .flag {
+  flex-wrap: wrap;
+  justify-self: start;
+  gap: 4px 8px;
+  padding: 4px 8px;
+}
+
+.about summary {
+  cursor: pointer;
+}
+
+.about summary:hover {
+  color: var(--ink-2);
+}
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus,

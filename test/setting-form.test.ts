@@ -12,6 +12,7 @@ import {
   followFile,
   formFor,
   fromDraft,
+  replacesBuiltIns,
   toDraft,
 } from "../src/view/index.ts";
 
@@ -233,4 +234,17 @@ test("a value saved from JSON is in step with the file, so a later change is fol
 test("an empty field for a key the file lacks follows the file when the key appears", () => {
   const model: SettingSchema = { type: "string" };
   assert.equal(followFile(formFor(model, undefined), model, undefined, "opus").kept, false);
+});
+
+test("an autoMode list without $defaults is flagged as replacing the built-in rules", () => {
+  // Catches a custom hard_deny list silently dropping Claude Code's built-in block rules.
+  assert.equal(replacesBuiltIns("autoMode", "hard_deny", "Never push to main"), true);
+  assert.equal(replacesBuiltIns("autoMode", "hard_deny", "$defaults\nNever push to main"), false);
+  assert.equal(
+    replacesBuiltIns("autoMode", "allow", ""),
+    false,
+    "an empty list keeps the built-ins"
+  );
+  assert.equal(replacesBuiltIns("autoMode", "classifyAllShell", "true"), false);
+  assert.equal(replacesBuiltIns("permissions", "allow", "Bash(npm test)"), false);
 });

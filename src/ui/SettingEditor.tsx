@@ -21,6 +21,7 @@ import {
   followFile,
   formFor,
   fromDraft,
+  replacesBuiltIns,
   toDraft,
 } from "../view/settings.ts";
 import { api } from "./api.ts";
@@ -213,7 +214,16 @@ function ValueForm({
   return (
     <>
       <Labeled label="Value in this file" kind={kind}>
-        {(id) => <Field id={id} kind={kind} property={property} draft={draft} onChange={onType} />}
+        {(id) => (
+          <Field
+            id={id}
+            settingKey={settingKey}
+            kind={kind}
+            property={property}
+            draft={draft}
+            onChange={onType}
+          />
+        )}
       </Labeled>
       {kind === "json" && fieldKind(property) !== "json" && !fitsForm && (
         <p className="muted small">
@@ -293,6 +303,7 @@ function Labeled({
 
 function Field({
   id,
+  settingKey,
   kind,
   property,
   draft,
@@ -300,6 +311,7 @@ function Field({
   inObject = false,
 }: {
   id: string;
+  settingKey: string;
   kind: FieldKind;
   property: SettingSchema;
   draft: Draft;
@@ -329,29 +341,61 @@ function Field({
     return (
       <ObjectFields
         id={id}
+        settingKey={settingKey}
         property={property}
         draft={typeof draft === "object" && !Array.isArray(draft) ? draft : {}}
         onChange={onChange}
       />
     );
-  if (kind === "lines" || kind === "json")
+  if (kind === "lines")
     return (
-      <textarea
+      <TextArea
         id={id}
-        className="mono"
-        rows={Math.min(14, Math.max(inObject ? 2 : 4, String(draft).split("\n").length + 1))}
-        spellCheck={false}
-        placeholder={kind === "lines" && inObject ? "One entry per line" : undefined}
-        value={String(draft)}
-        onChange={(e) => onChange(e.target.value)}
+        text={String(draft)}
+        minRows={inObject ? 2 : 4}
+        // An entry longer than the field would wrap and read as two; it scrolls instead.
+        wrap="off"
+        placeholder={inObject ? "One entry per line" : undefined}
+        onChange={onChange}
       />
     );
+  if (kind === "json")
+    return <TextArea id={id} text={String(draft)} minRows={4} onChange={onChange} />;
   return (
     <input
       id={id}
       className="mono"
       type={kind === "number" ? "number" : "text"}
       value={String(draft)}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+function TextArea({
+  id,
+  text,
+  minRows,
+  wrap,
+  placeholder,
+  onChange,
+}: {
+  id: string;
+  text: string;
+  minRows: number;
+  wrap?: "off";
+  placeholder?: string | undefined;
+  onChange: (d: Draft) => void;
+}) {
+  return (
+    <textarea
+      id={id}
+      className="mono"
+      rows={Math.min(14, Math.max(minRows, text.split("\n").length + 1))}
+      spellCheck={false}
+      wrap={wrap}
+      placeholder={placeholder}
+      value={text}
       onChange={(e) => onChange(e.target.value)}
     />
   );
@@ -424,11 +468,13 @@ function Choices({
 /** One control per property the schema names, in the schema's order; an empty one is left unset. */
 function ObjectFields({
   id,
+  settingKey,
   property,
   draft,
   onChange,
 }: {
   id: string;
+  settingKey: string;
   property: SettingSchema;
   draft: DraftObject;
   onChange: (d: Draft) => void;
@@ -437,6 +483,8 @@ function ObjectFields({
     <div id={id} className="object-fields">
       {Object.entries(property.properties ?? {}).map(([name, schema]) => {
         const kind = fieldKind(schema);
+        const value = draft[name] ?? toDraft(kind, schema, undefined, true);
+        const set = (next: Draft) => onChange({ ...draft, [name]: next });
         return (
           <div key={name} className="object-field">
             <Labeled
@@ -451,19 +499,41 @@ function ObjectFields({
               {(fieldId) => (
                 <Field
                   id={fieldId}
+                  settingKey={settingKey}
                   kind={kind}
                   property={schema}
-                  draft={draft[name] ?? toDraft(kind, schema, undefined, true)}
-                  onChange={(next) => onChange({ ...draft, [name]: next })}
+                  draft={value}
+                  onChange={set}
                   inObject
                 />
               )}
             </Labeled>
-            {schema.description && <p className="muted small">{schema.description}</p>}
+            {replacesBuiltIns(settingKey, name, value) && (
+              <p className="flag warn">
+                Without "$defaults", these entries replace Claude Code's built-in {name} entries
+                instead of adding to them.
+                <button type="button" onClick={() => set(`$defaults\n${value}`)}>
+                  Keep built-in entries
+                </button>
+              </p>
+            )}
+            {schema.description && <About text={schema.description} />}
           </div>
         );
       })}
     </div>
+  );
+}
+
+/** A field's description: its first sentence, and the rest a click away. */
+function About({ text }: { text: string }) {
+  const [, first, rest] = /^(.+?\.)\s+(.+)$/s.exec(text) ?? [];
+  if (!first || !rest) return <p className="muted small">{text}</p>;
+  return (
+    <details className="about muted small">
+      <summary>{first}</summary>
+      {rest}
+    </details>
   );
 }
 
