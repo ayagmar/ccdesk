@@ -16,7 +16,7 @@ import { buildContext } from "./context.ts";
 import { isConfigHome, type ScanEnv } from "./env.ts";
 import { isDir, isFile, readJsonObject, stringsIn } from "./files.ts";
 import { isRecord } from "./data.ts";
-import { gitRoot, mainWorktreeRoot, visibilityOf } from "./git.ts";
+import { gitRoot, mainWorktreeRoot, trustKey, visibilityOf } from "./git.ts";
 import { AGENTS_MD_MODES, resolveInstructions } from "./instructions.ts";
 import { readInventory } from "./inventory.ts";
 import { readMemoryStore } from "./memory.ts";
@@ -94,7 +94,7 @@ export async function scanDirectory(
   const mode = agentsMdMode(settings);
   const excludes = effective.find((s) => s.key === "claudeMdExcludes")?.value;
   const mainRoot = exists ? await mainWorktreeRoot(path) : null;
-  const trust = trustOf(env, claudeJson, path, mainRoot ?? root);
+  const trust = trustOf(env, claudeJson, path, mainRoot, root);
   const managedLayer = settings.find((l) => l.scope === "managed");
   const managedClaudeMd = managedLayer?.data?.claudeMd;
   const instructions = await resolveInstructions({
@@ -212,11 +212,12 @@ function trustOf(
   env: ScanEnv,
   claudeJson: Record<string, unknown> | null,
   path: string,
-  repositoryRoot: string | null
+  mainRoot: string | null,
+  gitRoot: string | null
 ): Trust {
   const projects = isRecord(claudeJson?.projects) ? claudeJson.projects : {};
   const entry = (key: string) => (isRecord(projects[key]) ? projects[key] : {});
-  const root = repositoryRoot ?? path;
+  const root = trustKey(path, mainRoot, gitRoot);
   const own = entry(root);
   const trust: Trust = {
     root,
@@ -230,7 +231,7 @@ function trustOf(
           ? "declined"
           : "not-asked",
   };
-  if (!trust.trusted && !repositoryRoot)
+  if (!trust.trusted && !mainRoot && !gitRoot)
     for (let d = dirname(path); d !== dirname(d); d = dirname(d))
       if (entry(d).hasTrustDialogAccepted === true) {
         trust.inheritedFrom = d;

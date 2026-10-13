@@ -1,4 +1,4 @@
-import { dirname, isAbsolute, join, matchesGlob, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { type DirectoryView, type PathMatch, type PathTest } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
 import {
@@ -14,6 +14,15 @@ import {
 } from "./files.ts";
 import { parseFrontmatter } from "./data.ts";
 import { scanDirectory } from "./index.ts";
+import {
+  AGENTS_MD_NAMES,
+  agentsMdLoads,
+  CLAUDE_MD_NAMES,
+  isExcluded,
+  linkedRuleBlock,
+  ruleTarget,
+  safeMatch,
+} from "./instructions.ts";
 import { applySkillOverrides, readSkill } from "./inventory.ts";
 
 /** Globs are written with forward slashes on every platform. */
@@ -21,15 +30,9 @@ function slashed(path: string): string {
   return path.split(sep).join("/");
 }
 
+/** An invalid pattern matches nothing; the others still count (docs: memory#path-specific-rules). */
 function firstMatch(globs: string[], path: string): string | undefined {
-  return globs.find((glob) => {
-    try {
-      return matchesGlob(path, glob);
-    } catch {
-      // An invalid pattern matches nothing; the others still count (docs: memory#path-specific-rules).
-      return false;
-    }
-  });
+  return globs.find((glob) => safeMatch(path, glob));
 }
 
 /**
@@ -54,8 +57,6 @@ export async function testPath(
 
   const excludes = stringsIn(view.effective.find((e) => e.key === "claudeMdExcludes")?.value);
   const overrides = view.effective.find((e) => e.key === "skillOverrides")?.value;
-  const excluded = (path: string) =>
-    excludes.some((glob) => firstMatch([glob], path) !== undefined);
 
   // Path rules Claude Code would use at all: not excluded, not waiting for approval.
   for (const rule of view.instructions) {
@@ -81,31 +82,26 @@ export async function testPath(
       const path = join(folder, name);
       const file = await readTextFile(env, path);
       if (!file) return false;
-      if (!excluded(path) && file.bytes <= MAX_TEXT_BYTES)
+      if (!isExcluded(excludes, path, file.realPath) && file.bytes <= MAX_TEXT_BYTES)
         matches.push({ kind: "nested", path, scope });
       return true;
     };
     // managed-only leaves out files at launch, but a subfolder's CLAUDE.md and rules still load
     // on demand (docs: memory#choose-which-instruction-files-load).
     let hasClaudeMd = false;
-    for (const name of ["CLAUDE.md", ".claude/CLAUDE.md"])
-      if (await nested(name, "project")) hasClaudeMd = true;
+    for (const name of CLAUDE_MD_NAMES) if (await nested(name, "project")) hasClaudeMd = true;
     if (mode !== "managed-only" && (await nested("CLAUDE.local.md", "local"))) hasClaudeMd = true;
-    const agents =
-      mode === "claude-md-and-agents-md" || (mode === "claude-md-or-agents-md" && !hasClaudeMd);
-    if (agents) await nested("AGENTS.md", "project");
+    if (agentsMdLoads(mode, hasClaudeMd))
+      for (const name of AGENTS_MD_NAMES) await nested(name, "project");
     for (const path of await walkMarkdown(join(folder, ".claude", "rules"))) {
       const text = await readTextFile(env, path);
-      if (!text || text.bytes > MAX_TEXT_BYTES || excluded(path)) continue;
-      // As at startup: excluded by its target's path too, and a rule linked from outside the
-      // project waits for your approval, then loads only without paths
-      // (docs: memory#share-rules-across-projects-with-symlinks).
-      const real = await resolvedPath(path);
-      const outside = !isWithin(realCwd, real) && !isWithin(await resolvedPath(folder), real);
-      const linked = text.realPath ?? (outside ? real : undefined);
-      if (linked !== undefined && excluded(linked)) continue;
+      if (!text || text.bytes > MAX_TEXT_BYTES) continue;
+      // As at startup: excluded by its target's path too, and one linked from outside the project
+      // waits for your approval, then loads only without paths.
+      const linked = await ruleTarget(text, folder, realCwd);
+      if (isExcluded(excludes, path, linked)) continue;
       const globs = toStringList(parseFrontmatter(text.text).data.paths);
-      if (!isWithin(realCwd, real) && (!approved || globs.length > 0)) continue;
+      if (linkedRuleBlock(linked, realCwd, approved, globs.length > 0)) continue;
       const glob =
         globs.length === 0 ? undefined : firstMatch(globs, slashed(relative(folder, target)));
       if (globs.length === 0 || glob)

@@ -173,3 +173,43 @@ test("a subfolder's skills load on demand only when Claude may invoke them itsel
   assert.deepEqual(await skills("src/a.ts"), ["lint"]);
   assert.deepEqual(await skills("src/a.css"), ["css", "lint"]);
 });
+
+test("a subfolder's AGENTS.md and linked rules load on demand exactly as they load when Claude starts there", async () => {
+  const modes = ["claude-md-or-agents-md", "claude-md-and-agents-md", "claude-md"];
+  for (const mode of modes)
+    for (const withClaudeMd of [false, true])
+      for (const approved of [false, true]) {
+        const f = makeFixture();
+        f.json("home/.claude/settings.json", {
+          pluginConfigs: { "agents-md@builtin": { options: { instructionFiles: mode } } },
+        });
+        f.write("shared-rules/style.md", "Early returns.\n");
+        f.write("shared-rules/api.md", '---\npaths: ["**/*.ts"]\n---\nValidate.\n');
+        f.link("app/sub/.claude/rules/shared", f.at("shared-rules"));
+        f.write("app/sub/AGENTS.md", "Agents.\n");
+        f.write("app/sub/.claude/AGENTS.md", "More agents.\n");
+        if (withClaudeMd) f.write("app/sub/CLAUDE.md", "Claude.\n");
+        if (approved)
+          f.json("home/.claude.json", {
+            projects: Object.fromEntries(
+              ["app", "app/sub"].map((dir) => [
+                f.at(dir),
+                { hasClaudeMdExternalIncludesApproved: true },
+              ])
+            ),
+          });
+
+        const atStartup = (await scanDirectory(f.env, f.at("app/sub"))).instructions
+          .filter((i) => i.dir === f.at("app/sub") && i.status !== "skipped")
+          .map((i) => f.rel(i.path));
+        const onDemand = (await testPath(f.env, f.at("app"), "sub/x.ts")).matches.map((m) =>
+          f.rel(m.path)
+        );
+
+        assert.deepEqual(
+          onDemand.sort(),
+          atStartup.sort(),
+          `${mode}, CLAUDE.md ${withClaudeMd}, approved ${approved}`
+        );
+      }
+});
