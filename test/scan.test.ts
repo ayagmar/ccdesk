@@ -1077,13 +1077,14 @@ test("MCP policy entries and server values match after variable expansion, each 
       literal: "Blocked by deniedMcpServers",
       filled: "Blocked by deniedMcpServers",
       kept: "active",
-      wide: "Not in allowedMcpServers",
+      wide: "Not in allowedMcpServers; an allowedMcpServers entry was ignored because expanding its variables changes its scheme, host or path",
       docs: "active",
       "plugin:kit:srv": "Blocked by deniedMcpServers",
     }
   );
   // The page shows each value as written, never expanded.
   assert.ok(!JSON.stringify(view).includes("/fake/tools/bin/kept"));
+  assert.ok(!JSON.stringify(view).includes("fake-token-5"));
   assert.match(
     view.inventory.mcpServers.find((s) => s.name === "expanded")?.target ?? "",
     /^\$\{TOOLS\}\/bin\/a /

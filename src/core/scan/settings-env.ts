@@ -96,8 +96,10 @@ function ignoredReason(scope: Scope, name: string, value: unknown): string | und
     WINDOWS_NOT_FROM_REPOSITORY.has(name.toUpperCase()) ||
     NOT_FROM_REPOSITORY_PATTERNS.some((p) => p.test(name));
   if (!notFromRepository) return undefined;
-  if (typeof value === "string" && OFF_VALUES[name]?.includes(value.toLowerCase()))
-    return undefined;
+  // The OTEL_LOG_* switches take any casing; the exporter selectors are off only as "none".
+  const off =
+    name.startsWith("OTEL_LOG_") && typeof value === "string" ? value.toLowerCase() : value;
+  if (typeof off === "string" && OFF_VALUES[name]?.includes(off)) return undefined;
   return "Project and local settings cannot set this variable; set it in your shell, user or managed settings";
 }
 

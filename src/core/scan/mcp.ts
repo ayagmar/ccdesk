@@ -456,9 +456,12 @@ function environmentsOf({ env, layers, trust, profile }: Input): Environments {
   };
 }
 
-/** A serverUrl pattern's scheme, host and path, which an allow entry's expansion may not change. */
+/**
+ * A serverUrl pattern's scheme, host and path, which an allow entry's expansion may not change.
+ * A user and password before the host are not part of it.
+ */
 function urlScope(pattern: string): string {
-  const p = /^([^:/]+):\/\/([^/:]+)(?::[^/]*)?(\/.*)?$/.exec(pattern);
+  const p = /^([^:/]+):\/\/(?:[^@/]*@)?([^/:]+)(?::[^/]*)?(\/.*)?$/.exec(pattern);
   return p ? JSON.stringify([p[1], p[2], p[3]]) : pattern;
 }
 
@@ -488,23 +491,29 @@ function policyOf(
   layers: SettingsLayer[],
   envs: Environments
 ): { blocks: (d: Defined) => string | null } {
+  // Each entry expanded, or null where Claude Code ignores it.
   const entries = (list: "allow" | "deny", from: SettingsLayer[]) =>
     from.flatMap((l) =>
       policyEntries(
         unredactedData(l)?.[list === "allow" ? "allowedMcpServers" : "deniedMcpServers"]
-      ).flatMap((e) => expandEntry(e, list, envs) ?? [])
+      ).map((e) => expandEntry(e, list, envs))
     );
-  const denied = entries("deny", layers);
+  const denied = entries("deny", layers).flatMap((e) => e ?? []);
   const managedOnly =
     layers.find((l) => l.scope === "managed")?.data?.allowManagedMcpServersOnly === true;
   const allowLayers = layers.filter((l) => !managedOnly || l.scope === "managed");
   const allowSet = allowLayers.some((l) => Array.isArray(l.data?.allowedMcpServers));
-  const allowList = entries("allow", allowLayers);
+  const allowEntries = entries("allow", allowLayers);
+  const allowList = allowEntries.flatMap((e) => e ?? []);
+  // Without this, an entry plainly in the file would leave the block unexplained.
+  const ignoredNote = allowEntries.includes(null)
+    ? "; an allowedMcpServers entry was ignored because expanding its variables changes its scheme, host or path"
+    : "";
   return {
     blocks: (d) => {
       if (denied.some((e) => matches(e, d))) return "Blocked by deniedMcpServers";
       if (allowSet && !d.organisation && !allowed(allowList, d))
-        return managedOnly ? "Not in the managed allowedMcpServers" : "Not in allowedMcpServers";
+        return `${managedOnly ? "Not in the managed allowedMcpServers" : "Not in allowedMcpServers"}${ignoredNote}`;
       return null;
     },
   };
