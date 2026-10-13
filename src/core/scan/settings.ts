@@ -16,7 +16,7 @@ import { mainWorktreeRoot } from "./git.ts";
 import { repairManaged } from "./managed-repair.ts";
 import { type Dropped, sandboxFilter } from "./sandbox.ts";
 import { envFilter } from "./settings-env.ts";
-import { validatorFor } from "./settings-schema.ts";
+import { hasSchemaType, validatorFor } from "./settings-schema.ts";
 
 /** Lowest precedence first, so later layers override earlier ones. */
 const PRECEDENCE: Scope[] = ["user", "project", "local", "managed"];
@@ -181,18 +181,36 @@ export async function settingsFiles(env: ScanEnv, dir: string): Promise<Settings
   return files;
 }
 
-/** What the settings schema rejects in a file, each led by the key, such as `cleanupPeriodDays must be number`. */
-function settingsErrors(data: Record<string, unknown>): string[] {
-  return Object.entries(data).flatMap(([key, value]) => {
+/**
+ * What the settings schema rejects in a file, each led by where, such as `cleanupPeriodDays must be
+ * number`. A top-level key of the wrong type is the file's top-level shape failing, which rejects
+ * the whole file; anything deeper is an entry Claude Code may skip while the rest applies. An
+ * unknown nested field is no error: Claude Code's check strips unknown keys from most objects
+ * (docs: managed-settings#find-entries-claude-code-dropped, settings#fix-a-broken-settings-file).
+ */
+function settingsErrors(data: Record<string, unknown>): { file: string[]; entries: string[] } {
+  const file: string[] = [];
+  const entries: string[] = [];
+  for (const [key, value] of Object.entries(data)) {
     const validate = validatorFor(key);
-    if (!validate) return [];
+    if (!validate) continue;
     // "manual" is an alias Claude Code accepts for "default" (docs: permission-modes).
     const checked =
       key === "permissions" && isRecord(value) && value.defaultMode === "manual"
         ? { ...value, defaultMode: "default" }
         : value;
-    return schemaErrors(validate, checked, key);
-  });
+    const errors = schemaErrors(validate, checked, key).filter(
+      (e) => !e.endsWith("must NOT have additional properties")
+    );
+    if (hasSchemaType([key], checked)) entries.push(...errors);
+    else file.push(...errors);
+  }
+  return { file, entries };
+}
+
+/** The first few errors, for a problem line. */
+function firstErrors(errors: string[]): string {
+  return errors.slice(0, 3).join("; ") + (errors.length > 3 ? "; …" : "");
 }
 
 /**
@@ -214,16 +232,17 @@ export async function readSettingsLayers(
     if (file.legacy && !result.ok && result.missing) continue;
     const layer: SettingsLayer = { scope: file.scope, path: file.path, exists: true, data: null };
     if (file.legacy) layer.legacy = true;
-    const errors = result.ok ? settingsErrors(result.data) : [];
-    if (result.ok && errors.length > 0) {
-      // A user, project or local file with a value the schema rejects is not applied at all: an
-      // interactive session offers to fix it, exit, or continue without it, and claude -p skips it
-      // (docs: settings#fix-a-broken-settings-file, managed-settings#find-entries-claude-code-dropped).
-      const shown = errors.slice(0, 3).join("; ") + (errors.length > 3 ? "; …" : "");
-      layer.error = `has a value Claude Code's settings schema rejects (${shown}), so Claude Code skips the whole file: an interactive session asks at startup whether to fix it, exit or continue without it, and claude -p skips it`;
+    const errors = result.ok ? settingsErrors(result.data) : null;
+    if (result.ok && errors && errors.file.length > 0) {
+      // A user, project or local file whose top-level shape the schema rejects is not applied at
+      // all: an interactive session offers to fix it, exit, or continue without it, and claude -p
+      // skips it (docs: settings#fix-a-broken-settings-file, managed-settings#find-entries-claude-code-dropped).
+      layer.error = `has a value Claude Code's settings schema rejects (${firstErrors(errors.file)}), so Claude Code skips the whole file: an interactive session asks at startup whether to fix it, exit or continue without it, and claude -p skips it`;
     } else if (result.ok) {
       layer.data = redactSecrets(result.data);
       unredacted.set(layer, result.data);
+      if (errors && errors.entries.length > 0)
+        layer.warning = `has entries Claude Code's settings schema rejects (${firstErrors(errors.entries)}); Claude Code may skip them with a warning, and the rest of the file applies`;
     } else if (result.missing) layer.exists = false;
     else layer.error = result.error;
     layers.push(layer);

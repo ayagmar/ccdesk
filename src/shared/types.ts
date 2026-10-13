@@ -119,6 +119,8 @@ export interface SettingsLayer {
   /** Parsed JSON with `env` and `headers` values redacted. */
   data: Record<string, unknown> | null;
   error?: string;
+  /** Entries Claude Code may skip while the rest of the file applies. */
+  warning?: string;
   /** For managed settings: a file that is not a JSON object, so Claude Code refuses to start. */
   blocksStart?: boolean;
   /**
@@ -496,6 +498,8 @@ export interface Problem {
   error: string;
   /** Claude Code refuses to start until this file is fixed, rather than skipping it. */
   blocksStart?: boolean;
+  /** Only some entries are affected; the rest of the file applies. */
+  partial?: boolean;
 }
 
 /** Something Claude Code adds to context once Claude reads or edits a file. */

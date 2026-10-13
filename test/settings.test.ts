@@ -568,3 +568,32 @@ test("a quoted managed allowManagedMcpServersOnly holds, an invalid deny list is
     credentials: { files: [{ path: "~/.aws/credentials", mode: "deny" }] },
   });
 });
+
+test("a nested field Claude Code tolerates or may skip leaves the rest of the file in effect", async () => {
+  const f = makeFixture();
+  // An unknown nested field is stripped, as Claude Code's settings check does for most objects.
+  f.json("home/.claude/settings.json", {
+    model: "opus",
+    permissions: { deny: ["Bash"] },
+    statusLine: { type: "command", command: "x", someNewerField: 1 },
+  });
+  // A nested value the schema rejects is an entry Claude Code may skip, not a reason to skip the file.
+  f.json("app/.claude/settings.json", {
+    theme: "dark",
+    permissions: { deny: ["Read"], defaultMode: "careful" },
+  });
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.equal(setting(view, "model")?.value, "opus");
+  assert.equal(setting(view, "theme")?.value, "dark");
+  const denied = view.permissions.flatMap((p) =>
+    p.kind === "rule" && p.list === "deny" ? [p.rule] : []
+  );
+  assert.deepEqual(denied.sort(), ["Bash", "Read"]);
+  assert.deepEqual(
+    view.problems.map((p) => [p.path, p.partial ?? false]),
+    [[f.at("app/.claude/settings.json"), true]]
+  );
+  assert.match(view.problems[0]?.error ?? "", /permissions\.defaultMode/);
+});
