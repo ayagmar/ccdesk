@@ -64,8 +64,8 @@ Hidden values stay hidden, so ccdesk compares them as shown: two `env` entries t
 
 The All settings section lists every key in Claude Code's settings reference, set or not, grouped by area. For each one it shows what the setting does, which files Claude Code reads it from, its documented values and default, and the value it has here. Select a key to read its documentation and, where ccdesk can write it, set it in the file you choose.
 
-Some keys cannot be set from here: keys Claude Code keeps in `~/.claude.json` (use `/config` in Claude Code), managed-only keys, nested fields such as `sandbox.network.allowedDomains` (edit the parent key), and the few documented keys that are not yet in the schema ccdesk ships with.
+Some keys cannot be set from here: keys Claude Code keeps in `~/.claude.json` (use `/config` in Claude Code), managed-only keys, nested fields such as `sandbox.network.allowedDomains` (edit the parent key), and the few documented keys that no schema ccdesk ships with defines yet.
 
 ## Where the schema comes from
 
-The schema is generated from the `Settings` type in [`@anthropic-ai/claude-agent-sdk`](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk), which is published with each Claude Code release. Which files each key is read from, and the descriptions in All settings, come from the [settings reference](https://code.claude.com/docs/en/settings-reference). A daily job regenerates both; see [Contributing](../contributing/#claude-code-data).
+The schema is generated from the `Settings` type in [`@anthropic-ai/claude-agent-sdk`](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk), which is published with each Claude Code release. For documented keys that type leaves out, such as `autoMode`, ccdesk uses the definition from [SchemaStore](https://json.schemastore.org/claude-code-settings.json), and the editor says so under the key's description. Which files each key is read from, and the descriptions in All settings, come from the [settings reference](https://code.claude.com/docs/en/settings-reference). A daily job regenerates all of them; see [Contributing](../contributing/#claude-code-data).

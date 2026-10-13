@@ -1,8 +1,9 @@
 name: Claude Code data
 
 # Claude Code's settings schema ships as the Settings type in @anthropic-ai/claude-agent-sdk,
-# which is published with every Claude Code release; which file each setting is read from and
-# the built-in tools come from the docs. This opens a PR when any of them changed.
+# which is published with every Claude Code release; SchemaStore's schema fills in documented keys
+# the SDK lacks. Which file each setting is read from and the built-in tools come from the docs.
+# This opens a PR when any of them changed.
 # PRs opened with GITHUB_TOKEN do not trigger CI by themselves; close and reopen the PR,
 # or push to it, to run CI.
 
@@ -50,9 +51,11 @@ jobs:
           LATEST: ${{ steps.sdk.outputs.latest }}
         run: |
           if [ "$CURRENT" != "$LATEST" ]; then pnpm add -D "@anthropic-ai/claude-agent-sdk@$LATEST"; fi
-          pnpm run schema
+          pnpm run schemastore
+          # The schema borrows only keys the docs list, so the catalog is regenerated first.
           pnpm run scopes
           pnpm run tools
+          pnpm run schema "$RUNNER_TEMP/schema-gaps.md"
           # The generators write JSON.stringify output; formatting it first keeps a formatting-only
           # difference from counting as a change and failing the format check.
           pnpm exec biome format --write src/shared/settings.schema.json src/shared/hook-events.json src/shared/settings-scopes.json src/shared/settings-catalog.json src/shared/builtin-tools.json
@@ -85,7 +88,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           {
-            echo "Regenerated the settings schema from @anthropic-ai/claude-agent-sdk $LATEST, and the setting scopes, settings catalog and built-in tools from the Claude Code docs. \`pnpm run check\` passed in the workflow."
+            echo "Regenerated the settings schema from @anthropic-ai/claude-agent-sdk $LATEST and SchemaStore, and the setting scopes, settings catalog and built-in tools from the Claude Code docs. \`pnpm run check\` passed in the workflow."
+            if [ -s "$RUNNER_TEMP/schema-gaps.md" ]; then
+              echo
+              echo "## Documented keys with no schema"
+              echo
+              echo "Neither the SDK nor SchemaStore defines these, so ccdesk shows them but cannot edit them:"
+              echo
+              cat "$RUNNER_TEMP/schema-gaps.md"
+            fi
             if [ -s "$RUNNER_TEMP/docs-changes.md" ]; then
               echo
               echo "## Docs sections the code follows by hand changed"
@@ -96,7 +107,7 @@ jobs:
             fi
           } > "$RUNNER_TEMP/pr-body.md"
           git switch -c "$branch"
-          git add package.json pnpm-lock.yaml src/shared/settings.schema.json src/shared/hook-events.json src/shared/settings-scopes.json src/shared/settings-catalog.json src/shared/builtin-tools.json scripts/docs-fingerprints.json
+          git add package.json pnpm-lock.yaml src/shared/settings.schema.json src/shared/hook-events.json src/shared/settings-scopes.json src/shared/settings-catalog.json src/shared/builtin-tools.json scripts/docs-fingerprints.json scripts/schemastore-claude-code-settings.json
           git commit -m "chore: update Claude Code data (claude-agent-sdk $LATEST)"
           git push origin "$branch"
           gh pr create --base master --head "$branch" \

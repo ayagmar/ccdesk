@@ -333,6 +333,24 @@ test("a settings value of the wrong type is reported and cannot be saved", async
   assert.equal(readFileSync(file, "utf8"), "{}");
 });
 
+test("autoMode, which only SchemaStore's schema defines, is editable in user settings and checked", async () => {
+  // Catches the schema losing the documented keys it borrows: autoMode would turn read-only again.
+  const dir = fixture.at("work/auto-mode");
+  fixture.json("work/auto-mode/.claude/settings.json", {});
+  const preview = (value: unknown, scope = "user") =>
+    call("/api/settings/preview", { method: "POST", body: { dir, scope, key: "autoMode", value } });
+
+  const rules = { allow: ["$defaults", "Merging directly on our repositories is authorized"] };
+  const valid = (await preview(rules)).json as Preview & { errors: string[] };
+  assert.deepEqual(valid.errors, []);
+  assert.deepEqual(JSON.parse(valid.after).autoMode, rules);
+
+  const wrong = (await preview({ allow: "everything" })).json as { errors: string[] };
+  assert.match(wrong.errors.join(), /autoMode\.allow must be array/);
+
+  assertRefused(await preview(rules, "project"), 409, /only from managed or user settings/);
+});
+
 test("saving refuses when the file changed after it was reviewed", async () => {
   const dir = fixture.at("work/raced");
   const file = fixture.json("work/raced/.claude/settings.json", { model: "opus" });

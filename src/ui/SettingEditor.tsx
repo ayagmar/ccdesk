@@ -111,6 +111,7 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
       {property && (
         <>
           {property.description && <p className="hint">{property.description}</p>}
+          {property.$comment && <p className="muted small">{property.$comment}</p>}
           <ScopeButtons
             label="File to change"
             scopes={EDITABLE_SCOPES}

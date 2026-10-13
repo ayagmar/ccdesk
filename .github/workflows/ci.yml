@@ -40,7 +40,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run check
-      # The generated settings schema must match the pinned claude-agent-sdk.
+      # The generated settings schema must match the pinned claude-agent-sdk and SchemaStore snapshot.
       - run: pnpm run schema && git diff --exit-code -- src/shared/settings.schema.json src/shared/hook-events.json
       # Install the packed tarball the way npx would, start it in an empty home and load the page
       # and its script, so a file missing from "files" fails here. Importing the package checks
