@@ -140,11 +140,12 @@ export function Contents({ text, markdown = true }: { text: string; markdown?: b
 }
 
 // A tab left open across an upgrade or rebuild asks for a chunk that is gone; show the text as written
-// rather than unmounting the page.
+// rather than unmounting the page, and log why, since a bug in the renderer would land here too.
 const MarkdownText = lazy(() =>
-  import("../MarkdownText.tsx").catch(() => ({
-    default: ({ text }: { text: string }) => <pre className="raw">{text}</pre>,
-  }))
+  import("../MarkdownText.tsx").catch((error: unknown) => {
+    console.error("ccdesk could not load the Markdown renderer; showing text as written.", error);
+    return { default: ({ text }: { text: string }) => <pre className="raw">{text}</pre> };
+  })
 );
 
 /** Markdown in the page's prose style. The renderer comes from this server, so it shows at once. */
