@@ -6,6 +6,7 @@ import {
   type SettingSchema,
   type SettingsEdit,
 } from "../shared/types.ts";
+import { firstSentence } from "../view/format.ts";
 import { lineName } from "../view/lines.ts";
 import {
   allowedValues,
@@ -527,8 +528,8 @@ function ObjectFields({
 
 /** A field's description: its first sentence, and the rest a click away. */
 function About({ text }: { text: string }) {
-  const [, first, rest] = /^(.+?\.)\s+(.+)$/s.exec(text) ?? [];
-  if (!first || !rest) return <p className="muted small">{text}</p>;
+  const [first, rest] = firstSentence(text);
+  if (!rest) return <p className="muted small">{text}</p>;
   return (
     <details className="about muted small">
       <summary>{first}</summary>
