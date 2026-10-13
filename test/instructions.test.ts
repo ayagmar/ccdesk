@@ -156,6 +156,17 @@ test("rules in the managed folder load after the managed CLAUDE.md and cannot be
   );
 });
 
+test("a file reached under two names, such as .claude/CLAUDE.md linked to CLAUDE.md, loads once", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "shared");
+  f.link("app/.claude/CLAUDE.md", "../CLAUDE.md");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(loadedPaths(view, f.root), ["app/CLAUDE.md"]);
+  assert.equal(view.context.filter((b) => b.kind === "instruction").length, 1);
+});
+
 test("paths mentioned in code spans or fences are not treated as imports", async () => {
   const f = makeFixture();
   f.write(
