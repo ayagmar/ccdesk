@@ -105,10 +105,9 @@ export async function manifestPaths(
   key: string
 ): Promise<string[] | null> {
   const value = manifest[key];
-  const list = typeof value === "string" ? [value] : Array.isArray(value) ? value : null;
-  if (!list) return null;
+  if (typeof value !== "string" && !Array.isArray(value)) return null;
   const out: string[] = [];
-  for (const item of list) {
+  for (const item of typeof value === "string" ? [value] : value) {
     if (typeof item !== "string") continue;
     const path = await inside(plugin, item);
     if (path) out.push(path);
@@ -127,8 +126,9 @@ export async function manifestConfigs(
   problems: Problem[]
 ): Promise<Array<{ value: unknown; path: string }>> {
   const value = manifest[key];
+  if (value === undefined) return [];
   const out: Array<{ value: unknown; path: string }> = [];
-  for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) {
+  for (const item of Array.isArray(value) ? value : [value]) {
     if (isRecord(item)) out.push({ value: item, path: manifestPath(plugin) });
     if (typeof item !== "string") continue;
     const path = await inside(plugin, item);

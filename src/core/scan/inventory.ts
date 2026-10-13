@@ -188,70 +188,103 @@ async function readSkills(
 
 /** A plugin's skills, agents, commands and output styles, from its folders and its manifest. */
 async function pluginEntries(env: ScanEnv, loaded: LoadedPlugin, problems: Problem[]) {
-  const { plugin } = loaded;
-  const root = plugin.installPath;
-  const options = { plugin: plugin.id, problems };
-  // `skills` adds to the default folder; the other keys replace theirs (docs: plugins-reference).
-  const extraSkills = await manifestPaths(loaded, "skills");
-  const skillDirs = [join(root, "skills"), ...(extraSkills ?? [])];
-  const rootSkill = extraSkills === null && !(await isDir(join(root, "skills")));
+  const root = loaded.plugin.installPath;
+  const options = { plugin: loaded.plugin.id, problems };
   const namespace = pluginNamespace(loaded);
-  const skills: Entry[] = [];
-  if (rootSkill)
-    for (const skill of await readSkills(env, root, "plugin", options)) {
-      // Without a name, a root SKILL.md is named after the plugin (docs: skills#how-a-skill-gets-its-command-name).
-      if (skill.folder === root && !stringField(parseFrontmatter(skill.text).data, "name"))
-        skill.name = namespace;
-      skills.push(skill);
-    }
-  for (const dir of skillDirs) skills.push(...(await readSkills(env, dir, "plugin", options)));
   const listed = async (key: string, folder: string, separator = "/") =>
     readPaths(env, (await manifestPaths(loaded, key)) ?? [join(root, folder)], "plugin", {
       ...options,
       separator,
     });
-  const commands = await listed("commands", "commands", ":");
-  for (const c of await manifestCommandMap(loaded))
-    commands.push(
-      c.text === null
-        ? ((await readEntry(env, c.path, c.name, "plugin", { ...options, isCommand: true })) ?? {
-            name: c.name,
-            description: c.description,
-            path: c.path,
-            scope: "plugin",
-            plugin: plugin.id,
-            text: "",
-          })
-        : {
-            name: c.name,
-            description: c.description,
-            path: c.path,
-            scope: "plugin",
-            plugin: plugin.id,
-            text: c.text,
-          }
-    );
+  const skills = await pluginSkills(env, loaded, problems);
+  const commands = [
+    ...(await listed("commands", "commands", ":")),
+    ...(await manifestCommands(env, loaded, problems)),
+  ];
   // A plugin's skills and commands are called as plugin-name:name; a name that already has the
   // prefix keeps it once (docs: skills#how-a-skill-gets-its-command-name).
   for (const entry of [...skills, ...commands])
     entry.id = entry.name.startsWith(`${namespace}:`) ? entry.name : `${namespace}:${entry.name}`;
-  // A plugin subagent is named with the plugin and its subfolders (docs: sub-agents#choose-the-subagent-scope).
+  return {
+    skills,
+    agents: await pluginAgents(env, loaded, problems),
+    commands,
+    outputStyles: await listed("outputStyles", "output-styles"),
+  };
+}
+
+/** A plugin's skills: its skills folder, the manifest's extra ones, or a SKILL.md at its root. */
+async function pluginSkills(
+  env: ScanEnv,
+  loaded: LoadedPlugin,
+  problems: Problem[]
+): Promise<Entry[]> {
+  const root = loaded.plugin.installPath;
+  const options = { plugin: loaded.plugin.id, problems };
+  // `skills` adds to the default folder; the other keys replace theirs (docs: plugins-reference).
+  const extraSkills = await manifestPaths(loaded, "skills");
+  const skillDirs = [join(root, "skills"), ...(extraSkills ?? [])];
+  const rootSkill = extraSkills === null && !(await isDir(join(root, "skills")));
+  const skills: Entry[] = [];
+  if (rootSkill)
+    for (const skill of await readSkills(env, root, "plugin", options)) {
+      // Without a name, a root SKILL.md is named after the plugin (docs: skills#how-a-skill-gets-its-command-name).
+      if (skill.folder === root && !stringField(parseFrontmatter(skill.text).data, "name"))
+        skill.name = pluginNamespace(loaded);
+      skills.push(skill);
+    }
+  for (const dir of skillDirs) skills.push(...(await readSkills(env, dir, "plugin", options)));
+  return skills;
+}
+
+/** The commands a plugin's manifest names with their own file or text. */
+async function manifestCommands(
+  env: ScanEnv,
+  loaded: LoadedPlugin,
+  problems: Problem[]
+): Promise<Entry[]> {
+  const plugin = loaded.plugin.id;
+  const commands: Entry[] = [];
+  for (const c of await manifestCommandMap(loaded)) {
+    const listed: Entry = {
+      name: c.name,
+      description: c.description,
+      path: c.path,
+      scope: "plugin",
+      plugin,
+      text: c.text ?? "",
+    };
+    const read =
+      c.text === null
+        ? await readEntry(env, c.path, c.name, "plugin", { plugin, problems, isCommand: true })
+        : null;
+    commands.push(read ?? listed);
+  }
+  return commands;
+}
+
+/** A plugin's subagents, named with the plugin and its subfolders (docs: sub-agents#choose-the-subagent-scope). */
+async function pluginAgents(
+  env: ScanEnv,
+  loaded: LoadedPlugin,
+  problems: Problem[]
+): Promise<Entry[]> {
+  const root = loaded.plugin.installPath;
+  const namespace = pluginNamespace(loaded);
   const agents: Entry[] = [];
   for (const path of (await manifestPaths(loaded, "agents")) ?? [join(root, "agents")]) {
     const folder = (await isDir(path)) ? path : null;
-    for (const agent of await readPaths(env, [path], "plugin", options)) {
+    for (const agent of await readPaths(env, [path], "plugin", {
+      plugin: loaded.plugin.id,
+      problems,
+    })) {
       const subfolders = folder ? relative(folder, dirname(agent.path)).split(/[/\\]/) : [];
       const own = agent.name.split("/").at(-1) ?? agent.name;
       agent.id = [namespace, ...subfolders.filter(Boolean), own].join(":");
       agents.push(agent);
     }
   }
-  return {
-    skills,
-    agents,
-    commands,
-    outputStyles: await listed("outputStyles", "output-styles"),
-  };
+  return agents;
 }
 
 interface InventoryInput {
@@ -502,32 +535,39 @@ async function readHooks(input: InventoryInput, plugins: LoadedPlugin[]): Promis
 
 function hooksFrom(config: unknown, source: Source, sourcePath: string, plugin?: Plugin): Hook[] {
   if (!isRecord(config)) return [];
-  const out: Hook[] = [];
-  for (const [event, groups] of Object.entries(config)) {
-    if (!Array.isArray(groups)) continue;
-    for (const [g, group] of groups.entries()) {
-      if (!isRecord(group) || !Array.isArray(group.hooks)) continue;
-      for (const [index, h] of group.hooks.entries()) {
-        if (!isRecord(h)) continue;
-        const entry: Hook = {
-          event,
-          type: stringField(h, "type") || "command",
-          command:
-            stringField(h, "command") ||
-            stringField(h, "prompt") ||
-            shownUrl(stringField(h, "url")),
-          source,
-          sourcePath,
-          active: true,
-          at: { group: g, index },
-          definition: redactSecrets(h),
-        };
-        const matcher = stringField(group, "matcher");
-        if (matcher) entry.matcher = matcher;
-        if (plugin) entry.plugin = plugin.id;
-        out.push(entry);
-      }
-    }
-  }
-  return out;
+  return Object.entries(config).flatMap(([event, groups]) =>
+    Array.isArray(groups)
+      ? groups.flatMap((group, g) => groupHooks(event, g, group, source, sourcePath, plugin))
+      : []
+  );
+}
+
+/** The hooks of one matcher group, each with where it sits so an edit can find it again. */
+function groupHooks(
+  event: string,
+  g: number,
+  group: unknown,
+  source: Source,
+  sourcePath: string,
+  plugin?: Plugin
+): Hook[] {
+  if (!isRecord(group) || !Array.isArray(group.hooks)) return [];
+  const matcher = stringField(group, "matcher");
+  return group.hooks.flatMap((h: unknown, index): Hook[] => {
+    if (!isRecord(h)) return [];
+    const entry: Hook = {
+      event,
+      type: stringField(h, "type") || "command",
+      command:
+        stringField(h, "command") || stringField(h, "prompt") || shownUrl(stringField(h, "url")),
+      source,
+      sourcePath,
+      active: true,
+      at: { group: g, index },
+      definition: redactSecrets(h),
+    };
+    if (matcher) entry.matcher = matcher;
+    if (plugin) entry.plugin = plugin.id;
+    return [entry];
+  });
 }

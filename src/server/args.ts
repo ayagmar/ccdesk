@@ -62,9 +62,7 @@ export function parse(argv: string[]): Command {
   if (values.help) return { command: "help" };
 
   const [first, ...rest] = positionals;
-  const name =
-    first === undefined ? "serve" : first === "scan" || first === "explain" ? first : null;
-  if (name === null) throw usage(`unknown command ${first}`);
+  const name = commandOf(first);
   for (const flag of Object.keys(values) as Flag[])
     if (!FLAGS[name].includes(flag))
       throw usage(`--${flag} does not go with ${name === "serve" ? "the page" : name}`);
@@ -81,16 +79,29 @@ export function parse(argv: string[]): Command {
     return { command: "explain", file, dir: values.dir, configDir };
   }
 
-  const port = values.port ? Number(values.port) : values.dev ? DEV_PORT : 0;
-  if (!Number.isInteger(port) || port < 0 || port > 65535)
-    throw usage(`invalid --port ${values.port}`);
   return {
     command: "serve",
-    port,
+    port: portOf(values),
     configDir,
     open: values.open ?? true,
     dev: values.dev ?? false,
   };
+}
+
+/** The command the first word names; without one, the page. */
+function commandOf(first: string | undefined): keyof typeof FLAGS {
+  if (first === undefined) return "serve";
+  if (first === "scan" || first === "explain") return first;
+  throw usage(`unknown command ${first}`);
+}
+
+/** The port to serve on: --port, the dev server's with --dev, or else any free one. */
+function portOf(values: ReturnType<typeof options>["values"]): number {
+  if (!values.port) return values.dev ? DEV_PORT : 0;
+  const port = Number(values.port);
+  if (!Number.isInteger(port) || port < 0 || port > 65535)
+    throw usage(`invalid --port ${values.port}`);
+  return port;
 }
 
 function usage(message: string): UsageError {

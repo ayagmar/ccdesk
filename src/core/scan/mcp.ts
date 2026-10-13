@@ -51,6 +51,17 @@ interface Defined {
   organisation: boolean;
 }
 
+/** What the page shows a server connects to: its URL, or its command line with values hidden. */
+function targetOf(
+  url: string | null,
+  command: string[] | null,
+  definition: Record<string, unknown>
+): string {
+  if (url) return shownUrl(url);
+  if (!command) return "";
+  return [command[0], ...stringsIn(definition.args)].join(" ");
+}
+
 function define(
   servers: unknown,
   scope: McpServer["scope"],
@@ -71,11 +82,7 @@ function define(
       scope,
       // An entry without a type is read as stdio, even one with a url (docs: mcp).
       transport: type || "stdio",
-      target: url
-        ? shownUrl(url)
-        : command
-          ? [command[0], ...stringsIn(definition.args)].join(" ")
-          : "",
+      target: targetOf(url, command, definition),
       sourcePath,
       status: "active",
       definition,
@@ -173,6 +180,11 @@ function policyEntries(value: unknown): PolicyEntry[] {
 }
 
 /** A `serverUrl` pattern (docs: managed-mcp#how-serverurl-entries-match). */
+const DEFAULT_PORTS = new Map([
+  ["https", "443"],
+  ["http", "80"],
+]);
+
 function urlMatches(pattern: string, url: string): boolean {
   const p = /^([^:/]+):\/\/([^/:]+)(?::([^/]*))?(\/.*)?$/.exec(pattern);
   let u: URL;
@@ -186,7 +198,7 @@ function urlMatches(pattern: string, url: string): boolean {
   const scheme_ = u.protocol.slice(0, -1);
   if (!wildcard(scheme).test(scheme_)) return false;
   if (!wildcard(host.replace(/\.$/, ""), "i").test(u.hostname.replace(/\.$/, ""))) return false;
-  const actualPort = u.port || (scheme_ === "https" ? "443" : scheme_ === "http" ? "80" : "");
+  const actualPort = u.port || (DEFAULT_PORTS.get(scheme_) ?? "");
   // No port: a full hostname means the default port only, a wildcard hostname any port.
   if (port !== undefined) {
     if (!wildcard(port).test(actualPort)) return false;
@@ -228,7 +240,7 @@ interface Input {
  * server is one that is configured and allowed, not one that is known to work.
  */
 export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Promise<McpServer[]> {
-  const { env, projectDir, layers, claudeJson, trust, profile, problems } = input;
+  const { env, layers, claudeJson, trust, profile, problems } = input;
   const projects = isRecord(claudeJson?.projects) ? claudeJson.projects : {};
   // Local servers live in the entry under the trust key, even from a subdirectory: claude mcp add
   // --scope local writes there and claude mcp list reads only that entry, ignoring one for the
@@ -236,82 +248,19 @@ export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Pro
   const entry = projects[trust.root];
   const project: Record<string, unknown> = isRecord(entry) ? entry : {};
 
-  const managed = layers.find((l) => l.scope === "managed");
-  // Checked as written: the layer has header values hidden, which would hide a ${VAR} in one.
-  const managedServers = input.managed?.managedMcpServers;
   const managedFile = join(env.managedDir, "managed-mcp.json");
   const managedJson = await readJsonOrReport(env, managedFile, problems);
-  const mcpJson = join(projectDir, ".mcp.json");
-  const shared = await readJsonOrReport(env, mcpJson, problems);
-  const defined: Defined[] = [
-    ...(managedJson ? define(managedJson.mcpServers, "managed", managedFile, true) : []),
-    ...defineManaged(managedServers, managed?.path ?? ""),
-    ...define(project.mcpServers, "local", env.claudeJson),
-    ...(shared ? define(shared.mcpServers, "project", mcpJson) : []),
-    ...define(claudeJson?.mcpServers, "user", env.claudeJson),
+  const defined = [
+    ...(await configuredServers(input, project, managedFile, managedJson)),
+    ...(await pluginServers(env, plugins, problems)),
   ];
-  for (const loaded of plugins) {
-    const { plugin } = loaded;
-    const path = join(plugin.installPath, ".mcp.json");
-    const file = await readJsonOrReport(env, path, problems);
-    // A server name declared later in the same plugin replaces an earlier one.
-    const own = new Map<string, Defined>();
-    const add = (list: Defined[]) => {
-      for (const d of list) own.set(d.server.name, d);
-    };
-    if (file) add(define(file.mcpServers ?? file, "plugin", path));
-    for (const part of await manifestConfigs(env, loaded, "mcpServers", problems))
-      add(define(part.value, "plugin", part.path));
-    for (const d of own.values()) d.server.plugin = plugin.id;
-    defined.push(...own.values());
-  }
-
   // A managed-mcp.json that does not parse is reported; ccdesk cannot tell which servers it lists,
   // so it does not show it taking control.
   const exclusive = managedJson !== null;
-  const denied = layers.flatMap((l) => policyEntries(l.data?.deniedMcpServers));
-  const managedOnly = managed?.data?.allowManagedMcpServersOnly === true;
-  const allowLayers = layers.filter((l) => !managedOnly || l.scope === "managed");
-  const allowSet = allowLayers.some((l) => Array.isArray(l.data?.allowedMcpServers));
-  const allowList = allowLayers.flatMap((l) => policyEntries(l.data?.allowedMcpServers));
-
+  const policy = policyOf(layers);
   const disabledHere = stringsIn(project.disabledMcpServers);
-  // A cloned repository cannot approve its own servers: project and local approvals count once the
-  // folder is trusted, local ones in your configuration home right away (docs: mcp#project-server-approvals-and-workspace-trust).
-  // A disabledMcpjsonServers entry in any file rejects the server.
-  const approvalCounts = (scope: Scope) =>
-    (scope !== "project" && scope !== "local") ||
-    trust.trusted ||
-    (scope === "local" && isConfigHome(env, projectDir));
-  // Your answers to the .mcp.json prompt sit in the project entry: claude mcp list counts an
-  // enableAllProjectMcpServers there, and claude mcp reset-project-choices clears it (v2.1.296).
-  const sources: Array<{
-    source: McpApproval["source"];
-    path: string;
-    data: Record<string, unknown>;
-  }> = [
-    ...layers.flatMap((l) => (l.data ? [{ source: l.scope, path: l.path, data: l.data }] : [])),
-    { source: "claude-json", path: env.claudeJson, data: project },
-  ];
-  const answersFor = (name: string): McpApproval[] =>
-    sources.flatMap(({ source, path, data }) => {
-      const counts = source === "claude-json" || approvalCounts(source);
-      const out: McpApproval[] = [];
-      if (data.enableAllProjectMcpServers === true)
-        out.push({ key: "enableAllProjectMcpServers", source, path, counts });
-      if (stringsIn(data.enabledMcpjsonServers).includes(name))
-        out.push({ key: "enabledMcpjsonServers", source, path, counts });
-      if (stringsIn(data.disabledMcpjsonServers).includes(name))
-        out.push({ key: "disabledMcpjsonServers", source, path, counts: true });
-      return out;
-    });
-  const from = (a: McpApproval) =>
-    a.source === "claude-json" ? "your answer in ~/.claude.json" : `${a.source} settings`;
+  const answersFor = approvalAnswers(input, project);
 
-  const set = (server: McpServer, status: McpServer["status"], note: string) => {
-    server.status = status;
-    server.note = note;
-  };
   const byName = new Map<string, Defined>();
   const enabledEndpoints = new Map<string, Defined>();
   for (const d of defined) {
@@ -333,38 +282,152 @@ export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Pro
       continue;
     }
     if (server.scope !== "plugin") byName.set(server.name, d);
-    if (denied.some((e) => matches(e, d))) set(server, "blocked", "Blocked by deniedMcpServers");
-    else if (allowSet && !d.organisation && !allowed(allowList, d))
-      set(
-        server,
-        "blocked",
-        managedOnly ? "Not in the managed allowedMcpServers" : "Not in allowedMcpServers"
-      );
+    const blocked = policy.blocks(d);
+    if (blocked) set(server, "blocked", blocked);
     else if (disabledHere.includes(server.name))
       set(server, "disabled", "Turned off for this project in /mcp");
-    else if (server.scope === "project") {
-      const answers = answersFor(server.name);
-      if (answers.length > 0) server.approvals = answers;
-      const rejection = answers.find((a) => a.key === "disabledMcpjsonServers");
-      const waiting = answers.find((a) => a.key !== "disabledMcpjsonServers" && !a.counts);
-      const approved = answers.some((a) => a.key !== "disabledMcpjsonServers" && a.counts);
-      if (rejection)
-        set(server, "rejected", `Rejected by disabledMcpjsonServers in ${from(rejection)}`);
-      // claude -p connects them without asking, approved or not (docs: permissions#what-runs-before-you-trust-a-folder).
-      else if (!approved && profile === "print")
-        server.note =
-          "Not approved, but claude -p connects .mcp.json servers without asking; the SDK does when settingSources includes project";
-      else if (!approved)
-        set(
-          server,
-          "pending",
-          waiting
-            ? `Claude Code asks before starting it: ${waiting.key} in ${from(waiting)} counts once you trust this folder`
-            : "Claude Code asks before starting servers from .mcp.json: answer its prompt, or list the server in enabledMcpjsonServers in your user settings"
-        );
-    }
+    else if (server.scope === "project") approve(server, answersFor(server.name), profile);
     if (server.status === "active" || server.status === "pending")
       enabledEndpoints.set(endpoint(d), d);
   }
   return defined.map((d) => d.server);
+}
+
+function set(server: McpServer, status: McpServer["status"], note: string): void {
+  server.status = status;
+  server.note = note;
+}
+
+/** The servers your settings, ~/.claude.json and the project define, in precedence order. */
+async function configuredServers(
+  input: Input,
+  project: Record<string, unknown>,
+  managedFile: string,
+  managedJson: Record<string, unknown> | null
+): Promise<Defined[]> {
+  const { env, projectDir, layers, claudeJson, problems } = input;
+  const managed = layers.find((l) => l.scope === "managed");
+  const mcpJson = join(projectDir, ".mcp.json");
+  const shared = await readJsonOrReport(env, mcpJson, problems);
+  return [
+    ...(managedJson ? define(managedJson.mcpServers, "managed", managedFile, true) : []),
+    // Checked as written: the layer has header values hidden, which would hide a ${VAR} in one.
+    ...defineManaged(input.managed?.managedMcpServers, managed?.path ?? ""),
+    ...define(project.mcpServers, "local", env.claudeJson),
+    ...(shared ? define(shared.mcpServers, "project", mcpJson) : []),
+    ...define(claudeJson?.mcpServers, "user", env.claudeJson),
+  ];
+}
+
+/** The servers each enabled plugin brings, from its .mcp.json and its manifest. */
+async function pluginServers(
+  env: ScanEnv,
+  plugins: LoadedPlugin[],
+  problems: Problem[]
+): Promise<Defined[]> {
+  const defined: Defined[] = [];
+  for (const loaded of plugins) {
+    const { plugin } = loaded;
+    const path = join(plugin.installPath, ".mcp.json");
+    const file = await readJsonOrReport(env, path, problems);
+    // A server name declared later in the same plugin replaces an earlier one.
+    const own = new Map<string, Defined>();
+    const add = (list: Defined[]) => {
+      for (const d of list) own.set(d.server.name, d);
+    };
+    if (file) add(define(file.mcpServers ?? file, "plugin", path));
+    for (const part of await manifestConfigs(env, loaded, "mcpServers", problems))
+      add(define(part.value, "plugin", part.path));
+    for (const d of own.values()) d.server.plugin = plugin.id;
+    defined.push(...own.values());
+  }
+  return defined;
+}
+
+/** deniedMcpServers and allowedMcpServers across the settings: why a server is blocked, if it is. */
+function policyOf(layers: SettingsLayer[]): { blocks: (d: Defined) => string | null } {
+  const denied = layers.flatMap((l) => policyEntries(l.data?.deniedMcpServers));
+  const managedOnly =
+    layers.find((l) => l.scope === "managed")?.data?.allowManagedMcpServersOnly === true;
+  const allowLayers = layers.filter((l) => !managedOnly || l.scope === "managed");
+  const allowSet = allowLayers.some((l) => Array.isArray(l.data?.allowedMcpServers));
+  const allowList = allowLayers.flatMap((l) => policyEntries(l.data?.allowedMcpServers));
+  return {
+    blocks: (d) => {
+      if (denied.some((e) => matches(e, d))) return "Blocked by deniedMcpServers";
+      if (allowSet && !d.organisation && !allowed(allowList, d))
+        return managedOnly ? "Not in the managed allowedMcpServers" : "Not in allowedMcpServers";
+      return null;
+    },
+  };
+}
+
+/**
+ * The answers about a .mcp.json server, each with whether it counts here. A cloned repository
+ * cannot approve its own servers: project and local approvals count once the folder is trusted,
+ * local ones in your configuration home right away (docs: mcp#project-server-approvals-and-workspace-trust).
+ * A disabledMcpjsonServers entry in any file rejects the server. Your answers to the .mcp.json
+ * prompt sit in the project entry: claude mcp list counts an enableAllProjectMcpServers there, and
+ * claude mcp reset-project-choices clears it (v2.1.296).
+ */
+function approvalAnswers(
+  input: Input,
+  project: Record<string, unknown>
+): (name: string) => McpApproval[] {
+  const { env, projectDir, layers, trust } = input;
+  const approvalCounts = (scope: Scope) =>
+    (scope !== "project" && scope !== "local") ||
+    trust.trusted ||
+    (scope === "local" && isConfigHome(env, projectDir));
+  const sources: Array<{
+    source: McpApproval["source"];
+    path: string;
+    data: Record<string, unknown>;
+  }> = [
+    ...layers.flatMap((l) => (l.data ? [{ source: l.scope, path: l.path, data: l.data }] : [])),
+    { source: "claude-json", path: env.claudeJson, data: project },
+  ];
+  return (name) =>
+    sources.flatMap(({ source, path, data }) => {
+      const counts = source === "claude-json" || approvalCounts(source);
+      const out: McpApproval[] = [];
+      if (data.enableAllProjectMcpServers === true)
+        out.push({ key: "enableAllProjectMcpServers", source, path, counts });
+      if (stringsIn(data.enabledMcpjsonServers).includes(name))
+        out.push({ key: "enabledMcpjsonServers", source, path, counts });
+      if (stringsIn(data.disabledMcpjsonServers).includes(name))
+        out.push({ key: "disabledMcpjsonServers", source, path, counts: true });
+      return out;
+    });
+}
+
+/** Where an approval answer was given, as the page names it. */
+function answerSource(a: McpApproval): string {
+  return a.source === "claude-json" ? "your answer in ~/.claude.json" : `${a.source} settings`;
+}
+
+/** Marks a .mcp.json server rejected, waiting for approval, or left active by its answers. */
+function approve(server: McpServer, answers: McpApproval[], profile: SessionProfile): void {
+  if (answers.length > 0) server.approvals = answers;
+  const rejection = answers.find((a) => a.key === "disabledMcpjsonServers");
+  const waiting = answers.find((a) => a.key !== "disabledMcpjsonServers" && !a.counts);
+  const approved = answers.some((a) => a.key !== "disabledMcpjsonServers" && a.counts);
+  if (rejection) {
+    set(server, "rejected", `Rejected by disabledMcpjsonServers in ${answerSource(rejection)}`);
+    return;
+  }
+  if (approved) return;
+  // claude -p connects them without asking, approved or not (docs: permissions#what-runs-before-you-trust-a-folder).
+  if (profile === "print") {
+    server.note =
+      "Not approved, but claude -p connects .mcp.json servers without asking; the SDK does when settingSources includes project";
+    return;
+  }
+  set(
+    server,
+    "pending",
+    waiting
+      ? `Claude Code asks before starting it: ${waiting.key} in ${answerSource(waiting)} counts once you trust this folder`
+      : "Claude Code asks before starting servers from .mcp.json: answer its prompt, or list the server in enabledMcpjsonServers in your user settings"
+  );
 }

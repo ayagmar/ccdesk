@@ -254,90 +254,91 @@ export function effectiveSettings(layers: SettingsLayer[]): EffectiveSetting[] {
   const filterSandbox = sandboxFilter((key, scope) =>
     allowedScopes(key).includes(scope) ? byScope.get(scope)?.[key] : undefined
   );
-  const out: EffectiveSetting[] = [];
-  for (const key of [...keys].sort()) {
-    const allowed = allowedScopes(key);
-    const present = PRECEDENCE.filter((scope) => byScope.get(scope)?.[key] !== undefined);
-    const valueIn = (scope: Scope) => byScope.get(scope)?.[key];
-    const ignored = present
-      .filter((scope) => !allowed.includes(scope))
-      .map((scope) => ({ scope, value: valueIn(scope), reason: ignoredReason(key) }));
-    let defined = present.filter((scope) => allowed.includes(scope));
-    // A managed availableModels list is applied as-is; other files' entries are ignored.
-    if (key === "availableModels" && defined.includes("managed")) {
-      for (const scope of defined.filter((s) => s !== "managed"))
-        ignored.push({
-          scope,
-          value: valueIn(scope),
-          reason: "Managed settings set availableModels, so Claude Code uses that list as-is",
-        });
-      defined = ["managed"];
-    }
-    if (defined.length === 0) {
-      out.push({ key, value: undefined, from: [], merged: false, overridden: [], ignored });
-      continue;
-    }
-    const values = defined.map((scope) => {
-      const { value, dropped } = withoutIgnoredFields(key, scope, valueIn(scope), filterSandbox);
-      for (const d of dropped) ignored.push({ scope, ...d });
-      return { scope, value };
-    });
-    const top = values[values.length - 1];
-    if (!top) continue;
-    const mergeable =
-      !WHOLE_VALUE_KEYS.has(key) &&
-      values.every((v) => Array.isArray(v.value) || isRecord(v.value));
-    const strict = STRICTEST[key];
-    const decided = strict && strictWinner(strict, values);
-    if (strict && decided) {
-      const { winner } = decided;
-      // Only files that may just tighten it set the key, and none tightens it past the default.
-      if (!winner)
-        for (const v of values)
-          ignored.push({ ...v, reason: "it is not stricter than Claude Code's default" });
-      out.push({
-        key,
-        value: winner?.value,
-        from: winner ? [winner.scope] : [],
-        merged: false,
-        overridden: winner ? values.filter((v) => v !== winner).reverse() : [],
-        ignored,
-        note: strictNote(strict),
-      });
-    } else if (mergeable && values.length > 1) {
-      out.push({
-        key,
-        value: withStrictFields(
-          key,
-          values.slice(1).reduce((acc, v) => mergeKey(key, acc, v.value), values[0]?.value),
-          values
-        ),
-        from: defined,
-        merged: true,
-        overridden: [],
-        ignored,
-      });
-    } else if (isRecord(top.value)) {
-      out.push({
-        key,
-        value: withStrictFields(key, top.value, values),
-        from: [top.scope],
-        merged: false,
-        overridden: values.slice(0, -1).reverse(),
-        ignored,
-      });
-    } else {
-      out.push({
-        key,
-        value: top.value,
-        from: [top.scope],
-        merged: false,
-        overridden: values.slice(0, -1).reverse(),
-        ignored,
-      });
-    }
+  return [...keys]
+    .sort()
+    .map((key) => effectiveSetting(key, (scope) => byScope.get(scope)?.[key], filterSandbox));
+}
+
+/** One key's value, from its value in each scope, lowest precedence first. */
+function effectiveSetting(
+  key: string,
+  valueIn: (scope: Scope) => unknown,
+  filterSandbox: ReturnType<typeof sandboxFilter>
+): EffectiveSetting {
+  const { defined, ignored } = scopesThatCount(key, valueIn);
+  const values = defined.map((scope) => {
+    const { value, dropped } = withoutIgnoredFields(key, scope, valueIn(scope), filterSandbox);
+    for (const d of dropped) ignored.push({ scope, ...d });
+    return { scope, value };
+  });
+  const top = values.at(-1);
+  if (!top) return { key, value: undefined, from: [], merged: false, overridden: [], ignored };
+  const strict = STRICTEST[key];
+  const decided = strict && strictWinner(strict, values);
+  if (strict && decided) {
+    const { winner } = decided;
+    // Only files that may just tighten it set the key, and none tightens it past the default.
+    if (!winner)
+      for (const v of values)
+        ignored.push({ ...v, reason: "it is not stricter than Claude Code's default" });
+    return {
+      key,
+      value: winner?.value,
+      from: winner ? [winner.scope] : [],
+      merged: false,
+      overridden: winner ? values.filter((v) => v !== winner).reverse() : [],
+      ignored,
+      note: strictNote(strict),
+    };
   }
-  return out;
+  const mergeable =
+    !WHOLE_VALUE_KEYS.has(key) && values.every((v) => Array.isArray(v.value) || isRecord(v.value));
+  if (mergeable && values.length > 1)
+    return {
+      key,
+      value: withStrictFields(
+        key,
+        values.slice(1).reduce((acc, v) => mergeKey(key, acc, v.value), values[0]?.value),
+        values
+      ),
+      from: defined,
+      merged: true,
+      overridden: [],
+      ignored,
+    };
+  return {
+    key,
+    value: withStrictFields(key, top.value, values),
+    from: [top.scope],
+    merged: false,
+    overridden: values.slice(0, -1).reverse(),
+    ignored,
+  };
+}
+
+/**
+ * The scopes whose value for `key` counts, lowest precedence first, and the values Claude Code
+ * ignores: ones from files the key is not read from, and, once managed settings set
+ * availableModels, every other file's list, since Claude Code uses the managed one as-is.
+ */
+function scopesThatCount(
+  key: string,
+  valueIn: (scope: Scope) => unknown
+): { defined: Scope[]; ignored: EffectiveSetting["ignored"] } {
+  const allowed = allowedScopes(key);
+  const present = PRECEDENCE.filter((scope) => valueIn(scope) !== undefined);
+  const ignored = present
+    .filter((scope) => !allowed.includes(scope))
+    .map((scope) => ({ scope, value: valueIn(scope), reason: ignoredReason(key) }));
+  const defined = present.filter((scope) => allowed.includes(scope));
+  if (key !== "availableModels" || !defined.includes("managed")) return { defined, ignored };
+  for (const scope of defined.filter((s) => s !== "managed"))
+    ignored.push({
+      scope,
+      value: valueIn(scope),
+      reason: "Managed settings set availableModels, so Claude Code uses that list as-is",
+    });
+  return { defined: ["managed"], ignored };
 }
 
 /** An object setting with each nested strictness exception (such as permissions.x) applied. */

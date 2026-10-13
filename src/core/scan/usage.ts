@@ -100,7 +100,7 @@ export function usageCounter() {
    * rejects with CountStopped and the next one starts, even if a read of the stopped count never
    * returns.
    */
-  return function readUsage(
+  return function countUsage(
     env: ScanEnv,
     dir: string,
     rules: RuleInEffect[],
@@ -186,10 +186,7 @@ async function count(
   const folders = repository ? checkouts : [dir];
   const projects = join(env.claudeDir, "projects");
   const storeNames = await listDir(projects);
-  const taken = new Set<string>();
-  const calls: Call[] = [];
-  const counted = new Set<string>();
-  let sessions = 0;
+  const tally: Tally = { taken: new Set(), calls: [], sessions: 0 };
   for (const folder of folders) {
     const own = storeDirName(folder);
     // Sessions started in a subfolder or a nested worktree have their own store, named with the
@@ -202,24 +199,14 @@ async function count(
     for (const name of stores) {
       const store = join(projects, name);
       const files = await transcriptsIn(store);
-      for (const [file, session] of files) {
-        if (taken.has(file)) continue;
-        // A subagent's session decides; one whose session file is gone goes by its own start.
-        const start =
-          (await transcript(transcripts, env, session, signal))?.startCwd ??
-          (await transcript(transcripts, env, file, signal))?.startCwd;
-        if (start ? !isWithin(folder, start) : name !== own) continue;
-        taken.add(file);
-        counted.add(file);
-        calls.push(...((await transcript(transcripts, env, file, signal))?.calls ?? []));
-        if (file === session) sessions++;
-      }
+      await countStore(transcripts, env, signal, tally, folder, files, name === own);
       checkStopped(signal);
       for (const path of transcripts.keys())
         if (path.startsWith(store + sep) && !files.has(path)) transcripts.delete(path);
     }
   }
-  trimCache(transcripts, counted, maxCachedCalls);
+  const { calls, sessions } = tally;
+  trimCache(transcripts, tally.taken, maxCachedCalls);
   return {
     sessions,
     repository,
@@ -228,6 +215,39 @@ async function count(
     approvals: approvals(calls, rules),
     matches: Object.fromEntries(rules.map((r) => [r.rule, matchCount(r, calls)])),
   };
+}
+
+/** What a count has found so far: the transcripts it took, their calls, and how many sessions. */
+interface Tally {
+  taken: Set<string>;
+  calls: Call[];
+  sessions: number;
+}
+
+/**
+ * Adds the transcripts in one store whose session started in `folder`. A subagent's session
+ * decides; one whose session file is gone goes by its own start, or, without one, by whether the
+ * store is the folder's own.
+ */
+async function countStore(
+  transcripts: Cache,
+  env: ScanEnv,
+  signal: AbortSignal,
+  tally: Tally,
+  folder: string,
+  files: Map<string, string>,
+  ownStore: boolean
+): Promise<void> {
+  for (const [file, session] of files) {
+    if (tally.taken.has(file)) continue;
+    const start =
+      (await transcript(transcripts, env, session, signal))?.startCwd ??
+      (await transcript(transcripts, env, file, signal))?.startCwd;
+    if (start ? !isWithin(folder, start) : !ownStore) continue;
+    tally.taken.add(file);
+    tally.calls.push(...((await transcript(transcripts, env, file, signal))?.calls ?? []));
+    if (file === session) tally.sessions++;
+  }
 }
 
 /** Drops the least recently counted transcripts over the limit, keeping those just counted. */
@@ -319,10 +339,10 @@ async function readFrom(
 }
 
 /** Takes the tool calls from an assistant line and your answers from a tool result line. */
-function read(line: string, transcript: Transcript): void {
+function read(line: string, into: Transcript): void {
   const hasCall = line.includes('"tool_use"');
   const hasDecision = line.includes('"permissionDecision"');
-  const hasStart = !transcript.startCwd && line.includes('"cwd"');
+  const hasStart = !into.startCwd && line.includes('"cwd"');
   if (!hasCall && !hasDecision && !hasStart) return;
   let record: unknown;
   try {
@@ -331,27 +351,34 @@ function read(line: string, transcript: Transcript): void {
     return;
   }
   if (!isRecord(record)) return;
-  if (!transcript.startCwd && typeof record.cwd === "string") transcript.startCwd = record.cwd;
+  if (!into.startCwd && typeof record.cwd === "string") into.startCwd = record.cwd;
   if (!isRecord(record.message)) return;
   const content = record.message.content;
   if (!Array.isArray(content)) return;
+  if (record.type === "assistant") readCalls(record, content, into);
+  else if (record.type === "user") readDecision(record, content, into);
+}
+
+/** The tool calls in an assistant line. */
+function readCalls(record: Record<string, unknown>, content: unknown[], into: Transcript): void {
   const at = typeof record.timestamp === "string" ? record.timestamp : "";
-  if (record.type === "assistant") {
-    for (const block of content) {
-      if (!isRecord(block) || block.type !== "tool_use") continue;
-      if (typeof block.id !== "string" || typeof block.name !== "string") continue;
-      const call = callOf(block.name, isRecord(block.input) ? block.input : {}, at);
-      transcript.calls.push(call);
-      transcript.byId.set(block.id, call);
-    }
-    return;
+  for (const block of content) {
+    if (!isRecord(block) || block.type !== "tool_use") continue;
+    if (typeof block.id !== "string" || typeof block.name !== "string") continue;
+    const call = callOf(block.name, isRecord(block.input) ? block.input : {}, at);
+    into.calls.push(call);
+    into.byId.set(block.id, call);
   }
+}
+
+/** Your answer to the calls a tool result line answers, when you gave it by hand. */
+function readDecision(record: Record<string, unknown>, content: unknown[], into: Transcript): void {
   const decision = record.permissionDecision;
-  if (record.type !== "user" || !isRecord(decision)) return;
+  if (!isRecord(decision)) return;
   if (typeof decision.source !== "string" || !decision.source.startsWith("user")) return;
   for (const block of content) {
     if (!isRecord(block) || block.type !== "tool_result") continue;
-    const call = typeof block.tool_use_id === "string" && transcript.byId.get(block.tool_use_id);
+    const call = typeof block.tool_use_id === "string" && into.byId.get(block.tool_use_id);
     if (call) call.byYou = decision.decision === "accept";
   }
 }

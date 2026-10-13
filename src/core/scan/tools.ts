@@ -58,6 +58,28 @@ function matcherCovers(matcher: string | undefined, name: string): boolean {
   }
 }
 
+/**
+ * The rules about one tool: `whole` name the tool itself and decide it, `scoped` apply to some of
+ * its calls only. EndConversation ignores rules (see builtinTools).
+ */
+function rulesFor(name: string, rules: ToolRule[]): { whole: ToolRule[]; scoped: ToolRule[] } {
+  const whole: ToolRule[] = [];
+  const scoped: ToolRule[] = [];
+  if (name === EXEMPT) return { whole, scoped };
+  for (const r of rules) {
+    const { tool, specifier } = parseRule(r.rule);
+    if (specifier === null) {
+      if (namesTool(r.list, tool, name)) whole.push(r);
+      // Monitor's commands follow the Bash rules; its WebSocket watches do not
+      // (docs: tools-reference#monitor-tool).
+      else if (name === "Monitor" && namesTool(r.list, tool, "Bash")) scoped.push(r);
+    } else if (tool === name && UNCHECKED_PATH_RULE_TOOLS.has(tool)) {
+      scoped.push({ ...r, unchecked: true });
+    } else if (tool === name || coveredTools(tool, r.list).includes(name)) scoped.push(r);
+  }
+  return { whole, scoped };
+}
+
 /** Every built-in tool, with the rules and hooks that apply to it here. */
 export function builtinTools(permissions: Permission[], hooks: Hook[]): BuiltinTool[] {
   const rules: ToolRule[] = permissions.flatMap((p) =>
@@ -65,20 +87,7 @@ export function builtinTools(permissions: Permission[], hooks: Hook[]): BuiltinT
   );
   const preToolUse = hooks.filter((h) => h.active && h.event === "PreToolUse");
   const tools = table.tools.map(({ name, description, asks }) => {
-    const whole: ToolRule[] = [];
-    const scoped: ToolRule[] = [];
-    for (const r of rules) {
-      if (name === EXEMPT) break;
-      const { tool, specifier } = parseRule(r.rule);
-      if (specifier === null) {
-        if (namesTool(r.list, tool, name)) whole.push(r);
-        // Monitor's commands follow the Bash rules; its WebSocket watches do not
-        // (docs: tools-reference#monitor-tool).
-        else if (name === "Monitor" && namesTool(r.list, tool, "Bash")) scoped.push(r);
-      } else if (tool === name && UNCHECKED_PATH_RULE_TOOLS.has(tool)) {
-        scoped.push({ ...r, unchecked: true });
-      } else if (tool === name || coveredTools(tool, r.list).includes(name)) scoped.push(r);
-    }
+    const { whole, scoped } = rulesFor(name, rules);
     const decidedBy = CHECK_ORDER.map((list) => whole.find((r) => r.list === list)).find(Boolean);
     const tool: BuiltinTool = {
       name,

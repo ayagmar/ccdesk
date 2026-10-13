@@ -126,19 +126,39 @@ interface Ctx {
  */
 export async function resolveInstructions(options: ResolveOptions): Promise<Instruction[]> {
   const { env, cwd, mode, excludes, externalImports, managedClaudeMd, problems } = options;
-  /** A file that exists but cannot be read is reported, not taken for a missing one. */
-  const readInstruction = (path: string) => readTextFile(env, path, problems);
   const ctx: Ctx = {
     realCwd: await resolvedPath(resolve(cwd)),
     env,
     approved: externalImports === "approved",
     problems,
   };
-  const managedOnly = mode === "managed-only";
-  const skippedByMode = `Skipped: instruction mode is ${mode}`;
-  const out: Instruction[] = [];
+  const out = await readOwnFiles(ctx, managedClaudeMd);
+  const { claudeFiles, agentsFiles } = await readDirectoryFiles(ctx, cwd);
+  explainClaudeFiles(claudeFiles, cwd);
+  explainAgentsFiles(agentsFiles, claudeFiles, mode);
+  for (const dir of ancestorsRootFirst(cwd))
+    out.push(
+      ...claudeFiles.filter((f) => f.dir === dir),
+      ...agentsFiles.filter((f) => f.dir === dir)
+    );
+  applyLoadRules(out, ctx, mode, excludes, externalImports);
+  addChecks(out);
+  return out;
+}
 
-  const managed = await readInstruction(join(env.managedDir, "CLAUDE.md"));
+/** A file that exists but cannot be read is reported, not taken for a missing one. */
+function readInstruction(ctx: Ctx, path: string): Promise<TextFile | null> {
+  return readTextFile(ctx.env, path, ctx.problems);
+}
+
+/** The managed and user files, which come first and do not depend on the folder. */
+async function readOwnFiles(
+  ctx: Ctx,
+  managedClaudeMd: ResolveOptions["managedClaudeMd"]
+): Promise<Instruction[]> {
+  const { env } = ctx;
+  const out: Instruction[] = [];
+  const managed = await readInstruction(ctx, join(env.managedDir, "CLAUDE.md"));
   if (managed)
     out.push(
       await instruction(
@@ -171,7 +191,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
     out.push(entry);
   }
 
-  const user = await readInstruction(join(env.claudeDir, "CLAUDE.md"));
+  const user = await readInstruction(ctx, join(env.claudeDir, "CLAUDE.md"));
   if (user)
     out.push(
       await instruction(
@@ -184,51 +204,76 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
       )
     );
   for (const path of await walkMarkdown(join(env.claudeDir, "rules"))) {
-    const file = await readInstruction(path);
+    const file = await readInstruction(ctx, path);
     if (file) out.push(await rule(file, "user", env.claudeDir, ctx));
   }
+  return out;
+}
 
-  // Per directory, root first: CLAUDE.md, .claude/CLAUDE.md, rules, then CLAUDE.local.md last
-  // ("your personal notes are the last thing Claude reads at that level"), then AGENTS.md.
+/**
+ * The project and local files of `cwd` and every folder above it. Per directory, root first:
+ * CLAUDE.md, .claude/CLAUDE.md, rules, then CLAUDE.local.md last ("your personal notes are the last
+ * thing Claude reads at that level"), then AGENTS.md.
+ */
+async function readDirectoryFiles(
+  ctx: Ctx,
+  cwd: string
+): Promise<{ claudeFiles: Instruction[]; agentsFiles: Instruction[] }> {
   const claudeFiles: Instruction[] = [];
   const agentsFiles: Instruction[] = [];
   for (const dir of ancestorsRootFirst(cwd)) {
-    // ~/.claude/CLAUDE.md and ~/.claude/rules are the user files above, not the home's project files.
-    const holdsClaudeDir = join(dir, ".claude") === env.claudeDir;
-    for (const name of CLAUDE_MD_NAMES) {
-      if (holdsClaudeDir && name === ".claude/CLAUDE.md") continue;
-      const file = await readInstruction(join(dir, name));
-      if (file) claudeFiles.push(await instruction(file, "claude-md", "project", dir, ctx, ""));
-    }
-    if (!holdsClaudeDir && dir !== env.claudeDir)
-      for (const path of await walkMarkdown(join(dir, ".claude", "rules"))) {
-        const file = await readInstruction(path);
-        if (file) claudeFiles.push(await rule(file, "project", dir, ctx));
-      }
-    const local = await readInstruction(join(dir, "CLAUDE.local.md"));
-    if (local) claudeFiles.push(await instruction(local, "claude-local-md", "local", dir, ctx, ""));
+    claudeFiles.push(...(await readClaudeFiles(ctx, dir)));
     for (const name of AGENTS_MD_NAMES) {
-      const file = await readInstruction(join(dir, name));
+      const file = await readInstruction(ctx, join(dir, name));
       if (file) agentsFiles.push(await instruction(file, "agents-md", "project", dir, ctx, ""));
     }
   }
+  return { claudeFiles, agentsFiles };
+}
 
-  const hasClaudeMd = claudeFiles.some((f) => f.kind !== "rule");
+/** One folder's CLAUDE.md files, rules and CLAUDE.local.md, in the order Claude Code reads them. */
+async function readClaudeFiles(ctx: Ctx, dir: string): Promise<Instruction[]> {
+  const { env } = ctx;
+  const out: Instruction[] = [];
+  // ~/.claude/CLAUDE.md and ~/.claude/rules are the user files above, not the home's project files.
+  const holdsClaudeDir = join(dir, ".claude") === env.claudeDir;
+  for (const name of CLAUDE_MD_NAMES) {
+    if (holdsClaudeDir && name === ".claude/CLAUDE.md") continue;
+    const file = await readInstruction(ctx, join(dir, name));
+    if (file) out.push(await instruction(file, "claude-md", "project", dir, ctx, ""));
+  }
+  if (!holdsClaudeDir && dir !== env.claudeDir)
+    for (const path of await walkMarkdown(join(dir, ".claude", "rules"))) {
+      const file = await readInstruction(ctx, path);
+      if (file) out.push(await rule(file, "project", dir, ctx));
+    }
+  const local = await readInstruction(ctx, join(dir, "CLAUDE.local.md"));
+  if (local) out.push(await instruction(local, "claude-local-md", "local", dir, ctx, ""));
+  return out;
+}
+
+/** Why each CLAUDE.md and CLAUDE.local.md loads; rules have their reason already. */
+function explainClaudeFiles(claudeFiles: Instruction[], cwd: string): void {
   for (const file of claudeFiles) {
     if (file.kind === "rule") continue;
-    file.reason =
-      file.kind === "claude-local-md"
-        ? "Your private notes for this directory"
-        : file.dir === resolve(cwd)
-          ? "Instructions for this directory"
-          : "Inherited from a parent directory";
+    if (file.kind === "claude-local-md") file.reason = "Your private notes for this directory";
+    else if (file.dir === resolve(cwd)) file.reason = "Instructions for this directory";
+    else file.reason = "Inherited from a parent directory";
   }
+}
 
+/** Whether each AGENTS.md loads next to the CLAUDE.md files found, and why. */
+function explainAgentsFiles(
+  agentsFiles: Instruction[],
+  claudeFiles: Instruction[],
+  mode: AgentsMdMode
+): void {
+  const hasClaudeMd = claudeFiles.some((f) => f.kind !== "rule");
   const includedElsewhere = new Set(
     claudeFiles.flatMap((f) => [f.realPath ?? f.path, ...f.imports.map((i) => i.resolved)])
   );
   for (const file of agentsFiles) {
-    if (!agentsMdLoads(mode, false)) skip(file, skippedByMode);
+    if (!agentsMdLoads(mode, false)) skip(file, skippedByMode(mode));
     else if (includedElsewhere.has(file.realPath ?? file.path))
       skip(file, "Already included through a CLAUDE.md import or symlink");
     else if (!agentsMdLoads(mode, hasClaudeMd))
@@ -240,13 +285,20 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
       file.reason = "Loaded alongside CLAUDE.md (instruction mode claude-md-and-agents-md)";
     else file.reason = "Loaded because there is no CLAUDE.md here or above";
   }
+}
 
-  for (const dir of ancestorsRootFirst(cwd))
-    out.push(
-      ...claudeFiles.filter((f) => f.dir === dir),
-      ...agentsFiles.filter((f) => f.dir === dir)
-    );
-
+/**
+ * Skips what Claude Code leaves out of every file but managed ones: all of them in managed-only
+ * mode, ones matched by claudeMdExcludes, ones over 4 MiB, and project rules linked from outside
+ * the project that do not qualify.
+ */
+function applyLoadRules(
+  out: Instruction[],
+  ctx: Ctx,
+  mode: AgentsMdMode,
+  excludes: string[],
+  externalImports: Trust["externalImports"]
+): void {
   const waiting =
     externalImports === "declined"
       ? "You declined imports from outside this project"
@@ -254,7 +306,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
   for (const file of out) {
     if (file.scope === "managed") continue;
     // Path-scoped rules still load on demand in managed-only mode (docs: memory#choose-which-instruction-files-load).
-    if (managedOnly && file.status === "loaded") skip(file, skippedByMode);
+    if (mode === "managed-only" && file.status === "loaded") skip(file, skippedByMode(mode));
     // Managed files cannot be excluded.
     if (isExcluded(excludes, file.path, file.realPath)) skip(file, "Skipped by claudeMdExcludes");
     if (file.status !== "skipped" && file.bytes > MAX_TEXT_BYTES)
@@ -272,8 +324,10 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
     else if (block === "has-paths")
       skip(file, "Links outside this project, and such a rule loads only without a paths field");
   }
-  addChecks(out);
-  return out;
+}
+
+function skippedByMode(mode: AgentsMdMode): string {
+  return `Skipped: instruction mode is ${mode}`;
 }
 
 function skip(file: Instruction, reason: string) {

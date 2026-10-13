@@ -177,10 +177,10 @@ export function hiddenValues(text: string | null): string | null {
  * password and query. Longest first, so a secret that contains another is taken out whole.
  */
 export function secretTexts(value: unknown): string[] {
-  const found = hiddenIn(value).flatMap(({ raw, shown }): Array<string | undefined> => {
+  const found = hiddenIn(value).flatMap(({ raw, shown: hidden }): Array<string | undefined> => {
     if (typeof raw !== "string") return [];
-    if (shown === "•••") return [raw];
-    if (typeof shown === "string" && shown.endsWith("=•••"))
+    if (hidden === "•••") return [raw];
+    if (typeof hidden === "string" && hidden.endsWith("=•••"))
       return [raw.slice(raw.indexOf("=") + 1)];
     if (shownUrl(raw) === raw) return [];
     const url = URL.parse(raw);
