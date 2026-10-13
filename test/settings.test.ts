@@ -362,8 +362,40 @@ test("server-managed settings or a macOS profile on disk are named above the man
   assert.deepEqual(await higher(), [f.at("home/.claude/remote-settings.json"), profile]);
 });
 
+test("a project or local env waits for the trust dialog in an interactive session; claude -p applies it", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/settings.json", { env: { FAKE_USER_FLAG: "1" } });
+  f.json("app/.claude/settings.json", { env: { FAKE_PROJECT_FLAG: "fake-project-value" } });
+  f.json("app/.claude/settings.local.json", { env: { FAKE_LOCAL_FLAG: "fake-local-value" } });
+  const env = async (profile: "interactive" | "print") => {
+    const view = await scanDirectory(f.env, f.at("app"), profile);
+    assert.ok(!JSON.stringify(view).includes("fake-project-value"));
+    return setting(view, "env");
+  };
+
+  const held = await env("interactive");
+  assert.deepEqual(Object.keys(held?.value as object), ["FAKE_USER_FLAG"]);
+  assert.deepEqual(
+    held?.ignored.map((i) => [i.scope, i.waitsForTrust]),
+    [
+      ["project", true],
+      ["local", true],
+    ]
+  );
+
+  const print = await env("print");
+  assert.deepEqual(Object.keys(print?.value as object).sort(), [
+    "FAKE_LOCAL_FLAG",
+    "FAKE_PROJECT_FLAG",
+    "FAKE_USER_FLAG",
+  ]);
+  assert.deepEqual(print?.ignored, []);
+});
+
 test("env variables a repository may not set, or no file may set, are ignored by name", async () => {
   const f = makeFixture();
+  // Trusted, so only the per-variable rules hold values back.
+  f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
   f.json("home/.claude/settings.json", {
     env: { HOME: "/fake/user-home", CLAUDE_CODE_RESTRICTED: "1", FAKE_TOOL_FLAG: "1" },
   });

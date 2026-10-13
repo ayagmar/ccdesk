@@ -6,6 +6,8 @@ import { isRecord } from "./data.ts";
 export interface Dropped {
   value: unknown;
   reason: string;
+  /** Held only until you trust the folder, rather than ignored. */
+  waitsForTrust?: boolean;
 }
 
 interface Rule {

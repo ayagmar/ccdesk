@@ -104,6 +104,25 @@ function ignoredReason(scope: Scope, name: string, value: unknown): string | und
 }
 
 /**
+ * A repository's `env` held back until you trust the folder, as Claude Code holds it in an
+ * interactive session (docs: settings-reference#when-claude-code-applies-env-values,
+ * permissions#what-runs-before-you-trust-a-folder). `filtered` is envFilter's result for the file.
+ */
+export function heldForTrust(filtered: { value: unknown; dropped: Dropped[] }): {
+  value: unknown;
+  dropped: Dropped[];
+} {
+  if (filtered.value === undefined) return filtered;
+  const held: Dropped = {
+    value: filtered.value,
+    reason:
+      "Claude Code applies project and local env values once you trust this folder; a variable it classifies as safe, such as model selection, timeouts and limits, or a feature toggle, applies at startup, and the docs don't list which those are",
+    waitsForTrust: true,
+  };
+  return { value: undefined, dropped: [...filtered.dropped, held] };
+}
+
+/**
  * A file's `env` without the variables Claude Code ignores from it, undefined when none is left, and
  * what was dropped, grouped by reason. `raw` is the same value unhidden, since whether a telemetry
  * variable turns telemetry off depends on its value; only names and hidden values are returned.
