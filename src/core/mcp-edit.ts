@@ -9,11 +9,14 @@ import { gitRoot, mainWorktreeRoot, trustKey } from "./scan/git.ts";
 import { serverProblems } from "./scan/mcp.ts";
 import { hasHiddenValues, jsonSyntaxError, redactSecrets, secretTexts, shown } from "./secrets.ts";
 import {
+  type Planned,
   RefusedError,
   readIfExists,
+  readJsonObject,
   recordChange,
   recordClaudeMcpChange,
   type Serially,
+  saveReviewed,
   serially,
   writeAtomic,
 } from "./write.ts";
@@ -113,10 +116,7 @@ function quoted(word: string): string {
   return `'${word.replaceAll("'", "'\\''")}'`;
 }
 
-interface Planned {
-  preview: SettingsEditPreview;
-  save: () => Promise<Change | { target: string }>;
-}
+type Plan = Planned<SettingsEditPreview, Change | { target: string }>;
 
 /**
  * Checks what an edit asks for against the servers as they are now: the one to remove must still
@@ -158,23 +158,12 @@ function edited(servers: Record<string, unknown>, edit: McpEdit): Record<string,
 }
 
 /** A project server: ccdesk changes .mcp.json itself, backed up and listed in Recent changes. */
-async function planProject(env: ScanEnv, edit: McpEdit): Promise<Planned> {
+async function planProject(env: ScanEnv, edit: McpEdit): Promise<Plan> {
   const dir = resolve(edit.dir);
   if (!(await stat(dir).catch(() => null))?.isDirectory())
     throw new RefusedError(`${dir} is not a directory on this machine.`);
   const path = join(dir, ".mcp.json");
-  const raw = await readIfExists(env, path);
-  let data: Record<string, unknown> = {};
-  if (raw !== null && raw.trim() !== "") {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (error) {
-      throw new RefusedError(`${path} is ${jsonSyntaxError(error)}; fix it by hand first.`);
-    }
-    if (!isRecord(parsed)) throw new RefusedError(`${path} does not hold a JSON object.`);
-    data = parsed;
-  }
+  const { raw, data, reformats } = await readJsonObject(env, path);
   const servers = isRecord(data.mcpServers) ? data.mcpServers : {};
   checked(servers, edit);
   const next = { ...data, mcpServers: edited(servers, edit) };
@@ -187,7 +176,7 @@ async function planProject(env: ScanEnv, edit: McpEdit): Promise<Planned> {
       before,
       after: errors.length > 0 ? (before ?? "") : shown(next),
       revision: revisionOf(raw),
-      reformats: raw !== null && raw.trim() !== "" && raw !== `${JSON.stringify(data, null, 2)}\n`,
+      reformats,
       errors,
     },
     save: () =>
@@ -199,11 +188,15 @@ async function planProject(env: ScanEnv, edit: McpEdit): Promise<Planned> {
 }
 
 /**
- * A user or local server, which lives in ~/.claude.json: ccdesk runs Claude Code's own
- * `claude mcp` commands rather than write that file, which Claude Code rewrites all the time.
+ * The user or local servers an edit changes in ~/.claude.json, and the folder claude runs in for
+ * them. Local servers are kept per project, under the key the scan reads them from; Claude Code
+ * files them there from any folder below. User servers do not depend on the folder, so claude runs
+ * in your home directory for them.
  */
-async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Promise<Planned> {
-  const dir = resolve(edit.dir);
+async function claudeJsonServers(
+  env: ScanEnv,
+  edit: McpEdit
+): Promise<{ cwd: string; servers: Record<string, unknown> }> {
   const raw = await readIfExists(env, env.claudeJson);
   let data: Record<string, unknown> = {};
   try {
@@ -212,21 +205,23 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
   } catch (error) {
     throw new RefusedError(`${env.claudeJson} is ${jsonSyntaxError(error)}; fix it by hand first.`);
   }
-  // Local servers are kept per project, under the key the scan reads them from. Claude Code files
-  // them there from any folder below.
-  const projects = isRecord(data.projects) ? data.projects : {};
-  const root = trustKey(dir, await mainWorktreeRoot(dir), await gitRoot(dir));
-  // User servers do not depend on the folder, so claude runs in your home directory for them.
-  const cwd = edit.scope === "user" ? env.home : root;
+  const dir = resolve(edit.dir);
+  const cwd =
+    edit.scope === "user"
+      ? env.home
+      : trustKey(dir, await mainWorktreeRoot(dir), await gitRoot(dir));
   if (!(await stat(cwd).catch(() => null))?.isDirectory())
     throw new RefusedError(`${cwd} is not a directory on this machine.`);
+  const projects = isRecord(data.projects) ? data.projects : {};
   const holder = edit.scope === "user" ? data : projects[cwd];
   const servers = isRecord(holder) && isRecord(holder.mcpServers) ? holder.mcpServers : {};
-  checked(servers, edit);
-  const { remove, add } = edit;
-  const errors = add ? serverProblems(add.definition) : [];
-  // Names follow "--", so one such as --help is a name, not an option.
-  const addArgs = (name: string, definition: unknown) => [
+  return { cwd, servers };
+}
+
+/** The `claude mcp` arguments for an edit; names follow "--", so one such as --help is a name. */
+const claudeArgs = {
+  remove: (edit: McpEdit, name: string) => ["mcp", "remove", "--scope", edit.scope, "--", name],
+  add: (edit: McpEdit, name: string, definition: unknown) => [
     "mcp",
     "add-json",
     "--scope",
@@ -234,29 +229,82 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
     "--",
     name,
     JSON.stringify(definition),
-  ];
-  // The commands shown and recorded name the profile, so pasting one changes the same servers.
+  ],
+};
+
+/**
+ * `claude` with these arguments as you would type it in bash, zsh or Git Bash: the server's name
+ * and definition after "--" are quoted, and the profile ccdesk reads is named, so pasting the line
+ * changes the same servers. With `cwd`, it starts by going to the folder claude ran in.
+ */
+function commandLine(env: ScanEnv, args: string[], cwd?: string): string {
+  const names = args.indexOf("--") + 1;
   const claude =
     env.configDir === undefined ? "claude" : `CLAUDE_CONFIG_DIR=${quoted(env.configDir)} claude`;
-  const addCommand = (name: string, definition: unknown) =>
-    `${claude} mcp add-json --scope ${edit.scope} -- ${quoted(name)} ${quoted(JSON.stringify(definition))}`;
+  const line = [claude, ...args.slice(0, names), ...args.slice(names).map(quoted)].join(" ");
+  return cwd === undefined ? line : `cd ${quoted(cwd)} && ${line}`;
+}
+
+/**
+ * A user or local server, which lives in ~/.claude.json: ccdesk runs Claude Code's own
+ * `claude mcp` commands rather than write that file, which Claude Code rewrites all the time.
+ */
+async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Promise<Plan> {
+  const { cwd, servers } = await claudeJsonServers(env, edit);
+  checked(servers, edit);
+  const { remove, add } = edit;
+  const errors = add ? serverProblems(add.definition) : [];
   const before = Object.keys(servers).length > 0 ? shown(servers) : null;
+  // A local server's commands to paste go to the folder it belongs to first.
+  const from = edit.scope === "local" ? cwd : undefined;
   // Recent changes lists the edit with the servers it touched, values hidden as the page shows
-  // them, and the commands that put them back from the folder claude ran in.
+  // them, and the commands that put them back.
   const record = () => {
     const names = [remove?.name, add?.name].filter((n) => n !== undefined);
     const touched = (all: Record<string, unknown>) =>
       Object.fromEntries(Object.entries(all).filter(([name]) => names.includes(name)));
-    const at = edit.scope === "local" ? `cd ${quoted(cwd)} && ` : "";
     return recordClaudeMcpChange(env, {
       target: env.claudeJson,
       shownBefore: shown(touched(servers)),
       shownAfter: shown(touched(edited(servers, edit))),
       undoCommands: [
-        ...(add ? [`${at}${claude} mcp remove --scope ${edit.scope} -- ${quoted(add.name)}`] : []),
-        ...(remove ? [`${at}${addCommand(remove.name, redactSecrets(servers[remove.name]))}`] : []),
+        ...(add ? [commandLine(env, claudeArgs.remove(edit, add.name), from)] : []),
+        ...(remove
+          ? [
+              commandLine(
+                env,
+                claudeArgs.add(edit, remove.name, redactSecrets(servers[remove.name])),
+                from
+              ),
+            ]
+          : []),
       ],
     });
+  };
+  const save = async () => {
+    if (remove) await run(claudeArgs.remove(edit, remove.name), cwd, env.configDir);
+    // The change is made by then; a record that cannot be written only leaves it unlisted.
+    if (!add) {
+      await record().catch(() => undefined);
+      return { target: env.claudeJson };
+    }
+    try {
+      await run(claudeArgs.add(edit, add.name, add.definition), cwd, env.configDir);
+    } catch (error) {
+      if (!remove) throw error;
+      // A replaced server goes back as it was, so a refused add does not lose it. When that fails
+      // too, the error gives the command that puts it back; a replaced server has no hidden values
+      // (see checked), so the command shows nothing the page does not.
+      const putBack = claudeArgs.add(edit, remove.name, servers[remove.name]);
+      await run(putBack, cwd, env.configDir).catch(() => {
+        throw new RefusedError(
+          `ccdesk removed ${remove.name}, then could not add it back. In bash, zsh or Git Bash, put it back with: ${commandLine(env, putBack, from)} (${error instanceof Error ? error.message : String(error)})`
+        );
+      });
+      throw error;
+    }
+    await record().catch(() => undefined);
+    return { target: env.claudeJson };
   };
   return {
     preview: {
@@ -270,41 +318,17 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
       errors,
       // Shown with secrets hidden; the command that runs has the values you typed.
       commands: [
-        ...(remove ? [`${claude} mcp remove --scope ${edit.scope} -- ${quoted(remove.name)}`] : []),
-        ...(add ? [addCommand(add.name, redactSecrets(add.definition))] : []),
+        ...(remove ? [commandLine(env, claudeArgs.remove(edit, remove.name))] : []),
+        ...(add
+          ? [commandLine(env, claudeArgs.add(edit, add.name, redactSecrets(add.definition)))]
+          : []),
       ],
     },
-    save: async () => {
-      if (remove)
-        await run(["mcp", "remove", "--scope", edit.scope, "--", remove.name], cwd, env.configDir);
-      // The change is made by then; a record that cannot be written only leaves it unlisted.
-      if (!add) {
-        await record().catch(() => undefined);
-        return { target: env.claudeJson };
-      }
-      try {
-        await run(addArgs(add.name, add.definition), cwd, env.configDir);
-      } catch (error) {
-        if (!remove) throw error;
-        // A replaced server goes back as it was, so a refused add does not lose it. When that
-        // fails too, the error gives the command that puts it back, from the folder a local server
-        // belongs to; a replaced server has no hidden values (see checked), so the command shows
-        // nothing the page does not.
-        const original = servers[remove.name];
-        await run(addArgs(remove.name, original), cwd, env.configDir).catch(() => {
-          throw new RefusedError(
-            `ccdesk removed ${remove.name}, then could not add it back. In bash, zsh or Git Bash, put it back with: ${edit.scope === "local" ? `cd ${quoted(cwd)} && ` : ""}${addCommand(remove.name, original)} (${error instanceof Error ? error.message : String(error)})`
-          );
-        });
-        throw error;
-      }
-      await record().catch(() => undefined);
-      return { target: env.claudeJson };
-    },
+    save,
   };
 }
 
-function plan(env: ScanEnv, edit: McpEdit, run: RunClaude): Promise<Planned> {
+function plan(env: ScanEnv, edit: McpEdit, run: RunClaude): Promise<Plan> {
   return edit.scope === "project" ? planProject(env, edit) : planClaudeJson(env, edit, run);
 }
 
@@ -324,11 +348,10 @@ export function saveMcpEdit(
   run: RunClaude,
   queue: Serially = serially
 ): Promise<Change | { target: string }> {
-  return queue(async () => {
-    const planned = await plan(env, edit, run);
-    if (planned.preview.errors.length > 0) throw new RefusedError(planned.preview.errors.join(" "));
-    if (planned.preview.revision !== expectedRevision)
-      throw new RefusedError("The servers changed since you reviewed this edit; review it again.");
-    return planned.save();
-  });
+  return saveReviewed(
+    queue,
+    () => plan(env, edit, run),
+    expectedRevision,
+    "The servers changed since you reviewed this edit; review it again."
+  );
 }

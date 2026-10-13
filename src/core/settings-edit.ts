@@ -7,7 +7,6 @@ import {
   type Change,
   type HookEdit,
   type PermissionEdit,
-  type Scope,
   type SettingsEdit,
   type SettingsEditPreview,
 } from "../shared/types.ts";
@@ -17,12 +16,14 @@ import { isRecord } from "./scan/data.ts";
 import { isSkippedMcpRule } from "./scan/permissions.ts";
 import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
 import { schemaErrors } from "./schema.ts";
-import { hasHiddenValues, jsonSyntaxError, redactSecrets, shown } from "./secrets.ts";
+import { hasHiddenValues, redactSecrets, shown } from "./secrets.ts";
 import {
+  type Planned,
   RefusedError,
-  readIfExists,
+  readJsonObject,
   recordChange,
   type Serially,
+  saveReviewed,
   serially,
   writeAtomic,
 } from "./write.ts";
@@ -40,14 +41,7 @@ function validatorFor(key: string): Validator | null {
   return validate;
 }
 
-interface PlannedEdit {
-  path: string;
-  scope: Scope;
-  raw: string | null;
-  /** The text ccdesk would write; null when the value failed validation. */
-  next: string | null;
-  preview: SettingsEditPreview;
-}
+type PlannedEdit = Planned<SettingsEditPreview, Change>;
 
 async function editableFile(
   env: ScanEnv,
@@ -62,22 +56,6 @@ async function editableFile(
   if (file.scope !== "user" && !(await stat(dir).catch(() => null))?.isDirectory())
     throw new RefusedError(`${dir} is not a directory on this machine.`);
   return file;
-}
-
-async function readSettings(
-  env: ScanEnv,
-  path: string
-): Promise<{ raw: string | null; data: Record<string, unknown> }> {
-  const raw = await readIfExists(env, path);
-  if (raw === null || raw.trim() === "") return { raw, data: {} };
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    throw new RefusedError(`${path} is ${jsonSyntaxError(error)}; fix it by hand first.`);
-  }
-  if (!isRecord(parsed)) throw new RefusedError(`${path} does not hold a JSON object.`);
-  return { raw, data: parsed };
 }
 
 /**
@@ -99,7 +77,7 @@ async function planKey(
     throw new RefusedError(`${key} is not in Claude Code's settings schema (${schema.$comment}).`);
 
   const { path } = file;
-  const { raw, data } = await readSettings(env, path);
+  const { raw, data, reformats } = await readJsonObject(env, path);
   const nextValue = value(data);
   // ccdesk never shows hidden values, so it must not write them either.
   if (
@@ -110,33 +88,29 @@ async function planKey(
   if (raw !== null && JSON.stringify(nextValue) === JSON.stringify(data[key]))
     throw new RefusedError("This file already says that; there is nothing to change.");
 
-  const before = raw === null ? null : shown(data);
-  // The diff is rendered from the parsed file, so a file in another layout is reported as
-  // reformatted instead of diffing its raw text.
-  const reformats =
-    raw !== null && raw.trim() !== "" && raw !== `${JSON.stringify(data, null, 2)}\n`;
-  const base = { path, before, revision: revisionOf(raw), reformats };
   const errors =
     nextValue === undefined
       ? []
       : [...schemaErrors(validate, nextValue, key), ...newHookEvents(key, data[key], nextValue)];
-  if (errors.length > 0)
-    return {
-      path,
-      scope: file.scope,
-      raw,
-      next: null,
-      preview: { ...base, after: before ?? "", errors },
-    };
   const next = { ...data };
   if (nextValue === undefined) delete next[key];
   else next[key] = nextValue;
+  const text = `${JSON.stringify(next, null, 2)}\n`;
+  const before = raw === null ? null : shown(data);
   return {
-    path,
-    scope: file.scope,
-    raw,
-    next: `${JSON.stringify(next, null, 2)}\n`,
-    preview: { ...base, after: shown(next), errors: [] },
+    preview: {
+      path,
+      before,
+      after: errors.length > 0 ? (before ?? "") : shown(next),
+      revision: revisionOf(raw),
+      reformats,
+      errors,
+    },
+    save: () =>
+      recordChange(env, { kind: "settings", target: path, before: raw }, async () => {
+        await writeAtomic(env, path, text, revisionOf(raw));
+        return { target: path, revision: revisionOf(text) };
+      }),
   };
 }
 
@@ -265,17 +239,7 @@ async function planHookEdit(env: ScanEnv, edit: HookEdit): Promise<PlannedEdit> 
   );
 }
 
-/** Writes a planned edit, but only if the file is still the revision the preview was made from. */
-async function commit(env: ScanEnv, plan: PlannedEdit, expectedRevision: string): Promise<Change> {
-  if (plan.next === null) throw new RefusedError(plan.preview.errors.join("; "));
-  if (plan.preview.revision !== expectedRevision)
-    throw new RefusedError("The file changed since you reviewed this edit; review it again.");
-  const next = plan.next;
-  return recordChange(env, { kind: "settings", target: plan.path, before: plan.raw }, async () => {
-    await writeAtomic(env, plan.path, next, expectedRevision);
-    return { target: plan.path, revision: revisionOf(next) };
-  });
-}
+const CHANGED = "The file changed since you reviewed this edit; review it again.";
 
 export async function previewSettingsEdit(
   env: ScanEnv,
@@ -290,7 +254,7 @@ export function saveSettingsEdit(
   expectedRevision: string,
   queue: Serially = serially
 ): Promise<Change> {
-  return queue(async () => commit(env, await planSettingsEdit(env, edit), expectedRevision));
+  return saveReviewed(queue, () => planSettingsEdit(env, edit), expectedRevision, CHANGED);
 }
 
 export async function previewPermissionEdit(
@@ -306,7 +270,7 @@ export function savePermissionEdit(
   expectedRevision: string,
   queue: Serially = serially
 ): Promise<Change> {
-  return queue(async () => commit(env, await planPermissionEdit(env, edit), expectedRevision));
+  return saveReviewed(queue, () => planPermissionEdit(env, edit), expectedRevision, CHANGED);
 }
 
 export async function previewHookEdit(env: ScanEnv, edit: HookEdit): Promise<SettingsEditPreview> {
@@ -319,5 +283,5 @@ export function saveHookEdit(
   expectedRevision: string,
   queue: Serially = serially
 ): Promise<Change> {
-  return queue(async () => commit(env, await planHookEdit(env, edit), expectedRevision));
+  return saveReviewed(queue, () => planHookEdit(env, edit), expectedRevision, CHANGED);
 }

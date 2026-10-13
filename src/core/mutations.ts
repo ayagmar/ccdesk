@@ -7,11 +7,13 @@ import { parseFrontmatter } from "./scan/data.ts";
 import { shownText } from "./secrets.ts";
 import { deadLinks, indexMentions } from "./scan/memory.ts";
 import {
+  type Planned,
   RefusedError,
   readIfExists,
   recordChange,
   removeExactly,
   type Serially,
+  saveReviewed,
   serially,
   writeAtomic,
 } from "./write.ts";
@@ -67,26 +69,9 @@ export function revisionOfBoth(first: string | null, second: string | null): str
 }
 
 /** A memory change worked out from disk as it is now: what it shows for review and what it writes. */
-interface Plan {
-  preview: MemoryChangePreview;
-  save: () => Promise<Change>;
-}
+type Plan = Planned<MemoryChangePreview, Change>;
 
-const reviewAgain = () =>
-  new RefusedError("The memory or MEMORY.md changed since you reviewed this; review it again.");
-
-/** Runs a plan only while everything it was worked out from is as reviewed. */
-function saveReviewed(
-  plan: () => Promise<Plan>,
-  expectedRevision: string,
-  queue: Serially
-): Promise<Change> {
-  return queue(async () => {
-    const planned = await plan();
-    if (planned.preview.revision !== expectedRevision) throw reviewAgain();
-    return planned.save();
-  });
-}
+const REVIEW_AGAIN = "The memory or MEMORY.md changed since you reviewed this; review it again.";
 
 /** MEMORY.md's lines without the empty ones a trailing newline leaves. */
 function indexLines(index: string | null): string[] {
@@ -136,7 +121,7 @@ async function planDelete(env: ScanEnv, path: string): Promise<Plan> {
               );
             });
         }
-        if (!removed) throw reviewAgain();
+        if (!removed) throw new RefusedError(REVIEW_AGAIN);
         // The lines are kept as they were in the backup; the page gets them as ccdesk shows text.
         return {
           target: real,
@@ -250,5 +235,5 @@ export function changeMemory(
   expectedRevision: string,
   queue: Serially = serially
 ): Promise<Change> {
-  return saveReviewed(() => PLANS[action](env, path), expectedRevision, queue);
+  return saveReviewed(queue, () => PLANS[action](env, path), expectedRevision, REVIEW_AGAIN);
 }
