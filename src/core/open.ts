@@ -138,7 +138,9 @@ function launch([command, args]: Command, path: string, host: Host): Promise<str
     });
     child.once("exit", (code) => {
       clearTimeout(timer);
-      resolve(code === 0 ? null : `${command} exited with code ${code}`);
+      // explorer.exe hands the file to the running shell and exits with 1 even when that worked.
+      if (code === 0 || command === "explorer") return resolve(null);
+      resolve(`${command} exited with code ${code}`);
     });
   });
 }

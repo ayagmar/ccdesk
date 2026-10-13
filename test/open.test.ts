@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { chmodSync } from "node:fs";
 import { test } from "node:test";
-import { editorCommands, spawnPlan } from "../src/core/open.ts";
+import { editorCommands, openInEditor, spawnPlan } from "../src/core/open.ts";
+import { makeFixture } from "./helpers/fixture.ts";
 
 const none = () => false;
 
@@ -53,4 +55,18 @@ test("on Windows a .cmd editor is started through cmd.exe with every part quoted
   });
   assert.throws(() => spawnPlan("code", [], "C:\\%PATH%\\x.md", "win32"));
   assert.equal(spawnPlan("code", [], "/a b/x.md", "linux").file, "code");
+});
+
+test("on Windows, Explorer opening the file counts as opened, though it exits with code 1", {
+  // A stand-in explorer is a shell script here; on Windows the real one would open a window.
+  skip: process.platform === "win32",
+}, async () => {
+  const f = makeFixture();
+  const explorer = f.write("bin/explorer", "#!/bin/sh\nexit 1\n");
+  chmodSync(explorer, 0o755);
+  const file = f.write("app/CLAUDE.md", "x");
+
+  const opened = await openInEditor(file, { platform: "win32", processEnv: { PATH: f.at("bin") } });
+
+  assert.equal(opened, "explorer");
 });
