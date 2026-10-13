@@ -12,6 +12,7 @@ import { HOOK_EVENTS } from "@anthropic-ai/claude-agent-sdk";
 import { fileURLToPath } from "node:url";
 import { createGenerator } from "ts-json-schema-generator";
 import catalog from "../src/shared/settings-catalog.json" with { type: "json" };
+import { plain } from "../src/view/sections/catalog.ts";
 import { borrowMissingKeys, SCHEMASTORE_SNAPSHOT } from "./schemastore.ts";
 
 const sdkVersion: string = JSON.parse(
@@ -35,7 +36,11 @@ const schemastore: { properties: Record<string, Record<string, unknown>> } = JSO
 );
 
 // Fields such as autoMode.classifyAllShell are documented on their own but live in their parent.
-const documented = Object.keys(catalog.keys).filter((key) => !key.includes("."));
+const documented = Object.fromEntries(
+  Object.entries(catalog.keys)
+    .filter(([key]) => !key.includes("."))
+    .map(([key, entry]) => [key, plain(entry.summary)])
+);
 const { properties, borrowed, uncovered } = borrowMissingKeys(
   settings.properties,
   schemastore.properties,

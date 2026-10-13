@@ -6,8 +6,9 @@
 for Claude Code settings, <https://json.schemastore.org/claude-code-settings.json>, reformatted.
 `src/shared/settings.schema.json` (`dist/shared/settings.schema.json` in the package) includes
 definitions copied from it for documented keys that the Settings type in
-`@anthropic-ai/claude-agent-sdk` does not define. Each copied definition has a `$comment` added that
-names SchemaStore as its source; nothing else in it is changed.
+`@anthropic-ai/claude-agent-sdk` does not define. In each copied definition, the top-level
+`description` is replaced with the summary from Claude Code's settings reference and a `$comment`
+naming SchemaStore as its source is added; nothing else in it is changed.
 
 SchemaStore's NOTICE file:
 
