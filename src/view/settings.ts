@@ -68,9 +68,9 @@ export function formFor(property: SettingSchema | undefined, value: unknown): Fo
 
 /**
  * The form once the file's value changes from `was` to `now`, as when Claude Code or an editor
- * writes it. A form you have not edited follows the file, as does one that matches it, as after
- * saving. One you have edited is kept, control and all, to be reviewed against the file as it is
- * now.
+ * writes it. A form that still holds what the file had follows the file, as does one that holds
+ * what it has now, as after saving. One you have edited is kept, control and all, to be reviewed
+ * against the file as it is now.
  */
 export function followFile(
   form: Form,
@@ -78,13 +78,20 @@ export function followFile(
   was: unknown,
   now: unknown
 ): { form: Form; kept: boolean } {
-  const next = formFor(property, now);
-  const edited = !sameForm(form, formFor(property, was));
-  return edited && !sameForm(form, next) ? { form, kept: true } : { form: next, kept: false };
+  if (!holds(form, property, was) && !holds(form, property, now)) return { form, kept: true };
+  return { form: formFor(property, now), kept: false };
 }
 
-function sameForm(a: Form, b: Form): boolean {
-  return a.kind === b.kind && JSON.stringify(a.draft) === JSON.stringify(b.draft);
+/**
+ * Whether a form stands for a file's value: it is that value's form, such as the empty field for a
+ * key the file lacks, or it holds that value in another control, such as JSON you switched to.
+ */
+function holds(form: Form, property: SettingSchema | undefined, value: unknown): boolean {
+  const own = formFor(property, value);
+  if (own.kind === form.kind && JSON.stringify(own.draft) === JSON.stringify(form.draft))
+    return true;
+  const held = fromDraft(form.kind, property, form.draft);
+  return "value" in held && JSON.stringify(held.value) === JSON.stringify(value);
 }
 
 /** The form's value as JSON, to write what the controls cannot, such as an empty list. */

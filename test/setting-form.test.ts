@@ -207,3 +207,30 @@ test("what the form cannot say, such as an empty list, is written through JSON",
     draft: formFor(rules, { soft_deny: ["rm"] }).draft,
   });
 });
+
+test("a form switched to JSON but not edited still follows the file", () => {
+  const model: SettingSchema = { type: "string" };
+  const json = asJson(formFor(model, "sonnet"), model);
+  assert.ok(!("error" in json));
+
+  const followed = followFile(json, model, "sonnet", "opus");
+  assert.equal(followed.kept, false);
+  assert.deepEqual(followed.form, formFor(model, "opus"));
+});
+
+test("a value saved from JSON is in step with the file, so a later change is followed", () => {
+  const model: SettingSchema = { type: "string" };
+  const saved: Form = { kind: "json", draft: '"opus"' };
+
+  const afterSave = followFile(saved, model, "sonnet", "opus");
+  assert.equal(afterSave.kept, false);
+  assert.deepEqual(
+    followFile(afterSave.form, model, "opus", "haiku").form,
+    formFor(model, "haiku")
+  );
+});
+
+test("an empty field for a key the file lacks follows the file when the key appears", () => {
+  const model: SettingSchema = { type: "string" };
+  assert.equal(followFile(formFor(model, undefined), model, undefined, "opus").kept, false);
+});
