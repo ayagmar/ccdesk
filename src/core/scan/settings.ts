@@ -18,20 +18,6 @@ import { type Dropped, sandboxFilter } from "./sandbox.ts";
 import { envFilter } from "./settings-env.ts";
 import { validatorFor } from "./settings-schema.ts";
 
-/** What the settings schema rejects in a file, each led by the key, such as `cleanupPeriodDays must be number`. */
-function settingsErrors(data: Record<string, unknown>): string[] {
-  return Object.entries(data).flatMap(([key, value]) => {
-    const validate = validatorFor(key);
-    if (!validate) return [];
-    // "manual" is an alias Claude Code accepts for "default" (docs: permission-modes).
-    const checked =
-      key === "permissions" && isRecord(value) && value.defaultMode === "manual"
-        ? { ...value, defaultMode: "default" }
-        : value;
-    return schemaErrors(validate, checked, key);
-  });
-}
-
 /** Lowest precedence first, so later layers override earlier ones. */
 const PRECEDENCE: Scope[] = ["user", "project", "local", "managed"];
 
@@ -195,6 +181,20 @@ export async function settingsFiles(env: ScanEnv, dir: string): Promise<Settings
   return files;
 }
 
+/** What the settings schema rejects in a file, each led by the key, such as `cleanupPeriodDays must be number`. */
+function settingsErrors(data: Record<string, unknown>): string[] {
+  return Object.entries(data).flatMap(([key, value]) => {
+    const validate = validatorFor(key);
+    if (!validate) return [];
+    // "manual" is an alias Claude Code accepts for "default" (docs: permission-modes).
+    const checked =
+      key === "permissions" && isRecord(value) && value.defaultMode === "manual"
+        ? { ...value, defaultMode: "default" }
+        : value;
+    return schemaErrors(validate, checked, key);
+  });
+}
+
 /**
  * Settings files that apply in `dir`, highest precedence first. `managed` is what
  * readManagedSettings read, so a scan reads the managed files once.
@@ -258,8 +258,8 @@ export interface ManagedSettings {
 
 /**
  * managed-settings.json, then every *.json in managed-settings.d in alphabetical order, merged and
- * repaired as Claude Code repairs entries that fail validation, with nothing hidden: for checks such as managedMcpServers that must see header values. Never sent to the
- * page as is.
+ * repaired as Claude Code repairs entries that fail validation, with nothing hidden: for checks such
+ * as managedMcpServers that must see header values. Never sent to the page as is.
  */
 export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings> {
   const dropInDir = join(env.managedDir, "managed-settings.d");
