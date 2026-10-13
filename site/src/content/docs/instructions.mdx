@@ -34,7 +34,7 @@ A file is skipped when:
 - it is an `AGENTS.md`, and a `CLAUDE.md` or `CLAUDE.local.md` exists in any folder from the top of the filesystem down to the open directory (`~/.claude/CLAUDE.md` does not count), or a `CLAUDE.md` already imports it or links to it;
 - it is a `CLAUDE.md`, `.claude/CLAUDE.md`, rule or `CLAUDE.local.md` at the filesystem root, such as `/CLAUDE.md` or `C:\CLAUDE.md`, where Claude Code does not look;
 - it is a file that loaded earlier, reached again under another name through a link, such as a `.claude/CLAUDE.md` that links to `CLAUDE.md`;
-- your `claudeMdExcludes` setting matches its path, or for a link, its target's. As in Claude Code, `*` and `**` also match folders whose names start with a dot, such as `.claude`, and a glob written through a linked folder matches the files it leads to;
+- your `claudeMdExcludes` setting matches its path, or for a link, its target's. As in Claude Code, `*` and `**` also match folders whose names start with a dot, such as `.claude`, and a glob written through a linked folder matches the files it leads to, except on Windows for a glob that starts with a drive letter, where Claude Code does not follow the link either;
 - it is larger than 4 MiB, which Claude Code does not load, managed files included;
 - a plugin setting limits instruction files to `CLAUDE.md` only, or to managed files only;
 - it is an `AGENTS.md`, and an `enabledPlugins` entry in any settings file turns off the built-in plugin that reads it (`cc-plugin-agents-md@builtin`, or `agents-md@builtin` before v2.1.285), as `/plugin` does. Claude Code then reads `CLAUDE.md` files only, and the managed-only setting does not apply either;

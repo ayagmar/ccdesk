@@ -145,22 +145,30 @@ test("in a worktree inside the main checkout, the main checkout's project files 
   );
 });
 
-test("claudeMdExcludes globs match files in .claude folders, and patterns written through a link", async () => {
+test("claudeMdExcludes globs match files in .claude folders", async () => {
   const f = makeFixture();
   f.write("mono/team/CLAUDE.md", "team");
   f.write("mono/team/.claude/CLAUDE.md", "team settings");
   f.write("mono/team/.claude/rules/a.md", "rule");
+  f.json("home/.claude/settings.json", { claudeMdExcludes: [`${f.at("mono/team")}/**`] });
+
+  const team = await scanDirectory(f.env, f.at("mono/team"));
+
+  assert.deepEqual(loadedPaths(team, f.root), []);
+});
+
+test("a claudeMdExcludes glob written through a linked folder matches the files it leads to", {
+  // Claude Code adds the linked form only for a glob that starts with /, never for C:/... ones.
+  skip: process.platform === "win32",
+}, async () => {
+  const f = makeFixture();
   f.write("mono/other/CLAUDE.md", "other");
   f.write("mono/other/.claude/rules/b.md", "rule");
   f.link("monolink", f.at("mono"));
-  f.json("home/.claude/settings.json", {
-    claudeMdExcludes: [`${f.at("mono/team")}/**`, `${f.at("monolink/other")}/**`],
-  });
+  f.json("home/.claude/settings.json", { claudeMdExcludes: [`${f.at("monolink/other")}/**`] });
 
-  const team = await scanDirectory(f.env, f.at("mono/team"));
   const other = await scanDirectory(f.env, f.at("mono/other"));
 
-  assert.deepEqual(loadedPaths(team, f.root), []);
   assert.deepEqual(loadedPaths(other, f.root), []);
 });
 
