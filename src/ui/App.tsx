@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Component, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { type Overview, type SessionProfile } from "../shared/types.ts";
 import { buildRows } from "../view/sections/index.ts";
 import { type Row } from "../view/sections/types.ts";
@@ -88,20 +88,23 @@ export function App() {
         onTextSize={appearance.changeTextSize}
       />
       <main className="main">
-        <PageContent
-          page={page}
-          visit={visit}
-          config={config}
-          overview={overview}
-          rows={rows}
-          jump={jump}
-          onJumped={() => setJump(null)}
-          onToast={setToast}
-          onOpenDirectory={openDirectory}
-          onOpenPalette={() => setPalette({})}
-          onProfile={changeProfile}
-          onCompare={pickCompared}
-        />
+        {/* Navigating starts the next page afresh, so one view's error does not stick to the others. */}
+        <ErrorBoundary key={visit} hint="Open another page from the rail, or reload.">
+          <PageContent
+            page={page}
+            visit={visit}
+            config={config}
+            overview={overview}
+            rows={rows}
+            jump={jump}
+            onJumped={() => setJump(null)}
+            onToast={setToast}
+            onOpenDirectory={openDirectory}
+            onOpenPalette={() => setPalette({})}
+            onProfile={changeProfile}
+            onCompare={pickCompared}
+          />
+        </ErrorBoundary>
       </main>
       {palette && (
         <Palette
@@ -240,6 +243,28 @@ function Loading() {
       Reading your config…
     </div>
   );
+}
+
+/**
+ * An error while drawing shows where it happened instead of leaving the app blank. Around a page,
+ * the rail still leads elsewhere; around the whole app (main.tsx), reloading is the way out. React
+ * logs the error and its component stack to the console.
+ */
+export class ErrorBoundary extends Component<
+  { children: ReactNode; hint: string },
+  { error: Error | null }
+> {
+  override state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: unknown): { error: Error } {
+    return { error: error instanceof Error ? error : new Error(String(error)) };
+  }
+
+  override render() {
+    if (!this.state.error) return this.props.children;
+    const reason = this.state.error.message.replace(/\.$/, "");
+    return <Problem message={`ccdesk could not show this page: ${reason}. ${this.props.hint}`} />;
+  }
 }
 
 function Problem({ message }: { message: string }) {

@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { App } from "./App.tsx";
+import { App, ErrorBoundary } from "./App.tsx";
 import "@fontsource-variable/hanken-grotesk";
 import "@fontsource-variable/jetbrains-mono";
 import "./styles.css";
@@ -18,7 +18,9 @@ const root = document.getElementById("root");
 if (root) {
   createRoot(root).render(
     <StrictMode>
-      <App />
+      <ErrorBoundary hint="Reload the page to try again.">
+        <App />
+      </ErrorBoundary>
     </StrictMode>
   );
 }
