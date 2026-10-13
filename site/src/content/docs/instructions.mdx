@@ -14,7 +14,7 @@ The Instructions section lists every instruction file that applies to the open d
 
 ## Load order
 
-1. The managed `CLAUDE.md` in your organisation's managed folder, and the `claudeMd` key of managed settings.
+1. The managed `CLAUDE.md` in your organisation's managed folder, the `claudeMd` key of managed settings, then every `.md` file under the managed folder's `.claude/rules/`.
 2. `~/.claude/CLAUDE.md`, then every `.md` file under `~/.claude/rules/`.
 3. For each folder from the top of the filesystem down to the open directory:
    `CLAUDE.md`, `.claude/CLAUDE.md`, the `.md` files under `.claude/rules/`, `CLAUDE.local.md`, `AGENTS.md` and `.claude/AGENTS.md`.

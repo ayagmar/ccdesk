@@ -45,6 +45,19 @@ test("editing a project's CLAUDE.md wakes a page waiting for changes", async () 
   assert.equal((await waiting).changed, true);
 });
 
+test("adding a rule to the managed folder wakes a page waiting for changes", async () => {
+  const f = makeFixture();
+  mkdirSync(f.at("app"), { recursive: true });
+  f.write("etc/claude-code/.claude/rules/security.md", "one\n");
+  const watcher = watcherFor(f);
+  await settled(watcher, f.at("app"));
+
+  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  f.write("etc/claude-code/.claude/rules/infra/new.md", "two\n");
+
+  assert.equal((await waiting).changed, true);
+});
+
 test("creating a file CLAUDE.md imports but that was missing wakes a page waiting for changes", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "@docs/new.md\n");
