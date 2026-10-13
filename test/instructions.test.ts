@@ -208,6 +208,25 @@ test("a rule with unquoted globs, a tab-indented paths list or spaces after its 
   );
 });
 
+test("a rule whose paths all match everything, such as **, loads every session", async () => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/all.md", '---\npaths: "**"\n---\neverywhere');
+  f.write("app/.claude/rules/both.md", '---\npaths: ["**", "**/**"]\n---\neverywhere too');
+  f.write("app/.claude/rules/src.md", '---\npaths: ["src/**", "**"]\n---\nsource');
+
+  const view = await scanDirectory(f.env, f.at("app"));
+  const rules = view.instructions.filter((i) => i.kind === "rule");
+
+  assert.deepEqual(
+    rules.map((r) => [f.rel(r.path), r.status]),
+    [
+      ["app/.claude/rules/all.md", "loaded"],
+      ["app/.claude/rules/both.md", "loaded"],
+      ["app/.claude/rules/src.md", "on-match"],
+    ]
+  );
+});
+
 test("project instruction files report whether git tracks them", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "shared");

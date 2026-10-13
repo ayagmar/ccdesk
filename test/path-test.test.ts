@@ -63,6 +63,18 @@ test("a nested skill whose folder name another skill has is named with its direc
   );
 });
 
+test("a subfolder's rule whose paths is ** loads for any file there, as one without paths", async () => {
+  const f = makeFixture();
+  f.write("app/sub/.claude/rules/all.md", '---\npaths: "**"\n---\neverywhere');
+
+  const result = await testPath(f.env, f.at("app"), "sub/a.ts");
+
+  assert.deepEqual(
+    result.matches.map((m) => [m.kind, f.rel(m.path), m.glob ?? null]),
+    [["nested", "app/sub/.claude/rules/all.md", null]]
+  );
+});
+
 test("a file outside the start directory gets nothing from it", async () => {
   const f = makeFixture();
   f.write("app/.claude/rules/all.md", '---\npaths: ["**/*"]\n---\nx\n');
