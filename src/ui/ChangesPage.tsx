@@ -47,6 +47,7 @@ export function ChangesPage({ onRestored }: { onRestored: (text: string) => void
       (page) => {
         setBackups(page.changes);
         setMore(page.more);
+        setProblem(null);
       },
       (error: unknown) => setProblem(errorText(error))
     );
@@ -58,6 +59,7 @@ export function ChangesPage({ onRestored }: { onRestored: (text: string) => void
     api.backups(last.id).then((page) => {
       setBackups((list) => [...(list ?? []), ...page.changes]);
       setMore(page.more);
+      setProblem(null);
     }, fail);
   };
 
