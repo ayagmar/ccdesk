@@ -243,7 +243,10 @@ export interface Entry {
   override?: "name-only" | "user-invocable-only" | "off";
   /** A subagent, skill or command whose name a definition Claude Code prefers also uses: that file. */
   shadowedBy?: string;
-  /** Why Claude Code skips this subagent file, when its frontmatter falls short. */
+  /**
+   * Why Claude Code does not load it: a subagent file whose frontmatter falls short, or an entry
+   * from your or the project's files that managed settings keep to plugins.
+   */
   skipped?: string;
   /**
    * The name Claude Code calls it by when that is not `name`: a plugin's entries are prefixed with

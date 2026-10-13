@@ -240,3 +240,18 @@ test("a subfolder's AGENTS.md and linked rules load on demand exactly as they lo
         );
       }
 });
+
+test("with skills kept to plugins by managed settings, no project skill loads for a matching file", async () => {
+  const f = makeFixture();
+  f.json("etc/claude-code/managed-settings.json", { strictPluginOnlyCustomization: ["skills"] });
+  const skill = (name: string) => `---\nname: ${name}\ndescription: d\npaths: "**/*.ts"\n---\n`;
+  f.write("app/.claude/skills/start/SKILL.md", skill("start"));
+  f.write("app/src/.claude/skills/nested/SKILL.md", skill("nested"));
+
+  const result = await testPath(f.env, f.at("app"), "src/api/users.ts");
+
+  assert.deepEqual(
+    result.matches.filter((m) => m.kind === "skill"),
+    []
+  );
+});

@@ -35,6 +35,8 @@ import {
   manifestConfigs,
   manifestPaths,
   pluginNamespace,
+  pluginOnlyNote,
+  pluginOnlySurfaces,
   readPlugins,
 } from "./plugins.ts";
 
@@ -342,12 +344,14 @@ export function agentProblems(text: string): string[] {
 /**
  * Subagents by priority: managed, then project folders closest to the start directory first, then
  * yours. A name defined again lower down is marked as shadowed (docs: sub-agents#choose-the-subagent-scope).
- * A file Claude Code skips takes no part in that.
+ * A file Claude Code skips, or one that `locked` keeps to managed settings and plugins, takes no
+ * part in that.
  */
 async function readAgents(
   env: ScanEnv,
   projectDir: string,
   gitRoot: string | null,
+  locked: boolean,
   problems: Problem[]
 ) {
   const sources: [string, Source][] = [
@@ -361,7 +365,8 @@ async function readAgents(
   const winners = new Map<string, Entry>();
   for (const [dir, scope] of sources)
     for (const agent of await readFileEntries(env, dir, scope, { problems })) {
-      const [problem] = agentProblems(agent.text);
+      const problem =
+        locked && scope !== "managed" ? pluginOnlyNote("agents") : agentProblems(agent.text)[0];
       if (problem) {
         agent.skipped = problem;
         agents.push(agent);
@@ -416,6 +421,7 @@ export function applySkillOverrides(entries: Entry[], overrides: unknown) {
 
 export async function readInventory(input: InventoryInput): Promise<Inventory> {
   const { env, projectDir, gitRoot, layers, problems } = input;
+  const locked = pluginOnlySurfaces(input.managed);
   const plugins = await readPlugins(env, layers, projectDir, gitRoot, problems);
   const active = plugins.filter((p) => p.plugin.enabled);
   const fromPlugins = await Promise.all(
@@ -453,6 +459,11 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
       const real = skill.realPath ?? skill.folder ?? skill.path;
       if (seenFolders.has(real)) continue;
       seenFolders.add(real);
+      if (locked.has("skills") && scope !== "managed") {
+        skill.skipped = pluginOnlyNote("skills");
+        skills.push(skill);
+        continue;
+      }
       const winner = winners.get(skill.name);
       if (winner && winner.scope !== skill.scope) skill.shadowedBy = winner.path;
       else if (!winner) winners.set(skill.name, skill);
@@ -464,6 +475,7 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
   const commands = await files("commands", ":");
   // A skill of the same name runs instead of it (docs: skills#resolve-skills-that-share-a-name).
   for (const command of commands) {
+    if (locked.has("skills")) command.skipped = pluginOnlyNote("skills");
     if (isTrue(parseFrontmatter(command.text).data["disable-model-invocation"]))
       command.listed = false;
     const skill = winners.get(command.name);
@@ -474,7 +486,7 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
 
   return {
     agents: [
-      ...(await readAgents(env, projectDir, gitRoot, problems)),
+      ...(await readAgents(env, projectDir, gitRoot, locked.has("agents"), problems)),
       ...fromPlugins.flatMap((p) => p.agents),
     ],
     skills: [...skills, ...fromPlugins.flatMap((p) => p.skills)],
@@ -513,6 +525,7 @@ async function readHooks(input: InventoryInput, plugins: LoadedPlugin[]): Promis
       .flatMap((scope) => layers.filter((l) => l.scope === scope))
       .find((l) => typeof l.data?.disableAllHooks === "boolean")?.data?.disableAllHooks === true;
   const managedOnly = managed?.allowManagedHooksOnly === true;
+  const locked = pluginOnlySurfaces(input.managed).has("hooks");
   const forcedByManaged = new Set(
     plugins.filter((p) => p.plugin.enabledIn === "managed").map((p) => p.plugin.id)
   );
@@ -532,6 +545,9 @@ async function readHooks(input: InventoryInput, plugins: LoadedPlugin[]): Promis
     } else if (!organisation && managedOnly) {
       hook.active = false;
       hook.note = "Managed settings allow only managed hooks (allowManagedHooksOnly)";
+    } else if (locked && hook.source !== "managed" && hook.source !== "plugin") {
+      hook.active = false;
+      hook.note = pluginOnlyNote("hooks");
     } else if (hook.source !== "plugin" && heldBack) {
       hook.active = false;
       hook.note = "Waits until you accept Claude Code's trust dialog for this folder";
