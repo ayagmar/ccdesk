@@ -16,7 +16,7 @@ const PRECEDENCE: Scope[] = ["user", "project", "local", "managed"];
 /** Keys whose whole value comes from the highest layer that sets it, even though they are lists. */
 const WHOLE_VALUE_KEYS = new Set(["fallbackModel", "modelPicker"]);
 /** Maps whose entries are taken whole from the highest layer that has them, never field by field. */
-const WHOLE_ENTRY_KEYS = new Set(["managedMcpServers", "extraKnownMarketplaces", "modelSettings"]);
+const WHOLE_ENTRY_KEYS = new Set(["managedMcpServers", "extraKnownMarketplaces"]);
 
 interface Strict {
   /** Least strict value first. */
@@ -290,14 +290,73 @@ export function effectiveSettings(layers: SettingsLayer[]): EffectiveSetting[] {
   const filterSandbox = sandboxFilter((key, scope) =>
     allowedScopes(key).includes(scope) ? byScope.get(scope)?.[key] : undefined
   );
-  return [...keys].sort().map((key) =>
-    effectiveSetting(
+  return [...keys].sort().map((key) => {
+    const setting = effectiveSetting(
       key,
       (scope) => byScope.get(scope)?.[key],
       (scope) => rawByScope.get(scope)?.[key],
       filterSandbox
-    )
-  );
+    );
+    return key === "modelSettings"
+      ? withModelEffort(setting, (k, scope) => byScope.get(scope)?.[k])
+      : setting;
+  });
+}
+
+/**
+ * modelSettings with each model's effortLevel and maxEffortLevel as Claude Code resolves them; its
+ * other fields merge field by field. The level comes from the highest file that sets it for the
+ * model, or that sets a top-level effortLevel applying to every model (any file but user settings,
+ * where it applies only to older models). Each file caps the model at its entry's maxEffortLevel,
+ * else its top-level one, and the lowest cap holds (docs: settings-reference#modelsettings,
+ * #maxeffortlevel).
+ */
+function withModelEffort(
+  setting: EffectiveSetting,
+  valueIn: (key: string, scope: Scope) => unknown
+): EffectiveSetting {
+  if (!isRecord(setting.value)) return setting;
+  const ladder = STRICTEST.maxEffortLevel?.ladder ?? [];
+  const entryIn = (scope: Scope, model: string) => {
+    const models = valueIn("modelSettings", scope);
+    const entry = isRecord(models) ? models[model] : undefined;
+    return isRecord(entry) ? entry : {};
+  };
+  const value: Record<string, unknown> = {};
+  const overridden = [...setting.overridden];
+  for (const [model, merged] of Object.entries(setting.value)) {
+    if (!isRecord(merged)) {
+      value[model] = merged;
+      continue;
+    }
+    const { effortLevel: _level, maxEffortLevel: cap, ...entry } = merged;
+    let decided = false;
+    for (const scope of [...PRECEDENCE].reverse()) {
+      const level = entryIn(scope, model).effortLevel;
+      if (level !== undefined && decided)
+        overridden.push({ scope, value: { [model]: { effortLevel: level } } });
+      else if (level !== undefined) entry.effortLevel = level;
+      decided ||=
+        level !== undefined || (scope !== "user" && valueIn("effortLevel", scope) !== undefined);
+    }
+    if (PRECEDENCE.some((scope) => entryIn(scope, model).maxEffortLevel !== undefined)) {
+      const caps = PRECEDENCE.map(
+        (scope) => entryIn(scope, model).maxEffortLevel ?? valueIn("maxEffortLevel", scope)
+      );
+      // Starts from the highest entry's own cap, so an invalid one still shows when no cap is valid.
+      entry.maxEffortLevel = caps.reduce(
+        (low, c) => (ladder.indexOf(c) > ladder.indexOf(low) ? c : low),
+        cap
+      );
+    }
+    value[model] = entry;
+  }
+  return {
+    ...setting,
+    value,
+    overridden,
+    note: "Claude Code takes each model's effortLevel from the highest file that sets it, and caps the model at the lowest maxEffortLevel any file gives it",
+  };
 }
 
 /** One key's value, from its value in each scope, lowest precedence first. */

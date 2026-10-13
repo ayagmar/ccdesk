@@ -413,3 +413,29 @@ test("env variables a repository may not set, or no file may set, are ignored by
   );
   assert.ok(!JSON.stringify(env).includes("/fake/"));
 });
+
+test("each model's effort comes from the highest file that sets it, capped at the lowest cap of any file", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/settings.json", {
+    modelSettings: {
+      "claude-opus-5-5": { maxEffortLevel: "low" },
+      "claude-sonnet-5": { effortLevel: "xhigh", maxEffortLevel: "max", autoCompactWindow: 200000 },
+    },
+  });
+  // A top-level effortLevel in project settings applies to every model, so it outranks the level
+  // you saved for Sonnet in user settings; its cap holds although your entry exempts Sonnet.
+  f.json("app/.claude/settings.json", { effortLevel: "low", maxEffortLevel: "medium" });
+  f.json("app/.claude/settings.local.json", {
+    modelSettings: { "claude-opus-5-5": { effortLevel: "high" } },
+  });
+
+  const models = setting(await scanDirectory(f.env, f.at("app")), "modelSettings");
+
+  assert.deepEqual(models?.value, {
+    "claude-opus-5-5": { effortLevel: "high", maxEffortLevel: "low" },
+    "claude-sonnet-5": { maxEffortLevel: "medium", autoCompactWindow: 200000 },
+  });
+  assert.deepEqual(models?.overridden, [
+    { scope: "user", value: { "claude-sonnet-5": { effortLevel: "xhigh" } } },
+  ]);
+});
