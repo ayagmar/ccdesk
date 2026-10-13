@@ -63,7 +63,7 @@ ccdesk flags three things on instruction files that load, with a count after the
 - a paragraph of 60 characters or more repeats one in an earlier file, so Claude reads it twice;
 - an `@import` points at a file that does not exist.
 
-Instruction files that exist but cannot be read, for example because of their permissions, are listed at the top of the page with settings and `.mcp.json` files that are not valid JSON.
+Instruction files that exist but cannot be read, for example because of their permissions or a link that loops, are listed at the top of the page. So are memory, subagent, skill and command files that cannot be read, and any of these that is not valid JSON: a settings file, `~/.claude.json`, a `.mcp.json`, `managed-mcp.json`, and a plugin's `plugin.json` or `hooks/hooks.json`. A missing file is not listed.
 
 ## Editing
 
