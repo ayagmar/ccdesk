@@ -14,8 +14,10 @@ import {
 import { basename, dirname, join } from "node:path";
 import { type Static, Type } from "typebox";
 import { BACKUP_KINDS, type BackupKind } from "../shared/types.ts";
+import { isRecord } from "./scan/data.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isCredentials, isSecretPath, revisionOf } from "./scan/files.ts";
+import { jsonSyntaxError } from "./secrets.ts";
 
 /** A change ccdesk refuses on purpose; the server answers 409 with the message. */
 export class RefusedError extends Error {}
@@ -44,6 +46,40 @@ export function changeQueue(): Serially {
 
 /** The queue the save functions use when they are called without a core's. */
 export const serially = changeQueue();
+
+/** What every change's review has: the revision it was worked out from and why it cannot be saved. */
+interface Review {
+  /** Fingerprint of everything the change was worked out from. */
+  revision: string;
+  /** When there are any, nothing is saved. */
+  errors?: string[];
+}
+
+/** A change worked out from disk as it is now: what it shows for review, and how to make it. */
+export interface Planned<Preview extends Review, T> {
+  preview: Preview;
+  save: () => Promise<T>;
+}
+
+/**
+ * Plans a change again and makes it, but only when it has no errors and everything it was worked
+ * out from is as reviewed; `changed` is the refusal otherwise. Planning and saving share one turn
+ * of the queue, so no other change lands between the check and the write.
+ */
+export function saveReviewed<T>(
+  queue: Serially,
+  plan: () => Promise<Planned<Review, T>>,
+  expectedRevision: string,
+  changed: string
+): Promise<T> {
+  return queue(async () => {
+    const { preview, save } = await plan();
+    const errors = preview.errors ?? [];
+    if (errors.length > 0) throw new RefusedError(errors.join("; "));
+    if (preview.revision !== expectedRevision) throw new RefusedError(changed);
+    return save();
+  });
+}
 
 export function backupRoot(env: ScanEnv): string {
   return join(env.claudeDir, "backups", "ccdesk");
@@ -80,6 +116,27 @@ export async function readIfExists(env: ScanEnv, path: string): Promise<string |
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
   }
+}
+
+/**
+ * A JSON file that holds an object, as ccdesk edits it: missing or empty is `{}`, anything else
+ * that is not an object is refused. `reformats` says whether writing it back as 2-space JSON
+ * changes more than the edit, since its diff is rendered from the parsed file.
+ */
+export async function readJsonObject(
+  env: ScanEnv,
+  path: string
+): Promise<{ raw: string | null; data: Record<string, unknown>; reformats: boolean }> {
+  const raw = await readIfExists(env, path);
+  if (raw === null || raw.trim() === "") return { raw, data: {}, reformats: false };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new RefusedError(`${path} is ${jsonSyntaxError(error)}; fix it by hand first.`);
+  }
+  if (!isRecord(parsed)) throw new RefusedError(`${path} does not hold a JSON object.`);
+  return { raw, data: parsed, reformats: raw !== `${JSON.stringify(parsed, null, 2)}\n` };
 }
 
 /**

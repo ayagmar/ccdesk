@@ -7,12 +7,14 @@ import { shownText } from "./secrets.ts";
 import { scanDirectory } from "./scan/index.ts";
 import { agentProblems } from "./scan/inventory.ts";
 import {
+  type Planned,
   RefusedError,
   readIfExists,
   recordChange,
   removeExactly,
   type Serially,
   StaleError,
+  saveReviewed,
   serially,
   writeAtomic,
 } from "./write.ts";
@@ -47,13 +49,7 @@ async function targetOf(env: ScanEnv, edit: AgentEdit): Promise<string> {
   return join(folder, `${file}.md`);
 }
 
-interface Planned {
-  path: string;
-  raw: string | null;
-  preview: SettingsEditPreview;
-}
-
-async function plan(env: ScanEnv, edit: AgentEdit): Promise<Planned> {
+async function plan(env: ScanEnv, edit: AgentEdit): Promise<Planned<SettingsEditPreview, Change>> {
   const path = await targetOf(env, edit);
   const raw = await readIfExists(env, path);
   if (!edit.path && raw !== null)
@@ -71,17 +67,23 @@ async function plan(env: ScanEnv, edit: AgentEdit): Promise<Planned> {
     errors = [
       "ccdesk does not write env, header or URL values it would then hide; add them in your editor instead.",
     ];
+  const { text } = edit;
   return {
-    path,
-    raw,
     preview: {
       path,
       before,
-      after: errors.length > 0 ? (before ?? "") : (shownText(edit.text) ?? ""),
+      after: errors.length > 0 ? (before ?? "") : (shownText(text) ?? ""),
       revision: revisionOf(raw),
       reformats: false,
       errors,
     },
+    save: () =>
+      recordChange(env, { kind: "agent", target: path, before: raw }, async () => {
+        if (text !== null) await writeAtomic(env, path, text, revisionOf(raw));
+        else if (!(await removeExactly(path, revisionOf(raw))))
+          throw new StaleError(`${path} changed while ccdesk deleted it; nothing was deleted.`);
+        return { target: path, revision: revisionOf(text) };
+      }),
   };
 }
 
@@ -99,17 +101,10 @@ export function saveAgentEdit(
   expectedRevision: string,
   queue: Serially = serially
 ): Promise<Change> {
-  return queue(async () => {
-    const { path, raw, preview } = await plan(env, edit);
-    if (preview.errors.length > 0) throw new RefusedError(preview.errors.join(" "));
-    if (preview.revision !== expectedRevision)
-      throw new RefusedError("The agent changed since you reviewed this; review it again.");
-    const { text } = edit;
-    return recordChange(env, { kind: "agent", target: path, before: raw }, async () => {
-      if (text !== null) await writeAtomic(env, path, text, expectedRevision);
-      else if (!(await removeExactly(path, expectedRevision)))
-        throw new StaleError(`${path} changed while ccdesk deleted it; nothing was deleted.`);
-      return { target: path, revision: revisionOf(text) };
-    });
-  });
+  return saveReviewed(
+    queue,
+    () => plan(env, edit),
+    expectedRevision,
+    "The agent changed since you reviewed this; review it again."
+  );
 }
