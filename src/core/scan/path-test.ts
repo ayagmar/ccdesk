@@ -18,7 +18,8 @@ import {
   AGENTS_MD_NAMES,
   agentsMdLoads,
   CLAUDE_MD_NAMES,
-  isExcluded,
+  type ExcludeMatcher,
+  excludeMatcher,
   linkedRuleBlock,
   ruleTarget,
   safeMatch,
@@ -60,7 +61,9 @@ export async function testPath(
     realCwd: await resolvedPath(cwd),
     approved: view.trust.externalImports === "approved",
     mode: view.agentsMdMode,
-    excludes: stringsIn(view.effective.find((e) => e.key === "claudeMdExcludes")?.value),
+    isExcluded: await excludeMatcher(
+      stringsIn(view.effective.find((e) => e.key === "claudeMdExcludes")?.value)
+    ),
     overrides: view.effective.find((e) => e.key === "skillOverrides")?.value,
     startSkills: new Set(
       view.inventory.skills.filter((s) => s.scope !== "plugin").map((s) => s.name)
@@ -88,7 +91,7 @@ interface FolderTest {
   realCwd: string;
   approved: boolean;
   mode: DirectoryView["agentsMdMode"];
-  excludes: string[];
+  isExcluded: ExcludeMatcher;
   overrides: unknown;
   /** Names of the skills loaded at startup, which a nested skill of the same name is told from. */
   startSkills: Set<string>;
@@ -109,14 +112,14 @@ function startRuleMatches(view: DirectoryView, target: string, projectRoot: stri
 
 /** A folder's CLAUDE.md, CLAUDE.local.md and AGENTS.md files that load on demand. */
 async function nestedInstructions(test: FolderTest, folder: string): Promise<PathMatch[]> {
-  const { env, excludes, mode } = test;
+  const { env, isExcluded, mode } = test;
   const matches: PathMatch[] = [];
   /** Whether the file is there; an excluded one or one over the limit is there but not loaded. */
   const nested = async (name: string, scope: PathMatch["scope"]) => {
     const path = join(folder, name);
     const text = await readTextFile(env, path);
     if (!text) return false;
-    if (!isExcluded(excludes, path, text.realPath) && text.bytes <= MAX_TEXT_BYTES)
+    if (!isExcluded(path, text.realPath) && text.bytes <= MAX_TEXT_BYTES)
       matches.push({ kind: "nested", path, scope });
     return true;
   };
@@ -132,7 +135,7 @@ async function nestedInstructions(test: FolderTest, folder: string): Promise<Pat
 
 /** A folder's rules that load for the file: ones without paths, and ones whose paths match it. */
 async function nestedRules(test: FolderTest, folder: string): Promise<PathMatch[]> {
-  const { env, target, realCwd, approved, excludes } = test;
+  const { env, target, realCwd, approved, isExcluded } = test;
   const matches: PathMatch[] = [];
   for (const path of await walkMarkdown(join(folder, ".claude", "rules"))) {
     const text = await readTextFile(env, path);
@@ -140,7 +143,7 @@ async function nestedRules(test: FolderTest, folder: string): Promise<PathMatch[
     // As at startup: excluded by its target's path too, and one linked from outside the project
     // waits for your approval, then loads only without paths.
     const linked = await ruleTarget(text, folder, realCwd);
-    if (isExcluded(excludes, path, linked)) continue;
+    if (isExcluded(path, linked)) continue;
     const globs = toStringList(parseFrontmatter(text.text).data.paths);
     if (linkedRuleBlock(linked, realCwd, approved, globs.length > 0)) continue;
     const glob =

@@ -115,6 +115,25 @@ test("in a worktree inside the main checkout, the main checkout's project files 
   );
 });
 
+test("claudeMdExcludes globs match files in .claude folders, and patterns written through a link", async () => {
+  const f = makeFixture();
+  f.write("mono/team/CLAUDE.md", "team");
+  f.write("mono/team/.claude/CLAUDE.md", "team settings");
+  f.write("mono/team/.claude/rules/a.md", "rule");
+  f.write("mono/other/CLAUDE.md", "other");
+  f.write("mono/other/.claude/rules/b.md", "rule");
+  f.link("monolink", f.at("mono"));
+  f.json("home/.claude/settings.json", {
+    claudeMdExcludes: [`${f.at("mono/team")}/**`, `${f.at("monolink/other")}/**`],
+  });
+
+  const team = await scanDirectory(f.env, f.at("mono/team"));
+  const other = await scanDirectory(f.env, f.at("mono/other"));
+
+  assert.deepEqual(loadedPaths(team, f.root), []);
+  assert.deepEqual(loadedPaths(other, f.root), []);
+});
+
 test("paths mentioned in code spans or fences are not treated as imports", async () => {
   const f = makeFixture();
   f.write(
