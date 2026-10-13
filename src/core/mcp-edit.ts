@@ -5,7 +5,7 @@ import { type Change, type McpEdit, type SettingsEditPreview } from "../shared/t
 import { type ScanEnv } from "./scan/env.ts";
 import { revisionOf } from "./scan/files.ts";
 import { isRecord } from "./scan/data.ts";
-import { gitRoot, mainWorktreeRoot, trustKey } from "./scan/git.ts";
+import { claudeJsonKey, gitRoot, mainWorktreeRoot, trustKey } from "./scan/git.ts";
 import { serverProblems } from "./scan/mcp.ts";
 import { hasHiddenValues, jsonSyntaxError, redactSecrets, secretTexts, shown } from "./secrets.ts";
 import {
@@ -213,7 +213,7 @@ async function claudeJsonServers(
   if (!(await stat(cwd).catch(() => null))?.isDirectory())
     throw new RefusedError(`${cwd} is not a directory on this machine.`);
   const projects = isRecord(data.projects) ? data.projects : {};
-  const holder = edit.scope === "user" ? data : projects[cwd];
+  const holder = edit.scope === "user" ? data : projects[claudeJsonKey(env, cwd)];
   const servers = isRecord(holder) && isRecord(holder.mcpServers) ? holder.mcpServers : {};
   return { cwd, servers };
 }

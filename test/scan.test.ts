@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { basename } from "node:path";
 import { test } from "node:test";
-import { scanDirectory } from "../src/core/index.ts";
+import { scanDirectory, scanOverview } from "../src/core/index.ts";
 import { makeFixture, memoryDirFor } from "./helpers/fixture.ts";
 
 type View = Awaited<ReturnType<typeof scanDirectory>>;
@@ -440,6 +440,34 @@ test("in a subdirectory of a repository, local servers come from the repository 
     projects: { [f.at("repo")]: local("root-db"), [f.at("repo/apps/web")]: local("web-db") },
   });
   assert.deepEqual(await localNames(), ["root-db"]);
+});
+
+test("~/.claude.json entries keyed as Claude Code writes them give the folder's trust and local servers", async () => {
+  const f = makeFixture();
+  const env = { ...f.env, platform: process.platform };
+  // Claude Code keys a folder with forward slashes on Windows, and as it is elsewhere.
+  const key = (path: string) => (env.platform === "win32" ? path.replaceAll("\\", "/") : path);
+  f.write("app/README.md", "x");
+  f.json("home/.claude.json", {
+    projects: {
+      [key(f.at("app"))]: {
+        hasTrustDialogAccepted: true,
+        mcpServers: { db: { command: "db-server" } },
+      },
+    },
+  });
+
+  const view = await scanDirectory(env, f.at("app"));
+  assert.equal(view.trust.trusted, true);
+  assert.deepEqual(
+    view.inventory.mcpServers.filter((s) => s.scope === "local").map((s) => [s.name, s.status]),
+    [["db", "active"]]
+  );
+  const overview = await scanOverview(env, f.at("app"));
+  assert.deepEqual(
+    overview.projects.filter((p) => basename(p.path) === "app").map((p) => p.path),
+    [f.at("app")]
+  );
 });
 
 test("claude -p treats an untrusted folder as trusted for hooks and .mcp.json, not for repository grants", async () => {

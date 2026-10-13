@@ -13,6 +13,7 @@ import { redactSecrets, shownUrl } from "../secrets.ts";
 import { isConfigHome, type ScanEnv } from "./env.ts";
 import { readJsonOrReport, stringField, stringsIn, wildcard } from "./files.ts";
 import { isRecord } from "./data.ts";
+import { claudeJsonKey } from "./git.ts";
 import { type LoadedPlugin, manifestConfigs } from "./plugins.ts";
 import serverSchema from "../../shared/mcp-server.schema.json" with { type: "json" };
 import { schemaErrors } from "../schema.ts";
@@ -245,7 +246,7 @@ export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Pro
   // Local servers live in the entry under the trust key, even from a subdirectory: claude mcp add
   // --scope local writes there and claude mcp list reads only that entry, ignoring one for the
   // subdirectory (observed with v2.1.296; the docs do not say).
-  const entry = projects[trust.root];
+  const entry = projects[claudeJsonKey(env, trust.root)];
   const project: Record<string, unknown> = isRecord(entry) ? entry : {};
 
   const managedFile = join(env.managedDir, "managed-mcp.json");
