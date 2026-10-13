@@ -1,9 +1,10 @@
 import { useId, useState } from "react";
 import { EDITABLE_SCOPES } from "../shared/scopes.ts";
 import { type DirectoryView, type Hook, type HookEdit, type Scope } from "../shared/types.ts";
+import { parseJson } from "../view/settings.ts";
 import { api } from "./api.ts";
 import { tilde } from "./format.ts";
-import { fileFor, parseJson, projectOrUser, ScopePicker } from "./editorKit.tsx";
+import { fileFor, projectOrUser, ScopePicker } from "./editorKit.tsx";
 import { reference } from "./reference.ts";
 import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
 

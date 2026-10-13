@@ -1086,6 +1086,12 @@ input::placeholder {
   color: var(--bad);
 }
 
+/* An editor's flags are sentences, such as why a value cannot be saved; they wrap in the pane. */
+.editor .flag {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .segmented {
   margin: 0;
   min-width: 0;
@@ -2121,6 +2127,25 @@ button:disabled {
 .field textarea {
   resize: vertical;
   line-height: 1.5;
+}
+
+fieldset.field {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.object-fields {
+  display: grid;
+  gap: 12px;
+  padding-left: 12px;
+  border-left: 1px solid var(--rule);
+}
+
+.object-field {
+  display: grid;
+  gap: 4px;
 }
 
 .field input:focus,

@@ -1,7 +1,8 @@
 import { useId, useState } from "react";
 import { type DirectoryView, type McpEdit, type McpServer } from "../shared/types.ts";
+import { parseJson } from "../view/settings.ts";
 import { api } from "./api.ts";
-import { parseJson, ScopeButtons } from "./editorKit.tsx";
+import { ScopeButtons } from "./editorKit.tsx";
 import { tilde } from "./format.ts";
 import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
 
