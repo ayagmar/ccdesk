@@ -257,13 +257,13 @@ test("a hook event Claude Code does not know is not written, unless the file alr
       method: "POST",
       body: { dir, scope: "project", key: "hooks", value },
     });
-  const before = readFileSync(file, "utf8");
+  const untouched = readFileSync(file, "utf8");
 
   const unknown = (await preview({ OldEvent: [hook], Nope: [hook] })).json as Preview;
   assert.deepEqual(unknown.errors, ["Nope is not a hook event Claude Code knows."]);
   const kept = (await preview({ OldEvent: [hook], Stop: [hook] })).json as Preview;
   assert.deepEqual(kept.errors, []);
-  assert.equal(readFileSync(file, "utf8"), before);
+  assert.equal(readFileSync(file, "utf8"), untouched);
 });
 
 test("a settings edit is previewed as a file change, then saved with a backup", async () => {
@@ -273,18 +273,18 @@ test("a settings edit is previewed as a file change, then saved with a backup", 
 
   const preview = await call("/api/settings/preview", { method: "POST", body: edit });
   assert.equal(preview.status, 200);
-  const { before, after, revision, errors } = preview.json as Preview;
+  const { before: shownBefore, after: shownAfter, revision, errors } = preview.json as Preview;
   assert.deepEqual(errors, []);
-  assert.deepEqual(JSON.parse(after), { model: "sonnet", effortLevel: "high" });
+  assert.deepEqual(JSON.parse(shownAfter), { model: "sonnet", effortLevel: "high" });
   assert.deepEqual(
     JSON.parse(readFileSync(file, "utf8")),
-    JSON.parse(before ?? ""),
+    JSON.parse(shownBefore ?? ""),
     "preview writes nothing"
   );
 
   const saved = await call("/api/settings/save", { method: "POST", body: { ...edit, revision } });
   assert.equal(saved.status, 200);
-  assert.equal(readFileSync(file, "utf8"), after);
+  assert.equal(readFileSync(file, "utf8"), shownAfter);
   assert.equal((await backups()).find((b) => b.id === (saved.json as Change).id)?.target, file);
 
   const view = await call(`/api/directory?path=${encodeURIComponent(dir)}`);
@@ -879,7 +879,7 @@ test("a settings file with another hard link is not saved, so the two names keep
   const settings = fixture.at("work/hardlink-settings/.claude/settings.json");
   fixture.write("work/hardlink-settings/.claude/.keep", "");
   linkSync(shared, settings);
-  const before = readFileSync(shared, "utf8");
+  const untouched = readFileSync(shared, "utf8");
 
   const res = await saveSetting({
     dir: fixture.at("work/hardlink-settings"),
@@ -890,7 +890,7 @@ test("a settings file with another hard link is not saved, so the two names keep
 
   assert.equal(res.status, 409);
   assert.match((res.json as { error: string }).error, /hard links/);
-  assert.equal(readFileSync(settings, "utf8"), before);
+  assert.equal(readFileSync(settings, "utf8"), untouched);
   assert.equal(lstatSync(settings).ino, lstatSync(shared).ino);
 });
 
@@ -1063,7 +1063,7 @@ test("adding a permission rule the file already has changes nothing", async () =
   const file = fixture.json("work/perms-same/.claude/settings.json", {
     permissions: { allow: ["Read"] },
   });
-  const before = readFileSync(file, "utf8");
+  const untouched = readFileSync(file, "utf8");
 
   const res = await call("/api/permissions/preview", {
     method: "POST",
@@ -1071,7 +1071,7 @@ test("adding a permission rule the file already has changes nothing", async () =
   });
 
   assert.equal(res.status, 409);
-  assert.equal(readFileSync(file, "utf8"), before);
+  assert.equal(readFileSync(file, "utf8"), untouched);
 });
 
 test("undoing a memory delete is refused when MEMORY.md changed since", async () => {
@@ -1361,7 +1361,7 @@ test("a hook is not replaced by one that sends header values ccdesk would hide",
   const file = fixture.json("work/hooks-replace-secret/.claude/settings.json", {
     hooks: { Stop: [{ hooks: [command("bell")] }] },
   });
-  const before = readFileSync(file, "utf8");
+  const untouched = readFileSync(file, "utf8");
   const [hook] = await hooksIn(dir);
   assert.ok(hook);
 
@@ -1379,7 +1379,7 @@ test("a hook is not replaced by one that sends header values ccdesk would hide",
     },
   });
   assert.equal(replaced.status, 409);
-  assert.equal(readFileSync(file, "utf8"), before);
+  assert.equal(readFileSync(file, "utf8"), untouched);
 });
 
 test("changing the matcher of a hook alone in its group keeps the group where it is", async () => {
@@ -1594,7 +1594,7 @@ test("keys in a server's args are hidden, and such a server is not rewritten", a
   const file = fixture.json("work/mcp-args/.mcp.json", {
     mcpServers: { api: { command: "npx", args } },
   });
-  const before = readFileSync(file, "utf8");
+  const untouched = readFileSync(file, "utf8");
 
   const view = await call(`/api/directory?path=${encodeURIComponent(dir)}`);
   const api = (await serversIn(dir)).find((s) => s.name === "api");
@@ -1613,7 +1613,7 @@ test("keys in a server's args are hidden, and such a server is not rewritten", a
   assert.doesNotMatch(JSON.stringify(view.json), /secret/);
   assert.equal(api.target, "npx -y some-mcp --api-key ••• --token=••• ••• --port 8080");
   assert.equal(rewritten.status, 409);
-  assert.equal(readFileSync(file, "utf8"), before);
+  assert.equal(readFileSync(file, "utf8"), untouched);
   assert.equal(userAdd.status, 200);
   assert.doesNotMatch(JSON.stringify(userAdd.json), /secret/);
 });
@@ -1649,7 +1649,7 @@ test("user and local servers are changed through claude mcp, never by writing ~/
       projects: { [dir]: { mcpServers: { db: { command: "db-mcp" } } } },
     })
   );
-  const before = readFileSync(fixture.env.claudeJson, "utf8");
+  const untouched = readFileSync(fixture.env.claudeJson, "utf8");
   claudeRuns.length = 0;
 
   const replaced = await saveMcp({
@@ -1699,7 +1699,7 @@ test("user and local servers are changed through claude mcp, never by writing ~/
       cwd: fixture.env.home,
     },
   ]);
-  assert.equal(readFileSync(fixture.env.claudeJson, "utf8"), before);
+  assert.equal(readFileSync(fixture.env.claudeJson, "utf8"), untouched);
 });
 
 /** Every file in a backup folder, read as text. */
@@ -1869,11 +1869,11 @@ test("a replaced server that cannot be put back comes with a command that restor
     add: { name: "notes", definition: { command: "node", args: ["--v2"] } },
   });
   assert.equal(refused.status, 409);
-  const command = /put it back with: (.*) \(/.exec((refused.json as { error: string }).error)?.[1];
-  assert.ok(command);
+  const putBack = /put it back with: (.*) \(/.exec((refused.json as { error: string }).error)?.[1];
+  assert.ok(putBack);
 
   chmodSync(fixture.write("bin/claude", '#!/bin/sh\nprintf "%s\\n" "$PWD" "$@"\n'), 0o755);
-  const printed = execFileSync("sh", ["-c", command], {
+  const printed = execFileSync("sh", ["-c", putBack], {
     cwd: fixture.env.home,
     env: { ...process.env, PATH: `${fixture.at("bin")}:${process.env.PATH}` },
     encoding: "utf8",

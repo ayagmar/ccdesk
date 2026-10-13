@@ -52,6 +52,18 @@ function transcript(cwd: string, calls: [tool: string, input: object, answer?: s
     .join("");
 }
 
+/** The folders of the made-up setup, and how to write into it. */
+interface Demo {
+  home: string;
+  claude: string;
+  api: string;
+  web: string;
+  notes: string;
+  write: (path: string, content: string) => void;
+  json: (path: string, value: unknown) => void;
+  git: (dir: string, ...args: string[]) => void;
+}
+
 export function makeDemoHome(root: string): DemoHome {
   const home = join(root, "home");
   const claude = join(home, ".claude");
@@ -64,7 +76,7 @@ export function makeDemoHome(root: string): DemoHome {
     writeFileSync(path, content);
   };
   const json = (path: string, value: unknown) => write(path, `${JSON.stringify(value, null, 2)}\n`);
-  const git = (dir: string, ...args: string[]) =>
+  const git = (dir: string, ...args: string[]) => {
     execFileSync("git", ["-C", dir, ...args], {
       stdio: "ignore",
       env: {
@@ -76,8 +88,20 @@ export function makeDemoHome(root: string): DemoHome {
         GIT_COMMITTER_EMAIL: "demo@example.com",
       },
     });
+  };
+  const demo: Demo = { home, claude, api, web, notes, write, json, git };
+  writeUserScope(demo);
+  writePlugin(demo);
+  writeApi(demo);
+  writeWeb(demo);
+  writeClaudeJson(demo);
+  writeMemory(demo);
+  writeTranscripts(demo);
+  return { home, start: api };
+}
 
-  // User scope.
+/** Your user files: CLAUDE.md, settings, hooks, subagents, skills, a command and an output style. */
+function writeUserScope({ claude, write, json }: Demo): void {
   write(
     join(claude, "CLAUDE.md"),
     `# How I work
@@ -172,8 +196,10 @@ Look for table rewrites and long locks first.
     join(claude, "output-styles", "terse.md"),
     "---\nname: terse\ndescription: Short answers, code first.\n---\n\nAnswer in as few words as the question allows.\n"
   );
+}
 
-  // A plugin from a made-up marketplace.
+/** A plugin from a made-up marketplace. */
+function writePlugin({ claude, write, json }: Demo): void {
   const plugin = join(claude, "plugins", "cache", "demo-market", "release-notes", "1.4.0");
   json(join(plugin, ".claude-plugin", "plugin.json"), {
     name: "release-notes",
@@ -197,8 +223,10 @@ Look for table rewrites and long locks first.
       ],
     },
   });
+}
 
-  // acme-api: the directory the screenshots open on.
+/** acme-api: the directory the screenshots open on. */
+function writeApi({ api, write, json, git }: Demo): void {
   write(
     join(api, "CLAUDE.md"),
     `# acme-api
@@ -291,8 +319,10 @@ Read the migration and the rule file, then report anything that is not reversibl
     ".claude/rules"
   );
   git(api, "commit", "-q", "-m", "init");
+}
 
-  // acme-web: a second repository.
+/** acme-web: a second repository, and a notes folder outside git. */
+function writeWeb({ web, notes, write, json, git }: Demo): void {
   write(
     join(web, "CLAUDE.md"),
     "# acme-web\n\nAstro storefront. Components live in `src/components`; keep them server-rendered.\n"
@@ -305,8 +335,10 @@ Read the migration and the rule file, then report anything that is not reversibl
   git(web, "add", ".");
   git(web, "commit", "-q", "-m", "init");
   write(join(notes, "todo.md"), "- renew the staging certificate\n");
+}
 
-  // ~/.claude.json: trust, user and local MCP servers.
+/** ~/.claude.json: trust, user and local MCP servers. */
+function writeClaudeJson({ home, api, web, notes, json }: Demo): void {
   json(join(home, ".claude.json"), {
     numStartups: 214,
     mcpServers: {
@@ -330,8 +362,10 @@ Read the migration and the rule file, then report anything that is not reversibl
       [notes]: { hasTrustDialogAccepted: false },
     },
   });
+}
 
-  // Auto memory.
+/** Auto memory for both repositories, with one memory saved in each. */
+function writeMemory({ claude, api, web, write }: Demo): void {
   const apiMemory = join(claude, "projects", storeName(api), "memory");
   write(
     join(apiMemory, "MEMORY.md"),
@@ -394,8 +428,10 @@ Read the migration and the rule file, then report anything that is not reversibl
       "List defects first, then risks, then nits."
     )
   );
+}
 
-  // Transcripts, so tool counts and suggested rules show up.
+/** Transcripts, so tool counts and suggested rules show up. */
+function writeTranscripts({ claude, api, web, write }: Demo): void {
   write(
     join(claude, "projects", storeName(api), "demo-session-1.jsonl"),
     transcript(api, [
@@ -432,6 +468,4 @@ Read the migration and the rule file, then report anything that is not reversibl
       ["Read", { file_path: join(web, "CLAUDE.md") }],
     ])
   );
-
-  return { home, start: api };
 }

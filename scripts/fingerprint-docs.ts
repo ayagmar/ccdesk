@@ -61,7 +61,7 @@ function sections(markdown: string): Map<string, string> {
   });
   const out = new Map<string, string>();
   headings.forEach((h, i) => {
-    const end = headings.slice(i + 1).find((next) => next.level <= h.level)?.line ?? lines.length;
+    const end = headings.slice(i + 1).find((later) => later.level <= h.level)?.line ?? lines.length;
     out.set(h.anchor, lines.slice(h.line, end).join("\n"));
   });
   return out;
@@ -116,8 +116,9 @@ writeFileSync(OUT, `${JSON.stringify(next, null, 2)}\n`);
 
 for (const [key, value] of Object.entries(next)) {
   if (previous[key] === value) continue;
-  const what =
-    value === "missing" ? "is gone" : previous[key] === undefined ? "is newly cited" : "changed";
+  let what = "changed";
+  if (value === "missing") what = "is gone";
+  else if (previous[key] === undefined) what = "is newly cited";
   console.log(
     `- [\`${key}\`](${DOCS}/${key}) ${what}; cited in ${[...(cited.get(key) ?? [])].map((f) => `\`${f}\``).join(", ")}`
   );

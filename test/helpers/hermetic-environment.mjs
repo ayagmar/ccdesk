@@ -52,7 +52,7 @@ Object.assign(process.env, {
 });
 
 globalThis.fetch = async (input) => {
-  const target = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const target = input instanceof Request ? input.url : String(input);
   throw new Error(`Unexpected network access from test: ${target}`);
 };
 
