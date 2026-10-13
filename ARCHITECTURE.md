@@ -45,7 +45,7 @@ Usage counts arrive separately: the page posts the rules in effect to `/api/usag
 
 ## Secrets
 
-Values under `env` and `headers`, keys in URLs, and secret-looking arguments of MCP servers are replaced with `•••` by `redactSecrets` in `secrets.ts`. The scan applies it before a value goes into a `DirectoryView`, and every preview and restore preview shows files through `shownText` or `shown`, so a hidden value never reaches the browser, diffs included. Files named like the credentials file, or linked to it, are never read (`isSecretPath`, `isCredentials`), and a core's `openFile` refuses to open them, whatever opener it was given.
+Values under `env` and `headers`, keys in URLs, and secret-looking arguments of MCP servers are replaced with `•••` by `redactSecrets` in `secrets.ts`. MCP policy entries are hidden the same way (`serverCommand` arguments, `serverUrl` credentials); the policy check matches against each layer's file data, which `unredactedData` in `scan/settings.ts` keeps outside the view. The scan applies it before a value goes into a `DirectoryView`, and every preview and restore preview shows files through `shownText` or `shown`, so a hidden value never reaches the browser, diffs included. Files named like the credentials file, or linked to it, are never read (`isSecretPath`, `isCredentials`), and a core's `openFile` refuses to open them, whatever opener it was given.
 
 ccdesk never writes back a value the page saw as `•••`. Settings, hook and agent edits refuse when the value they change holds a hidden value, or when the new value would be hidden (`settings-edit.ts`, `agent-edit.ts`). Restoring a settings or MCP file is refused when its hidden values changed since the backup, unless the file no longer parses. A new MCP server may hold the env values and headers you type for it.
 
@@ -53,7 +53,7 @@ ccdesk never writes back a value the page saw as `•••`. Settings, hook and
 
 Every edit runs twice: once to show it, once to make it.
 
-1. `preview*(env, edit)` plans the edit from the file on disk and returns the diff and a `revision`, a fingerprint of what it read. A memory change binds two files (the memory and `MEMORY.md`) into one revision.
+1. `preview*(env, edit)` plans the edit from the file on disk and returns the diff and a `revision`, a fingerprint of what it read. For a settings, permission, hook, project MCP or agent edit, `reviewRevision` in `write.ts` also binds the path and the file it leads to, so a save that would land in another file, such as a local settings file that moved to a new repository's root, needs a new review. A memory change binds two files (the memory and `MEMORY.md`) into one revision.
 2. A core's `save*(edit, revision)` plans the same edit again and writes only if the revision still matches. It returns a `Change`: `id` (its backup folder), `target`, the file's `revision` after the change, and `created` when the file did not exist.
 3. Undo is `core.restoreBackup(change.id, change.revision)`. Recent changes uses `listBackups`, then `previewRestore(env, id)` for the diff and its revision, then `restoreBackup` with that revision.
 
