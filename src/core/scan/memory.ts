@@ -4,6 +4,7 @@ import {
   type MemoryIndex,
   type MemoryStore,
   type MemoryType,
+  type Problem,
   type TextFile,
 } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
@@ -16,18 +17,20 @@ const INDEX_LINE_LIMIT = 200;
 const INDEX_BYTE_LIMIT = 25 * 1024;
 const TYPES: MemoryType[] = ["user", "feedback", "project", "reference"];
 
+/** The memory files in `dir`; a file that is there but cannot be read goes into `problems`. */
 export async function readMemoryStore(
   env: ScanEnv,
   dir: string,
-  projectPath: string | null
+  projectPath: string | null,
+  problems?: Problem[]
 ): Promise<MemoryStore | null> {
   if (!(await isDir(dir))) return null;
-  const indexFile = await readTextFile(env, join(dir, INDEX_FILE));
+  const indexFile = await readTextFile(env, join(dir, INDEX_FILE), problems);
   const files = (await listDir(dir)).filter((f) => f.endsWith(".md") && f !== INDEX_FILE);
 
   const memories: Memory[] = [];
   for (const file of files) {
-    const text = await readTextFile(env, join(dir, file));
+    const text = await readTextFile(env, join(dir, file), problems);
     if (!text) continue;
     const { data, body } = parseFrontmatter(text.text);
     const metadata =

@@ -107,6 +107,7 @@ export async function scanDirectory(
     claudeJson,
     trust,
     profile,
+    problems,
   });
 
   // Every project file that shapes Claude here, so the UI can say who sees each one.
@@ -158,7 +159,7 @@ export async function scanDirectory(
     localFromRepository,
     profile,
   };
-  const memory = await readMemory(env, mainRoot, path, effective, trustOptions);
+  const memory = await readMemory(env, mainRoot, path, effective, trustOptions, problems);
   const permissions = permissionsOf(settings, trustOptions);
 
   for (const l of settings)
@@ -193,7 +194,8 @@ export async function scanDirectory(
     permissions,
     tools: builtinTools(permissions, inventory.hooks),
     trust,
-    problems,
+    // One line per file: a file read twice, such as a rule that a CLAUDE.md also imports, is one problem.
+    problems: problems.filter((p, i) => problems.findIndex((q) => q.path === p.path) === i),
     sharing,
   };
 }
@@ -244,7 +246,8 @@ async function readMemory(
   mainRoot: string | null,
   path: string,
   effective: EffectiveSetting[],
-  trustOptions: TrustOptions
+  trustOptions: TrustOptions,
+  problems: Problem[]
 ): Promise<MemoryStore> {
   const key = mainRoot ?? path;
   const setting = effective.find((s) => s.key === "autoMemoryDirectory");
@@ -260,7 +263,7 @@ async function readMemory(
   const customDir = typeof custom?.value === "string" ? expandHome(env, custom.value) : null;
   const storeName = env.projectDirName ?? storeDirName(key);
   const dir = customDir ?? join(env.claudeDir, "projects", storeName, "memory");
-  const store: MemoryStore = (await readMemoryStore(env, dir, key)) ?? {
+  const store: MemoryStore = (await readMemoryStore(env, dir, key, problems)) ?? {
     dir,
     loaded: true,
     projectPath: key,

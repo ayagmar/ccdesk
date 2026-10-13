@@ -1,4 +1,4 @@
-import { open, realpath, stat } from "node:fs/promises";
+import { realpath, stat } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { storeDirName } from "../../shared/memory.ts";
 import {
@@ -8,7 +8,14 @@ import {
   type Usage,
 } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isCredentials, isDir, isWithin, listDir, wildcard } from "./files.ts";
+import {
+  isCredentials,
+  isDir,
+  isWithin,
+  listDir,
+  openUnlessCredentials,
+  wildcard,
+} from "./files.ts";
 import { isRecord } from "./data.ts";
 import { worktrees } from "./git.ts";
 import { namesTool, parseRule } from "./tools.ts";
@@ -269,7 +276,7 @@ async function transcript(
   transcripts.set(file, known);
   if (known.size === info.size && known.mtimeMs === info.mtimeMs) return known;
   try {
-    await readFrom(file, known, info.size, signal);
+    await readFrom(env, file, known, info.size, signal);
     known.size = info.size;
     known.mtimeMs = info.mtimeMs;
   } catch (error) {
@@ -281,12 +288,15 @@ async function transcript(
 
 /** Reads whole lines from the offset up to `size`; a line still being written is read next time. */
 async function readFrom(
+  env: ScanEnv,
   file: string,
   known: Transcript,
   size: number,
   signal: AbortSignal
 ): Promise<void> {
-  const handle = await open(file, "r");
+  // Checked again on the open file, so one swapped for the credentials file after transcript()'s check is not read.
+  const handle = await openUnlessCredentials(env, file);
+  if (!handle) return;
   try {
     let carried = Buffer.alloc(0);
     let position = known.offset;

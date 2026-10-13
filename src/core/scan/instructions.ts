@@ -1,5 +1,3 @@
-import { constants } from "node:fs";
-import { access, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, matchesGlob, parse, resolve } from "node:path";
 import {
   type AgentsMdMode,
@@ -56,7 +54,7 @@ interface ResolveOptions {
   externalImports: Trust["externalImports"];
   /** The managed settings' `claudeMd` text, which loads like a managed CLAUDE.md. */
   managedClaudeMd: { path: string; text: string } | null;
-  /** Receives instruction files that exist but cannot be read. */
+  /** Receives instruction files and imports that exist but cannot be read. */
   problems: Problem[];
 }
 
@@ -66,6 +64,7 @@ interface Ctx {
   realCwd: string;
   env: ScanEnv;
   approved: boolean;
+  problems: Problem[];
 }
 
 /**
@@ -76,20 +75,12 @@ interface Ctx {
 export async function resolveInstructions(options: ResolveOptions): Promise<Instruction[]> {
   const { env, cwd, mode, excludes, externalImports, managedClaudeMd, problems } = options;
   /** A file that exists but cannot be read is reported, not taken for a missing one. */
-  const readInstruction = async (path: string) => {
-    const file = await readTextFile(env, path);
-    if (file || !(await stat(path).catch(() => null))?.isFile()) return file;
-    const denied = await access(path, constants.R_OK).then(
-      () => null,
-      (error: NodeJS.ErrnoException) => error.code ?? String(error)
-    );
-    if (denied) problems.push({ path, error: `cannot be read (${denied})` });
-    return null;
-  };
+  const readInstruction = (path: string) => readTextFile(env, path, problems);
   const ctx: Ctx = {
     realCwd: await resolvedPath(resolve(cwd)),
     env,
     approved: externalImports === "approved",
+    problems,
   };
   const managedOnly = mode === "managed-only";
   const skippedByMode = `Skipped: instruction mode is ${mode}`;
@@ -339,7 +330,8 @@ async function collectImports(
       if (seen.has(real)) continue;
       seen.add(real);
       const external = !isWithin(ctx.realCwd, real);
-      const imported = !external || readExternal ? await readTextFile(ctx.env, target) : null;
+      const imported =
+        !external || readExternal ? await readTextFile(ctx.env, target, ctx.problems) : null;
       const ref: ImportRef = {
         raw,
         resolved: real,

@@ -1,11 +1,10 @@
-import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { storeDirName } from "../../shared/memory.ts";
 import { type MemoryStore, type ProjectSummary } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isCredentials, isDir, listDir } from "./files.ts";
+import { isDir, listDir, openUnlessCredentials } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { readMemoryStore } from "./memory.ts";
 
@@ -102,8 +101,9 @@ async function sessionCwd(
   sessions: Transcript[]
 ): Promise<string | null> {
   for (const { file } of sessions.slice(0, 3)) {
-    if (await isCredentials(env, join(storeDir, file))) continue;
-    const input = createReadStream(join(storeDir, file), { encoding: "utf8" });
+    const handle = await openUnlessCredentials(env, join(storeDir, file)).catch(() => null);
+    if (!handle) continue;
+    const input = handle.createReadStream({ encoding: "utf8" });
     const lines = createInterface({ input });
     let read = 0;
     try {
