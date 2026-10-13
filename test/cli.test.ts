@@ -52,12 +52,13 @@ test("--dev listens on the port the UI dev server proxies to, unless --port says
   });
 });
 
-test("a port that is not a whole number from 0 to 65535 is refused", () => {
+test("a port that is not a whole number from 0 to 65535 is refused with the help text", () => {
   // Catches a typo such as --port 80800 or --port eighty being passed on to listen().
   for (const port of ["eighty", "80800", "-1", "1.5"])
     assert.throws(
       () => parse([`--port=${port}`]),
-      (error) => error instanceof UsageError && error.message === `ccdesk: invalid --port ${port}`
+      (error) =>
+        error instanceof UsageError && error.message === `ccdesk: invalid --port ${port}\n\n${HELP}`
     );
 });
 

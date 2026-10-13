@@ -83,7 +83,7 @@ export function parse(argv: string[]): Command {
 
   const port = values.port ? Number(values.port) : values.dev ? DEV_PORT : 0;
   if (!Number.isInteger(port) || port < 0 || port > 65535)
-    throw new UsageError(`ccdesk: invalid --port ${values.port}`);
+    throw usage(`invalid --port ${values.port}`);
   return {
     command: "serve",
     port,

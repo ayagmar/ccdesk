@@ -19,10 +19,10 @@ import {
 } from "./write.ts";
 
 /**
- * Runs `claude` with these arguments in `cwd` and resolves with its output. Replaced in tests, so
- * nothing outside the test changes.
+ * Runs `claude` with these arguments in `cwd`, with the profile ccdesk reads so its edits land
+ * where the page shows them, and resolves with its output. Replaced in tests, so nothing outside
+ * the test changes.
  */
-/** Runs claude with the profile ccdesk reads, so its edits land where the page shows them. */
 export type RunClaude = (
   args: string[],
   cwd: string,

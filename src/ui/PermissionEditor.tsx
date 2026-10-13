@@ -2,19 +2,17 @@ import { useId, useState } from "react";
 import { EDITABLE_SCOPES, PERMISSION_LISTS } from "../shared/scopes.ts";
 import {
   type DirectoryView,
-  type Permission,
   type PermissionEdit,
   type PermissionList,
   type Scope,
 } from "../shared/types.ts";
 import { lineName } from "../view/lines.ts";
+import { type Rule } from "../view/sections/permissions.ts";
 import { api } from "./api.ts";
 import { Bullet } from "./Bullet.tsx";
 import { tilde } from "./format.ts";
 import { type Saved } from "./SettingEditor.tsx";
 import { useReviewedChange } from "./useReviewedChange.tsx";
-
-type Rule = Extract<Permission, { kind: "rule" }>;
 
 interface Props {
   view: DirectoryView;

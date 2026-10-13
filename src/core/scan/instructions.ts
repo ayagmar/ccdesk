@@ -151,13 +151,13 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
   const agentsFiles: Instruction[] = [];
   for (const dir of ancestorsRootFirst(cwd)) {
     // ~/.claude/CLAUDE.md and ~/.claude/rules are the user files above, not the home's project files.
-    const isConfigHome = join(dir, ".claude") === env.claudeDir;
+    const holdsClaudeDir = join(dir, ".claude") === env.claudeDir;
     for (const name of ["CLAUDE.md", ".claude/CLAUDE.md"]) {
-      if (isConfigHome && name === ".claude/CLAUDE.md") continue;
+      if (holdsClaudeDir && name === ".claude/CLAUDE.md") continue;
       const file = await readInstruction(join(dir, name));
       if (file) claudeFiles.push(await instruction(file, "claude-md", "project", dir, ctx, ""));
     }
-    if (!isConfigHome && dir !== env.claudeDir)
+    if (!holdsClaudeDir && dir !== env.claudeDir)
       for (const path of await walkMarkdown(join(dir, ".claude", "rules"))) {
         const file = await readInstruction(path);
         if (file) claudeFiles.push(await rule(file, "project", dir, ctx));
