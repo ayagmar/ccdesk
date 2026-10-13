@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.4](https://github.com/ayagmar/ccdesk/compare/v0.2.3...v0.2.4) (2026-10-13)
+
+### Features
+
+* **core:** warn when a higher managed source than the files is present ([cb04a30](https://github.com/ayagmar/ccdesk/commit/cb04a30e72293270bdf4e3529a938ef13188bb41))
+
+### Bug Fixes
+
+* **core:** count Explorer as having opened the file on Windows ([eb1a120](https://github.com/ayagmar/ccdesk/commit/eb1a12090507be426765c38d2e71a5f5500622ef))
+* **core:** hide header values and more secret flags in MCP server args ([3a9ee02](https://github.com/ayagmar/ccdesk/commit/3a9ee024a124602f486b3e8f41e23fffa7c84565))
+* **core:** look up ~/.claude.json folders as Claude Code keys them on Windows ([67a445d](https://github.com/ayagmar/ccdesk/commit/67a445d2a569bccd8f1615e798af099ece5dbe38))
+* **core:** name long project stores as Claude Code does ([98f4dd8](https://github.com/ayagmar/ccdesk/commit/98f4dd8f4efbe1ce0c2154e58b554c9a05baed95))
+* **core:** read JSON files that start with a byte order mark ([6bb2fd3](https://github.com/ayagmar/ccdesk/commit/6bb2fd302d468f1603d2230270ce5c9999027e93))
+* **core:** report a backup folder ccdesk cannot read instead of listing none ([1209b9c](https://github.com/ayagmar/ccdesk/commit/1209b9c0a360939a3247fd3e92ad9b0d41b579f6))
+* **core:** say why claude did not start on Windows instead of "not on PATH" ([9c0d3ad](https://github.com/ayagmar/ccdesk/commit/9c0d3adcc0ad0cb1ff4ed6b66377b603c1b1f4da))
+
+### Performance Improvements
+
+* **core:** group hand-approved calls without copying each group ([9ab7219](https://github.com/ayagmar/ccdesk/commit/9ab7219986690e08669f3aceacb93f3f48777e11))
+* **ui:** refresh the overview on focus and saves, not on watched changes ([9010576](https://github.com/ayagmar/ccdesk/commit/901057643dfcded5f2463ccb09353a5d264f109d))
+
 ## [0.2.3](https://github.com/ayagmar/ccdesk/compare/v0.2.2...v0.2.3) (2026-10-13)
 
 ### Features
