@@ -8,8 +8,8 @@ import {
   editKind,
   expects,
   type Form,
-  firstSentence,
   fieldKind,
+  firstSentence,
   followFile,
   formFor,
   fromDraft,
@@ -250,13 +250,17 @@ test("an autoMode list without $defaults is flagged as replacing the built-in ru
   // Catches a custom hard_deny list silently dropping Claude Code's built-in block rules, in the
   // form or in JSON: the check reads the value, not a control.
   assert.deepEqual(replacedBuiltIns("autoMode", { hard_deny: ["Never push to main"] }), [
-    "hard_deny",
+    { list: "hard_deny", empty: false },
   ]);
   assert.deepEqual(
     replacedBuiltIns("autoMode", { hard_deny: ["$defaults", "Never push to main"] }),
     []
   );
-  assert.deepEqual(replacedBuiltIns("autoMode", { allow: [] }), [], "an empty list keeps them");
+  // An empty list is the worst case: it drops every built-in entry and adds none.
+  assert.deepEqual(replacedBuiltIns("autoMode", { hard_deny: [] }), [
+    { list: "hard_deny", empty: true },
+  ]);
+  assert.deepEqual(replacedBuiltIns("autoMode", {}), [], "a list left out keeps them");
   assert.deepEqual(replacedBuiltIns("autoMode", { classifyAllShell: true }), []);
   assert.deepEqual(replacedBuiltIns("permissions", { allow: ["Bash(npm test)"] }), []);
 });

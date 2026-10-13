@@ -1,4 +1,5 @@
 {
+  "auto-mode-config#override-the-block-and-allow-rules": "d7938f5b501691c5",
   "hooks#disable-or-remove-hooks": "8a1cf18f1fe9b456",
   "hooks#matcher-patterns": "aa7387f5f22e1d65",
   "hooks#workspace-trust": "ee17b56dafbc6250",
