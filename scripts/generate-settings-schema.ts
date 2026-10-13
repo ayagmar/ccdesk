@@ -36,10 +36,13 @@ const schemastore: { properties: Record<string, Record<string, unknown>> } = JSO
 );
 
 // Fields such as autoMode.classifyAllShell are documented on their own but live in their parent.
+// The editor shows a key's description as its only explanation, so it gets the docs' full account
+// (what false does, that leaving out "$defaults" replaces the built-in rules), not the one-line
+// summary written for the settings index.
 const documented = Object.fromEntries(
-  Object.entries(catalog.keys)
+  Object.entries(catalog.keys as Record<string, { summary: string; about?: string }>)
     .filter(([key]) => !key.includes("."))
-    .map(([key, entry]) => [key, plain(entry.summary)])
+    .map(([key, entry]) => [key, plain(entry.about ?? entry.summary).replace(/\s+/g, " ")])
 );
 const { properties, borrowed, uncovered } = borrowMissingKeys(
   settings.properties,

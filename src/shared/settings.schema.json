@@ -4617,19 +4617,19 @@
         },
         "autoConnectIde": {
           "type": "boolean",
-          "description": "Connect to a running VS Code or JetBrains IDE automatically from an external terminal",
+          "description": "Connect to a running IDE automatically when you start Claude Code from an external terminal. Appears in /config as Auto-connect to IDE (external terminal) when you run Claude Code outside a VS Code or JetBrains terminal.",
           "default": false,
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
         "autoInstallIdeExtension": {
           "type": "boolean",
-          "description": "Turn off automatic install of the IDE extension from a VS Code terminal",
+          "description": "Install the Claude Code IDE extension automatically when you run Claude Code from a VS Code terminal. Appears in /config as Auto-install IDE extension when you run Claude Code inside a VS Code or JetBrains terminal.",
           "default": true,
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
         "autoMode": {
           "type": "object",
-          "description": "Add your own allow and deny rules to the auto mode classifier",
+          "description": "Add your own rules to what the auto mode classifier blocks and allows. Use it to tell the classifier which repos, buckets, and domains your organization trusts, so it stops blocking routine internal operations. The classifier ships with built-in allow and deny rules. Include the literal string \"$defaults\" in an array to keep those built-in rules at that position and add yours around them; leave it out to replace them with yours.",
           "additionalProperties": false,
           "properties": {
             "allow": {
@@ -4670,18 +4670,18 @@
         },
         "awaySummaryEnabled": {
           "type": "boolean",
-          "description": "Turn off the session recap shown when you come back to the terminal",
+          "description": "Show a one-line session recap when you return to the terminal after a few minutes away. Set it to false, or turn off Session recap in /config, to stop the recap.",
           "default": true,
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
         "axScreenReader": {
           "type": "boolean",
-          "description": "Render screen-reader friendly output",
+          "description": "Render screen-reader friendly output: flat text without decorative borders or animations. Screen-reader mode uses the classic renderer, so the tui setting has no effect while it is active; attached background sessions still render fullscreen.",
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
         "browserExternalPageTools": {
           "type": "string",
-          "description": "Keep Claude's tools off external pages in the desktop Browser pane",
+          "description": "Stop Claude from using its tools to read or act on external pages in the desktop app's Browser pane. People in your organization can still open external sites themselves, and local dev server previews keep working with Claude's tools. The desktop app reads this key; the terminal CLI ignores it.",
           "enum": [
             "disabled"
           ],
@@ -4689,7 +4689,7 @@
         },
         "diffTool": {
           "type": "string",
-          "description": "Choose whether Claude's proposed file changes open in the VS Code or JetBrains diff viewer or stay in the terminal",
+          "description": "Choose where Claude Code shows the diff of an Edit or Write change it proposes when a VS Code or JetBrains IDE is connected: \"auto\" opens it in the IDE's diff viewer, \"terminal\" keeps it in the terminal. Appears in /config as Diff tool only while Claude Code is connected to a VS Code or JetBrains IDE.",
           "enum": [
             "auto",
             "terminal"
@@ -4699,23 +4699,23 @@
         },
         "disableBrowserExternalNavigation": {
           "type": "boolean",
-          "description": "Limit the desktop Browser pane to localhost for people and Claude",
+          "description": "Turn off external browsing in the desktop app's Browser pane for people and Claude alike. Localhost dev server previews keep working. The desktop app reads this key; the terminal CLI ignores it.",
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
         "disableMobileSimulatorTools": {
           "type": "boolean",
-          "description": "Block Claude's tools in the desktop iOS Simulator pane",
+          "description": "Block Claude's tools for the desktop app's iOS Simulator pane. People keep manual use of the pane; only Claude's access is removed, and nobody can turn it back on from inside the app. The desktop app reads this key; the terminal CLI ignores it.",
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
         "externalEditorContext": {
           "type": "boolean",
-          "description": "Show Claude's last response as comments when you press Ctrl+G to edit",
+          "description": "When you press Ctrl+G, Claude Code opens the prompt you're typing in your external editor. With this key on, the editor buffer starts with Claude's previous response as # comment lines, so you can read it while you write, and Claude Code strips those lines when you save. Appears in /config as Show last response in external editor.",
           "default": false,
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
         "permissionExplainerEnabled": {
           "type": "boolean",
-          "description": "Removed in v2.1.257, together with the Ctrl+E command explanation on shell permission prompts",
+          "description": "Warning: Removed in v2.1.257, together with the Ctrl+E command explanation on Bash and PowerShell permission prompts. Setting it has no effect on current versions. Through v2.1.256, you could press Ctrl+E on a Bash or PowerShell permission prompt to see a model-generated explanation of the command, and set this key to false to turn that shortcut off.",
           "default": true,
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
@@ -4724,7 +4724,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Limit which hosts Desktop SSH sessions can reach",
+          "description": "Limit the hosts a Desktop SSH session can connect to. Only the Desktop app reads this key; the CLI doesn't. Patterns are case-insensitive: matches any host, .example.com matches example.com and every subdomain, and anything else is an exact match against the hostname after ~/.ssh/config resolution. An empty array turns SSH sessions off.",
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
         "teammateDefaultModel": {
@@ -4732,7 +4732,7 @@
             "string",
             "null"
           ],
-          "description": "Removed in v2.1.234; see Specify teammates and models for how Claude Code picks a teammate's model",
+          "description": "Warning: Removed in v2.1.234, together with its /config row Default teammate model. Setting it has no effect on current versions. Through v2.1.233, you set this key to the model for agent team teammates your prompt didn't name a model for: an alias such as \"sonnet\", or null to follow the lead's model. For the model Claude Code picks for such teammates now, see specify teammates and models.",
           "examples": [
             "sonnet"
           ],
@@ -4740,7 +4740,7 @@
         },
         "useAutoModeDuringPlan": {
           "type": "boolean",
-          "description": "Let the auto mode classifier review shell commands in plan mode; set false to get prompts instead",
+          "description": "Choose whether Claude Code uses the auto mode classifier to review shell commands in plan mode. With the default true, the classifier reviews each command during planning when auto mode is available and you see no prompt, except for critical-path removals. Set false to get a permission prompt for every command outside the built-in read-only set. Appears in /config as Use auto mode during plan.",
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         }
       },
