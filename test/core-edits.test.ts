@@ -39,3 +39,19 @@ test("undoing a permission change puts back the file's own text, layout included
   await restoreBackup(f.env, change.id, change.revision);
   assert.equal(readFileSync(file, "utf8"), HAND_WRITTEN);
 });
+
+test("a settings file with a byte order mark can be edited, and undo puts the mark back", async () => {
+  const f = makeFixture();
+  const text = `\uFEFF${JSON.stringify({ permissions: { allow: ["Read"] } }, null, 2)}\n`;
+  const file = f.write("app/.claude/settings.json", text);
+  const edit = { dir: f.at("app"), file, add: { list: "deny" as const, rule: "Bash(rm:*)" } };
+
+  // Saving writes ccdesk's own layout, without the mark, so the preview says it reformats.
+  const { revision, reformats } = await previewPermissionEdit(f.env, edit);
+  assert.equal(reformats, true);
+  const change = await savePermissionEdit(f.env, edit, revision);
+  assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).permissions.deny, ["Bash(rm:*)"]);
+
+  await restoreBackup(f.env, change.id, change.revision);
+  assert.equal(readFileSync(file, "utf8"), text);
+});

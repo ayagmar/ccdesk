@@ -1,5 +1,5 @@
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { FRONTMATTER, isRecord } from "./scan/data.ts";
+import { FRONTMATTER, isRecord, parseJson } from "./scan/data.ts";
 
 /**
  * A server URL as ccdesk shows it: a user name, password or query string can carry a key, so they
@@ -89,7 +89,7 @@ export function shownText(text: string | null): string | null {
   if (text === null) return null;
   let data: unknown;
   try {
-    data = JSON.parse(text);
+    data = parseJson(text);
   } catch {
     return shownFrontmatter(text);
   }
@@ -115,7 +115,7 @@ function shownFrontmatter(text: string): string {
 /** A file named .json that does not parse is not shown: its text could still hold a secret. */
 export function shownJsonFile(text: string): string {
   try {
-    JSON.parse(text);
+    parseJson(text);
   } catch {
     return "(a JSON file ccdesk could not parse, so its text is not shown; open it to see it)\n";
   }
@@ -164,7 +164,7 @@ export function hasHiddenValues(value: unknown): boolean {
  */
 export function hiddenValues(text: string | null): string | null {
   try {
-    const data: unknown = text === null ? null : JSON.parse(text);
+    const data: unknown = text === null ? null : parseJson(text);
     return JSON.stringify(hiddenIn(data).map(({ path, raw }) => [path, raw]));
   } catch {
     return null;

@@ -14,7 +14,7 @@ import {
 import { basename, dirname, join } from "node:path";
 import { type Static, Type } from "typebox";
 import { BACKUP_KINDS, type BackupKind } from "../shared/types.ts";
-import { isRecord } from "./scan/data.ts";
+import { isRecord, parseJson } from "./scan/data.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isCredentials, isSecretPath, revisionOf } from "./scan/files.ts";
 import { jsonSyntaxError } from "./secrets.ts";
@@ -131,7 +131,7 @@ export async function readJsonObject(
   if (raw === null || raw.trim() === "") return { raw, data: {}, reformats: false };
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = parseJson(raw);
   } catch (error) {
     throw new RefusedError(`${path} is ${jsonSyntaxError(error)}; fix it by hand first.`);
   }

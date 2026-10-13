@@ -3,6 +3,7 @@ import { basename, dirname, join } from "node:path";
 import { Compile } from "typebox/compile";
 import { type BackupSummary, type RestorePreview } from "../shared/types.ts";
 import { assertMemoryDir, indexPathIn, revisionOfBoth } from "./mutations.ts";
+import { parseJson } from "./scan/data.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isWithin, revisionOf } from "./scan/files.ts";
 import { hiddenValues, shown, shownText } from "./secrets.ts";
@@ -88,7 +89,7 @@ function isAgentFile(env: ScanEnv, path: string): boolean {
 function shownSettings(text: string | null): string | null {
   if (text === null) return null;
   try {
-    return shown(JSON.parse(text));
+    return shown(parseJson(text));
   } catch {
     return "(not valid JSON; open the file to see it)\n";
   }
