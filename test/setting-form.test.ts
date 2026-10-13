@@ -107,7 +107,7 @@ test("a number too large for JSON is refused rather than sent as null", () => {
   for (const draft of ["1e400", "-1e400", "Infinity"])
     assert.deepEqual(fromDraft("number", { type: "number" }, draft), { error: "Enter a number." });
   assert.deepEqual(fromDraft("json", lines, "[1, 1e400]"), {
-    error: "Not valid JSON: a number is too large to save",
+    error: "A number is too large to save: JSON would write it as null.",
   });
 });
 

@@ -271,7 +271,7 @@ function jsonFromDraft(
     property && text !== "" && takesText(property)
       ? `. Text goes in double quotes: ${JSON.stringify(text)}`
       : "";
-  return { error: `Not valid JSON: ${parsed.error}${quote}` };
+  return { error: `${parsed.error}${quote}` };
 }
 
 function takesText(schema: SettingSchema): boolean {
@@ -279,19 +279,20 @@ function takesText(schema: SettingSchema): boolean {
   return [schema.type ?? []].flat().includes("string");
 }
 
-/** JSON typed into a form, or why it does not parse. */
+/** JSON typed into a form, or why it cannot be saved, as a sentence to show. */
 export function parseJson(text: string): { value: unknown } | { error: string } {
   try {
     return { value: JSON.parse(text, finiteNumbers) };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : String(error) };
+    if (error instanceof RangeError) return { error: error.message };
+    return { error: `Not valid JSON: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
 /** JSON.parse reads 1e400 as Infinity, which JSON.stringify writes as null. */
 function finiteNumbers(_key: string, value: unknown): unknown {
   if (typeof value === "number" && !Number.isFinite(value))
-    throw new Error("a number is too large to save");
+    throw new RangeError("A number is too large to save: JSON would write it as null.");
   return value;
 }
 

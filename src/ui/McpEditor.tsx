@@ -55,7 +55,7 @@ export function McpEditor({ view, server, onSaved }: Props) {
   const remove = server ? { name: server.name, definition: server.definition } : undefined;
   const review = () => {
     const parsed = parseJson(text);
-    if ("error" in parsed) return change.fail(`The server is not valid JSON: ${parsed.error}`);
+    if ("error" in parsed) return change.fail(parsed.error);
     void change.start(
       {
         dir: view.path,
