@@ -18,7 +18,8 @@ export type Load<T> =
 
 /**
  * The overview and the open directory, kept current: files changed elsewhere (an editor, Claude
- * itself) reload the page, and so does coming back to the tab, since ~/.claude.json is not watched.
+ * itself) reload the directory; coming back to the tab reloads both, since ~/.claude.json is not
+ * watched, and so does a change saved here.
  * `dir` is the directory shown.
  */
 export function useConfig(requested: string | null | undefined, profile: SessionProfile) {
@@ -80,10 +81,13 @@ export function useConfig(requested: string | null | undefined, profile: Session
   dirRef.current = dir;
   const profileRef = useRef(profile);
   profileRef.current = profile;
-  const reload = useCallback(() => {
+  const reloadDirectory = useCallback(() => {
     if (dirRef.current !== null) load(dirRef.current, profileRef.current, true);
+  }, [load]);
+  const reload = useCallback(() => {
+    reloadDirectory();
     refreshOverview();
-  }, [load, refreshOverview]);
+  }, [reloadDirectory, refreshOverview]);
 
   useEffect(() => {
     if (dir === null) return;
@@ -94,7 +98,9 @@ export function useConfig(requested: string | null | undefined, profile: Session
         try {
           const { changed, at } = await api.watch(dir, since, stop.signal);
           since = Math.max(since, at);
-          if (changed && !stop.signal.aborted) reload();
+          // Only the open directory's files are watched, so the overview, which scans every
+          // project, waits for your next save or for you to come back to the tab.
+          if (changed && !stop.signal.aborted) reloadDirectory();
         } catch {
           // Server stopped or the request was cancelled: wait before trying again.
           await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -103,7 +109,7 @@ export function useConfig(requested: string | null | undefined, profile: Session
     };
     void listen();
     return () => stop.abort();
-  }, [dir, reload]);
+  }, [dir, reloadDirectory]);
 
   useEffect(() => {
     let last = Date.now();
