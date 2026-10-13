@@ -24,6 +24,7 @@ Your organisation can also deliver managed settings from the claude.ai admin con
 - Lists merge across files, and objects merge key by key. Those rows say **merged** and show every file's bullet.
 - Some keys are read only from certain files. Claude Code's settings reference says which, and a value in any other file is marked **ignored**, with the reason in the inspector.
 - A few keys follow their own rule, which the inspector names: for some security switches the strictest value wins even from a lower file, `availableModels` from managed settings replaces every other file's list, a project or local `defaultMode` of `auto` or `bypassPermissions` is ignored, and so are the `sandbox` fields Claude Code does not take from a file: a repository's settings that loosen a sandbox managed settings require, values a managed-only lock such as `allowManagedDomainsOnly` covers, and nested keys read only from user or managed settings. ccdesk does not check the locks that depend on which paths are denied.
+- `env` variables Claude Code ignores are marked **ignored** by name: those a project or local file cannot set, such as `HOME`, `CLAUDE_CONFIG_DIR` and the variables that turn telemetry on or send it somewhere (an off value such as `OTEL_METRICS_EXPORTER=none` still applies), and those it reads only from the environment it starts in, such as `CLAUDE_CODE_PROJECT_DIR_NAME`, from any file.
 
 Values under `env` and `headers` show as `•••`. See [Safety and privacy](../safety-and-privacy/).
 
