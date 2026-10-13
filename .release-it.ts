@@ -21,15 +21,14 @@ export default {
     "@release-it/conventional-changelog": {
       preset: {
         name: "conventionalcommits",
+        // Only "#" and digits is an issue. Commits cite docs sections such as hooks#workspace-trust,
+        // which the default prefix turns into links to issues that do not exist. The preset passes
+        // this to both its parser (bodies and footers) and its writer (subjects and breaking-change
+        // notes). A RegExp is why this file is TypeScript rather than JSON.
+        issuePrefixes: [/#(?=\d)/],
       },
       infile: "CHANGELOG.md",
       header: "# Changelog",
-      parserOpts: {
-        // Only "#" and digits is an issue. Commit bodies cite docs sections such as
-        // hooks#workspace-trust, which the default prefix turns into links to issues that do not
-        // exist. A RegExp is why this file is TypeScript rather than JSON.
-        issuePrefixes: [/#(?=\d)/],
-      },
     },
   },
 } satisfies Config;
