@@ -302,6 +302,24 @@ test("a Project edit through a link to your home folder is refused, since that f
   assertRefused(res, 409, /edit it as User/);
 });
 
+test("a save is refused when the reviewed file moved, even though neither file exists", async () => {
+  // Outside git the local file is in the start folder; once a parent is a repository, at its root.
+  fixture.write("work/relocates/sub/README.md", "x");
+  const dir = fixture.at("work/relocates/sub");
+  const edit = { dir, scope: "local", key: "effortLevel", value: "high" };
+  const preview = (await call("/api/settings/preview", { method: "POST", body: edit }))
+    .json as Preview;
+  assert.equal(preview.path, fixture.at("work/relocates/sub/.claude/settings.local.json"));
+
+  fixture.git("work/relocates", "init", "-q");
+  const res = await call("/api/settings/save", {
+    method: "POST",
+    body: { ...edit, revision: preview.revision },
+  });
+  assertRefused(res, 409, /changed since you reviewed this/);
+  assert.equal(existsSync(fixture.at("work/relocates/.claude/settings.local.json")), false);
+});
+
 test("a settings edit is previewed as a file change, then saved with a backup", async () => {
   const dir = fixture.at("work/site");
   const file = fixture.json("work/site/.claude/settings.json", { model: "sonnet" });
