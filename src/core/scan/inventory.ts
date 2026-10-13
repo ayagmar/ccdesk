@@ -19,11 +19,11 @@ import {
   isFile,
   isWithin,
   listDir,
+  pathsField,
   readJsonOrReport,
   readTextFile,
   resolvedPath,
   stringField,
-  toStringList,
 } from "./files.ts";
 import { isRecord, parseFrontmatter } from "./data.ts";
 import { ancestorsRootFirst } from "./instructions.ts";
@@ -154,7 +154,7 @@ export async function readSkill(
     scope,
     text: file.text,
   };
-  const paths = toStringList(data.paths);
+  const paths = pathsField(data.paths);
   if (paths.length > 0) entry.paths = paths;
   const whenToUse = stringField(data, "when_to_use");
   if (whenToUse) entry.whenToUse = whenToUse;

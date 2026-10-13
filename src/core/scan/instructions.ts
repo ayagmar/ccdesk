@@ -17,9 +17,9 @@ import {
   isNetworkPath,
   isWithin,
   MAX_TEXT_BYTES,
+  pathsField,
   readTextFile,
   resolvedPath,
-  toStringList,
   walkMarkdown,
 } from "./files.ts";
 import { parseFrontmatter } from "./data.ts";
@@ -475,16 +475,9 @@ function addChecks(files: Instruction[]) {
   }
 }
 
-/**
- * A rule's `paths` globs, or none when it loads every session: without the field, or when each
- * glob, once a trailing `/**` is cut, is empty or `**` (observed in v2.1.296; the docs do not
- * say). The globs are kept as written, since the cut ones match differently (docs:
- * memory#path-specific-rules).
- */
+/** A rule's `paths` globs, or none when it loads every session. */
 export function rulePaths(text: string): string[] {
-  const paths = toStringList(parseFrontmatter(text).data.paths);
-  const cut = paths.map((p) => (p.endsWith("/**") ? p.slice(0, -3) : p)).filter(Boolean);
-  return cut.every((p) => p === "**") ? [] : paths;
+  return pathsField(parseFrontmatter(text).data.paths);
 }
 
 async function rule(file: TextFile, scope: Scope, dir: string, ctx: Ctx) {
