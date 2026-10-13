@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { basename } from "node:path";
 import { test } from "node:test";
-import { scanDirectory } from "../src/core/scan/index.ts";
+import { scanDirectory } from "../src/core/index.ts";
 import { makeFixture, memoryDirFor } from "./helpers/fixture.ts";
 
 type View = Awaited<ReturnType<typeof scanDirectory>>;

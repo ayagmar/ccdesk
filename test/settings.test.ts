@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { scanDirectory } from "../src/core/scan/index.ts";
+import { scanDirectory } from "../src/core/index.ts";
 import { effectiveSettings } from "../src/core/scan/settings.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
