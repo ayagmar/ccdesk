@@ -293,6 +293,15 @@ test("a hook event Claude Code does not know is not written, unless the file alr
   assert.equal(readFileSync(file, "utf8"), untouched);
 });
 
+test("a Project edit through a link to your home folder is refused, since that file is your user settings", async () => {
+  fixture.link("work/home-alias", fixture.env.home);
+  const res = await call("/api/settings/preview", {
+    method: "POST",
+    body: { dir: fixture.at("work/home-alias"), scope: "project", key: "effortLevel", value: "high" },
+  });
+  assertRefused(res, 409, /edit it as User/);
+});
+
 test("a settings edit is previewed as a file change, then saved with a backup", async () => {
   const dir = fixture.at("work/site");
   const file = fixture.json("work/site/.claude/settings.json", { model: "sonnet" });
