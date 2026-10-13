@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { dirname, normalize, relative } from "node:path";
 import { promisify } from "node:util";
 import { type Visibility } from "../../shared/types.ts";
+import { type ScanEnv } from "./env.ts";
 import { isWithin } from "./files.ts";
 
 const run = promisify(execFile);
@@ -58,6 +59,14 @@ export async function mainWorktreeRoot(dir: string): Promise<string | null> {
  */
 export function trustKey(dir: string, mainRoot: string | null, root: string | null): string {
   return mainRoot ?? root ?? dir;
+}
+
+/**
+ * A folder as ~/.claude.json names it under `projects`: Claude Code writes Windows paths with
+ * forward slashes (observed in v2.1.296; the docs do not say), so lookups go through this.
+ */
+export function claudeJsonKey(env: ScanEnv, path: string): string {
+  return env.platform === "win32" ? path.replaceAll("\\", "/") : path;
 }
 
 /** Git visibility of each path, batched into two git calls per repository. */

@@ -20,6 +20,7 @@ ccdesk runs on Linux, macOS and Windows with Node.js 22.19 or newer. Its tests r
 
 - Managed settings and instructions are read from `C:\Program Files\ClaudeCode`. ccdesk does not read policies from the registry.
 - Local settings (`.claude/settings.local.json`) are read from the directory you started in, not from the repository root.
+- In `~/.claude.json`, Claude Code names each folder with forward slashes, such as `C:/Users/you/app`. ccdesk looks up trust answers, local MCP servers and MCP approvals under that name.
 - The browser is opened with `start`, and files with your editor or Explorer. An editor that is a `.cmd` or `.bat` file, such as VS Code's `code`, is started through `cmd.exe`; a path containing `"` or `%` cannot be passed to it safely, so ccdesk asks you to open that file yourself.
 - Backups are not given special permissions. They keep the access rules of your user profile folder, which other users normally cannot read.
 - For user and local MCP servers, ccdesk runs `claude.exe` directly, or the `claude.exe` inside the npm package when only `claude.cmd` is on your `PATH`, so the server's JSON never passes through `cmd.exe`. The commands shown in the review are quoted for a POSIX shell such as Git Bash.

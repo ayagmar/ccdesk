@@ -21,7 +21,10 @@ export async function listProjects(
 ): Promise<KnownProject[]> {
   const byPath = new Map<string, KnownProject>();
   const storesRoot = join(env.claudeDir, "projects");
-  const knownPaths = isRecord(claudeJson?.projects) ? Object.keys(claudeJson.projects) : [];
+  // Claude Code keys Windows folders with forward slashes; listed here as Windows writes them.
+  const knownPaths = (isRecord(claudeJson?.projects) ? Object.keys(claudeJson.projects) : []).map(
+    (key) => (env.platform === "win32" ? key.replaceAll("/", "\\") : key)
+  );
 
   for (const name of await listDir(storesRoot)) {
     const storeDir = join(storesRoot, name);

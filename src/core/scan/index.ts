@@ -17,7 +17,7 @@ import { buildContext } from "./context.ts";
 import { isConfigHome, type ScanEnv } from "./env.ts";
 import { isDir, isFile, readJsonObject, stringsIn } from "./files.ts";
 import { isRecord } from "./data.ts";
-import { gitRoot, mainWorktreeRoot, trustKey, visibilityOf } from "./git.ts";
+import { claudeJsonKey, gitRoot, mainWorktreeRoot, trustKey, visibilityOf } from "./git.ts";
 import { AGENTS_MD_MODES, resolveInstructions } from "./instructions.ts";
 import { readInventory } from "./inventory.ts";
 import { readMemoryStore } from "./memory.ts";
@@ -243,7 +243,10 @@ function trustOf(
   repoRoot: string | null
 ): Trust {
   const projects = isRecord(claudeJson?.projects) ? claudeJson.projects : {};
-  const entry = (key: string) => (isRecord(projects[key]) ? projects[key] : {});
+  const entry = (dir: string) => {
+    const found = projects[claudeJsonKey(env, dir)];
+    return isRecord(found) ? found : {};
+  };
   const root = trustKey(path, mainRoot, repoRoot);
   const own = entry(root);
   const trust: Trust = {
