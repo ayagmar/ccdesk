@@ -178,6 +178,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
       ...agentsFiles.filter((f) => f.dir === dir)
     );
   applyLoadRules(out, ctx, mode, externalImports);
+  await skipRepeats(out);
   addChecks(out);
   return out;
 }
@@ -388,6 +389,22 @@ function applyLoadRules(
     if (block === "needs-approval") skip(file, `${waiting}; this rule links outside it`);
     else if (block === "has-paths")
       skip(file, "Links outside this project, and such a rule loads only without a paths field");
+  }
+}
+
+/**
+ * A file reached again under another name, such as a .claude/CLAUDE.md that links to CLAUDE.md,
+ * loads only the first time, as Claude Code keeps each file it read by its real path (observed
+ * in v2.1.296).
+ */
+async function skipRepeats(out: Instruction[]): Promise<void> {
+  const first = new Map<string, string>();
+  for (const file of out) {
+    if (file.status === "skipped") continue;
+    const real = file.realPath ?? (await resolvedPath(file.path));
+    const earlier = first.get(real);
+    if (earlier) skip(file, `Already loaded as ${earlier}`);
+    else first.set(real, file.path);
   }
 }
 
