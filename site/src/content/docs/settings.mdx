@@ -52,7 +52,7 @@ What happens on save:
 - The old file is copied to the backup folder first, and the change can be undone from the toast or from [Recent changes](../recent-changes/).
 - If the settings file is a link, for example into a dotfiles repository, ccdesk writes through it and the link stays a link.
 
-A key whose value holds hidden parts, such as a non-empty `env`, cannot be changed from ccdesk; edit it in the file. A settings file that is not valid JSON is listed at the top of the page with the line and column of the error, and ccdesk will not write to it until you fix it.
+A key whose value holds hidden parts, such as a non-empty `env`, or an `allowedMcpServers` or `deniedMcpServers` entry with a token in its command, cannot be changed from ccdesk; edit it in the file. A settings file that is not valid JSON is listed at the top of the page with the line and column of the error, and ccdesk will not write to it until you fix it.
 
 ## Comparing two directories
 
