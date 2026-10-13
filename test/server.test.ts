@@ -1630,6 +1630,12 @@ test("keys in a server's args are hidden, and such a server is not rewritten", a
     "plain-flag-secret",
     "--token=equals-secret",
     "ghp_prefixsecret123",
+    "--access-token",
+    "access-secret",
+    "--client-secret=client-value-secret",
+    // mcp-remote's way to reach a remote server: the header's name stays, its value is hidden.
+    "--header",
+    "Authorization: Bearer header-secret",
     "--port",
     "8080",
   ];
@@ -1637,6 +1643,9 @@ test("keys in a server's args are hidden, and such a server is not rewritten", a
     mcpServers: { api: { command: "npx", args } },
   });
   const untouched = readFileSync(file, "utf8");
+  // The values, not the flag names: --client-secret is shown.
+  const SECRET_VALUES =
+    /plain-flag-secret|equals-secret|prefixsecret|access-secret|client-value-secret|header-secret/;
 
   const view = await call(`/api/directory?path=${encodeURIComponent(dir)}`);
   const api = (await serversIn(dir)).find((s) => s.name === "api");
@@ -1652,33 +1661,46 @@ test("keys in a server's args are hidden, and such a server is not rewritten", a
     body: { dir, scope: "user", add: { name: "new", definition: { command: "npx", args } } },
   });
 
-  assert.doesNotMatch(JSON.stringify(view.json), /secret/);
-  assert.equal(api.target, "npx -y some-mcp --api-key ••• --token=••• ••• --port 8080");
+  assert.doesNotMatch(JSON.stringify(view.json), SECRET_VALUES);
+  assert.equal(
+    api.target,
+    "npx -y some-mcp --api-key ••• --token=••• ••• --access-token ••• --client-secret=••• --header Authorization: Bearer ••• --port 8080"
+  );
   assertRefused(rewritten, 409, /api has values ccdesk does not show/);
   assert.equal(readFileSync(file, "utf8"), untouched);
   assert.equal(userAdd.status, 200);
-  assert.doesNotMatch(JSON.stringify(userAdd.json), /secret/);
+  assert.doesNotMatch(JSON.stringify(userAdd.json), SECRET_VALUES);
 });
 
 test("a restore that would bring back a different key in a server's args is refused", async () => {
-  const dir = fixture.at("work/mcp-args-restore");
-  const servers = (key: string) => ({
-    mcpServers: { api: { command: "npx", args: ["some-mcp", "--api-key", key] } },
-  });
-  const file = fixture.json("work/mcp-args-restore/.mcp.json", servers("old-key"));
-  const added = await saveMcp({
-    dir,
-    scope: "project",
-    add: { name: "docs", definition: { command: "docs-mcp" } },
-  });
-  assert.equal(added.status, 200);
-  fixture.json("work/mcp-args-restore/.mcp.json", servers("rotated-key"));
+  const forms = {
+    flag: (key: string) => ["some-mcp", "--api-key", key],
+    header: (key: string) => [
+      "mcp-remote",
+      "https://x/mcp",
+      "--header",
+      `Authorization: Bearer ${key}`,
+    ],
+  };
+  for (const [form, args] of Object.entries(forms)) {
+    const dir = fixture.at(`work/mcp-args-restore-${form}`);
+    const servers = (key: string) => ({ mcpServers: { api: { command: "npx", args: args(key) } } });
+    const file = fixture.json(`work/mcp-args-restore-${form}/.mcp.json`, servers("old-key"));
+    const added = await saveMcp({
+      dir,
+      scope: "project",
+      add: { name: "docs", definition: { command: "docs-mcp" } },
+    });
+    assert.equal(added.status, 200);
+    fixture.json(`work/mcp-args-restore-${form}/.mcp.json`, servers("rotated-key"));
 
-  const { preview, res } = await restoreReviewed((added.json as Change).id);
+    const { preview, res } = await restoreReviewed((added.json as Change).id);
 
-  assert.match(preview.blocked ?? "", /Hidden values/);
-  assertRefused(res, 409, /Hidden values in this file .* changed since the backup/);
-  assert.match(readFileSync(file, "utf8"), /rotated-key/);
+    assert.doesNotMatch(JSON.stringify(preview), /old-key|rotated-key/);
+    assert.match(preview.blocked ?? "", /Hidden values/);
+    assertRefused(res, 409, /Hidden values in this file .* changed since the backup/);
+    assert.match(readFileSync(file, "utf8"), /rotated-key/);
+  }
 });
 
 test("user and local servers are changed through claude mcp, never by writing ~/.claude.json", async () => {

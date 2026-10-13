@@ -20,31 +20,48 @@ export function shownUrl(url: string): string {
   }
 }
 
-/** A flag whose value is a secret, such as `--token` or `--api-key`. */
-const SECRET_FLAG = /^--(token|api[-_]?key|apikey|password|secret|auth|key)$/i;
+/** A flag whose value is a secret, such as `--token`, `--api-key`, `--client-secret` or `--auth-token`. */
+const SECRET_FLAG = /^--([\w-]*[-_])?(token|api[-_]?key|apikey|password|secret|auth\w*|key)$/i;
+/** A flag whose value is an HTTP header, as mcp-remote takes `--header "Authorization: Bearer …"`. */
+const HEADER_FLAG = /^(--header|-H)$/;
+/** An argument that is itself a credential header or an Authorization value. */
+const SECRET_HEADER = /^([\w-]*(authorization|api-key|token|cookie)\s*:|(bearer|basic)\s+\S)/i;
 /** A value that starts like a common API key or token. */
 const KEY_PREFIX = /^(sk-|ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|xox[bp]-|glpat-|AKIA[0-9A-Z]{16})/;
 
+/** A header as ccdesk shows it: the name and the `Bearer` or `Basic` scheme stay, the rest is hidden. */
+function shownHeader(header: string): string {
+  const kept = /^([^:]*:\s*)?((bearer|basic)\s+)?/i.exec(header)?.[0] ?? "";
+  return `${kept}•••`;
+}
+
 /**
  * A server's command-line arguments as ccdesk shows them: the value after a secret flag, given as
- * `--token value` or `--token=value`, a value that starts like a known key, and the credentials in
- * a URL are hidden.
+ * `--token value` or `--token=value`, a header's value after `--header` or `-H`, a credential
+ * header or Authorization value on its own, a value that starts like a known key, and the
+ * credentials in a URL are hidden.
  */
 function shownArgs(args: unknown[]): unknown[] {
-  return args.map((arg, i) => {
-    if (typeof arg !== "string") return arg;
-    const previous = args[i - 1];
-    if (typeof previous === "string" && SECRET_FLAG.test(previous) && !arg.startsWith("-"))
-      return "•••";
-    const equals = arg.indexOf("=");
-    if (equals > 0) {
-      const name = arg.slice(0, equals);
-      if (SECRET_FLAG.test(name) || KEY_PREFIX.test(arg.slice(equals + 1))) return `${name}=•••`;
-    }
-    if (KEY_PREFIX.test(arg)) return "•••";
-    if (/^https?:\/\//i.test(arg)) return shownUrl(arg);
-    return arg;
-  });
+  return args.map((arg, i) => (typeof arg === "string" ? shownArg(arg, args[i - 1]) : arg));
+}
+
+/** One argument as ccdesk shows it, given the one before it. */
+function shownArg(arg: string, previous: unknown): string {
+  if (typeof previous === "string" && !arg.startsWith("-")) {
+    if (SECRET_FLAG.test(previous)) return "•••";
+    if (HEADER_FLAG.test(previous)) return shownHeader(arg);
+  }
+  const equals = arg.indexOf("=");
+  if (equals > 0) {
+    const name = arg.slice(0, equals);
+    const value = arg.slice(equals + 1);
+    if (HEADER_FLAG.test(name)) return `${name}=${shownHeader(value)}`;
+    if (SECRET_FLAG.test(name) || KEY_PREFIX.test(value)) return `${name}=•••`;
+  }
+  if (SECRET_HEADER.test(arg)) return shownHeader(arg);
+  if (KEY_PREFIX.test(arg)) return "•••";
+  if (/^https?:\/\//i.test(arg)) return shownUrl(arg);
+  return arg;
 }
 
 /**
@@ -173,15 +190,17 @@ export function hiddenValues(text: string | null): string | null {
 
 /**
  * The secret text in a value, to take out of a message that may quote it: an env or header value
- * or a hidden argument whole, the part after `=` of `--token=value`, and a URL's user name,
- * password and query. Longest first, so a secret that contains another is taken out whole.
+ * or a hidden argument whole, the hidden end of one whose start is shown (`--token=value`,
+ * `Authorization: Bearer value`), and a URL's user name, password and query. Longest first, so a
+ * secret that contains another is taken out whole.
  */
 export function secretTexts(value: unknown): string[] {
   const found = hiddenIn(value).flatMap(({ raw, shown: hidden }): Array<string | undefined> => {
     if (typeof raw !== "string") return [];
     if (hidden === "•••") return [raw];
-    if (typeof hidden === "string" && hidden.endsWith("=•••"))
-      return [raw.slice(raw.indexOf("=") + 1)];
+    // The start was kept, as in `--token=•••` or `Authorization: Bearer •••`: the rest is the secret.
+    if (typeof hidden === "string" && hidden.endsWith("•••") && raw.startsWith(hidden.slice(0, -3)))
+      return [raw.slice(hidden.length - 3)];
     if (shownUrl(raw) === raw) return [];
     const url = URL.parse(raw);
     return [url?.username, url?.password, url?.search.slice(1)];

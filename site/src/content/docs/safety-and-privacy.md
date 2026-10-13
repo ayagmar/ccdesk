@@ -19,8 +19,8 @@ ccdesk makes no network requests of its own. It does not connect to MCP servers,
 ## Secrets stay hidden
 
 - Values under `env` and `headers`, in settings files, hooks and MCP servers, are shown as `•••`, in tables, in the inspector and in diffs. The keys stay visible.
-- The user name, password and query string of a URL, such as an MCP server's `url`, are hidden wherever ccdesk shows it.
-- In an MCP server's `args`, the value after a flag such as `--token` or `--api-key`, and a value that starts like a common key (`sk-`, `ghp_`, `xoxb-`), are shown as `•••`.
+- The user name, password and query string of a URL, such as an MCP server's `url`, are hidden wherever ccdesk shows it. A key in the URL's path is not recognised and stays visible; keep such a URL in an environment variable and write `${VAR}` in the file.
+- In an MCP server's `args`, the value after a flag such as `--token`, `--api-key`, `--access-token` or `--client-secret`, a header's value after `--header` or `-H` (as `mcp-remote` takes `Authorization: Bearer …`), and a value that starts like a common key (`sk-`, `ghp_`, `xoxb-`), are shown as `•••`. The [MCP servers](../mcp-servers/) page has the full list.
 - A settings file reached through an `@import` or a link is shown with the same values hidden.
 - An error about a JSON file that does not parse gives only the line and column, never the text around it.
 - ccdesk never changes hidden values. An edit that would touch them is refused, and so is a restore that would bring back different ones. Removing an MCP server with hidden values is allowed.
