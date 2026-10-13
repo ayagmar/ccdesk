@@ -4,7 +4,7 @@ import { delimiter, join, resolve } from "node:path";
 import { type Change, type McpEdit, type SettingsEditPreview } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { revisionOf } from "./scan/files.ts";
-import { isRecord } from "./scan/data.ts";
+import { isRecord, parseJson } from "./scan/data.ts";
 import { claudeJsonKey, gitRoot, mainWorktreeRoot, trustKey } from "./scan/git.ts";
 import { serverProblems } from "./scan/mcp.ts";
 import { hasHiddenValues, jsonSyntaxError, redactSecrets, secretTexts, shown } from "./secrets.ts";
@@ -200,7 +200,7 @@ async function claudeJsonServers(
   const raw = await readIfExists(env, env.claudeJson);
   let data: Record<string, unknown> = {};
   try {
-    const parsed: unknown = raw === null ? {} : JSON.parse(raw);
+    const parsed: unknown = raw === null ? {} : parseJson(raw);
     if (isRecord(parsed)) data = parsed;
   } catch (error) {
     throw new RefusedError(`${env.claudeJson} is ${jsonSyntaxError(error)}; fix it by hand first.`);

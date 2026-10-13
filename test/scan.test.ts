@@ -726,6 +726,21 @@ test("a managed settings file that is not JSON stops Claude Code from starting; 
   assert.equal(broken.problems[0]?.blocksStart, true);
 });
 
+test("a JSON file that starts with a byte order mark is read, as Claude Code reads it", async () => {
+  // Windows PowerShell 5.1's Set-Content -Encoding UTF8 writes one.
+  const f = makeFixture();
+  f.write("etc/claude-code/managed-settings.json", '\uFEFF{"model":"opus"}');
+  f.write("app/.claude/settings.json", '\uFEFF{"theme":"dark"}');
+  f.write("app/CLAUDE.md", "@notes.json\n");
+  f.write("app/notes.json", '\uFEFF{"env":{"API_KEY":"sk-bom-secret"}}');
+
+  const view = await scanDirectory(f.env, f.at("app"));
+  assert.deepEqual(view.problems, []);
+  assert.deepEqual(setting(view, "model")?.from, ["managed"]);
+  assert.deepEqual(setting(view, "theme")?.from, ["project"]);
+  assert.doesNotMatch(JSON.stringify(view), /sk-bom-secret/);
+});
+
 test("an MCP rule with parentheses in a settings file is listed as skipped", async () => {
   const f = makeFixture();
   f.json("app/.claude/settings.json", {

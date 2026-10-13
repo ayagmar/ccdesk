@@ -4,7 +4,7 @@ import { type FileHandle, lstat, open, readdir, readlink, realpath, stat } from 
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { type Problem, type TextFile } from "../../shared/types.ts";
 import { jsonSyntaxError, shownJsonFile, shownText } from "../secrets.ts";
-import { isRecord } from "./data.ts";
+import { isRecord, parseJson } from "./data.ts";
 import { type ScanEnv } from "./env.ts";
 
 /** Claude Code skips a CLAUDE.md larger than this (docs: memory#auto-memory), so ccdesk reads no more. */
@@ -209,7 +209,7 @@ export async function readJsonObject(
   }
   if (emptyIsObject && raw.trim() === "") return { ok: true, data: {} };
   try {
-    const data: unknown = JSON.parse(raw);
+    const data: unknown = parseJson(raw);
     if (!isRecord(data))
       return { ok: false, missing: false, unparsed: true, error: "not a JSON object" };
     return { ok: true, data };

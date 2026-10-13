@@ -11,6 +11,15 @@ interface Frontmatter {
   body: string;
 }
 
+/**
+ * JSON.parse after dropping a leading byte order mark, as Claude Code does before it parses a
+ * settings, MCP or state file (observed in v2.1.296 and the SDK's safeParseJSON; the docs do not
+ * say). Windows PowerShell 5.1 and some editors write one.
+ */
+export function parseJson(text: string): unknown {
+  return JSON.parse(text.startsWith("\uFEFF") ? text.slice(1) : text);
+}
+
 export const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
 export function parseFrontmatter(text: string): Frontmatter {
