@@ -15,7 +15,7 @@ import {
   type Trust,
 } from "../../shared/types.ts";
 import { buildContext } from "./context.ts";
-import { isConfigHome, type ScanEnv } from "./env.ts";
+import { localInConfigHome, type ScanEnv } from "./env.ts";
 import { isDir, isFile, isWithin, readJsonObject, stringsIn } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { claudeJsonKey, gitRoot, mainWorktreeRoot, trustKey, visibilityOf } from "./git.ts";
@@ -124,8 +124,7 @@ export async function scanDirectory(
   const sharing = await shareProjectFiles(path, root, instructions, settings, inventory);
   const trustOptions = {
     trust,
-    // The local file at <folder>/.claude/settings.local.json, where <folder> is a configuration home.
-    inConfigHome: (file: string) => isConfigHome(env, dirname(dirname(file))),
+    inConfigHome: (file: string) => localInConfigHome(env, path, file),
     // Reads the visibility shareProjectFiles gave each layer.
     localFromRepository: await localFromRepository(settings),
     profile,

@@ -10,7 +10,7 @@ import {
   type Trust,
 } from "../../shared/types.ts";
 import { redactSecrets, shownUrl } from "../secrets.ts";
-import { isConfigHome, type ScanEnv } from "./env.ts";
+import { localInConfigHome, type ScanEnv } from "./env.ts";
 import { readJsonOrReport, stringField, stringsIn, wildcard } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { claudeJsonKey } from "./git.ts";
@@ -513,7 +513,7 @@ function policyOf(
 /**
  * The answers about a .mcp.json server, each with whether it counts here. A cloned repository
  * cannot approve its own servers: project and local approvals count once the folder is trusted,
- * local ones in your configuration home right away (docs: mcp#project-server-approvals-and-workspace-trust).
+ * your configuration home's own local file right away when started there (docs: mcp#project-server-approvals-and-workspace-trust).
  * A disabledMcpjsonServers entry in any file rejects the server. Your answers to the .mcp.json
  * prompt sit in the project entry: claude mcp list counts an enableAllProjectMcpServers there, and
  * claude mcp reset-project-choices clears it (v2.1.296).
@@ -523,10 +523,10 @@ function approvalAnswers(
   project: Record<string, unknown>
 ): (name: string) => McpApproval[] {
   const { env, projectDir, layers, trust } = input;
-  const approvalCounts = (scope: Scope) =>
+  const approvalCounts = (scope: Scope, path: string) =>
     (scope !== "project" && scope !== "local") ||
     trust.trusted ||
-    (scope === "local" && isConfigHome(env, projectDir));
+    (scope === "local" && localInConfigHome(env, projectDir, path));
   const sources: Array<{
     source: McpApproval["source"];
     path: string;
@@ -537,7 +537,7 @@ function approvalAnswers(
   ];
   return (name) =>
     sources.flatMap(({ source, path, data }) => {
-      const counts = source === "claude-json" || approvalCounts(source);
+      const counts = source === "claude-json" || approvalCounts(source, path);
       const out: McpApproval[] = [];
       if (data.enableAllProjectMcpServers === true)
         out.push({ key: "enableAllProjectMcpServers", source, path, counts });

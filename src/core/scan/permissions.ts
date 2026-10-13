@@ -54,7 +54,7 @@ export const CHECK_ORDER: PermissionList[] = ["deny", "ask", "allow"];
 
 export interface Options {
   trust: Trust;
-  /** Whether a local settings file is the one in your configuration home, which applies without the trust step. */
+  /** Whether a local settings file is your configuration home's own, in a session started there, so it applies without the trust step. */
   inConfigHome: (path: string) => boolean;
   /** The local settings file is tracked in git, so Claude Code treats it like repository settings. */
   localFromRepository: boolean;

@@ -56,6 +56,15 @@ export function isConfigHome(env: ScanEnv, path: string): boolean {
   return path === env.home || join(path, ".claude") === env.claudeDir;
 }
 
+/**
+ * Whether the local settings file at `file` is your configuration home's own, read in a session
+ * started there: only then does it apply before the trust step (docs:
+ * permissions#when-your-local-settings-file-needs-trust).
+ */
+export function localInConfigHome(env: ScanEnv, startDir: string, file: string): boolean {
+  return isConfigHome(env, startDir) && dirname(dirname(file)) === startDir;
+}
+
 /** Where macOS puts the com.anthropic.claudecode profile: for this user, then for the device. */
 function managedProfiles(): string[] {
   const dir = "/Library/Managed Preferences";

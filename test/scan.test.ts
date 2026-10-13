@@ -946,6 +946,42 @@ test("with CLAUDE_CONFIG_DIR inside a repository, the root's local file waits fo
   assert.equal(allowed("Read"), true);
 });
 
+test("started below a configuration home, its local file waits for trust like any other", async () => {
+  const f = makeFixture();
+  const env = {
+    ...f.env,
+    claudeDir: f.at("app/.claude"),
+    claudeJson: f.at("app/.claude/.claude.json"),
+  };
+  f.write("app/sub/README.md", "x");
+  f.git("app", "init", "-q");
+  f.json("app/.claude/settings.local.json", { permissions: { allow: ["Bash"] } });
+
+  const view = await scanDirectory(env, f.at("app/sub"));
+
+  assert.equal(
+    view.permissions.find((p) => p.kind === "rule" && p.rule === "Bash")?.inEffect,
+    false
+  );
+});
+
+test("with CLAUDE_CONFIG_DIR inside a repository, the root's local file cannot approve MCP servers before trust", async () => {
+  const f = makeFixture();
+  const env = {
+    ...f.env,
+    claudeDir: f.at("app/profile/.claude"),
+    claudeJson: f.at("app/profile/.claude/.claude.json"),
+  };
+  f.write("app/README.md", "x");
+  f.git("app", "init", "-q");
+  f.json("app/.claude/settings.local.json", { enableAllProjectMcpServers: true });
+  f.json("app/profile/.mcp.json", { mcpServers: { docs: { command: "docs-mcp" } } });
+
+  const view = await scanDirectory(env, f.at("app/profile"));
+
+  assert.notEqual(view.inventory.mcpServers.find((s) => s.name === "docs")?.status, "active");
+});
+
 test("a project autoMemoryDirectory applies under a trusted parent folder, as hooks do", async () => {
   const f = makeFixture();
   f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
