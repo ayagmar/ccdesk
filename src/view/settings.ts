@@ -67,19 +67,22 @@ export function formFor(property: SettingSchema | undefined, value: unknown): Fo
 }
 
 /**
- * The form once the file's value changes from `was` to `now`, as when Claude Code or an editor
- * writes it. A form that still holds what the file had follows the file, as does one that holds
- * what it has now, as after saving. One you have edited is kept, control and all, to be reviewed
- * against the file as it is now.
+ * The form once the value it is reviewed against changes from `was` to `now`: Claude Code or an
+ * editor wrote the file, or you picked another file. A form that still holds the old value follows
+ * the new one, as does one that holds the new value, as after saving. One you have edited is kept,
+ * control and all, to be reviewed against the new value. That is a `conflict` when the same file
+ * changed under you; picking another file means writing your value there.
  */
 export function followFile(
   form: Form,
   property: SettingSchema | undefined,
   was: unknown,
-  now: unknown
-): { form: Form; kept: boolean } {
-  if (!holds(form, property, was) && !holds(form, property, now)) return { form, kept: true };
-  return { form: formFor(property, now), kept: false };
+  now: unknown,
+  otherFile = false
+): { form: Form; conflict: boolean } {
+  if (!holds(form, property, was) && !holds(form, property, now))
+    return { form, conflict: !otherFile };
+  return { form: formFor(property, now), conflict: false };
 }
 
 /**

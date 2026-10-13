@@ -153,8 +153,7 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
  * from what the file holds. Compared as text, so re-reading an unchanged file (the page refreshes
  * on focus) keeps an unsaved draft. When Claude Code or an editor changes this value meanwhile, a
  * form you have not touched follows the file, and one you have is kept, to be reviewed against the
- * file as it is now. Picking another file does the same without the warning: the value you typed
- * is the one to write there.
+ * file as it is now. Picking another file does the same without the warning (see followFile).
  */
 function useForm(
   key: string,
@@ -178,9 +177,9 @@ function useForm(
       setForm(formFor(property, now));
       return;
     }
-    const next = followFile(form, property, parse(was.text), now);
-    if (!next.kept) setForm(next.form);
-    else if (was.scope === scope)
+    const next = followFile(form, property, parse(was.text), now, was.scope !== scope);
+    setForm(next.form);
+    if (next.conflict)
       change.fail("The file changed while you were editing. Your value is kept; review it again.");
   }, [key, scope, currentText]);
   return [form, setForm];

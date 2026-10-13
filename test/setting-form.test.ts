@@ -173,15 +173,21 @@ test("an unsaved edit is kept when the file changes, even when the file no longe
   };
 
   const kept = followFile(typed, rules, was, { allow: ["$defaults"], deny: ["x"] });
-  assert.equal(kept.kept, true);
+  assert.equal(kept.conflict, true);
   assert.deepEqual(kept.form, typed);
+});
+
+test("picking another file keeps a typed value for it, without calling that a conflict", () => {
+  const typed: Form = { kind: "string", draft: "opus" };
+  const switched = followFile(typed, { type: "string" }, "sonnet", "haiku", true);
+  assert.deepEqual(switched, { form: typed, conflict: false });
 });
 
 test("a form you have not edited follows the file, into JSON when the new value needs it", () => {
   const was = { allow: ["$defaults"] };
   const now = { allow: ["$defaults"], deny: ["x"] };
   const followed = followFile(formFor(rules, was), rules, was, now);
-  assert.equal(followed.kept, false);
+  assert.equal(followed.conflict, false);
   assert.deepEqual(followed.form, { kind: "json", draft: JSON.stringify(now, null, 2) });
 });
 
@@ -191,7 +197,7 @@ test("an edit the file now matches, as after saving it, follows the file", () =>
     kind: "object",
     draft: { ...(formFor(rules, undefined).draft as DraftObject), allow: "$defaults\nnpm test" },
   };
-  assert.equal(followFile(typed, rules, undefined, now).kept, false);
+  assert.deepEqual(followFile(typed, rules, undefined, now).form, formFor(rules, now));
 });
 
 test("what the form cannot say, such as an empty list, is written through JSON", () => {
@@ -216,7 +222,7 @@ test("a form switched to JSON but not edited still follows the file", () => {
   assert.ok(!("error" in json));
 
   const followed = followFile(json, model, "sonnet", "opus");
-  assert.equal(followed.kept, false);
+  assert.equal(followed.conflict, false);
   assert.deepEqual(followed.form, formFor(model, "opus"));
 });
 
@@ -225,7 +231,7 @@ test("a value saved from JSON is in step with the file, so a later change is fol
   const saved: Form = { kind: "json", draft: '"opus"' };
 
   const afterSave = followFile(saved, model, "sonnet", "opus");
-  assert.equal(afterSave.kept, false);
+  assert.equal(afterSave.conflict, false);
   assert.deepEqual(
     followFile(afterSave.form, model, "opus", "haiku").form,
     formFor(model, "haiku")
@@ -234,7 +240,10 @@ test("a value saved from JSON is in step with the file, so a later change is fol
 
 test("an empty field for a key the file lacks follows the file when the key appears", () => {
   const model: SettingSchema = { type: "string" };
-  assert.equal(followFile(formFor(model, undefined), model, undefined, "opus").kept, false);
+  assert.deepEqual(
+    followFile(formFor(model, undefined), model, undefined, "opus").form,
+    formFor(model, "opus")
+  );
 });
 
 test("an autoMode list without $defaults is flagged as replacing the built-in rules", () => {
