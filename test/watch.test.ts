@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { after, test } from "node:test";
-import { scanDirectory } from "../src/core/scan/index.ts";
-import { testPath } from "../src/core/scan/path-test.ts";
-import { Watcher } from "../src/core/watch.ts";
+import { scanDirectory, testPath, Watcher } from "../src/core/index.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
 const watchers: Watcher[] = [];
@@ -17,13 +15,32 @@ function watcherFor(f: ReturnType<typeof makeFixture>) {
   return watcher;
 }
 
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Resolves once the watchers of `dir` have started, so a change made after it is seen. */
+async function started(watcher: Watcher, dir: string): Promise<void> {
+  await watcher.subscribe(dir, () => {
+    // Only here to start the watchers.
+  });
+}
+
+/**
+ * Starts the watchers of `dir`. macOS can report changes made just before a watch starts, such as
+ * the fixture's own files; there it also waits until those have settled, so only later edits count.
+ */
+async function settled(watcher: Watcher, dir: string): Promise<void> {
+  await started(watcher, dir);
+  if (process.platform === "darwin") await pause(1000);
+}
+
 test("editing a project's CLAUDE.md wakes a page waiting for changes", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "one\n");
   const watcher = watcherFor(f);
+  await started(watcher, f.at("app"));
 
   const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
-  setTimeout(() => f.write("app/CLAUDE.md", "two\n"), 100);
+  f.write("app/CLAUDE.md", "two\n");
 
   assert.equal((await waiting).changed, true);
 });
@@ -34,9 +51,10 @@ test("creating a file CLAUDE.md imports but that was missing wakes a page waitin
   f.write("app/docs/README.md", "Not imported.\n");
   const watcher = watcherFor(f);
   await watcher.scan(f.at("app"));
+  await started(watcher, f.at("app"));
 
   const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
-  setTimeout(() => f.write("app/docs/new.md", "Now here.\n"), 100);
+  f.write("app/docs/new.md", "Now here.\n");
 
   assert.equal((await waiting).changed, true);
 });
@@ -47,16 +65,18 @@ test("creating the missing folder of an import, then the file, wakes a page each
   f.write("app/docs/README.md", "Not imported.\n");
   const watcher = watcherFor(f);
   await watcher.scan(f.at("app"));
+  await started(watcher, f.at("app"));
   const signal = new AbortController().signal;
 
   const folder = watcher.wait(f.at("app"), Date.now(), signal, 5000);
-  setTimeout(() => mkdirSync(f.at("app/docs/new-folder")), 100);
+  mkdirSync(f.at("app/docs/new-folder"));
   const first = await folder;
   assert.equal(first.changed, true);
 
   // No scan in between: the watchers move into the new folder on their own.
+  await started(watcher, f.at("app"));
   const file = watcher.wait(f.at("app"), first.at, signal, 5000);
-  setTimeout(() => f.write("app/docs/new-folder/new.md", "Now here.\n"), 100);
+  f.write("app/docs/new-folder/new.md", "Now here.\n");
   assert.equal((await file).changed, true);
 });
 
@@ -76,12 +96,10 @@ test("editing a file inside an installed plugin wakes a page waiting for changes
   const { f, plugin, watcher } = pluginFixture({});
   f.write(`${plugin}/agents/review.md`, "---\nname: review\ndescription: one\n---\n");
   await watcher.scan(f.at("app"));
+  await started(watcher, f.at("app"));
 
   const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
-  setTimeout(
-    () => f.write(`${plugin}/agents/review.md`, "---\nname: review\ndescription: two\n---\n"),
-    100
-  );
+  f.write(`${plugin}/agents/review.md`, "---\nname: review\ndescription: two\n---\n");
 
   assert.equal((await waiting).changed, true);
 });
@@ -90,12 +108,10 @@ test("editing an agent in a folder the plugin's manifest names wakes a page wait
   const { f, plugin, watcher } = pluginFixture({ agents: "./custom/" });
   f.write(`${plugin}/custom/review.md`, "---\nname: review\ndescription: one\n---\n");
   await watcher.scan(f.at("app"));
+  await started(watcher, f.at("app"));
 
   const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
-  setTimeout(
-    () => f.write(`${plugin}/custom/review.md`, "---\nname: review\ndescription: two\n---\n"),
-    100
-  );
+  f.write(`${plugin}/custom/review.md`, "---\nname: review\ndescription: two\n---\n");
 
   assert.equal((await waiting).changed, true);
 });
@@ -106,40 +122,46 @@ test("files a plugin's MCP server writes in its own folder do not count as a con
   f.write(`${plugin}/node_modules/dep/index.js`, "a");
   f.write(`${plugin}/data/state.json`, "a");
   await watcher.scan(f.at("app"));
-  // macOS can report changes made just before a watch starts; let those settle first.
-  const signal = new AbortController().signal;
-  await watcher.wait(f.at("app"), Number.MAX_SAFE_INTEGER, signal, 1000);
+  await settled(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), signal, 800);
-  setTimeout(() => {
-    f.write(`${plugin}/node_modules/dep/index.js`, "b");
-    f.write(`${plugin}/data/state.json`, "b");
-  }, 100);
+  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 800);
+  f.write(`${plugin}/node_modules/dep/index.js`, "b");
+  f.write(`${plugin}/data/state.json`, "b");
 
   assert.equal((await waiting).changed, false);
 });
-
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test("a subscriber hears once about an editor's save, and nothing after unsubscribing", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "one\n");
   const watcher = watcherFor(f);
-  // macOS can report changes made just before a watch starts; let those settle first.
-  await watcher.wait(f.at("app"), Number.MAX_SAFE_INTEGER, new AbortController().signal, 1000);
+  await settled(watcher, f.at("app"));
   let calls = 0;
-  const unsubscribe = await watcher.subscribe(f.at("app"), () => calls++);
+  let heard = () => {
+    // Replaced below, before anything can change.
+  };
+  const first = new Promise<void>((resolve) => {
+    heard = resolve;
+  });
+  const unsubscribe = await watcher.subscribe(f.at("app"), () => {
+    calls++;
+    heard();
+  });
 
   // An editor writes a file in several steps; the subscriber hears about the save once.
   f.write("app/CLAUDE.md", "two\n");
   await pause(100);
   f.write("app/CLAUDE.md", "three\n");
-  await pause(1000);
+  await first;
+  // A second call would come one settle (300 ms) after the last change was reported.
+  await pause(500);
   assert.equal(calls, 1);
 
   unsubscribe();
+  const since = Date.now();
   f.write("app/CLAUDE.md", "four\n");
-  await pause(1000);
+  // Answers once the change has settled, when subscribers are told.
+  await watcher.wait(f.at("app"), since, new AbortController().signal, 5000);
   assert.equal(calls, 1);
 });
 
@@ -160,8 +182,10 @@ test("closing the watcher answers a page still waiting, instead of keeping it un
   const f = makeFixture();
   f.write("app/CLAUDE.md", "one\n");
   const watcher = watcherFor(f);
+  await started(watcher, f.at("app"));
   const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  // The wait is waiting once the calls it queued have run.
+  await new Promise((resolve) => setImmediate(resolve));
 
   watcher.close();
   const answered = await Promise.race([
@@ -195,10 +219,10 @@ test("a change between two polls is reported to the next poll", async () => {
 
   await watcher.wait(f.at("app"), since, new AbortController().signal, 50);
   f.write("app/CLAUDE.md", "two\n");
-  await new Promise((resolve) => setTimeout(resolve, 600));
 
+  // Watchers started by this poll would miss the change, and wait until the timeout.
   assert.equal(
-    (await watcher.wait(f.at("app"), since, new AbortController().signal, 50)).changed,
+    (await watcher.wait(f.at("app"), since, new AbortController().signal, 5000)).changed,
     true
   );
 });
@@ -208,16 +232,11 @@ test("work in Claude Code's worktrees or unrelated files does not count as a con
   f.write("app/.claude/worktrees/feature/CLAUDE.md", "a");
   f.write("app/notes.txt", "a");
   const watcher = watcherFor(f);
-  // macOS can report changes made just before a watch starts, such as the files above; wait
-  // until those have settled so only the edits below are judged.
-  const signal = new AbortController().signal;
-  await watcher.wait(f.at("app"), Number.MAX_SAFE_INTEGER, signal, 1000);
+  await settled(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), signal, 800);
-  setTimeout(() => {
-    f.write("app/.claude/worktrees/feature/CLAUDE.md", "b");
-    f.write("app/notes.txt", "b");
-  }, 100);
+  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 800);
+  f.write("app/.claude/worktrees/feature/CLAUDE.md", "b");
+  f.write("app/notes.txt", "b");
 
   assert.equal((await waiting).changed, false);
 });
@@ -234,7 +253,10 @@ async function countingWatcher(f: ReturnType<typeof makeFixture>) {
   });
   watchers.push(watcher);
   await watcher.scan(f.at("app"));
-  await watcher.wait(f.at("app"), Number.MAX_SAFE_INTEGER, new AbortController().signal, 1000);
+  await settled(watcher, f.at("app"));
+  // A scan is reused only when it started after the watchers, in a later millisecond.
+  const watchingSince = Date.now();
+  while (Date.now() === watchingSince) await pause(1);
   counter.scans = 0;
   const pathTest = () => testPath(f.env, f.at("app"), "src/api/x.ts", (cwd) => watcher.view(cwd));
   return { watcher, counter, pathTest };
