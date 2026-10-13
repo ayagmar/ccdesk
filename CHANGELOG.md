@@ -15,7 +15,7 @@
 * **settings:** keep "e.g." inside a field's first sentence ([72f5e84](https://github.com/ayagmar/ccdesk/commit/72f5e8469a4f38b476998cf964029c5e5c02fa2d))
 * **settings:** keep unsaved edits, line breaks and empty lists in typed forms ([0d347d5](https://github.com/ayagmar/ccdesk/commit/0d347d5d0863593e573ac107dbdd58f35a647ae8))
 * **settings:** switching the target file keeps a typed value quietly ([2f3fc53](https://github.com/ayagmar/ccdesk/commit/2f3fc539ecf1eadcefa64d1eb01a77deb17582dd))
-* **settings:** warn about an empty autoMode list too ([7ff1882](https://github.com/ayagmar/ccdesk/commit/7ff18824fa96bfa7bc2966d63f3cc24b8d52a3c3)), references [auto-mode-config#override-the-block-and-allow-rules](https://github.com/auto-mode-config/issues/override-the-block-and-allow-rules)
+* **settings:** warn about an empty autoMode list too ([7ff1882](https://github.com/ayagmar/ccdesk/commit/7ff18824fa96bfa7bc2966d63f3cc24b8d52a3c3))
 * **settings:** warn about autoMode lists without $defaults in JSON too ([16b75ac](https://github.com/ayagmar/ccdesk/commit/16b75acabd6615417d549158fe88dbdc58baf6f8))
 
 ## [0.2.5](https://github.com/ayagmar/ccdesk/compare/v0.2.4...v0.2.5) (2026-10-13)
@@ -110,7 +110,7 @@
 
 ### Features
 
-* **ui:** add a text size control and raise the default sizes ([1a9fe82](https://github.com/ayagmar/ccdesk/commit/1a9fe82b35cc4743936b7bf3c7a6d4244c86779a)), references [#root](https://github.com/ayagmar/ccdesk/issues/root)
+* **ui:** add a text size control and raise the default sizes ([1a9fe82](https://github.com/ayagmar/ccdesk/commit/1a9fe82b35cc4743936b7bf3c7a6d4244c86779a))
 * **ui:** open the docs from the ccdesk logo ([834986a](https://github.com/ayagmar/ccdesk/commit/834986a40df7801e6b4cf12588fd69f65411458a))
 
 ### Bug Fixes
@@ -121,10 +121,10 @@
 
 ### Features
 
-* **agents:** create, change and delete subagent files ([1d8d011](https://github.com/ayagmar/ccdesk/commit/1d8d011c93c08dc8435ad304f5061378e8c4c1b7)), references [sub-agents#supported-frontmatter-fields](https://github.com/sub-agents/issues/supported-frontmatter-fields)
+* **agents:** create, change and delete subagent files ([1d8d011](https://github.com/ayagmar/ccdesk/commit/1d8d011c93c08dc8435ad304f5061378e8c4c1b7))
 * **cli:** add --config-dir to read another Claude folder ([777712a](https://github.com/ayagmar/ccdesk/commit/777712aeb91da62f3f323292c8050b600ff59f5a))
 * compare the settings of two directories ([9ec5e56](https://github.com/ayagmar/ccdesk/commit/9ec5e56b0d4f1cfc85b48accaea00ac59cf592c2))
-* describe a claude -p or SDK session as well as an interactive one ([45c0ad1](https://github.com/ayagmar/ccdesk/commit/45c0ad180c1a26074d151375f99b80ddb20dd99e)), references [permissions#what-runs-before-you-trust-a-folder](https://github.com/permissions/issues/what-runs-before-you-trust-a-folder) [#when-your-local-settings-file-needs-trust](https://github.com/ayagmar/ccdesk/issues/when-your-local-settings-file-needs-trust) [hooks#workspace-trust](https://github.com/hooks/issues/workspace-trust)
+* describe a claude -p or SDK session as well as an interactive one ([45c0ad1](https://github.com/ayagmar/ccdesk/commit/45c0ad180c1a26074d151375f99b80ddb20dd99e))
 * **hooks:** add, change and remove hooks in settings files ([7307b6b](https://github.com/ayagmar/ccdesk/commit/7307b6b1f3b7baa1ced8db4be6695e8456c87ef8))
 * list claude mcp edits in Recent changes ([bfc153c](https://github.com/ayagmar/ccdesk/commit/bfc153c5f3489143d73c2cfcc75a5fc2c1175e93))
 * **mcp:** add, change and remove MCP servers ([40f88a6](https://github.com/ayagmar/ccdesk/commit/40f88a6cce41f4c04d3816dfbd540cb2435482e9))
@@ -155,8 +155,8 @@
 * **memory:** stop flagging a 200-line MEMORY.md that ends in a newline as cut off ([07a670b](https://github.com/ayagmar/ccdesk/commit/07a670b209593d315e7850e6145e8443b5c01554))
 * **permissions:** say that ccdesk reads commands and addresses to match rules ([ca60592](https://github.com/ayagmar/ccdesk/commit/ca605920235512d041b03b0fbea57c4967f1ac70))
 * **readme:** link each screenshot to its full-size image ([18837fc](https://github.com/ayagmar/ccdesk/commit/18837fc055aede576926f15d90b031c3b6a19fa9))
-* **scan:** hold back settings-file hooks until the folder is trusted ([ab9ea97](https://github.com/ayagmar/ccdesk/commit/ab9ea973e153b343530ae5c945b8f71a28dd7895)), references [hooks#workspace-trust](https://github.com/hooks/issues/workspace-trust)
-* **scan:** name plugin skills and commands with their plugin ([43d178a](https://github.com/ayagmar/ccdesk/commit/43d178a0f14c9479b576c6260eea1541f5fb6d53)), references [skills#how-a-skill-gets-its-command-name](https://github.com/skills/issues/how-a-skill-gets-its-command-name) [plugins-reference#name](https://github.com/plugins-reference/issues/name)
+* **scan:** hold back settings-file hooks until the folder is trusted ([ab9ea97](https://github.com/ayagmar/ccdesk/commit/ab9ea973e153b343530ae5c945b8f71a28dd7895))
+* **scan:** name plugin skills and commands with their plugin ([43d178a](https://github.com/ayagmar/ccdesk/commit/43d178a0f14c9479b576c6260eea1541f5fb6d53))
 * **server:** put a file back when ccdesk cannot read it while removing it ([bfa4931](https://github.com/ayagmar/ccdesk/commit/bfa49318dc4df99605cc570e004cf6ed0b41543e))
 * **server:** refuse a hard link to the credentials file ([8689378](https://github.com/ayagmar/ccdesk/commit/86893788ee20e1c0fc53464306167a5329968d6e))
 * **server:** refuse a restore that would change hidden keys in args ([5ab6b40](https://github.com/ayagmar/ccdesk/commit/5ab6b409db633d82ac2cea37833639eff1d88c8d))
