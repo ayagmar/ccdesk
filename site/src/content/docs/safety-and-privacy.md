@@ -29,6 +29,7 @@ ccdesk makes no network requests of its own. It does not connect to MCP servers,
 
 - `~/.claude/.credentials.json`, where Claude Code keeps your login, is never read, opened or written: not by name, not through a link, not through an import.
 - `~/.claude.json` is never written, even through a settings file that links to it. Claude Code rewrites it during every session. User and local MCP server changes go through Claude Code's `claude mcp` commands, which write it.
+- `~/.claude/remote-settings.json`, where Claude Code caches your organisation's server-managed settings, and macOS configuration profiles are not read. ccdesk only checks whether they are there, to warn that the managed values it shows may not apply.
 - A `MEMORY.md` that links outside its memory folder is left alone.
 - Sessions and transcripts are never deleted or changed.
 

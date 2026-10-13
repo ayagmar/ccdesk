@@ -119,6 +119,11 @@ export interface SettingsLayer {
   error?: string;
   /** For managed settings: a file that is not a JSON object, so Claude Code refuses to start. */
   blocksStart?: boolean;
+  /**
+   * For managed settings: managed sources that rank above these files and that ccdesk does not
+   * read, such as the server-managed settings cache or a macOS configuration profile.
+   */
+  higherSources?: string[];
 }
 
 export interface EffectiveSetting {

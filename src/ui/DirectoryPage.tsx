@@ -156,6 +156,7 @@ export function DirectoryPage({
         </header>
         <SessionSwitch profile={view.profile} onProfile={onProfile} />
         <Problems problems={view.problems} />
+        <HigherManagedSources view={view} />
         {seeing ? (
           <ContextView view={view} />
         ) : (
@@ -468,6 +469,32 @@ function SessionSwitch({
         ))}
       </fieldset>
     </div>
+  );
+}
+
+/** Managed sources ccdesk does not read that rank above the managed settings files it shows. */
+function HigherManagedSources({ view }: { view: DirectoryView }) {
+  const higher = view.settings.find((l) => l.scope === "managed")?.higherSources;
+  if (!higher) return null;
+  return (
+    <section className="problems" aria-label="Managed settings ccdesk does not read">
+      <Icon name="warn" />
+      <ul className="plain">
+        <li>
+          Your organisation may also set policy in{" "}
+          {higher.map((path, i) => (
+            <span key={path}>
+              {i > 0 && " and "}
+              <span className="mono">{tilde(path)}</span>
+            </span>
+          ))}
+          , which ccdesk does not read. Claude Code uses the first managed source that sets a
+          policy, and these come before the managed settings files, so the managed values shown here
+          may not apply. <span className="mono">/status</span> in Claude Code names the source it
+          uses.
+        </li>
+      </ul>
+    </section>
   );
 }
 
