@@ -51,6 +51,8 @@ function shownArgs(args: unknown[]): unknown[] {
  * Replace values that commonly hold secrets with a placeholder, keeping the keys: env and headers
  * values, the user, password and query of a `url`, and secret values in the `args` of a command.
  */
+export function redactSecrets(value: Record<string, unknown>): Record<string, unknown>;
+export function redactSecrets(value: unknown): unknown;
 export function redactSecrets(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactSecrets);
   if (!isRecord(value)) return value;

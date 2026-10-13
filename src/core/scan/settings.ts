@@ -185,7 +185,7 @@ export async function readSettingsLayers(
     if (file.legacy && !result.ok && result.missing) continue;
     const layer: SettingsLayer = { scope: file.scope, path: file.path, exists: true, data: null };
     if (file.legacy) layer.legacy = true;
-    if (result.ok) layer.data = redactSecrets(result.data) as Record<string, unknown>;
+    if (result.ok) layer.data = redactSecrets(result.data);
     else if (result.missing) layer.exists = false;
     else layer.error = result.error;
     layers.push(layer);
@@ -233,7 +233,7 @@ export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings
 function managedLayer(path: string, managed: ManagedSettings): SettingsLayer {
   const { data, sources, dropIns, errors, blocksStart } = managed;
   const layer: SettingsLayer = { scope: "managed", path, exists: false, data: null };
-  if (data) layer.data = redactSecrets(data) as Record<string, unknown>;
+  if (data) layer.data = redactSecrets(data);
   layer.exists = sources.length > 0 || errors.length > 0;
   if (sources.length > 1 || dropIns.length > 0) layer.sources = sources;
   if (errors.length > 0) layer.error = errors.join("; ");
@@ -347,9 +347,11 @@ function withStrictFields(key: string, value: unknown, values: Valued[]): unknow
   for (const [path, strict] of Object.entries(STRICTEST)) {
     const [head, field] = path.split(".");
     if (head !== key || !field) continue;
-    const fieldValues = values
-      .filter((v) => isRecord(v.value) && (v.value as Record<string, unknown>)[field] !== undefined)
-      .map((v) => ({ scope: v.scope, value: (v.value as Record<string, unknown>)[field] }));
+    const fieldValues = values.flatMap((v) =>
+      isRecord(v.value) && v.value[field] !== undefined
+        ? [{ scope: v.scope, value: v.value[field] }]
+        : []
+    );
     const decided = strictWinner(strict, fieldValues);
     if (decided) out = { ...out, [field]: decided.winner?.value };
   }

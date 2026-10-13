@@ -321,8 +321,8 @@ function agentsMdMode(layers: DirectoryView["settings"]): AgentsMdMode {
       const entry = configs[id];
       const value =
         isRecord(entry) && isRecord(entry.options) ? entry.options.instructionFiles : undefined;
-      if (typeof value === "string" && AGENTS_MD_MODES.includes(value as AgentsMdMode))
-        return value as AgentsMdMode;
+      const mode = AGENTS_MD_MODES.find((m) => m === value);
+      if (mode) return mode;
     }
   }
   return "claude-md-or-agents-md";

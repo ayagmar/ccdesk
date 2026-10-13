@@ -58,44 +58,44 @@ function define(
   organisation = false
 ): Defined[] {
   if (!isRecord(servers)) return [];
-  return Object.entries(servers)
-    .filter(([, config]) => isRecord(config))
-    .map(([name, config]) => {
-      const c = config as Record<string, unknown>;
-      const type = stringField(c, "type");
-      const url = stringField(c, "url") || null;
-      const command = stringField(c, "command")
-        ? [stringField(c, "command"), ...stringsIn(c.args)]
-        : null;
-      const definition = redactSecrets(c) as Record<string, unknown>;
-      const server: McpServer = {
-        name,
-        scope,
-        // An entry without a type is read as stdio, even one with a url (docs: mcp).
-        transport: type || "stdio",
-        target: url
-          ? shownUrl(url)
-          : command
-            ? [command[0], ...stringsIn(definition.args)].join(" ")
-            : "",
-        sourcePath,
-        status: "active",
-        definition,
-      };
-      const [problem] = serverProblems(c);
-      if (problem) {
-        server.status = "invalid";
-        server.note = problem;
-      }
-      // A ${VAR} in an organisation entry means it still has to pass the allowlist.
-      const usesVariables = JSON.stringify(c).includes("${");
-      return {
+  return Object.entries(servers).flatMap(([name, c]) => {
+    if (!isRecord(c)) return [];
+    const type = stringField(c, "type");
+    const url = stringField(c, "url") || null;
+    const command = stringField(c, "command")
+      ? [stringField(c, "command"), ...stringsIn(c.args)]
+      : null;
+    const definition = redactSecrets(c);
+    const server: McpServer = {
+      name,
+      scope,
+      // An entry without a type is read as stdio, even one with a url (docs: mcp).
+      transport: type || "stdio",
+      target: url
+        ? shownUrl(url)
+        : command
+          ? [command[0], ...stringsIn(definition.args)].join(" ")
+          : "",
+      sourcePath,
+      status: "active",
+      definition,
+    };
+    const [problem] = serverProblems(c);
+    if (problem) {
+      server.status = "invalid";
+      server.note = problem;
+    }
+    // A ${VAR} in an organisation entry means it still has to pass the allowlist.
+    const usesVariables = JSON.stringify(c).includes("${");
+    return [
+      {
         server,
         command: type && type !== "stdio" ? null : command,
         url: type ? url : null,
         organisation: organisation && !usesVariables,
-      };
-    });
+      },
+    ];
+  });
 }
 
 /** Control and invisible formatting characters, such as zero-width spaces and bidi overrides. */
@@ -133,12 +133,10 @@ function managedEntryProblem(name: string, config: unknown): string | null {
 
 /** managedMcpServers from managed settings, with entries Claude Code drops marked invalid. */
 function defineManaged(servers: unknown, sourcePath: string): Defined[] {
+  if (!isRecord(servers)) return [];
   const defined = define(servers, "managed", sourcePath, true);
   for (const d of defined) {
-    const problem = managedEntryProblem(
-      d.server.name,
-      (servers as Record<string, unknown>)[d.server.name]
-    );
+    const problem = managedEntryProblem(d.server.name, servers[d.server.name]);
     if (problem) {
       d.server.status = "invalid";
       d.server.note = problem;

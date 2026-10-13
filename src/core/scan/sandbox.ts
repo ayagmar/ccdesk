@@ -227,8 +227,9 @@ export function sandboxFilter(valueIn: (key: string, scope: Scope) => unknown) {
         if (field !== drops.value) continue;
       } else if (drops) {
         if (!Array.isArray(field)) continue;
-        removed = field.filter(drops.entries);
-        if ((removed as unknown[]).length === 0) continue;
+        const entries = field.filter(drops.entries);
+        if (entries.length === 0) continue;
+        removed = entries;
         kept = field.filter((e) => !drops.entries(e));
       }
       out = replaced(out, path, kept);
