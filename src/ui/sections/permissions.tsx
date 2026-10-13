@@ -7,13 +7,9 @@ import { type RowOf } from "../../view/sections/types.ts";
 import { sessionsHere } from "../../view/usage.ts";
 import { Bullet } from "../Bullet.tsx";
 import { ago, plural, tilde, tildeAll } from "../format.ts";
+import { fileFor, ScopePicker } from "../editorKit.tsx";
 import { Icon } from "../Icon.tsx";
-import {
-  fileFor,
-  PermissionEditor,
-  ScopePicker,
-  usePermissionChange,
-} from "../PermissionEditor.tsx";
+import { PermissionEditor, usePermissionChange } from "../PermissionEditor.tsx";
 import { SettingEditor } from "../SettingEditor.tsx";
 import { Field, NameButton, PathValue } from "./kit.tsx";
 import { type Actions, type SectionUi } from "./types.ts";

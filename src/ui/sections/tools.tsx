@@ -14,7 +14,8 @@ import { sessionsHere } from "../../view/usage.ts";
 import { Bullet } from "../Bullet.tsx";
 import { plural, tilde } from "../format.ts";
 import { Icon } from "../Icon.tsx";
-import { fileFor, ScopePicker, usePermissionChange } from "../PermissionEditor.tsx";
+import { fileFor, ScopePicker } from "../editorKit.tsx";
+import { usePermissionChange } from "../PermissionEditor.tsx";
 import { Field, NameButton } from "./kit.tsx";
 import { type Actions, type SectionUi } from "./types.ts";
 

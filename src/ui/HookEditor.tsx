@@ -3,10 +3,9 @@ import { EDITABLE_SCOPES } from "../shared/scopes.ts";
 import { type DirectoryView, type Hook, type HookEdit, type Scope } from "../shared/types.ts";
 import { api } from "./api.ts";
 import { tilde } from "./format.ts";
-import { fileFor, projectOrUser, ScopePicker } from "./PermissionEditor.tsx";
+import { fileFor, parseJson, projectOrUser, ScopePicker } from "./editorKit.tsx";
 import { reference } from "./reference.ts";
-import { type Saved } from "./SettingEditor.tsx";
-import { useReviewedChange } from "./useReviewedChange.tsx";
+import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
 
 interface Props {
   view: DirectoryView;
@@ -43,14 +42,13 @@ export function HookEditor({ view, hook, onSaved }: Props) {
   const remove = hook ? { event: hook.event, at: hook.at, definition: hook.definition } : undefined;
   const review = () => {
     if (!file) return;
-    let definition: unknown;
-    try {
-      definition = JSON.parse(text);
-    } catch (error) {
-      change.fail(`The hook is not valid JSON: ${error instanceof Error ? error.message : error}`);
-      return;
-    }
-    const add = { event, ...(matcher.trim() ? { matcher: matcher.trim() } : {}), definition };
+    const parsed = parseJson(text);
+    if ("error" in parsed) return change.fail(`The hook is not valid JSON: ${parsed.error}`);
+    const add = {
+      event,
+      ...(matcher.trim() ? { matcher: matcher.trim() } : {}),
+      definition: parsed.value,
+    };
     void change.start(
       { dir: view.path, file, ...(remove ? { remove } : {}), add },
       hook ? `Changed a ${event} hook` : `Added a ${event} hook`

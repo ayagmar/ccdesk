@@ -6,13 +6,11 @@ import {
   type PermissionList,
   type Scope,
 } from "../shared/types.ts";
-import { lineName } from "../view/lines.ts";
 import { type Rule } from "../view/sections/permissions.ts";
 import { api } from "./api.ts";
-import { Bullet } from "./Bullet.tsx";
+import { fileFor, projectOrUser, ScopePicker } from "./editorKit.tsx";
 import { tilde } from "./format.ts";
-import { type Saved } from "./SettingEditor.tsx";
-import { useReviewedChange } from "./useReviewedChange.tsx";
+import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
 
 interface Props {
   view: DirectoryView;
@@ -39,16 +37,6 @@ export function usePermissionChange(view: DirectoryView, onSaved: (saved: Saved)
       message
     );
   return { ...change, start };
-}
-
-/** The settings file of one scope in this directory, which a new rule goes into. */
-export function fileFor(view: DirectoryView, scope: Scope): string | undefined {
-  return view.settings.find((l) => l.scope === scope && !l.legacy)?.path;
-}
-
-/** Project settings, or user settings where there is no project file, as in your home folder. */
-export function projectOrUser(view: DirectoryView): Scope {
-  return fileFor(view, "project") ? "project" : "user";
 }
 
 /** Move, remove or add one permission rule, reviewed as a diff of the settings file first. */
@@ -167,36 +155,5 @@ export function PermissionEditor({ view, rule, onSaved }: Props) {
       )}
       {change.shown}
     </section>
-  );
-}
-
-/** Which settings file a new rule goes into: user, project or local. */
-export function ScopePicker({
-  view,
-  scope,
-  onPick,
-}: {
-  view: DirectoryView;
-  scope: Scope;
-  onPick: (scope: Scope) => void;
-}) {
-  return (
-    <fieldset className="segmented" aria-label="File to change">
-      {EDITABLE_SCOPES.map((s) => (
-        <button
-          key={s}
-          type="button"
-          aria-pressed={scope === s}
-          // In your home folder .claude/settings.json is your user file, so there is no project file.
-          disabled={!fileFor(view, s)}
-          title={
-            fileFor(view, s) ? undefined : `No ${lineName(s).toLowerCase()} settings file here`
-          }
-          onClick={() => onPick(s)}
-        >
-          <Bullet line={s} hollow={scope !== s} /> {lineName(s)}
-        </button>
-      ))}
-    </fieldset>
   );
 }

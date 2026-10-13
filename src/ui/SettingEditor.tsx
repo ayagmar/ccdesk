@@ -1,28 +1,14 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { allowedScopes, EDITABLE_SCOPES } from "../shared/scopes.ts";
-import {
-  type Change,
-  type DirectoryView,
-  type Scope,
-  type SettingsEdit,
-  type SettingsEditPreview,
-} from "../shared/types.ts";
+import { type DirectoryView, type Scope, type SettingsEdit } from "../shared/types.ts";
 import { lineName } from "../view/lines.ts";
 import { type FieldKind, fieldKind } from "../view/settings.ts";
-import { api, errorText } from "./api.ts";
-import { Bullet } from "./Bullet.tsx";
-import { DiffView } from "./DiffView.tsx";
+import { api } from "./api.ts";
+import { parseJson, ScopeButtons } from "./editorKit.tsx";
 import { tilde } from "./format.ts";
 import { documentedValues } from "./settingsCatalog.ts";
 import { propertyFor, schemaSource, settingKeys } from "./settingsSchema.ts";
-
-/** A saved edit: the change to undo, what to tell you, and the row to show afterwards. */
-export interface Saved {
-  /** null for a change ccdesk made through Claude Code's own commands, which it cannot undo. */
-  change: Change | null;
-  message: string;
-  select?: string | null;
-}
+import { type ReviewedChange, type Saved, useReviewedChange } from "./useReviewedChange.tsx";
 
 interface Props {
   view: DirectoryView;
@@ -57,11 +43,8 @@ function fromDraft(kind: FieldKind, draft: Draft): { value: unknown } | { error:
         .filter(Boolean),
     };
   if (kind === "json") {
-    try {
-      return { value: JSON.parse(draft) };
-    } catch (error) {
-      return { error: `Not valid JSON: ${error instanceof Error ? error.message : String(error)}` };
-    }
+    const parsed = parseJson(draft);
+    return "error" in parsed ? { error: `Not valid JSON: ${parsed.error}` } : parsed;
   }
   if (kind === "enum" && draft === "") return { error: "Pick a value." };
   return { value: draft };
@@ -78,45 +61,13 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
   const kind = fieldKind(property);
   const layer = view.settings.find((l) => l.scope === scope && !l.legacy);
   const current = layer?.data?.[key];
-  const [draft, setDraft] = useState<Draft>(() => toDraft(kind, current));
   // The edit is kept with its review, so Save writes exactly what the diff showed.
-  const [review, setReview] = useState<{
-    preview: SettingsEditPreview;
-    edit: SettingsEdit;
-    removing: boolean;
-  } | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const fieldId = useId();
-
-  // Picking another key starts from what the file holds. Compared as text, so re-reading an
-  // unchanged file (the page refreshes on focus) keeps an unsaved draft. When Claude Code or an
-  // editor changes this value meanwhile, a draft you have not touched follows the file, and one
-  // you have is kept, to be reviewed against the file as it is now.
-  const currentText = JSON.stringify(current);
-  const base = useRef({ key, kind, text: currentText });
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the draft is read, not a trigger.
-  useEffect(() => {
-    const was = base.current;
-    base.current = { key, kind, text: currentText };
-    if (was.key === key && was.kind === kind && was.text === currentText) return;
-    setReview(null);
-    const parse = (text: string | undefined) => (text === undefined ? undefined : JSON.parse(text));
-    const now = toDraft(kind, parse(currentText));
-    const edited = JSON.stringify(draft) !== JSON.stringify(toDraft(kind, parse(was.text)));
-    // A draft that matches the file, as after saving it, is in step with it, not edited.
-    const differs = JSON.stringify(draft) !== JSON.stringify(now);
-    if (was.key === key && was.kind === kind && edited && differs) {
-      setProblem("The file changed while you were editing. Your value is kept; review it again.");
-      return;
-    }
-    setDraft(now);
-    setProblem(null);
-  }, [key, kind, currentText]);
-
-  // A review describes one value in one file; changing either sends you back to review again.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the dependencies are the triggers.
-  useEffect(() => setReview(null), [draft, scope, key]);
+  const change = useReviewedChange<SettingsEdit>(
+    api.previewSettings,
+    api.saveSettings,
+    (saved, edit) => onSaved({ ...saved, select: `set:${edit.key}` })
+  );
+  const [draft, setDraft] = useDraft(key, kind, current, change);
 
   const allowed = allowedScopes(key);
   // Start on a file Claude Code reads this key from.
@@ -124,69 +75,51 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
     const usable = EDITABLE_SCOPES.filter((s) => allowedScopes(key).includes(s));
     setScope((s) => (usable.includes(s) || !usable[0] ? s : usable[0]));
   }, [key]);
-  const known = property !== undefined;
-  const hidden = isHidden(current);
 
-  const startReview = async (removing: boolean) => {
-    setProblem(null);
-    const parsed = removing ? { value: undefined } : fromDraft(kind, draft);
-    if ("error" in parsed) return setProblem(parsed.error);
-    setBusy(true);
-    try {
-      const edit = { dir: view.path, scope, key, ...(removing ? {} : { value: parsed.value }) };
-      setReview({ preview: await api.previewSettings(edit), edit, removing });
-    } catch (error) {
-      setProblem(errorText(error));
-    } finally {
-      setBusy(false);
-    }
+  // A review describes one value in one file; changing either sends you back to review again.
+  const pickKey = (next: string) => {
+    setKey(next);
+    change.cancel();
+  };
+  const pickScope = (next: Scope) => {
+    setScope(next);
+    change.cancel();
+  };
+  const type = (next: Draft) => {
+    setDraft(next);
+    change.cancel();
   };
 
-  const save = async () => {
-    if (!review) return;
-    const { edit, preview, removing } = review;
-    setBusy(true);
-    try {
-      const change = await api.saveSettings(edit, preview.revision);
-      const where = `${lineName(edit.scope)} settings`;
-      onSaved({
-        change,
-        message: removing ? `Removed ${edit.key} from ${where}` : `Saved ${edit.key} in ${where}`,
-        select: `set:${edit.key}`,
-      });
-      setReview(null);
-    } catch (error) {
-      setProblem(errorText(error));
-    } finally {
-      setBusy(false);
-    }
+  const startReview = (removing: boolean) => {
+    const parsed = removing ? { value: undefined } : fromDraft(kind, draft);
+    if ("error" in parsed) return change.fail(parsed.error);
+    const where = `${lineName(scope)} settings`;
+    void change.start(
+      { dir: view.path, scope, key, ...(removing ? {} : { value: parsed.value }) },
+      removing ? `Removed ${key} from ${where}` : `Saved ${key} in ${where}`
+    );
   };
 
   return (
     <section className="editor" aria-label="Edit setting">
-      {settingKey === null && <KeyPicker value={key} onChange={setKey} />}
-      {key !== "" && !known && (
+      {settingKey === null && <KeyPicker value={key} onChange={pickKey} />}
+      {key !== "" && !property && (
         <p className="flag bad">
           {key} is not in Claude Code's settings schema ({schemaSource()}).
         </p>
       )}
-      {known && (
+      {property && (
         <>
           {property.description && <p className="hint">{property.description}</p>}
-          <fieldset className="segmented" aria-label="File to change">
-            {EDITABLE_SCOPES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                aria-pressed={scope === s}
-                disabled={!allowed.includes(s)}
-                title={allowed.includes(s) ? undefined : `Claude Code ignores ${key} in this file`}
-                onClick={() => setScope(s)}
-              >
-                <Bullet line={s} hollow={scope !== s} /> {lineName(s)}
-              </button>
-            ))}
-          </fieldset>
+          <ScopeButtons
+            label="File to change"
+            scopes={EDITABLE_SCOPES}
+            scope={scope}
+            onPick={pickScope}
+            unavailable={(s) =>
+              allowed.includes(s) ? undefined : `Claude Code ignores ${key} in this file`
+            }
+          />
           {!allowed.includes(scope) && (
             <p className="flag warn">
               Claude Code reads {key} only from {allowed.join(" or ") || "~/.claude.json"}; pick
@@ -197,70 +130,127 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
             {layer ? tilde(layer.path) : ""}
             {layer && !layer.exists ? " (will be created)" : ""}
           </p>
-          {hidden ? (
+          {isHidden(current) ? (
             <p className="flag warn">This value holds hidden secrets; edit it in the file.</p>
           ) : (
-            <>
-              <label className="field" htmlFor={fieldId}>
-                <span>Value in this file</span>
-                <Field
-                  id={fieldId}
-                  kind={kind}
-                  options={property.enum}
-                  draft={draft}
-                  onChange={setDraft}
-                />
-              </label>
-              {kind === "string" && documentedValues(key).length > 0 && (
-                <fieldset className="suggestions" aria-label="Values from the settings reference">
-                  <span className="muted small">Documented values</span>
-                  {documentedValues(key).map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className="mono"
-                      aria-pressed={draft === value}
-                      onClick={() => setDraft(value)}
-                    >
-                      {value}
-                    </button>
-                  ))}
-                </fieldset>
-              )}
-              {kind === "lines" && <p className="muted small">One entry per line.</p>}
-              <div className="editor-buttons">
-                <button
-                  type="button"
-                  className="primary"
-                  disabled={busy || !allowed.includes(scope)}
-                  onClick={() => startReview(false)}
-                >
-                  Review change
-                </button>
-                {current !== undefined && (
-                  <button type="button" disabled={busy} onClick={() => startReview(true)}>
-                    Remove from this file
-                  </button>
-                )}
-              </div>
-            </>
+            <ValueForm
+              settingKey={key}
+              kind={kind}
+              options={property.enum}
+              draft={draft}
+              onType={type}
+              busy={change.busy}
+              canSave={allowed.includes(scope)}
+              canRemove={current !== undefined}
+              onReview={startReview}
+            />
           )}
         </>
       )}
-      {problem && (
-        <p className="flag bad" role="alert">
-          {problem}
-        </p>
-      )}
-      {review && (
-        <Review
-          preview={review.preview}
-          busy={busy}
-          onSave={save}
-          onCancel={() => setReview(null)}
-        />
-      )}
+      {change.shown}
     </section>
+  );
+}
+
+/**
+ * The value you are typing, kept in step with the file. Picking another key starts from what the
+ * file holds. Compared as text, so re-reading an unchanged file (the page refreshes on focus) keeps
+ * an unsaved draft. When Claude Code or an editor changes this value meanwhile, a draft you have
+ * not touched follows the file, and one you have is kept, to be reviewed against the file as it is
+ * now.
+ */
+function useDraft(
+  key: string,
+  kind: FieldKind,
+  current: unknown,
+  change: Pick<ReviewedChange<SettingsEdit>, "cancel" | "fail">
+): [Draft, (draft: Draft) => void] {
+  const [draft, setDraft] = useState<Draft>(() => toDraft(kind, current));
+  const currentText = JSON.stringify(current);
+  const base = useRef({ key, kind, text: currentText });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the draft is read, not a trigger.
+  useEffect(() => {
+    const was = base.current;
+    base.current = { key, kind, text: currentText };
+    if (was.key === key && was.kind === kind && was.text === currentText) return;
+    change.cancel();
+    const parse = (text: string | undefined) => (text === undefined ? undefined : JSON.parse(text));
+    const now = toDraft(kind, parse(currentText));
+    const edited = JSON.stringify(draft) !== JSON.stringify(toDraft(kind, parse(was.text)));
+    // A draft that matches the file, as after saving it, is in step with it, not edited.
+    const differs = JSON.stringify(draft) !== JSON.stringify(now);
+    if (was.key === key && was.kind === kind && edited && differs) {
+      change.fail("The file changed while you were editing. Your value is kept; review it again.");
+      return;
+    }
+    setDraft(now);
+  }, [key, kind, currentText]);
+  return [draft, setDraft];
+}
+
+/** The value field, the documented values to pick from, and the buttons that start a review. */
+function ValueForm({
+  settingKey,
+  kind,
+  options,
+  draft,
+  onType,
+  busy,
+  canSave,
+  canRemove,
+  onReview,
+}: {
+  settingKey: string;
+  kind: FieldKind;
+  options: unknown[] | undefined;
+  draft: Draft;
+  onType: (draft: Draft) => void;
+  busy: boolean;
+  canSave: boolean;
+  canRemove: boolean;
+  onReview: (removing: boolean) => void;
+}) {
+  const fieldId = useId();
+  const documented = kind === "string" ? documentedValues(settingKey) : [];
+  return (
+    <>
+      <label className="field" htmlFor={fieldId}>
+        <span>Value in this file</span>
+        <Field id={fieldId} kind={kind} options={options} draft={draft} onChange={onType} />
+      </label>
+      {documented.length > 0 && (
+        <fieldset className="suggestions" aria-label="Values from the settings reference">
+          <span className="muted small">Documented values</span>
+          {documented.map((value) => (
+            <button
+              key={value}
+              type="button"
+              className="mono"
+              aria-pressed={draft === value}
+              onClick={() => onType(value)}
+            >
+              {value}
+            </button>
+          ))}
+        </fieldset>
+      )}
+      {kind === "lines" && <p className="muted small">One entry per line.</p>}
+      <div className="editor-buttons">
+        <button
+          type="button"
+          className="primary"
+          disabled={busy || !canSave}
+          onClick={() => onReview(false)}
+        >
+          Review change
+        </button>
+        {canRemove && (
+          <button type="button" disabled={busy} onClick={() => onReview(true)}>
+            Remove from this file
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -401,78 +391,5 @@ function KeyPicker({ value, onChange }: { value: string; onChange: (key: string)
         </div>
       )}
     </div>
-  );
-}
-
-export function Review({
-  preview,
-  busy,
-  onSave,
-  onCancel,
-}: {
-  preview: SettingsEditPreview;
-  busy: boolean;
-  onSave: () => void;
-  onCancel: () => void;
-}) {
-  const blocked = preview.errors.length > 0;
-  return (
-    <section className="review" aria-label="Review change">
-      <h3 className="sub-title">
-        {blocked ? "This value does not fit the schema" : `Change to ${tilde(preview.path)}`}
-      </h3>
-      {blocked ? (
-        <ul className="plain">
-          {preview.errors.map((e) => (
-            <li key={e} className="flag bad">
-              {e}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <DiffView before={preview.before ?? ""} after={preview.after} />
-      )}
-      {!blocked && preview.commands && (
-        <div className="muted small">
-          <p>
-            ccdesk does not write this file itself; Claude Code rewrites it all the time. Saving
-            runs Claude Code's own command instead (values hidden here):
-          </p>
-          {preview.commands.map((c) => (
-            <p key={c} className="mono wrap">
-              {c}
-            </p>
-          ))}
-          {preview.commands.some((c) => c.includes(" add-json ")) && (
-            <p>
-              The real values are passed to claude on its command line, where other programs on this
-              computer can see them while it runs.
-            </p>
-          )}
-          <p>
-            Recent changes lists this change and the command that puts it back, but ccdesk cannot
-            undo it for you.
-          </p>
-        </div>
-      )}
-      <div className="editor-buttons">
-        {!blocked && (
-          <button type="button" className="primary" disabled={busy} onClick={onSave}>
-            {busy ? "Saving…" : "Save"}
-          </button>
-        )}
-        <button type="button" disabled={busy} onClick={onCancel}>
-          {blocked ? "Back" : "Cancel"}
-        </button>
-      </div>
-      {!blocked && !preview.commands && preview.before !== null && (
-        <p className="muted small">
-          {preview.reformats
-            ? "ccdesk writes the whole file with 2-space indentation, as Claude Code does. "
-            : ""}
-          The old file is backed up first.
-        </p>
-      )}
-    </section>
   );
 }

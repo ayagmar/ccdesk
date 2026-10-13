@@ -15,7 +15,8 @@ export interface Group {
   shown: Row[];
 }
 
-function compare(a: string | number, b: string | number): number {
+/** Numbers by value, text in natural order, so app9 comes before app10. */
+export function compare(a: string | number, b: string | number): number {
   return typeof a === "number" && typeof b === "number"
     ? a - b
     : String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
