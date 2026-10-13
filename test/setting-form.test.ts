@@ -2,10 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { type SettingSchema } from "../src/shared/types.ts";
 import {
+  asForm,
+  asJson,
   type DraftObject,
   editKind,
   expects,
+  type Form,
   fieldKind,
+  followFile,
+  formFor,
   fromDraft,
   toDraft,
 } from "../src/view/index.ts";
@@ -37,8 +42,12 @@ const providers: SettingSchema = {
 };
 
 /** Saves a draft the way the editor does, failing the test on an error. */
-function save(schema: SettingSchema, draft: ReturnType<typeof toDraft>): unknown {
-  const parsed = fromDraft(fieldKind(schema), schema, draft);
+function save(
+  schema: SettingSchema,
+  draft: ReturnType<typeof toDraft>,
+  kind = fieldKind(schema)
+): unknown {
+  const parsed = fromDraft(kind, schema, draft);
   assert.ok("value" in parsed, "error" in parsed ? parsed.error : "");
   return parsed.value;
 }
@@ -94,7 +103,13 @@ test("a property that is not a number is refused by name", () => {
 
 test("a value a form cannot hold exactly is edited as JSON, so saving loses nothing", () => {
   // A property the schema does not name.
-  assert.equal(editKind(rules, { allow: [], deny: ["x"] }), "json");
+  assert.equal(editKind(rules, { allow: ["$defaults"] }), "object");
+  assert.equal(editKind(rules, { allow: ["$defaults"], deny: ["x"] }), "json");
+  // An empty list, which an empty field would leave out.
+  assert.equal(editKind(rules, { soft_deny: [] }), "json");
+  // Text with a line break, which a one-line field would join.
+  assert.equal(editKind(command, { type: "command", command: "echo one\necho two" }), "json");
+  assert.equal(editKind({ type: "string" }, "first\nsecond"), "json");
   // A property of the wrong type.
   assert.equal(editKind(command, { type: "command", command: "x", padding: "2" }), "json");
   // A value the schema does not list.
@@ -146,4 +161,49 @@ test("a JSON field says what shape the value takes", () => {
     expects({ type: "array", items: { type: "string", enum: ["skills", "agents"] } }),
     'a list, each one of "skills", "agents"'
   );
+});
+
+test("an unsaved edit is kept when the file changes, even when the file no longer fits the form", () => {
+  const was = { allow: ["$defaults"] };
+  const typed: Form = {
+    kind: "object",
+    draft: { ...(formFor(rules, was).draft as DraftObject), allow: "$defaults\nnpm test" },
+  };
+
+  const kept = followFile(typed, rules, was, { allow: ["$defaults"], deny: ["x"] });
+  assert.equal(kept.kept, true);
+  assert.deepEqual(kept.form, typed);
+});
+
+test("a form you have not edited follows the file, into JSON when the new value needs it", () => {
+  const was = { allow: ["$defaults"] };
+  const now = { allow: ["$defaults"], deny: ["x"] };
+  const followed = followFile(formFor(rules, was), rules, was, now);
+  assert.equal(followed.kept, false);
+  assert.deepEqual(followed.form, { kind: "json", draft: JSON.stringify(now, null, 2) });
+});
+
+test("an edit the file now matches, as after saving it, follows the file", () => {
+  const now = { allow: ["$defaults", "npm test"] };
+  const typed: Form = {
+    kind: "object",
+    draft: { ...(formFor(rules, undefined).draft as DraftObject), allow: "$defaults\nnpm test" },
+  };
+  assert.equal(followFile(typed, rules, undefined, now).kept, false);
+});
+
+test("what the form cannot say, such as an empty list, is written through JSON", () => {
+  const typed = formFor(rules, { allow: ["$defaults"] });
+  const json = asJson(typed, rules);
+  assert.ok(!("error" in json));
+  assert.deepEqual(save(rules, json.draft, "json"), { allow: ["$defaults"] });
+
+  const empty: Form = { kind: "json", draft: '{ "soft_deny": [] }' };
+  assert.deepEqual(asForm(empty, rules), {
+    error: "The form cannot hold this value exactly; edit it as JSON.",
+  });
+  assert.deepEqual(asForm({ kind: "json", draft: '{ "soft_deny": ["rm"] }' }, rules), {
+    kind: "object",
+    draft: formFor(rules, { soft_deny: ["rm"] }).draft,
+  });
 });

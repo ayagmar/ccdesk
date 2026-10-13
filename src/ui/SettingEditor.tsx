@@ -9,12 +9,17 @@ import {
 import { lineName } from "../view/lines.ts";
 import {
   allowedValues,
+  asForm,
+  asJson,
   type Draft,
   type DraftObject,
   editKind,
   expects,
   type FieldKind,
+  type Form,
   fieldKind,
+  followFile,
+  formFor,
   fromDraft,
   toDraft,
 } from "../view/settings.ts";
@@ -43,14 +48,13 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
   const property = propertyFor(key);
   const layer = view.settings.find((l) => l.scope === scope && !l.legacy);
   const current = layer?.data?.[key];
-  const kind = editKind(property, current);
   // The edit is kept with its review, so Save writes exactly what the diff showed.
   const change = useReviewedChange<SettingsEdit>(
     api.previewSettings,
     api.saveSettings,
     (saved, edit) => onSaved({ ...saved, select: `set:${edit.key}` })
   );
-  const [draft, setDraft] = useDraft(key, kind, property, current, change);
+  const [form, setForm] = useForm(key, property, current, change);
 
   const allowed = allowedScopes(key);
   // Start on a file Claude Code reads this key from.
@@ -68,13 +72,18 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
     setScope(next);
     change.cancel();
   };
-  const type = (next: Draft) => {
-    setDraft(next);
+  const type = (draft: Draft) => {
+    setForm({ ...form, draft });
+    change.cancel();
+  };
+  const switchTo = (next: Form | { error: string }) => {
+    if ("error" in next) return change.fail(next.error);
+    setForm(next);
     change.cancel();
   };
 
   const startReview = (removing: boolean) => {
-    const parsed = removing ? { value: undefined } : fromDraft(kind, property, draft);
+    const parsed = removing ? { value: undefined } : fromDraft(form.kind, property, form.draft);
     if ("error" in parsed) return change.fail(parsed.error);
     const where = `${lineName(scope)} settings`;
     void change.start(
@@ -119,10 +128,11 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
           ) : (
             <ValueForm
               settingKey={key}
-              kind={kind}
+              form={form}
               property={property}
-              draft={draft}
+              fitsForm={editKind(property, current) !== "json"}
               onType={type}
+              onSwitch={() => switchTo((form.kind === "json" ? asForm : asJson)(form, property))}
               busy={change.busy}
               canSave={allowed.includes(scope)}
               canRemove={current !== undefined}
@@ -137,60 +147,61 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
 }
 
 /**
- * The value you are typing, kept in step with the file. Picking another key starts from what the
- * file holds. Compared as text, so re-reading an unchanged file (the page refreshes on focus) keeps
- * an unsaved draft. When Claude Code or an editor changes this value meanwhile, a draft you have
- * not touched follows the file, and one you have is kept, to be reviewed against the file as it is
- * now.
+ * The value you are typing and its control, kept in step with the file. Picking another key starts
+ * from what the file holds. Compared as text, so re-reading an unchanged file (the page refreshes
+ * on focus) keeps an unsaved draft. When Claude Code or an editor changes this value meanwhile, a
+ * form you have not touched follows the file, and one you have is kept, to be reviewed against the
+ * file as it is now.
  */
-function useDraft(
+function useForm(
   key: string,
-  kind: FieldKind,
   property: SettingSchema | undefined,
   current: unknown,
   change: Pick<ReviewedChange<SettingsEdit>, "cancel" | "fail">
-): [Draft, (draft: Draft) => void] {
-  const [draft, setDraft] = useState<Draft>(() => toDraft(kind, property, current));
+): [Form, (form: Form) => void] {
+  const [form, setForm] = useState<Form>(() => formFor(property, current));
   const currentText = JSON.stringify(current);
-  const base = useRef({ key, kind, text: currentText });
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the draft is read, not a trigger.
+  const base = useRef({ key, text: currentText });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the form is read, not a trigger.
   useEffect(() => {
     const was = base.current;
-    base.current = { key, kind, text: currentText };
-    if (was.key === key && was.kind === kind && was.text === currentText) return;
+    base.current = { key, text: currentText };
+    if (was.key === key && was.text === currentText) return;
     change.cancel();
     const parse = (text: string | undefined) => (text === undefined ? undefined : JSON.parse(text));
-    const now = toDraft(kind, property, parse(currentText));
-    const edited =
-      JSON.stringify(draft) !== JSON.stringify(toDraft(kind, property, parse(was.text)));
-    // A draft that matches the file, as after saving it, is in step with it, not edited.
-    const differs = JSON.stringify(draft) !== JSON.stringify(now);
-    if (was.key === key && was.kind === kind && edited && differs) {
-      change.fail("The file changed while you were editing. Your value is kept; review it again.");
+    const now = parse(currentText);
+    if (was.key !== key) {
+      setForm(formFor(property, now));
       return;
     }
-    setDraft(now);
-  }, [key, kind, currentText]);
-  return [draft, setDraft];
+    const next = followFile(form, property, parse(was.text), now);
+    if (next.kept)
+      change.fail("The file changed while you were editing. Your value is kept; review it again.");
+    else setForm(next.form);
+  }, [key, currentText]);
+  return [form, setForm];
 }
 
 /** The value field, the documented values to pick from, and the buttons that start a review. */
 function ValueForm({
   settingKey,
-  kind,
+  form: { kind, draft },
   property,
-  draft,
+  fitsForm,
   onType,
+  onSwitch,
   busy,
   canSave,
   canRemove,
   onReview,
 }: {
   settingKey: string;
-  kind: FieldKind;
+  form: Form;
   property: SettingSchema;
-  draft: Draft;
+  /** Whether the controls can hold the file's value exactly. */
+  fitsForm: boolean;
   onType: (draft: Draft) => void;
+  onSwitch: () => void;
   busy: boolean;
   canSave: boolean;
   canRemove: boolean;
@@ -202,7 +213,7 @@ function ValueForm({
       <Labeled label="Value in this file" kind={kind}>
         {(id) => <Field id={id} kind={kind} property={property} draft={draft} onChange={onType} />}
       </Labeled>
-      {kind === "json" && fieldKind(property) !== "json" && (
+      {kind === "json" && fieldKind(property) !== "json" && !fitsForm && (
         <p className="muted small">
           The value in this file does not fit the form, so it is shown as JSON.
         </p>
@@ -237,6 +248,11 @@ function ValueForm({
         {canRemove && (
           <button type="button" disabled={busy} onClick={() => onReview(true)}>
             Remove from this file
+          </button>
+        )}
+        {fieldKind(property) !== "json" && (
+          <button type="button" disabled={busy} onClick={onSwitch}>
+            {kind === "json" ? "Edit in form" : "Edit as JSON"}
           </button>
         )}
       </div>

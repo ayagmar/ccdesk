@@ -54,6 +54,56 @@ export function editKind(property: SettingSchema | undefined, value: unknown): F
   return "value" in back && JSON.stringify(back.value) === JSON.stringify(value) ? kind : "json";
 }
 
+/** A value being edited: its control and what that control holds. */
+export interface Form {
+  kind: FieldKind;
+  draft: Draft;
+}
+
+/** The form for a value as the file has it. */
+export function formFor(property: SettingSchema | undefined, value: unknown): Form {
+  const kind = editKind(property, value);
+  return { kind, draft: toDraft(kind, property, value) };
+}
+
+/**
+ * The form once the file's value changes from `was` to `now`, as when Claude Code or an editor
+ * writes it. A form you have not edited follows the file, as does one that matches it, as after
+ * saving. One you have edited is kept, control and all, to be reviewed against the file as it is
+ * now.
+ */
+export function followFile(
+  form: Form,
+  property: SettingSchema | undefined,
+  was: unknown,
+  now: unknown
+): { form: Form; kept: boolean } {
+  const next = formFor(property, now);
+  const edited = !sameForm(form, formFor(property, was));
+  return edited && !sameForm(form, next) ? { form, kept: true } : { form: next, kept: false };
+}
+
+function sameForm(a: Form, b: Form): boolean {
+  return a.kind === b.kind && JSON.stringify(a.draft) === JSON.stringify(b.draft);
+}
+
+/** The form's value as JSON, to write what the controls cannot, such as an empty list. */
+export function asJson(form: Form, property: SettingSchema | undefined): Form | { error: string } {
+  const parsed = fromDraft(form.kind, property, form.draft);
+  if ("error" in parsed) return parsed;
+  return { kind: "json", draft: toDraft("json", property, parsed.value) };
+}
+
+/** JSON back in the setting's controls, when they can hold the value exactly. */
+export function asForm(form: Form, property: SettingSchema | undefined): Form | { error: string } {
+  const parsed = fromDraft("json", property, form.draft);
+  if ("error" in parsed) return parsed;
+  const kind = editKind(property, parsed.value);
+  if (kind === "json")
+    return { error: "The form cannot hold this value exactly; edit it as JSON." };
+  return { kind, draft: toDraft(kind, property, parsed.value) };
+}
+
 /** The values a schema allows, when it lists them: its enum, or its const as a list of one. */
 export function allowedValues(schema: SettingSchema): unknown[] | undefined {
   if (schema.enum) return schema.enum;
@@ -152,6 +202,8 @@ export function fromDraft(
       ? { value: draft }
       : { error: "Pick a value." };
   if (kind === "json") return jsonFromDraft(property, draft);
+  // A text field holds one line, so text with a line break is edited as JSON.
+  if (/[\r\n]/.test(draft)) return { error: "Text with a line break is edited as JSON." };
   return { value: draft };
 }
 
