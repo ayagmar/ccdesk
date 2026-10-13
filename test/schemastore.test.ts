@@ -8,19 +8,24 @@ test("SchemaStore fills only documented keys the SDK lacks, and never replaces t
   const sdk = { model: { type: "string" } };
   const schemastore = {
     model: { type: "number" },
-    autoMode: { type: "object" },
+    autoMode: { type: "object", description: "SchemaStore's own account" },
     retiredKey: { type: "boolean" },
   };
 
-  const { properties, borrowed, uncovered } = borrowMissingKeys(sdk, schemastore, [
-    "model",
-    "autoMode",
-    "copyOnSelect",
-  ]);
+  const { properties, borrowed, uncovered } = borrowMissingKeys(sdk, schemastore, {
+    model: "The model",
+    autoMode: "Rules for the auto mode classifier",
+    copyOnSelect: "Copy selected text",
+  });
 
+  // The shape comes from SchemaStore; what the editor tells the user comes from the docs.
   assert.deepEqual(properties, {
     model: { type: "string" },
-    autoMode: { type: "object", $comment: BORROWED_NOTE },
+    autoMode: {
+      type: "object",
+      description: "Rules for the auto mode classifier",
+      $comment: BORROWED_NOTE,
+    },
   });
   assert.deepEqual(borrowed, ["autoMode"]);
   assert.deepEqual(uncovered, ["copyOnSelect"]);
@@ -29,5 +34,5 @@ test("SchemaStore fills only documented keys the SDK lacks, and never replaces t
 test("a borrowed key that refers elsewhere in SchemaStore's schema stops the run", () => {
   const schemastore = { hooks: { type: "array", items: { $ref: "#/$defs/hookMatcher" } } };
 
-  assert.throws(() => borrowMissingKeys({}, schemastore, ["hooks"]), /hooks uses \$ref/);
+  assert.throws(() => borrowMissingKeys({}, schemastore, { hooks: "Hooks" }), /hooks uses \$ref/);
 });
