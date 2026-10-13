@@ -91,6 +91,22 @@ test("turning off the built-in AGENTS.md plugin leaves CLAUDE.md files only, und
   );
 });
 
+test("the built-in AGENTS.md plugin is on only while its enabledPlugins entry, if any, is true", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/settings.json", {
+    enabledPlugins: { "cc-plugin-agents-md@builtin": "yes" },
+  });
+  f.write("app/AGENTS.md", "agent rules");
+  f.json("on/.claude/settings.json", { enabledPlugins: { "agents-md@builtin": true } });
+  f.write("on/AGENTS.md", "agent rules");
+
+  const off = await scanDirectory(f.env, f.at("app"));
+  const on = await scanDirectory(f.env, f.at("on"));
+
+  assert.equal(off.instructions[0]?.status, "skipped");
+  assert.equal(on.instructions[0]?.status, "loaded");
+});
+
 test("the instruction mode is ignored when set in a project settings file", async () => {
   const f = makeFixture();
   f.json("app/.claude/settings.json", {
