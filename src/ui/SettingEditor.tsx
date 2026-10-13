@@ -22,6 +22,7 @@ import {
   followFile,
   formFor,
   fromDraft,
+  type ReplacedList,
   replacedBuiltIns,
   toDraft,
 } from "../view/settings.ts";
@@ -230,7 +231,7 @@ function ValueForm({
           )
         }
       </Labeled>
-      {kind === "json" && replaced.map((name) => <ReplacesBuiltIns key={name} name={name} />)}
+      {kind === "json" && replaced.map((r) => <ReplacesBuiltIns key={r.list} replaced={r} />)}
       {kind === "json" && fieldKind(property) !== "json" && !fitsForm && (
         <p className="muted small">
           The value in this file does not fit the form, so it is shown as JSON.
@@ -472,7 +473,7 @@ function ObjectFields({
   property: SettingSchema;
   draft: DraftObject;
   /** The lists that replace Claude Code's built-in entries, from replacedBuiltIns. */
-  replaced: string[];
+  replaced: ReplacedList[];
   onChange: (d: Draft) => void;
 }) {
   return (
@@ -481,6 +482,7 @@ function ObjectFields({
         const kind = fieldKind(schema);
         const value = draft[name] ?? toDraft(kind, schema, undefined, true);
         const set = (next: Draft) => onChange({ ...draft, [name]: next });
+        const dropped = replaced.find((r) => r.list === name);
         return (
           <div key={name} className="object-field">
             <Labeled
@@ -503,8 +505,8 @@ function ObjectFields({
                 />
               )}
             </Labeled>
-            {replaced.includes(name) && (
-              <ReplacesBuiltIns name={name} onKeep={() => set(`$defaults\n${value}`)} />
+            {dropped && (
+              <ReplacesBuiltIns replaced={dropped} onKeep={() => set(`$defaults\n${value}`)} />
             )}
             {schema.description && <About text={schema.description} />}
           </div>
@@ -515,11 +517,23 @@ function ObjectFields({
 }
 
 /** The warning for a list without "$defaults", with a button that adds it where the form can. */
-function ReplacesBuiltIns({ name, onKeep }: { name: string; onKeep?: () => void }) {
+function ReplacesBuiltIns({
+  replaced: { list, empty },
+  onKeep,
+}: {
+  replaced: ReplacedList;
+  onKeep?: () => void;
+}) {
   return (
     <p className="flag warn">
-      Without "$defaults", the {name} entries replace Claude Code's built-in ones instead of adding
-      to them.
+      {/* One span, so the sentence wraps as text beside the button rather than as flex items. */}
+      <span>
+        {empty
+          ? `The ${list} list is empty, so Claude Code uses none of its built-in ${list} entries.`
+          : `Without "$defaults", the ${list} entries replace Claude Code's built-in ones instead of adding to them.`}{" "}
+        To take the list over, copy the built-in entries from <code>claude auto-mode defaults</code>
+        .
+      </span>
       {onKeep && (
         <button type="button" onClick={onKeep}>
           Keep built-in entries

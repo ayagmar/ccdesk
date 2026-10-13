@@ -35,6 +35,7 @@ export {
   formFor,
   fromDraft,
   parseJson,
+  type ReplacedList,
   replacedBuiltIns,
   toDraft,
   valuesIn,

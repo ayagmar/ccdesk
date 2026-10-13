@@ -116,20 +116,28 @@ export function asForm(form: Form, property: SettingSchema | undefined): Form | 
 
 /**
  * autoMode's lists, each of which replaces Claude Code's built-in entries unless it includes
- * "$defaults" (docs: settings-reference#automode).
+ * "$defaults", even when it is empty (docs: settings-reference#automode,
+ * auto-mode-config#override-the-block-and-allow-rules).
  */
 const AUTO_MODE_LISTS = ["allow", "soft_deny", "environment", "hard_deny"];
 
+/** An autoMode list that drops Claude Code's built-in entries; an empty one keeps none at all. */
+export interface ReplacedList {
+  list: string;
+  empty: boolean;
+}
+
 /**
  * The lists in a setting's value that replace Claude Code's built-in entries instead of adding to
- * them: autoMode lists with entries, none of them "$defaults". A list left out keeps the built-in
- * ones. Read from the value, so the form and JSON warn alike.
+ * them: autoMode lists without "$defaults", empty ones included. A list left out keeps the
+ * built-in ones. Read from the value, so the form and JSON warn alike.
  */
-export function replacedBuiltIns(key: string, value: unknown): string[] {
+export function replacedBuiltIns(key: string, value: unknown): ReplacedList[] {
   if (key !== "autoMode" || !isObject(value)) return [];
-  return AUTO_MODE_LISTS.filter((name) => {
-    const list = value[name];
-    return Array.isArray(list) && list.length > 0 && !list.includes("$defaults");
+  return AUTO_MODE_LISTS.flatMap((list) => {
+    const entries = value[list];
+    if (!Array.isArray(entries) || entries.includes("$defaults")) return [];
+    return [{ list, empty: entries.length === 0 }];
   });
 }
 
