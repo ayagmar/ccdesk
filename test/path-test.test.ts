@@ -75,6 +75,22 @@ test("a subfolder's rule whose paths is ** loads for any file there, as one with
   );
 });
 
+test("paths split at commas outside braces, in a string and in each list item", async () => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/web.md", '---\npaths: "src/**/*.{ts,tsx}, docs/**"\n---\nweb');
+  f.write("app/.claude/rules/list.md", '---\npaths: ["lib/a.ts, src/**/*.tsx"]\n---\nlist');
+
+  const result = await testPath(f.env, f.at("app"), "src/x.tsx");
+
+  assert.deepEqual(
+    result.matches.map((m) => [f.rel(m.path), m.glob ?? null]),
+    [
+      ["app/.claude/rules/list.md", "src/**/*.tsx"],
+      ["app/.claude/rules/web.md", "src/**/*.{ts,tsx}"],
+    ]
+  );
+});
+
 test("a file outside the start directory gets nothing from it", async () => {
   const f = makeFixture();
   f.write("app/.claude/rules/all.md", '---\npaths: ["**/*"]\n---\nx\n');
