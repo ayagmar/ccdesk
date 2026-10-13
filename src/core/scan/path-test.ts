@@ -53,12 +53,50 @@ export async function testPath(
 
   const view = await viewOf(cwd);
   const projectRoot = view.gitRoot ?? cwd;
+  const test: FolderTest = {
+    env,
+    cwd,
+    target,
+    realCwd: await resolvedPath(cwd),
+    approved: view.trust.externalImports === "approved",
+    mode: view.agentsMdMode,
+    excludes: stringsIn(view.effective.find((e) => e.key === "claudeMdExcludes")?.value),
+    overrides: view.effective.find((e) => e.key === "skillOverrides")?.value,
+    startSkills: new Set(
+      view.inventory.skills.filter((s) => s.scope !== "plugin").map((s) => s.name)
+    ),
+  };
+  const matches = startRuleMatches(view, target, projectRoot);
+  // Folders below the start directory load their own instructions, rules and skills on demand.
+  const between: string[] = [];
+  for (let d = dirname(target); d !== cwd && isWithin(cwd, d); d = dirname(d)) between.unshift(d);
+  for (const folder of between)
+    matches.push(
+      ...(await nestedInstructions(test, folder)),
+      ...(await nestedRules(test, folder)),
+      ...(await nestedSkills(test, folder))
+    );
+  matches.push(...startSkillMatches(view, target, projectRoot));
+  return { file: target, inside: true, exists: await isFile(target), matches };
+}
+
+/** What one path test needs to know in each folder between the start directory and the file. */
+interface FolderTest {
+  env: ScanEnv;
+  cwd: string;
+  target: string;
+  realCwd: string;
+  approved: boolean;
+  mode: DirectoryView["agentsMdMode"];
+  excludes: string[];
+  overrides: unknown;
+  /** Names of the skills loaded at startup, which a nested skill of the same name is told from. */
+  startSkills: Set<string>;
+}
+
+/** Path rules Claude Code would use at all: not excluded, not waiting for approval. */
+function startRuleMatches(view: DirectoryView, target: string, projectRoot: string): PathMatch[] {
   const matches: PathMatch[] = [];
-
-  const excludes = stringsIn(view.effective.find((e) => e.key === "claudeMdExcludes")?.value);
-  const overrides = view.effective.find((e) => e.key === "skillOverrides")?.value;
-
-  // Path rules Claude Code would use at all: not excluded, not waiting for approval.
   for (const rule of view.instructions) {
     if (!rule.paths || rule.status !== "on-match") continue;
     // A project rule's globs are relative to the folder holding its .claude; others to the project.
@@ -66,81 +104,89 @@ export async function testPath(
     const glob = firstMatch(rule.paths, slashed(relative(base, target)));
     if (glob) matches.push({ kind: "rule", path: rule.path, scope: rule.scope, glob });
   }
+  return matches;
+}
 
-  const realCwd = await resolvedPath(cwd);
-  const approved = view.trust.externalImports === "approved";
-  // Folders below the start directory load their own instructions, rules and skills on demand.
-  const mode = view.agentsMdMode;
-  const startSkills = new Set(
-    view.inventory.skills.filter((s) => s.scope !== "plugin").map((s) => s.name)
-  );
-  const between: string[] = [];
-  for (let d = dirname(target); d !== cwd && isWithin(cwd, d); d = dirname(d)) between.unshift(d);
-  for (const folder of between) {
-    /** Whether the file is there; an excluded one or one over the limit is there but not loaded. */
-    const nested = async (name: string, scope: PathMatch["scope"]) => {
-      const path = join(folder, name);
-      const file = await readTextFile(env, path);
-      if (!file) return false;
-      if (!isExcluded(excludes, path, file.realPath) && file.bytes <= MAX_TEXT_BYTES)
-        matches.push({ kind: "nested", path, scope });
-      return true;
-    };
-    // managed-only leaves out files at launch, but a subfolder's CLAUDE.md and rules still load
-    // on demand (docs: memory#choose-which-instruction-files-load).
-    let hasClaudeMd = false;
-    for (const name of CLAUDE_MD_NAMES) if (await nested(name, "project")) hasClaudeMd = true;
-    if (mode !== "managed-only" && (await nested("CLAUDE.local.md", "local"))) hasClaudeMd = true;
-    if (agentsMdLoads(mode, hasClaudeMd))
-      for (const name of AGENTS_MD_NAMES) await nested(name, "project");
-    for (const path of await walkMarkdown(join(folder, ".claude", "rules"))) {
-      const text = await readTextFile(env, path);
-      if (!text || text.bytes > MAX_TEXT_BYTES) continue;
-      // As at startup: excluded by its target's path too, and one linked from outside the project
-      // waits for your approval, then loads only without paths.
-      const linked = await ruleTarget(text, folder, realCwd);
-      if (isExcluded(excludes, path, linked)) continue;
-      const globs = toStringList(parseFrontmatter(text.text).data.paths);
-      if (linkedRuleBlock(linked, realCwd, approved, globs.length > 0)) continue;
-      const glob =
-        globs.length === 0 ? undefined : firstMatch(globs, slashed(relative(folder, target)));
-      if (globs.length === 0 || glob)
-        matches.push({ kind: "nested", path, scope: "project", ...(glob ? { glob } : {}) });
-    }
-    // Only skills Claude may pick itself: not off, user-invocable-only or disable-model-invocation;
-    // one with paths only for a matching file, its globs read from its folder like a rule's.
-    for (const name of await listDir(join(folder, ".claude", "skills"))) {
-      const skill = await readSkill(env, join(folder, ".claude", "skills", name), "project");
-      if (!skill) continue;
-      applySkillOverrides([skill], overrides);
-      if (skill.listed === false) continue;
-      const glob = skill.paths && firstMatch(skill.paths, slashed(relative(folder, target)));
-      if (skill.paths && !glob) continue;
-      // A nested skill whose folder name another skill has is called by its folder as well, as
-      // apps/web:deploy (docs: skills#how-a-skill-gets-its-command-name).
-      matches.push({
-        kind: "skill",
-        path: skill.path,
-        scope: "project",
-        name: startSkills.has(name) ? `${slashed(relative(cwd, folder))}:${name}` : skill.name,
-        ...(glob ? { glob } : {}),
-      });
-    }
+/** A folder's CLAUDE.md, CLAUDE.local.md and AGENTS.md files that load on demand. */
+async function nestedInstructions(test: FolderTest, folder: string): Promise<PathMatch[]> {
+  const { env, excludes, mode } = test;
+  const matches: PathMatch[] = [];
+  /** Whether the file is there; an excluded one or one over the limit is there but not loaded. */
+  const nested = async (name: string, scope: PathMatch["scope"]) => {
+    const path = join(folder, name);
+    const text = await readTextFile(env, path);
+    if (!text) return false;
+    if (!isExcluded(excludes, path, text.realPath) && text.bytes <= MAX_TEXT_BYTES)
+      matches.push({ kind: "nested", path, scope });
+    return true;
+  };
+  // managed-only leaves out files at launch, but a subfolder's CLAUDE.md and rules still load
+  // on demand (docs: memory#choose-which-instruction-files-load).
+  let hasClaudeMd = false;
+  for (const name of CLAUDE_MD_NAMES) if (await nested(name, "project")) hasClaudeMd = true;
+  if (mode !== "managed-only" && (await nested("CLAUDE.local.md", "local"))) hasClaudeMd = true;
+  if (agentsMdLoads(mode, hasClaudeMd))
+    for (const name of AGENTS_MD_NAMES) await nested(name, "project");
+  return matches;
+}
+
+/** A folder's rules that load for the file: ones without paths, and ones whose paths match it. */
+async function nestedRules(test: FolderTest, folder: string): Promise<PathMatch[]> {
+  const { env, target, realCwd, approved, excludes } = test;
+  const matches: PathMatch[] = [];
+  for (const path of await walkMarkdown(join(folder, ".claude", "rules"))) {
+    const text = await readTextFile(env, path);
+    if (!text || text.bytes > MAX_TEXT_BYTES) continue;
+    // As at startup: excluded by its target's path too, and one linked from outside the project
+    // waits for your approval, then loads only without paths.
+    const linked = await ruleTarget(text, folder, realCwd);
+    if (isExcluded(excludes, path, linked)) continue;
+    const globs = toStringList(parseFrontmatter(text.text).data.paths);
+    if (linkedRuleBlock(linked, realCwd, approved, globs.length > 0)) continue;
+    const glob =
+      globs.length === 0 ? undefined : firstMatch(globs, slashed(relative(folder, target)));
+    if (globs.length === 0 || glob)
+      matches.push({ kind: "nested", path, scope: "project", ...(glob ? { glob } : {}) });
   }
+  return matches;
+}
 
-  // Skills Claude can pick on its own; one with disable-model-invocation only runs when you call it.
-  for (const skill of view.inventory.skills) {
-    if (!skill.paths || skill.listed === false || skill.shadowedBy) continue;
+/**
+ * A folder's skills Claude may pick itself: not off, user-invocable-only or
+ * disable-model-invocation; one with paths only for a matching file, its globs read from its
+ * folder like a rule's.
+ */
+async function nestedSkills(test: FolderTest, folder: string): Promise<PathMatch[]> {
+  const { env, cwd, target, overrides, startSkills } = test;
+  const matches: PathMatch[] = [];
+  for (const name of await listDir(join(folder, ".claude", "skills"))) {
+    const skill = await readSkill(env, join(folder, ".claude", "skills", name), "project");
+    if (!skill) continue;
+    applySkillOverrides([skill], overrides);
+    if (skill.listed === false) continue;
+    const glob = skill.paths && firstMatch(skill.paths, slashed(relative(folder, target)));
+    if (skill.paths && !glob) continue;
+    // A nested skill whose folder name another skill has is called by its folder as well, as
+    // apps/web:deploy (docs: skills#how-a-skill-gets-its-command-name).
+    matches.push({
+      kind: "skill",
+      path: skill.path,
+      scope: "project",
+      name: startSkills.has(name) ? `${slashed(relative(cwd, folder))}:${name}` : skill.name,
+      ...(glob ? { glob } : {}),
+    });
+  }
+  return matches;
+}
+
+/** Skills Claude can pick on its own; one with disable-model-invocation only runs when you call it. */
+function startSkillMatches(view: DirectoryView, target: string, projectRoot: string): PathMatch[] {
+  return view.inventory.skills.flatMap((skill): PathMatch[] => {
+    if (!skill.paths || skill.listed === false || skill.shadowedBy) return [];
     const glob = firstMatch(skill.paths, slashed(relative(projectRoot, target)));
-    if (glob)
-      matches.push({
-        kind: "skill",
-        path: skill.path,
-        scope: skill.scope,
-        glob,
-        name: skill.id ?? skill.name,
-      });
-  }
-
-  return { file: target, inside: true, exists: await isFile(target), matches };
+    if (!glob) return [];
+    return [
+      { kind: "skill", path: skill.path, scope: skill.scope, glob, name: skill.id ?? skill.name },
+    ];
+  });
 }

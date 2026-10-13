@@ -174,69 +174,75 @@ function matcherOf(group: unknown): string {
 /** One hook taken out, replaced or added, applied to the file as it is on disk. */
 async function planHookEdit(env: ScanEnv, edit: HookEdit): Promise<PlannedEdit> {
   const file = await editableFile(env, edit.dir, (f) => f.path === edit.file);
-  return planKey(
-    env,
-    file,
-    "hooks",
-    (data) => {
-      const hooks: Record<string, unknown> = isRecord(data.hooks)
-        ? structuredClone(data.hooks)
-        : {};
-      const groupsOf = (event: string): unknown[] => {
-        const groups = hooks[event];
-        return Array.isArray(groups) ? groups : [];
-      };
-      const { remove, add } = edit;
-      // Checked before any branch, so neither a new hook nor a replacement writes them.
-      if (add && hasHiddenValues(add.definition))
-        throw new RefusedError(
-          "ccdesk does not write header values it would then hide; add this hook in the file instead."
-        );
-      if (remove) {
-        const groups = groupsOf(remove.event);
-        const group = groups[remove.at.group];
-        const list = isRecord(group) && Array.isArray(group.hooks) ? group.hooks : null;
-        const hook = list?.[remove.at.index];
-        if (!list || JSON.stringify(redactSecrets(hook)) !== JSON.stringify(remove.definition))
-          throw new RefusedError(
-            "This hook changed in the file since ccdesk read it; review it again."
-          );
-        // The page saw this hook with its header values hidden, so a changed copy would lose them.
-        if (add && hasHiddenValues(hook))
-          throw new RefusedError(
-            "This hook sends header values ccdesk does not show; edit it in the file, or remove it and add it again."
-          );
-        const matcher = add?.matcher ?? "";
-        // A hook alone in its group keeps the group when only its matcher changes, unless another
-        // group already has that matcher.
-        const inPlace =
-          add?.event === remove.event &&
-          (matcher === matcherOf(group) ||
-            (list.length === 1 && !groups.some((g) => g !== group && matcherOf(g) === matcher)));
-        if (add && inPlace && isRecord(group)) {
-          list[remove.at.index] = add.definition;
-          if (matcher) group.matcher = matcher;
-          else delete group.matcher;
-          return hooks;
-        }
-        list.splice(remove.at.index, 1);
-        if (list.length === 0) groups.splice(remove.at.group, 1);
-        if (groups.length === 0 && add?.event !== remove.event) delete hooks[remove.event];
-      }
-      if (add) {
-        const groups = groupsOf(add.event);
-        const matcher = add.matcher ?? "";
-        const group = groups.find(
-          (g) => matcherOf(g) === matcher && isRecord(g) && Array.isArray(g.hooks)
-        );
-        if (isRecord(group) && Array.isArray(group.hooks)) group.hooks.push(add.definition);
-        else groups.push({ ...(matcher ? { matcher } : {}), hooks: [add.definition] });
-        hooks[add.event] = groups;
-      }
-      return Object.keys(hooks).length > 0 ? hooks : undefined;
-    },
-    true
-  );
+  return planKey(env, file, "hooks", (data) => editedHooks(data.hooks, edit), true);
+}
+
+/** The hooks setting with the edit applied, or undefined when no hooks are left. */
+function editedHooks(value: unknown, edit: HookEdit): Record<string, unknown> | undefined {
+  const hooks: Record<string, unknown> = isRecord(value) ? structuredClone(value) : {};
+  const { remove, add } = edit;
+  // Checked before any branch, so neither a new hook nor a replacement writes them.
+  if (add && hasHiddenValues(add.definition))
+    throw new RefusedError(
+      "ccdesk does not write header values it would then hide; add this hook in the file instead."
+    );
+  if (remove && takeOutHook(hooks, remove, add) === "replaced") return hooks;
+  if (add) {
+    const groups = groupsOf(hooks, add.event);
+    const matcher = add.matcher ?? "";
+    const group = groups.find(
+      (g) => matcherOf(g) === matcher && isRecord(g) && Array.isArray(g.hooks)
+    );
+    if (isRecord(group) && Array.isArray(group.hooks)) group.hooks.push(add.definition);
+    else groups.push({ ...(matcher ? { matcher } : {}), hooks: [add.definition] });
+    hooks[add.event] = groups;
+  }
+  return Object.keys(hooks).length > 0 ? hooks : undefined;
+}
+
+/** An event's matcher groups as stored in `hooks`, or a new list when it has none. */
+function groupsOf(hooks: Record<string, unknown>, event: string): unknown[] {
+  const groups = hooks[event];
+  return Array.isArray(groups) ? groups : [];
+}
+
+/**
+ * Takes the reviewed hook out of `hooks`, or puts `add` in its place when only its matcher or
+ * nothing about where it sits changes.
+ */
+function takeOutHook(
+  hooks: Record<string, unknown>,
+  remove: NonNullable<HookEdit["remove"]>,
+  add: HookEdit["add"]
+): "replaced" | "removed" {
+  const groups = groupsOf(hooks, remove.event);
+  const group = groups[remove.at.group];
+  const list = isRecord(group) && Array.isArray(group.hooks) ? group.hooks : null;
+  const hook = list?.[remove.at.index];
+  if (!list || JSON.stringify(redactSecrets(hook)) !== JSON.stringify(remove.definition))
+    throw new RefusedError("This hook changed in the file since ccdesk read it; review it again.");
+  // The page saw this hook with its header values hidden, so a changed copy would lose them.
+  if (add && hasHiddenValues(hook))
+    throw new RefusedError(
+      "This hook sends header values ccdesk does not show; edit it in the file, or remove it and add it again."
+    );
+  const matcher = add?.matcher ?? "";
+  // A hook alone in its group keeps the group when only its matcher changes, unless another
+  // group already has that matcher.
+  const inPlace =
+    add?.event === remove.event &&
+    (matcher === matcherOf(group) ||
+      (list.length === 1 && !groups.some((g) => g !== group && matcherOf(g) === matcher)));
+  if (add && inPlace && isRecord(group)) {
+    list[remove.at.index] = add.definition;
+    if (matcher) group.matcher = matcher;
+    else delete group.matcher;
+    return "replaced";
+  }
+  list.splice(remove.at.index, 1);
+  if (list.length === 0) groups.splice(remove.at.group, 1);
+  if (groups.length === 0 && add?.event !== remove.event) delete hooks[remove.event];
+  return "removed";
 }
 
 const CHANGED = "The file changed since you reviewed this edit; review it again.";

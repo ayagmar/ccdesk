@@ -57,14 +57,42 @@ function replaced(
  */
 function rulesFor(valueIn: (key: string, scope: Scope) => unknown): Rule[] {
   const managed = valueIn("sandbox", "managed");
-  const user = valueIn("sandbox", "user");
-  const managedSays = (path: string, value: unknown) => at(managed, path.split(".")) === value;
-
   const rules: Rule[] = [];
-  const add = (fields: string[], from: Scope[], reason: string, drops?: Rule["drops"]) => {
-    for (const field of fields) rules.push({ field, from, reason, ...(drops ? { drops } : {}) });
+  const managedFiles = at(managed, ["credentials", "files"]);
+  const lock: Lock = {
+    managed,
+    user: valueIn("sandbox", "user"),
+    valueIn,
+    managedSays: (path, value) => at(managed, path.split(".")) === value,
+    // docs: sandboxing#which-settings-can-disable-it
+    filesystemLocked:
+      isRecord(at(managed, ["filesystem"])) ||
+      (Array.isArray(managedFiles) && managedFiles.some((f) => isRecord(f) && f.mode === "deny")),
+    add: (fields, from, reason, drops) => {
+      for (const field of fields) rules.push({ field, from, reason, ...(drops ? { drops } : {}) });
+    },
   };
+  addScopeRules(lock);
+  addManagedLocks(lock);
+  addAdminRequiredRules(lock);
+  addLocksWithoutAdmin(lock);
+  addReadBlockRules(lock);
+  return rules;
+}
 
+/** What each group of rules below reads, and `add`, which records rules for fields. */
+interface Lock {
+  managed: unknown;
+  user: unknown;
+  valueIn: (key: string, scope: Scope) => unknown;
+  managedSays: (path: string, value: unknown) => boolean;
+  /** Managed settings configure the sandbox filesystem, so only they can turn it off. */
+  filesystemLocked: boolean;
+  add: (fields: string[], from: Scope[], reason: string, drops?: Rule["drops"]) => void;
+}
+
+/** Fields read from fewer files than the others, and entries dropped from repository files. */
+function addScopeRules({ add, filesystemLocked }: Lock): void {
   // Keys read from fewer files (docs: settings-reference, each key's Scope).
   for (const field of [
     "filesystem.allowManagedReadPathsOnly",
@@ -87,11 +115,6 @@ function rulesFor(valueIn: (key: string, scope: Scope) => unknown): Rule[] {
       REPOSITORY,
       `Claude Code reads sandbox.${field} only from user or managed settings`
     );
-  // docs: sandboxing#which-settings-can-disable-it
-  const managedFiles = at(managed, ["credentials", "files"]);
-  const filesystemLocked =
-    isRecord(at(managed, ["filesystem"])) ||
-    (Array.isArray(managedFiles) && managedFiles.some((f) => isRecord(f) && f.mode === "deny"));
   add(
     ["filesystem.disabled"],
     filesystemLocked ? NOT_MANAGED : REPOSITORY,
@@ -105,7 +128,10 @@ function rulesFor(valueIn: (key: string, scope: Scope) => unknown): Rule[] {
     "Claude Code drops mask entries from repository settings",
     { entries: (e) => isRecord(e) && e.mode === "mask" }
   );
+}
 
+/** A false allowUnsandboxedCommands that holds, and the managed-only allowlists. */
+function addManagedLocks({ add, user, managedSays }: Lock): void {
   // docs: sandboxing#turn-off-the-retry-with-strict-sandbox-mode
   if (
     managedSays("allowUnsandboxedCommands", false) ||
@@ -125,48 +151,54 @@ function rulesFor(valueIn: (key: string, scope: Scope) => unknown): Rule[] {
       NOT_MANAGED,
       "Managed settings honor only their own allowRead entries (allowManagedReadPathsOnly)"
     );
-  const domainsLocked = managedSays("network.allowManagedDomainsOnly", true);
-  if (domainsLocked)
+  if (managedSays("network.allowManagedDomainsOnly", true))
     add(
       ["network.allowedDomains", "network.httpProxyPort", "network.socksProxyPort"],
       NOT_MANAGED,
       "Managed settings honor only their own domains and proxy ports (allowManagedDomainsOnly)"
     );
+}
 
-  // docs: sandboxing#repository-settings-under-an-admin-required-sandbox
-  if (managedSays("allowUnsandboxedCommands", false) || domainsLocked) {
-    const reason =
-      "Managed settings require the sandbox, so Claude Code ignores repository settings that loosen it";
-    add(
-      [
-        "excludedCommands",
-        "ignoreViolations",
-        "network.allowedDomains",
-        "network.allowUnixSockets",
-        "network.allowMachLookup",
-        "network.httpProxyPort",
-        "network.socksProxyPort",
-        "filesystem.allowWrite",
-      ],
-      REPOSITORY,
-      reason
-    );
-    add(
-      [
-        "enableWeakerNestedSandbox",
-        "enableWeakerNetworkIsolation",
-        "network.allowAllUnixSockets",
-        "network.allowLocalBinding",
-      ],
-      REPOSITORY,
-      reason,
-      { value: true }
-    );
-    for (const field of ["enabled", "failIfUnavailable"])
-      if (at(user, [field]) === true) add([field], REPOSITORY, reason, { value: false });
-  }
+/** docs: sandboxing#repository-settings-under-an-admin-required-sandbox */
+function addAdminRequiredRules({ add, user, managedSays }: Lock): void {
+  if (
+    !managedSays("allowUnsandboxedCommands", false) &&
+    !managedSays("network.allowManagedDomainsOnly", true)
+  )
+    return;
+  const reason =
+    "Managed settings require the sandbox, so Claude Code ignores repository settings that loosen it";
+  add(
+    [
+      "excludedCommands",
+      "ignoreViolations",
+      "network.allowedDomains",
+      "network.allowUnixSockets",
+      "network.allowMachLookup",
+      "network.httpProxyPort",
+      "network.socksProxyPort",
+      "filesystem.allowWrite",
+    ],
+    REPOSITORY,
+    reason
+  );
+  add(
+    [
+      "enableWeakerNestedSandbox",
+      "enableWeakerNetworkIsolation",
+      "network.allowAllUnixSockets",
+      "network.allowLocalBinding",
+    ],
+    REPOSITORY,
+    reason,
+    { value: true }
+  );
+  for (const field of ["enabled", "failIfUnavailable"])
+    if (at(user, [field]) === true) add([field], REPOSITORY, reason, { value: false });
+}
 
-  // docs: sandboxing#locks-that-apply-without-an-admin-required-sandbox
+/** docs: sandboxing#locks-that-apply-without-an-admin-required-sandbox */
+function addLocksWithoutAdmin({ add, managed, user, valueIn }: Lock): void {
   const managedDeny = stringsIn(at(valueIn("permissions", "managed"), ["deny"]));
   if (
     stringsIn(at(managed, ["network", "deniedDomains"])).length > 0 ||
@@ -185,10 +217,21 @@ function rulesFor(valueIn: (key: string, scope: Scope) => unknown): Rule[] {
       REPOSITORY,
       "strictAllowlist is on, so Claude Code ignores a repository's domains and proxy ports"
     );
+}
 
-  // While the block covers sandboxed commands, repository allowRead and allowWrite entries do not
-  // count; it does not when filesystem isolation is off or allowManagedReadPathsOnly is set
-  // (docs: settings-reference#sandboxed-commands-under-the-block).
+/**
+ * While the block covers sandboxed commands, repository allowRead and allowWrite entries do not
+ * count; it does not when filesystem isolation is off or allowManagedReadPathsOnly is set
+ * (docs: settings-reference#sandboxed-commands-under-the-block).
+ */
+function addReadBlockRules({
+  add,
+  managed,
+  user,
+  valueIn,
+  managedSays,
+  filesystemLocked,
+}: Lock): void {
   const blocked = (["user", "project", "local", "managed"] as const).some(
     (s) => at(valueIn("permissions", s), ["blockReadsOutsideWorkingDirectories"]) === true
   );
@@ -202,7 +245,21 @@ function rulesFor(valueIn: (key: string, scope: Scope) => unknown): Rule[] {
       REPOSITORY,
       "blockReadsOutsideWorkingDirectories is on, so repository allowRead and allowWrite entries do not count"
     );
-  return rules;
+}
+
+/**
+ * What a rule takes out of a field's value and what it leaves, undefined for nothing; null when the
+ * rule does not apply to it.
+ */
+function splitField(rule: Rule, field: unknown): { removed: unknown; kept: unknown } | null {
+  if (field === undefined) return null;
+  const { drops } = rule;
+  if (!drops) return { removed: field, kept: undefined };
+  if ("value" in drops) return field === drops.value ? { removed: field, kept: undefined } : null;
+  if (!Array.isArray(field)) return null;
+  const entries = field.filter(drops.entries);
+  if (entries.length === 0) return null;
+  return { removed: entries, kept: field.filter((e) => !drops.entries(e)) };
 }
 
 /**
@@ -218,22 +275,10 @@ export function sandboxFilter(valueIn: (key: string, scope: Scope) => unknown) {
     for (const rule of rules) {
       if (!rule.from.includes(scope)) continue;
       const path = rule.field.split(".");
-      const field = at(out, path);
-      if (field === undefined) continue;
-      const drops = rule.drops;
-      let removed: unknown = field;
-      let kept: unknown;
-      if (drops && "value" in drops) {
-        if (field !== drops.value) continue;
-      } else if (drops) {
-        if (!Array.isArray(field)) continue;
-        const entries = field.filter(drops.entries);
-        if (entries.length === 0) continue;
-        removed = entries;
-        kept = field.filter((e) => !drops.entries(e));
-      }
-      out = replaced(out, path, kept);
-      dropped.push({ value: nested(path, removed), reason: rule.reason });
+      const split = splitField(rule, at(out, path));
+      if (!split) continue;
+      out = replaced(out, path, split.kept);
+      dropped.push({ value: nested(path, split.removed), reason: rule.reason });
     }
     return { value: out, dropped };
   };

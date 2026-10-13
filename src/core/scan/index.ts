@@ -9,6 +9,7 @@ import {
   type Overview,
   type Problem,
   type SessionProfile,
+  type SettingsLayer,
   type Sharing,
   type Trust,
 } from "../../shared/types.ts";
@@ -71,14 +72,7 @@ export async function scanDirectory(
   const path = resolve(dir);
   const exists = await isDir(path);
   const problems: Problem[] = [];
-  const claudeJsonFile = await readJsonObject(env, env.claudeJson);
-  const claudeJson = claudeJsonFile.ok ? claudeJsonFile.data : null;
-  // Without it the folder looks untrusted and your servers missing, so the problem says why.
-  if (!claudeJsonFile.ok && !claudeJsonFile.missing)
-    problems.push({
-      path: env.claudeJson,
-      error: `${claudeJsonFile.error}, so ccdesk cannot show your trust answers or your user and local MCP servers`,
-    });
+  const claudeJson = await readClaudeJson(env, problems);
   const root = exists ? await gitRoot(path) : null;
 
   const managed = await readManagedSettings(env);
@@ -95,18 +89,13 @@ export async function scanDirectory(
   const excludes = effective.find((s) => s.key === "claudeMdExcludes")?.value;
   const mainRoot = exists ? await mainWorktreeRoot(path) : null;
   const trust = trustOf(env, claudeJson, path, mainRoot, root);
-  const managedLayer = settings.find((l) => l.scope === "managed");
-  const managedClaudeMd = managedLayer?.data?.claudeMd;
   const instructions = await resolveInstructions({
     env,
     cwd: path,
     mode,
     excludes: stringsIn(excludes),
     externalImports: trust.externalImports,
-    managedClaudeMd:
-      managedLayer && typeof managedClaudeMd === "string"
-        ? { path: `${managedLayer.path}#claudeMd`, text: managedClaudeMd }
-        : null,
+    managedClaudeMd: managedClaudeMd(settings),
     problems,
   });
 
@@ -123,53 +112,12 @@ export async function scanDirectory(
     problems,
   });
 
-  // Every project file that shapes Claude here, so the UI can say who sees each one.
-  const mcpJson = join(path, ".mcp.json");
-  const projectFiles = [
-    ...instructions.filter((i) => i.scope === "project" || i.scope === "local").map((i) => i.path),
-    ...settings
-      .filter((s) => s.exists && (s.scope === "project" || s.scope === "local"))
-      .map((s) => s.path),
-    ...((await isFile(mcpJson)) ? [mcpJson] : []),
-    ...[...inventory.agents, ...inventory.skills, ...inventory.commands, ...inventory.outputStyles]
-      .filter((e) => e.scope === "project" || e.scope === "local")
-      .map((e) => e.path),
-  ];
-  const visibility = await visibilityOf(root, projectFiles);
-  for (const item of [...instructions, ...settings]) {
-    const v = visibility.get(item.path);
-    if (v) item.visibility = v;
-  }
-  let sharing: Sharing | null = null;
-  if (root) {
-    sharing = { tracked: [], untracked: [], ignored: [] };
-    for (const file of new Set(projectFiles)) {
-      const v = visibility.get(file);
-      // Shown as repository paths, with forward slashes on every platform.
-      const rel = relative(root, file).replaceAll("\\", "/");
-      if (v === "tracked") sharing.tracked.push(rel);
-      else if (v === "untracked") sharing.untracked.push(rel);
-      else if (v === "ignored") sharing.ignored.push(rel);
-    }
-  }
-
-  // A local file tracked in git, or in a .claude that is a link, counts as the repository's
-  // (docs: permissions#when-your-local-settings-file-needs-trust).
-  const localFromRepository = (
-    await Promise.all(
-      settings
-        .filter((l) => l.scope === "local" && l.exists)
-        .map(
-          async (l) =>
-            l.visibility === "tracked" ||
-            ((await lstat(dirname(l.path)).catch(() => null))?.isSymbolicLink() ?? false)
-        )
-    )
-  ).some(Boolean);
+  const sharing = await shareProjectFiles(path, root, instructions, settings, inventory);
   const trustOptions = {
     trust,
     inConfigHome: isConfigHome(env, path),
-    localFromRepository,
+    // Reads the visibility shareProjectFiles gave each layer.
+    localFromRepository: await localFromRepository(settings),
     profile,
   };
   const memory = await readMemory(env, mainRoot, path, effective, trustOptions, problems);
@@ -203,6 +151,85 @@ export async function scanDirectory(
   };
 }
 
+/** ~/.claude.json, or null when it is missing or broken; a broken one is a problem. */
+async function readClaudeJson(
+  env: ScanEnv,
+  problems: Problem[]
+): Promise<Record<string, unknown> | null> {
+  const file = await readJsonObject(env, env.claudeJson);
+  if (file.ok) return file.data;
+  // Without it the folder looks untrusted and your servers missing, so the problem says why.
+  if (!file.missing)
+    problems.push({
+      path: env.claudeJson,
+      error: `${file.error}, so ccdesk cannot show your trust answers or your user and local MCP servers`,
+    });
+  return null;
+}
+
+/** The CLAUDE.md text managed settings give in their claudeMd key. */
+function managedClaudeMd(settings: SettingsLayer[]): { path: string; text: string } | null {
+  const managed = settings.find((l) => l.scope === "managed");
+  const text = managed?.data?.claudeMd;
+  return managed && typeof text === "string" ? { path: `${managed.path}#claudeMd`, text } : null;
+}
+
+/**
+ * Says who sees each project file that shapes Claude here: marks the instructions and settings
+ * with their git visibility, and returns the repository's files by visibility, or null outside one.
+ */
+async function shareProjectFiles(
+  path: string,
+  root: string | null,
+  instructions: DirectoryView["instructions"],
+  settings: SettingsLayer[],
+  inventory: DirectoryView["inventory"]
+): Promise<Sharing | null> {
+  const inProject = (scope: string) => scope === "project" || scope === "local";
+  const mcpJson = join(path, ".mcp.json");
+  const projectFiles = [
+    ...instructions.filter((i) => inProject(i.scope)).map((i) => i.path),
+    ...settings.filter((s) => s.exists && inProject(s.scope)).map((s) => s.path),
+    ...((await isFile(mcpJson)) ? [mcpJson] : []),
+    ...[...inventory.agents, ...inventory.skills, ...inventory.commands, ...inventory.outputStyles]
+      .filter((e) => inProject(e.scope))
+      .map((e) => e.path),
+  ];
+  const visibility = await visibilityOf(root, projectFiles);
+  for (const item of [...instructions, ...settings]) {
+    const v = visibility.get(item.path);
+    if (v) item.visibility = v;
+  }
+  if (!root) return null;
+  const sharing: Sharing = { tracked: [], untracked: [], ignored: [] };
+  for (const file of new Set(projectFiles)) {
+    const v = visibility.get(file);
+    // Shown as repository paths, with forward slashes on every platform.
+    const rel = relative(root, file).replaceAll("\\", "/");
+    if (v === "tracked") sharing.tracked.push(rel);
+    else if (v === "untracked") sharing.untracked.push(rel);
+    else if (v === "ignored") sharing.ignored.push(rel);
+  }
+  return sharing;
+}
+
+/**
+ * Whether the local settings file counts as the repository's: tracked in git, or in a .claude
+ * that is a link (docs: permissions#when-your-local-settings-file-needs-trust).
+ */
+async function localFromRepository(settings: SettingsLayer[]): Promise<boolean> {
+  const fromRepository = await Promise.all(
+    settings
+      .filter((l) => l.scope === "local" && l.exists)
+      .map(
+        async (l) =>
+          l.visibility === "tracked" ||
+          ((await lstat(dirname(l.path)).catch(() => null))?.isSymbolicLink() ?? false)
+      )
+  );
+  return fromRepository.some(Boolean);
+}
+
 /**
  * Your answers to Claude Code's trust dialogs, from ~/.claude.json (docs: permissions#project-allow-rules-and-workspace-trust).
  * In a repository the key is the main checkout's root; outside one it is the folder, and a trusted
@@ -213,31 +240,35 @@ function trustOf(
   claudeJson: Record<string, unknown> | null,
   path: string,
   mainRoot: string | null,
-  gitRoot: string | null
+  repoRoot: string | null
 ): Trust {
   const projects = isRecord(claudeJson?.projects) ? claudeJson.projects : {};
   const entry = (key: string) => (isRecord(projects[key]) ? projects[key] : {});
-  const root = trustKey(path, mainRoot, gitRoot);
+  const root = trustKey(path, mainRoot, repoRoot);
   const own = entry(root);
   const trust: Trust = {
     root,
     trusted: own.hasTrustDialogAccepted === true,
     sessionOnly: path === env.home,
-    // These two keys are not documented; they are what Claude Code writes for the import dialog.
-    externalImports:
-      own.hasClaudeMdExternalIncludesApproved === true
-        ? "approved"
-        : own.hasClaudeMdExternalIncludesWarningShown === true
-          ? "declined"
-          : "not-asked",
+    externalImports: importAnswer(own),
   };
-  if (!trust.trusted && !mainRoot && !gitRoot)
+  if (!trust.trusted && !mainRoot && !repoRoot)
     for (let d = dirname(path); d !== dirname(d); d = dirname(d))
       if (entry(d).hasTrustDialogAccepted === true) {
         trust.inheritedFrom = d;
         break;
       }
   return trust;
+}
+
+/**
+ * Your answer to the dialog about imports from outside the project. These two keys are not
+ * documented; they are what Claude Code writes for that dialog.
+ */
+function importAnswer(project: Record<string, unknown>): Trust["externalImports"] {
+  if (project.hasClaudeMdExternalIncludesApproved === true) return "approved";
+  if (project.hasClaudeMdExternalIncludesWarningShown === true) return "declined";
+  return "not-asked";
 }
 
 /**

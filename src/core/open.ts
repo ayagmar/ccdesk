@@ -84,13 +84,7 @@ export function editorCommands(
     if (!TERMINAL_EDITORS.has(name(command[0]))) out.push(command);
   }
   for (const editor of GUI_EDITORS) if (found(editor)) out.push([editor, []]);
-  out.push(
-    platform === "darwin"
-      ? ["open", []]
-      : platform === "win32"
-        ? ["explorer", []]
-        : ["xdg-open", []]
-  );
+  out.push(fileOpener(platform));
   return out.filter((c, i) => out.findIndex((o) => o[0] === c[0]) === i);
 }
 
@@ -154,13 +148,21 @@ function launch([command, args]: Command, path: string, host: Host): Promise<str
  * failed. On Windows `start` is a cmd.exe builtin, so cmd.exe is the command.
  */
 export function openBrowser(url: string, host: Host): Promise<string | null> {
-  const command: Command =
-    host.platform === "darwin"
-      ? ["open", []]
-      : host.platform === "win32"
-        ? ["cmd.exe", ["/c", "start", ""]]
-        : ["xdg-open", []];
-  return launch(command, url, host);
+  return launch(browserOpener(host.platform), url, host);
+}
+
+/** The system's own way to open a file in the app it belongs to. */
+function fileOpener(platform: NodeJS.Platform): Command {
+  if (platform === "darwin") return ["open", []];
+  if (platform === "win32") return ["explorer", []];
+  return ["xdg-open", []];
+}
+
+/** The system's own way to open a URL in the default browser. */
+function browserOpener(platform: NodeJS.Platform): Command {
+  if (platform === "darwin") return ["open", []];
+  if (platform === "win32") return ["cmd.exe", ["/c", "start", ""]];
+  return ["xdg-open", []];
 }
 
 /**

@@ -3,6 +3,7 @@ import {
   type ContextBlock,
   type EffectiveSetting,
   type Entry,
+  type ImportRef,
   type Instruction,
   type Inventory,
   type MemoryStore,
@@ -89,30 +90,57 @@ export async function buildContext(input: ContextInput): Promise<ContextBlock[]>
       null
     ),
   ];
-
-  const style = effective.find((s) => s.key === "outputStyle")?.value;
-  if (typeof style === "string" && !BUILT_IN_STYLES.includes(style.toLowerCase())) {
-    const custom = inventory.outputStyles.find((s) => s.name === style);
+  const style = outputStyleBlock(effective, inventory);
+  if (style) blocks.push(style);
+  blocks.push(...(await instructionBlocks(env, projectRoot, instructions)));
+  const index = memory?.index;
+  if (memory?.loaded && index) {
     blocks.push(
-      custom
-        ? block(
-            { kind: "output-style", path: custom.path, scope: custom.scope },
-            parseFrontmatter(custom.text).body
-          )
-        : block(
-            {
-              kind: "not-counted",
-              path: `Output style "${style}"`,
-              scope: "user",
-              note: "ccdesk could not find this style's file",
-            },
-            null
-          )
+      block(
+        { kind: "memory-index", path: index.path, scope: "memory" },
+        index.text.split("\n").slice(0, index.loadedLines).join("\n")
+      )
     );
   }
+  blocks.push(...listingBlocks(inventory));
+  return blocks;
+}
 
-  // A file both imported and loaded on its own (a rule, an AGENTS.md) is counted once, as itself,
-  // also when it is loaded through a link, to it or to its folder, and imported by its real path.
+/** The output style's text, when outputStyle names one that is not built in. */
+function outputStyleBlock(
+  effective: EffectiveSetting[],
+  inventory: Inventory
+): ContextBlock | null {
+  const style = effective.find((s) => s.key === "outputStyle")?.value;
+  if (typeof style !== "string" || BUILT_IN_STYLES.includes(style.toLowerCase())) return null;
+  const custom = inventory.outputStyles.find((s) => s.name === style);
+  if (custom)
+    return block(
+      { kind: "output-style", path: custom.path, scope: custom.scope },
+      parseFrontmatter(custom.text).body
+    );
+  return block(
+    {
+      kind: "not-counted",
+      path: `Output style "${style}"`,
+      scope: "user",
+      note: "ccdesk could not find this style's file",
+    },
+    null
+  );
+}
+
+/**
+ * The loaded instruction files, each after the files it imports. A file both imported and loaded
+ * on its own (a rule, an AGENTS.md) is counted once, as itself, also when it is loaded through a
+ * link, to it or to its folder, and imported by its real path.
+ */
+async function instructionBlocks(
+  env: ScanEnv,
+  projectRoot: string,
+  instructions: Instruction[]
+): Promise<ContextBlock[]> {
+  const blocks: ContextBlock[] = [];
   const loaded = new Set(
     (
       await Promise.all(
@@ -130,32 +158,7 @@ export async function buildContext(input: ContextInput): Promise<ContextBlock[]>
       if (!ref.exists || loaded.has(ref.resolved) || added.has(ref.resolved)) continue;
       added.add(ref.resolved);
       await importsOf(file, ref.resolved);
-      const fields = { kind: "import" as const, path: ref.resolved, scope: file.scope, via };
-      if (ref.pending)
-        blocks.push(
-          block(
-            { ...fields, note: "Not loaded until you approve imports from outside this project" },
-            null
-          )
-        );
-      else if (ref.tooLarge)
-        blocks.push(
-          block({ ...fields, note: "Over 4 MiB, so Claude Code does not load it" }, null)
-        );
-      else if (!showable(env, projectRoot, ref.resolved))
-        blocks.push(
-          block(
-            {
-              ...fields,
-              note: "Outside this project and your Claude folders, so ccdesk does not show or count it. Claude Code loads it.",
-            },
-            null
-          )
-        );
-      else {
-        const text = await readTextFile(env, ref.resolved);
-        blocks.push(block(fields, text ? injectedText(text.text) : null));
-      }
+      blocks.push(await importBlock(env, projectRoot, file, ref, via));
     }
   };
   for (const file of instructions) {
@@ -165,17 +168,40 @@ export async function buildContext(input: ContextInput): Promise<ContextBlock[]>
       block({ kind: "instruction", path: file.path, scope: file.scope }, injectedText(file.text))
     );
   }
+  return blocks;
+}
 
-  const index = memory?.index;
-  if (memory?.loaded && index) {
-    blocks.push(
-      block(
-        { kind: "memory-index", path: index.path, scope: "memory" },
-        index.text.split("\n").slice(0, index.loadedLines).join("\n")
-      )
+/** One imported file: its text, or why ccdesk does not count it. */
+async function importBlock(
+  env: ScanEnv,
+  projectRoot: string,
+  file: Instruction,
+  ref: ImportRef,
+  via: string
+): Promise<ContextBlock> {
+  const fields = { kind: "import" as const, path: ref.resolved, scope: file.scope, via };
+  if (ref.pending)
+    return block(
+      { ...fields, note: "Not loaded until you approve imports from outside this project" },
+      null
     );
-  }
+  if (ref.tooLarge)
+    return block({ ...fields, note: "Over 4 MiB, so Claude Code does not load it" }, null);
+  if (!showable(env, projectRoot, ref.resolved))
+    return block(
+      {
+        ...fields,
+        note: "Outside this project and your Claude folders, so ccdesk does not show or count it. Claude Code loads it.",
+      },
+      null
+    );
+  const text = await readTextFile(env, ref.resolved);
+  return block(fields, text ? injectedText(text.text) : null);
+}
 
+/** The skill listing, the subagent descriptions and the MCP tool names Claude sees. */
+function listingBlocks(inventory: Inventory): ContextBlock[] {
+  const blocks: ContextBlock[] = [];
   const listed = [...inventory.skills, ...inventory.commands].filter(
     (s) => s.listed !== false && !s.shadowedBy
   );
