@@ -22,16 +22,12 @@ import { readInventory } from "./inventory.ts";
 import { readMemoryStore } from "./memory.ts";
 import { permissionsOf, type Options as TrustOptions, trustWaits } from "./permissions.ts";
 import { listProjects } from "./projects.ts";
-import { effectiveSettings, readSettingsLayers } from "./settings.ts";
+import { effectiveSettings, readManagedSettings, readSettingsLayers } from "./settings.ts";
 import { builtinTools } from "./tools.ts";
 
-async function readClaudeJson(env: ScanEnv): Promise<Record<string, unknown> | null> {
-  const result = await readJsonObject(env, env.claudeJson);
-  return result.ok ? result.data : null;
-}
-
 export async function scanOverview(env: ScanEnv, launchDir: string): Promise<Overview> {
-  const claudeJson = await readClaudeJson(env);
+  const result = await readJsonObject(env, env.claudeJson);
+  const claudeJson = result.ok ? result.data : null;
   const projects = await listProjects(env, claudeJson, launchDir);
 
   const hashesByName = new Map<string, Array<{ projectPath: string; hash: string }>>();
@@ -74,10 +70,26 @@ export async function scanDirectory(
 ): Promise<DirectoryView> {
   const path = resolve(dir);
   const exists = await isDir(path);
-  const claudeJson = await readClaudeJson(env);
+  const problems: Problem[] = [];
+  const claudeJsonFile = await readJsonObject(env, env.claudeJson);
+  const claudeJson = claudeJsonFile.ok ? claudeJsonFile.data : null;
+  // Without it the folder looks untrusted and your servers missing, so the problem says why.
+  if (!claudeJsonFile.ok && !claudeJsonFile.missing)
+    problems.push({
+      path: env.claudeJson,
+      error: `${claudeJsonFile.error}, so ccdesk cannot show your trust answers or your user and local MCP servers`,
+    });
   const root = exists ? await gitRoot(path) : null;
 
-  const settings = await readSettingsLayers(env, path);
+  const managed = await readManagedSettings(env);
+  const settings = await readSettingsLayers(env, path, managed);
+  for (const l of settings)
+    if (l.error)
+      problems.push({
+        path: l.path,
+        error: l.error,
+        ...(l.blocksStart ? { blocksStart: true } : {}),
+      });
   const effective = effectiveSettings(settings);
   const mode = agentsMdMode(settings);
   const excludes = effective.find((s) => s.key === "claudeMdExcludes")?.value;
@@ -85,7 +97,6 @@ export async function scanDirectory(
   const trust = trustOf(env, claudeJson, path, mainRoot ?? root);
   const managedLayer = settings.find((l) => l.scope === "managed");
   const managedClaudeMd = managedLayer?.data?.claudeMd;
-  const problems: Problem[] = [];
   const instructions = await resolveInstructions({
     env,
     cwd: path,
@@ -104,6 +115,8 @@ export async function scanDirectory(
     projectDir: path,
     gitRoot: root,
     layers: settings,
+    effective,
+    managed: managed.data,
     claudeJson,
     trust,
     profile,
@@ -161,16 +174,6 @@ export async function scanDirectory(
   };
   const memory = await readMemory(env, mainRoot, path, effective, trustOptions, problems);
   const permissions = permissionsOf(settings, trustOptions);
-
-  for (const l of settings)
-    if (l.error)
-      problems.push({
-        path: l.path,
-        error: l.error,
-        ...(l.blocksStart ? { blocksStart: true } : {}),
-      });
-  const mcp = await readJsonObject(env, mcpJson);
-  if (!mcp.ok && !mcp.missing) problems.push({ path: mcpJson, error: mcp.error });
 
   return {
     path,

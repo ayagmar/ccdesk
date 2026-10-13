@@ -1,6 +1,7 @@
 import { basename, dirname, join, relative } from "node:path";
 import { HIGHEST_FIRST } from "../../shared/scopes.ts";
 import {
+  type EffectiveSetting,
   type Entry,
   type Hook,
   type Inventory,
@@ -18,7 +19,7 @@ import {
   isFile,
   isWithin,
   listDir,
-  readJsonObject,
+  readJsonOrReport,
   readTextFile,
   resolvedPath,
   stringField,
@@ -28,13 +29,13 @@ import { isRecord, parseFrontmatter } from "./data.ts";
 import { ancestorsRootFirst } from "./instructions.ts";
 import { readMcpServers } from "./mcp.ts";
 import {
+  type LoadedPlugin,
   manifestCommandMap,
   manifestConfigs,
   manifestPaths,
   pluginNamespace,
   readPlugins,
 } from "./plugins.ts";
-import { effectiveSettings } from "./settings.ts";
 
 type Source = Scope | "plugin";
 
@@ -186,14 +187,15 @@ async function readSkills(
 }
 
 /** A plugin's skills, agents, commands and output styles, from its folders and its manifest. */
-async function pluginEntries(env: ScanEnv, plugin: Plugin, problems: Problem[]) {
+async function pluginEntries(env: ScanEnv, loaded: LoadedPlugin, problems: Problem[]) {
+  const { plugin } = loaded;
   const root = plugin.installPath;
   const options = { plugin: plugin.id, problems };
   // `skills` adds to the default folder; the other keys replace theirs (docs: plugins-reference).
-  const extraSkills = await manifestPaths(env, plugin, "skills");
+  const extraSkills = await manifestPaths(loaded, "skills");
   const skillDirs = [join(root, "skills"), ...(extraSkills ?? [])];
   const rootSkill = extraSkills === null && !(await isDir(join(root, "skills")));
-  const namespace = await pluginNamespace(env, plugin);
+  const namespace = pluginNamespace(loaded);
   const skills: Entry[] = [];
   if (rootSkill)
     for (const skill of await readSkills(env, root, "plugin", options)) {
@@ -204,12 +206,12 @@ async function pluginEntries(env: ScanEnv, plugin: Plugin, problems: Problem[]) 
     }
   for (const dir of skillDirs) skills.push(...(await readSkills(env, dir, "plugin", options)));
   const listed = async (key: string, folder: string, separator = "/") =>
-    readPaths(env, (await manifestPaths(env, plugin, key)) ?? [join(root, folder)], "plugin", {
+    readPaths(env, (await manifestPaths(loaded, key)) ?? [join(root, folder)], "plugin", {
       ...options,
       separator,
     });
   const commands = await listed("commands", "commands", ":");
-  for (const c of await manifestCommandMap(env, plugin))
+  for (const c of await manifestCommandMap(loaded))
     commands.push(
       c.text === null
         ? ((await readEntry(env, c.path, c.name, "plugin", { ...options, isCommand: true })) ?? {
@@ -235,7 +237,7 @@ async function pluginEntries(env: ScanEnv, plugin: Plugin, problems: Problem[]) 
     entry.id = entry.name.startsWith(`${namespace}:`) ? entry.name : `${namespace}:${entry.name}`;
   // A plugin subagent is named with the plugin and its subfolders (docs: sub-agents#choose-the-subagent-scope).
   const agents: Entry[] = [];
-  for (const path of (await manifestPaths(env, plugin, "agents")) ?? [join(root, "agents")]) {
+  for (const path of (await manifestPaths(loaded, "agents")) ?? [join(root, "agents")]) {
     const folder = (await isDir(path)) ? path : null;
     for (const agent of await readPaths(env, [path], "plugin", options)) {
       const subfolders = folder ? relative(folder, dirname(agent.path)).split(/[/\\]/) : [];
@@ -258,6 +260,9 @@ interface InventoryInput {
   /** The repository (or worktree) root, where the search for project skills stops. */
   gitRoot: string | null;
   layers: SettingsLayer[];
+  effective: EffectiveSetting[];
+  /** Managed settings as written, nothing hidden: for checks that must see header values. */
+  managed: Record<string, unknown> | null;
   claudeJson: Record<string, unknown> | null;
   trust: Trust;
   profile: SessionProfile;
@@ -370,8 +375,8 @@ export function applySkillOverrides(entries: Entry[], overrides: unknown) {
 
 export async function readInventory(input: InventoryInput): Promise<Inventory> {
   const { env, projectDir, gitRoot, layers, problems } = input;
-  const plugins = await readPlugins(env, layers, projectDir, gitRoot);
-  const active = plugins.filter((p) => p.enabled);
+  const plugins = await readPlugins(env, layers, projectDir, gitRoot, problems);
+  const active = plugins.filter((p) => p.plugin.enabled);
   const fromPlugins = await Promise.all(
     active.map((plugin) => pluginEntries(env, plugin, problems))
   );
@@ -423,7 +428,7 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
     const skill = winners.get(command.name);
     if (skill) command.shadowedBy = skill.path;
   }
-  const overrides = effectiveSettings(layers).find((s) => s.key === "skillOverrides")?.value;
+  const overrides = input.effective.find((s) => s.key === "skillOverrides")?.value;
   applySkillOverrides([...skills, ...commands], overrides);
 
   return {
@@ -437,28 +442,24 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
       ...(await readOutputStyles(env, projectDir, gitRoot, problems)),
       ...fromPlugins.flatMap((p) => p.outputStyles),
     ],
-    hooks: await readHooks(env, layers, active, input.trust, input.profile),
+    hooks: await readHooks(input, active),
     mcpServers: await readMcpServers(input, active),
-    plugins,
+    plugins: plugins.map((p) => p.plugin),
   };
 }
 
-async function readHooks(
-  env: ScanEnv,
-  layers: SettingsLayer[],
-  plugins: Plugin[],
-  trust: Trust,
-  profile: SessionProfile
-): Promise<Hook[]> {
+async function readHooks(input: InventoryInput, plugins: LoadedPlugin[]): Promise<Hook[]> {
+  const { env, layers, trust, profile, problems } = input;
   const out: Hook[] = [];
   for (const layer of layers) {
     if (layer.data) out.push(...hooksFrom(layer.data.hooks, layer.scope, layer.path));
   }
-  for (const plugin of plugins) {
+  for (const loaded of plugins) {
+    const { plugin } = loaded;
     const path = join(plugin.installPath, "hooks", "hooks.json");
-    const file = await readJsonObject(env, path);
-    if (file.ok) out.push(...hooksFrom(file.data.hooks, "plugin", path, plugin));
-    for (const part of await manifestConfigs(env, plugin, "hooks"))
+    const file = await readJsonOrReport(env, path, problems);
+    if (file) out.push(...hooksFrom(file.hooks, "plugin", path, plugin));
+    for (const part of await manifestConfigs(env, loaded, "hooks", problems))
       out.push(...hooksFrom(part.value, "plugin", part.path, plugin));
   }
 
@@ -472,7 +473,7 @@ async function readHooks(
       .find((l) => typeof l.data?.disableAllHooks === "boolean")?.data?.disableAllHooks === true;
   const managedOnly = managed?.allowManagedHooksOnly === true;
   const forcedByManaged = new Set(
-    plugins.filter((p) => p.enabledIn === "managed").map((p) => p.id)
+    plugins.filter((p) => p.plugin.enabledIn === "managed").map((p) => p.plugin.id)
   );
   // An interactive session holds back hooks from every settings file, managed and yours included,
   // until the folder or a parent covering it is trusted; -p and the SDK do not (docs:

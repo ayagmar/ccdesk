@@ -333,6 +333,54 @@ test("a broken .mcp.json is reported as a problem", async () => {
   );
 });
 
+test("a broken ~/.claude.json is reported with what it hides, not shown as an untrusted folder", async () => {
+  const f = makeFixture();
+  f.write("home/.claude.json", "{ nope");
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    view.problems.map((p) => [p.path, p.error]),
+    [
+      [
+        f.env.claudeJson,
+        "not valid JSON (line 1, column 3), so ccdesk cannot show your trust answers or your user and local MCP servers",
+      ],
+    ]
+  );
+});
+
+test("a broken managed-mcp.json is reported, not taken for no organisation lockdown", async () => {
+  const f = makeFixture();
+  f.write("etc/claude-code/managed-mcp.json", "[]");
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    view.problems.map((p) => [p.path, p.error]),
+    [[f.at("etc/claude-code/managed-mcp.json"), "not a JSON object"]]
+  );
+});
+
+test("a plugin's broken plugin.json, .mcp.json and hooks.json are each reported", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/plugins/installed_plugins.json", {
+    plugins: { "kit@market": [{ scope: "user", installPath: f.at("plugins/kit") }] },
+  });
+  const broken = [
+    f.write("plugins/kit/.claude-plugin/plugin.json", "{ nope"),
+    f.write("plugins/kit/.mcp.json", "{ nope"),
+    f.write("plugins/kit/hooks/hooks.json", "{ nope"),
+  ];
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(view.problems.map((p) => p.path).sort(), broken.sort());
+});
+
 test("a project's disableAllHooks false overrides a user true", async () => {
   const f = makeFixture();
   f.json("home/.claude/settings.json", {

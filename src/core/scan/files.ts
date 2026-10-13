@@ -218,6 +218,18 @@ export async function readJsonObject(
   }
 }
 
+/** The object in a JSON file, or null; a file that is there but does not read or parse goes into `problems`. */
+export async function readJsonOrReport(
+  env: ScanEnv,
+  path: string,
+  problems: Problem[]
+): Promise<Record<string, unknown> | null> {
+  const result = await readJsonObject(env, path);
+  if (result.ok) return result.data;
+  if (!result.missing) problems.push({ path, error: result.error });
+  return null;
+}
+
 /** The strings in a JSON list; anything else counts as no strings. */
 export function stringsIn(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
