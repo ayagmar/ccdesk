@@ -2,7 +2,7 @@ import { type ReactNode, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { type Scope, type Visibility } from "../../shared/types.ts";
-import { api } from "../api.ts";
+import { api, errorText } from "../api.ts";
 import { sharedWithAgents, tilde } from "../format.ts";
 import { Icon } from "../Icon.tsx";
 
@@ -104,7 +104,7 @@ export function PathValue({ path }: { path: string }) {
         onClick={() => {
           api.open(path).then(
             ({ editor }) => show(`opened with ${editor}`, 2400),
-            (error: unknown) => show(error instanceof Error ? error.message : String(error), 6000)
+            (error: unknown) => show(errorText(error), 6000)
           );
         }}
       >

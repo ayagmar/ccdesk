@@ -1,7 +1,7 @@
 import { type FormEvent, useId, useState } from "react";
 import { type ContextBlock, type DirectoryView, type PathTest } from "../shared/types.ts";
 import { MATCH_KIND } from "../view/path-test.ts";
-import { api } from "./api.ts";
+import { api, errorText } from "./api.ts";
 import { Bullet } from "./Bullet.tsx";
 import { relativeTo, tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
@@ -136,7 +136,7 @@ function PathTester({ view }: { view: DirectoryView }) {
     setProblem(null);
     api.pathTest(view.path, file.trim()).then(setResult, (error: unknown) => {
       setResult(null);
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(errorText(error));
     });
   };
 

@@ -52,6 +52,13 @@ export class ApiError extends Error {
   }
 }
 
+/** What to tell you about a failed call: an expired token says how to get a new one. */
+export function errorText(error: unknown): string {
+  if (error instanceof ApiError && error.status === 401)
+    return "This page lost its access token. Open the link ccdesk printed in your terminal again.";
+  return error instanceof Error ? error.message : String(error);
+}
+
 async function request<T>(
   path: string,
   init?: { method: string; body: unknown },

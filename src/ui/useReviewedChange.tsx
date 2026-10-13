@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { type Change, type SettingsEditPreview } from "../shared/types.ts";
+import { errorText } from "./api.ts";
 import { Review, type Saved } from "./SettingEditor.tsx";
 
 /**
@@ -26,7 +27,7 @@ export function useReviewedChange<E>(
     try {
       setReview({ edit, preview: await preview(edit), message });
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(errorText(error));
     } finally {
       setBusy(false);
     }
@@ -40,7 +41,7 @@ export function useReviewedChange<E>(
       setReview(null);
       return true;
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(errorText(error));
       return false;
     } finally {
       setBusy(false);

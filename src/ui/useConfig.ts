@@ -7,7 +7,7 @@ import {
   type Usage,
 } from "../shared/types.ts";
 import { formatter } from "../view/format.ts";
-import { ApiError, api } from "./api.ts";
+import { api, errorText } from "./api.ts";
 import { setFormatter } from "./format.ts";
 import { setReference } from "./reference.ts";
 
@@ -15,12 +15,6 @@ export type Load<T> =
   | { state: "loading" }
   | { state: "error"; message: string }
   | { state: "ready"; data: T };
-
-export function errorText(error: unknown): string {
-  if (error instanceof ApiError && error.status === 401)
-    return "This page lost its access token. Open the link ccdesk printed in your terminal again.";
-  return error instanceof Error ? error.message : String(error);
-}
 
 /**
  * The overview and the open directory, kept current: files changed elsewhere (an editor, Claude
