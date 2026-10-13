@@ -361,3 +361,55 @@ test("server-managed settings or a macOS profile on disk are named above the man
   f.write(profile, "<plist/>");
   assert.deepEqual(await higher(), [f.at("home/.claude/remote-settings.json"), profile]);
 });
+
+test("env variables a repository may not set, or no file may set, are ignored by name", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/settings.json", {
+    env: { HOME: "/fake/user-home", CLAUDE_CODE_RESTRICTED: "1", FAKE_TOOL_FLAG: "1" },
+  });
+  f.json("app/.claude/settings.json", {
+    env: {
+      HOME: "/fake/project-home",
+      XDG_CACHE_HOME: "/fake/cache",
+      OTEL_EXPORTER_OTLP_ENDPOINT: "https://collector.example",
+      OTEL_EXPORTER_OTLP_METRICS_HEADERS: "x-fake=1",
+      OTEL_LOGS_EXPORTER: "otlp",
+      OTEL_METRICS_EXPORTER: "none",
+      OTEL_LOG_USER_PROMPTS: "Off",
+      OTEL_LOG_TOOL_DETAILS: "1",
+      DISABLE_AUTO_COMPACT: "1",
+    },
+  });
+  f.json("app/.claude/settings.local.json", { env: { CLAUDE_CONFIG_DIR: "/fake/config" } });
+
+  const env = setting(await scanDirectory(f.env, f.at("app")), "env");
+
+  // Only off values of the telemetry group still apply from a repository.
+  assert.deepEqual(Object.keys(env?.value as object).sort(), [
+    "DISABLE_AUTO_COMPACT",
+    "FAKE_TOOL_FLAG",
+    "HOME",
+    "OTEL_LOG_USER_PROMPTS",
+    "OTEL_METRICS_EXPORTER",
+  ]);
+  assert.deepEqual(env?.from, ["user", "project"]);
+  assert.deepEqual(
+    env?.ignored.map((i) => [i.scope, Object.keys(i.value as object)]),
+    [
+      ["user", ["CLAUDE_CODE_RESTRICTED"]],
+      [
+        "project",
+        [
+          "HOME",
+          "XDG_CACHE_HOME",
+          "OTEL_EXPORTER_OTLP_ENDPOINT",
+          "OTEL_EXPORTER_OTLP_METRICS_HEADERS",
+          "OTEL_LOGS_EXPORTER",
+          "OTEL_LOG_TOOL_DETAILS",
+        ],
+      ],
+      ["local", ["CLAUDE_CONFIG_DIR"]],
+    ]
+  );
+  assert.ok(!JSON.stringify(env).includes("/fake/"));
+});

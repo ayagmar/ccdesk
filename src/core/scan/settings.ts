@@ -8,6 +8,7 @@ import { isUserClaudeFolder, type ScanEnv } from "./env.ts";
 import { isFile, listDir, readJsonObject } from "./files.ts";
 import { mainWorktreeRoot } from "./git.ts";
 import { type Dropped, sandboxFilter } from "./sandbox.ts";
+import { envFilter } from "./settings-env.ts";
 
 /** Lowest precedence first, so later layers override earlier ones. */
 const PRECEDENCE: Scope[] = ["user", "project", "local", "managed"];
@@ -62,14 +63,19 @@ export function ignoredModeReason(scope: Scope, mode: unknown): string | undefin
   return undefined;
 }
 
-/** A file's value for `key` without nested fields Claude Code ignores from that file, and what was dropped. */
+/**
+ * A file's value for `key` without nested fields Claude Code ignores from that file, and what was
+ * dropped; undefined when nothing is left. `raw` is the value unhidden, for the checks that read values.
+ */
 function withoutIgnoredFields(
   key: string,
   scope: Scope,
   value: unknown,
+  raw: unknown,
   filterSandbox: ReturnType<typeof sandboxFilter>
 ): { value: unknown; dropped: Dropped[] } {
   if (key === "sandbox") return filterSandbox(scope, value);
+  if (key === "env") return envFilter(scope, value, raw);
   if (key !== "permissions" || !isRecord(value)) return { value, dropped: [] };
   const reason = ignoredModeReason(scope, value.defaultMode);
   if (!reason) return { value, dropped: [] };
@@ -271,31 +277,47 @@ function managedLayer(path: string, managed: ManagedSettings): SettingsLayer {
 export function effectiveSettings(layers: SettingsLayer[]): EffectiveSetting[] {
   // Layers are highest first; a second layer of one scope (a legacy local file) sits under the first.
   const byScope = new Map<Scope, Record<string, unknown>>();
+  const rawByScope = new Map<Scope, Record<string, unknown>>();
   for (const layer of layers) {
     if (!layer.data) continue;
+    const raw = unredactedData(layer) ?? layer.data;
     const higher = byScope.get(layer.scope);
+    const rawHigher = rawByScope.get(layer.scope);
     byScope.set(layer.scope, higher ? mergeSettings(layer.data, higher) : layer.data);
+    rawByScope.set(layer.scope, rawHigher ? mergeSettings(raw, rawHigher) : raw);
   }
   const keys = new Set([...byScope.values()].flatMap((data) => Object.keys(data)));
   const filterSandbox = sandboxFilter((key, scope) =>
     allowedScopes(key).includes(scope) ? byScope.get(scope)?.[key] : undefined
   );
-  return [...keys]
-    .sort()
-    .map((key) => effectiveSetting(key, (scope) => byScope.get(scope)?.[key], filterSandbox));
+  return [...keys].sort().map((key) =>
+    effectiveSetting(
+      key,
+      (scope) => byScope.get(scope)?.[key],
+      (scope) => rawByScope.get(scope)?.[key],
+      filterSandbox
+    )
+  );
 }
 
 /** One key's value, from its value in each scope, lowest precedence first. */
 function effectiveSetting(
   key: string,
   valueIn: (scope: Scope) => unknown,
+  rawIn: (scope: Scope) => unknown,
   filterSandbox: ReturnType<typeof sandboxFilter>
 ): EffectiveSetting {
   const { defined, ignored } = scopesThatCount(key, valueIn);
-  const values = defined.map((scope) => {
-    const { value, dropped } = withoutIgnoredFields(key, scope, valueIn(scope), filterSandbox);
+  const values = defined.flatMap((scope) => {
+    const { value, dropped } = withoutIgnoredFields(
+      key,
+      scope,
+      valueIn(scope),
+      rawIn(scope),
+      filterSandbox
+    );
     for (const d of dropped) ignored.push({ scope, ...d });
-    return { scope, value };
+    return value === undefined ? [] : [{ scope, value }];
   });
   const top = values.at(-1);
   if (!top) return { key, value: undefined, from: [], merged: false, overridden: [], ignored };
@@ -327,7 +349,7 @@ function effectiveSetting(
         values.slice(1).reduce((acc, v) => mergeKey(key, acc, v.value), values[0]?.value),
         values
       ),
-      from: defined,
+      from: values.map((v) => v.scope),
       merged: true,
       overridden: [],
       ignored,
