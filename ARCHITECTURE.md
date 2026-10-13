@@ -11,7 +11,7 @@ ccdesk is one npm package. `src/core` reads and writes Claude Code's configurati
 | `src/server/commands.ts` | What `ccdesk scan --json` and `ccdesk explain` print. Imports only the core and `src/view`. |
 | `src/server/start.ts` | `startServer(options)`: serves a core on 127.0.0.1 and resolves `{ url, close }`. |
 | `src/server/server.ts` | The `/api/*` routes, each a call on the core it is given; the token, Host and Origin checks, security headers, and the built UI. Turns errors into status codes. |
-| `src/core/scan/` | Reads. `index.ts` has `scanOverview` and `scanDirectory`; the other files each read one part (settings, instructions, memory, MCP, plugins, permissions, tools, context, usage, compare, path-test). `env.ts` defines `ScanEnv`, `files.ts` reads files (never the credentials file) and puts one that is there but cannot be read or parsed into the scan's problems, `data.ts` has `isRecord` and frontmatter parsing, and `git.ts` asks git for roots, worktrees and what is tracked. |
+| `src/core/scan/` | Reads. `index.ts` has `scanOverview` and `scanDirectory`; the other files each read one part (settings, instructions, memory, MCP, plugins, permissions, tools, context, usage, compare, path-test). `settings-schema.ts` finds the settings schema of a key or a field under one, `managed-repair.ts` reads managed settings that fail it as Claude Code repairs them, `env.ts` defines `ScanEnv`, `files.ts` reads files (never the credentials file) and puts one that is there but cannot be read or parsed into the scan's problems, `data.ts` has `isRecord` and frontmatter parsing, and `git.ts` asks git for roots, worktrees and what is tracked. |
 | `src/core/settings-edit.ts` | Settings, permission and hook edits, all in settings files. |
 | `src/core/agent-edit.ts`, `mcp-edit.ts`, `mutations.ts` | Subagent files, MCP servers, and auto memory. |
 | `src/core/parse-edit.ts` | Turns untrusted input (a JSON body) into a typed edit, or throws `InvalidEditError`. It checks the body against its schema in `src/shared/requests.ts`, then the rules a schema cannot state, such as a known hook event. |
@@ -92,7 +92,7 @@ Saves, restores, memory changes and usage counts are exported only as a core's m
 
 Still in module scope, and shared by every core:
 
-- The compiled TypeBox validators in `scan/settings.ts` (shared with `settings-edit.ts`), `scan/mcp.ts`, `parse-edit.ts`, `backups.ts` and `server.ts`. They come from bundled schemas and never change, so sharing them changes no result. `schemaErrors` lifts TypeBox's process-wide limit of eight errors while it lists them and puts it back after.
+- The compiled TypeBox validators in `scan/settings-schema.ts` (for the scan and `settings-edit.ts`), `scan/mcp.ts`, `parse-edit.ts`, `backups.ts` and `server.ts`. They come from bundled schemas and never change, so sharing them changes no result. `schemaErrors` lifts TypeBox's process-wide limit of eight errors while it lists them and puts it back after.
 - In the page: `format.ts` keeps the formatter for the home folder the overview names, and `reference.ts` keeps the data from `/api/reference`. `src/view` keeps neither; its callers pass them in a `ViewContext`.
 
 `Watcher` is per instance; the server makes one from its core's `env`.

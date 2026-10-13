@@ -1,31 +1,22 @@
 import { lstat } from "node:fs/promises";
 import { join } from "node:path";
-import { Compile, type Validator } from "typebox/compile";
-import schema from "../../shared/settings.schema.json" with { type: "json" };
 import { allowedScopes, EVERY_FILE, ignoredReason } from "../../shared/scopes.ts";
-import { type EffectiveSetting, type Scope, type SettingsLayer } from "../../shared/types.ts";
+import {
+  type EffectiveSetting,
+  type ManagedRepair,
+  type Scope,
+  type SettingsLayer,
+} from "../../shared/types.ts";
 import { schemaErrors } from "../schema.ts";
 import { redactSecrets } from "../secrets.ts";
 import { isRecord } from "./data.ts";
 import { isUserClaudeFolder, type ScanEnv } from "./env.ts";
 import { isFile, listDir, readJsonObject } from "./files.ts";
 import { mainWorktreeRoot } from "./git.ts";
+import { repairManaged } from "./managed-repair.ts";
 import { type Dropped, sandboxFilter } from "./sandbox.ts";
 import { envFilter } from "./settings-env.ts";
-
-const properties: Record<string, object> = schema.definitions.ClaudeCodeSettings.properties;
-const validators = new Map<string, Validator>();
-
-/** The settings schema's validator for one top-level key, or null for a key it does not define. */
-export function validatorFor(key: string): Validator | null {
-  if (!Object.hasOwn(properties, key)) return null;
-  let validate = validators.get(key);
-  if (!validate) {
-    validate = Compile(properties[key] as object);
-    validators.set(key, validate);
-  }
-  return validate;
-}
+import { validatorFor } from "./settings-schema.ts";
 
 /** What the settings schema rejects in a file, each led by the key, such as `cleanupPeriodDays must be number`. */
 function settingsErrors(data: Record<string, unknown>): string[] {
@@ -261,11 +252,13 @@ export interface ManagedSettings {
   errors: string[];
   /** A managed file that is there but not a JSON object: Claude Code refuses to start (docs: managed-settings#find-entries-claude-code-dropped). */
   blocksStart: boolean;
+  /** Entries that fail validation; `data` holds them as Claude Code reads them. */
+  repairs: ManagedRepair[];
 }
 
 /**
- * managed-settings.json, then every *.json in managed-settings.d in alphabetical order, merged, with
- * nothing hidden: for checks such as managedMcpServers that must see header values. Never sent to the
+ * managed-settings.json, then every *.json in managed-settings.d in alphabetical order, merged and
+ * repaired as Claude Code repairs entries that fail validation, with nothing hidden: for checks such as managedMcpServers that must see header values. Never sent to the
  * page as is.
  */
 export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings> {
@@ -288,16 +281,26 @@ export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings
     sources.push(source);
     data = data ? mergeSettings(data, result.data) : result.data;
   }
+  // Checked once merged, so a later drop-in's null removes a key an earlier file set.
+  const repaired = data ? repairManaged(data) : null;
   // Server-managed settings, then MDM, outrank the files; by default Claude Code uses the first
   // source that sets a policy key and skips the rest (docs: managed-settings#how-claude-code-combines-managed-sources).
   const candidates = [join(env.claudeDir, "remote-settings.json"), ...(env.managedProfiles ?? [])];
   const higher: string[] = [];
   for (const source of candidates) if (await isFile(source)) higher.push(source);
-  return { data, sources, dropIns, higher, errors, blocksStart };
+  return {
+    data: repaired?.data ?? null,
+    sources,
+    dropIns,
+    higher,
+    errors,
+    blocksStart,
+    repairs: repaired?.repairs ?? [],
+  };
 }
 
 function managedLayer(path: string, managed: ManagedSettings): SettingsLayer {
-  const { data, sources, dropIns, higher, errors, blocksStart } = managed;
+  const { data, sources, dropIns, higher, errors, blocksStart, repairs } = managed;
   const layer: SettingsLayer = { scope: "managed", path, exists: false, data: null };
   if (data) {
     layer.data = redactSecrets(data);
@@ -308,6 +311,7 @@ function managedLayer(path: string, managed: ManagedSettings): SettingsLayer {
   if (errors.length > 0) layer.error = errors.join("; ");
   if (blocksStart) layer.blocksStart = true;
   if (higher.length > 0) layer.higherSources = higher;
+  if (repairs.length > 0) layer.repairs = repairs;
   return layer;
 }
 

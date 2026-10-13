@@ -18,6 +18,8 @@ From highest precedence to lowest:
 
 Your organisation can also deliver managed settings from the claude.ai admin console (server-managed settings), through a macOS configuration profile, or in the Windows registry. ccdesk does not read those. Claude Code ranks the console's settings first, then the profile or the `HKLM` registry key, then the files above, and by default uses the first source that sets a policy. When the server-managed settings Claude Code keeps in `~/.claude/remote-settings.json` or a macOS profile is on disk, the page warns that the managed values it shows may not apply. Run `/status` in Claude Code to see which source it uses.
 
+Managed settings that fail Claude Code's settings schema are shown as Claude Code applies them, not as written. Claude Code repairs them rather than skipping the file: it strips invalid list entries, reads a quoted `"true"` or `"false"` as that Boolean, removes a key set to `null`, enforces an invalid `allowedMcpServers` or other managed allowlist as an empty list, reads a switch such as `allowManagedPermissionRulesOnly` as its restrictive value, repairs `permissions`, `autoMode` and `sandbox` field by field (withholding their grants while a deny list beside them is invalid), and drops the rest. A note under the page header lists each repair; hover over one to see what the file says.
+
 ## How a value is decided
 
 - For most keys the highest file wins. Lower values are listed in **Overrides**, struck through, with their own bullets.
