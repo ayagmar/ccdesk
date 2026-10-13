@@ -48,6 +48,7 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
     { path: join(env.claudeDir, "projects", storeDirName(memoryKey), "memory"), recursive: false },
     { path: env.managedDir, recursive: false },
     { path: join(env.managedDir, "managed-settings.d"), recursive: false },
+    { path: join(env.managedDir, ".claude", "rules"), recursive: true },
     ...extra,
   ];
   // The start directory and every parent can hold instructions, rules and settings.

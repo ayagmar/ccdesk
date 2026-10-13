@@ -134,6 +134,28 @@ test("claudeMdExcludes globs match files in .claude folders, and patterns writte
   assert.deepEqual(loadedPaths(other, f.root), []);
 });
 
+test("rules in the managed folder load after the managed CLAUDE.md and cannot be excluded", async () => {
+  const f = makeFixture();
+  f.write("etc/claude-code/CLAUDE.md", "policy");
+  f.write("etc/claude-code/.claude/rules/security.md", "never commit secrets");
+  f.write("etc/claude-code/.claude/rules/infra.md", '---\npaths: "infra/**"\n---\ninfra rules');
+  f.write("home/.claude/CLAUDE.md", "mine");
+  f.json("home/.claude/settings.json", { claudeMdExcludes: ["**/rules/**"] });
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    view.instructions.map((i) => [f.rel(i.path), i.scope, i.status]),
+    [
+      ["etc/claude-code/CLAUDE.md", "managed", "loaded"],
+      ["etc/claude-code/.claude/rules/infra.md", "managed", "on-match"],
+      ["etc/claude-code/.claude/rules/security.md", "managed", "loaded"],
+      ["home/.claude/CLAUDE.md", "user", "loaded"],
+    ]
+  );
+});
+
 test("paths mentioned in code spans or fences are not treated as imports", async () => {
   const f = makeFixture();
   f.write(

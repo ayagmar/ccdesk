@@ -187,7 +187,7 @@ function readInstruction(ctx: Ctx, path: string): Promise<TextFile | null> {
   return readTextFile(ctx.env, path, ctx.problems);
 }
 
-/** The managed and user files, which come first and do not depend on the folder. */
+/** The managed and user files and rules, which come first and do not depend on the folder. */
 async function readOwnFiles(
   ctx: Ctx,
   managedClaudeMd: ResolveOptions["managedClaudeMd"]
@@ -225,6 +225,12 @@ async function readOwnFiles(
     );
     entry.imports = [];
     out.push(entry);
+  }
+  // Like a project's, the managed folder's .claude/rules load next (observed in v2.1.296; the
+  // docs do not say), and as managed files cannot be excluded.
+  for (const path of await walkMarkdown(join(env.managedDir, ".claude", "rules"))) {
+    const file = await readInstruction(ctx, path);
+    if (file) out.push(await rule(file, "managed", env.managedDir, ctx));
   }
 
   const user = await readInstruction(ctx, join(env.claudeDir, "CLAUDE.md"));
