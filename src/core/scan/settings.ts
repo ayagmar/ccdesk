@@ -242,7 +242,7 @@ export async function readSettingsLayers(
       layer.data = redactSecrets(result.data);
       unredacted.set(layer, result.data);
       if (errors && errors.entries.length > 0)
-        layer.warning = `has entries Claude Code's settings schema rejects (${firstErrors(errors.entries)}); Claude Code may skip them with a warning, and the rest of the file applies`;
+        layer.warning = `has entries Claude Code's settings schema rejects (${firstErrors(errors.entries)}); Claude Code either skips these entries with a warning or, if its check rejects them, skips the whole file`;
     } else if (result.missing) layer.exists = false;
     else layer.error = result.error;
     layers.push(layer);
@@ -414,8 +414,10 @@ function withModelEffort(
     }
     value[model] = entry;
   }
-  // A single file with no cap to resolve has nothing to explain.
-  if (setting.from.length < 2 && !capped) return { ...setting, value, overridden };
+  // A single file with no level overridden and no cap to resolve has nothing to explain.
+  const levelOverridden = overridden.length > setting.overridden.length;
+  if (setting.from.length < 2 && !capped && !levelOverridden)
+    return { ...setting, value, overridden };
   return {
     ...setting,
     value,

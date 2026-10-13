@@ -505,7 +505,8 @@ function policyOf(
   const allowSet = allowLayers.some((l) => Array.isArray(l.data?.allowedMcpServers));
   const allowEntries = entries("allow", allowLayers);
   const allowList = allowEntries.flatMap((e) => e ?? []);
-  // Without this, an entry plainly in the file would leave the block unexplained.
+  // Without this, an entry plainly in the file would leave the block unexplained. Only URL entries
+  // are ignored, so only a URL server could have been admitted.
   const ignoredNote = allowEntries.includes(null)
     ? "; an allowedMcpServers entry was ignored because expanding its variables changes its scheme, host or path"
     : "";
@@ -513,7 +514,7 @@ function policyOf(
     blocks: (d) => {
       if (denied.some((e) => matches(e, d))) return "Blocked by deniedMcpServers";
       if (allowSet && !d.organisation && !allowed(allowList, d))
-        return `${managedOnly ? "Not in the managed allowedMcpServers" : "Not in allowedMcpServers"}${ignoredNote}`;
+        return `${managedOnly ? "Not in the managed allowedMcpServers" : "Not in allowedMcpServers"}${d.url ? ignoredNote : ""}`;
       return null;
     },
   };

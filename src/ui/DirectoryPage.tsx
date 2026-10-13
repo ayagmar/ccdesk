@@ -531,7 +531,7 @@ function ManagedRepairs({ view }: { view: DirectoryView }) {
 function problemOutcome(p: DirectoryView["problems"][number]): string {
   if (p.blocksStart)
     return "Claude Code refuses to start until your organisation's settings are fixed, so nothing below applies yet.";
-  // The message already says the rest of the file applies.
+  // The message already names both outcomes for the file.
   if (p.partial) return "";
   return "Claude Code may skip this file.";
 }

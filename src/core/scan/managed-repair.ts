@@ -270,6 +270,18 @@ function repairSandbox(value: Record<string, unknown>, report: Report): unknown 
   return out;
 }
 
+/**
+ * strictPluginOnlyCustomization: a value neither Boolean nor list locks all four surfaces; a list
+ * entry naming no surface is ignored and locks nothing.
+ */
+function pluginOnlySurfaces(path: Path, value: unknown, report: Report): unknown {
+  if (!Array.isArray(value)) return readAs(path, value, true, report);
+  const kept = value.filter((entry) => passes([...path, "[]"], entry));
+  if (kept.length < value.length)
+    report(path, value, "names a surface this version does not know, so that entry locks nothing");
+  return kept;
+}
+
 /** One top-level key that fails the schema, as Claude Code reads it; undefined when it drops the key. */
 function repairKey(key: string, value: unknown, report: Report): unknown {
   const path = [key];
@@ -289,9 +301,7 @@ function repairKey(key: string, value: unknown, report: Report): unknown {
     report(path, value, `enforced as an empty allowlist until it is fixed, so ${empty}`);
     return [];
   }
-  // A value neither Boolean nor list locks all four surfaces; a list entry naming no surface locks nothing.
-  if (key === "strictPluginOnlyCustomization" && !Array.isArray(value))
-    return readAs(path, value, true, report);
+  if (key === "strictPluginOnlyCustomization") return pluginOnlySurfaces(path, value, report);
   const noValue = NO_VALUE_WHEN_INVALID[key];
   if (noValue !== undefined) {
     report(path, value, noValue);
