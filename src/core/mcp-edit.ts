@@ -71,6 +71,17 @@ function secretsIn(args: string[]): string[] {
   });
 }
 
+/**
+ * Why claude did not start. On Windows a claude.cmd that npm did not install, such as Scoop's,
+ * Volta's or pnpm's, is on PATH but cannot be run without a shell, so "not on PATH" would mislead.
+ */
+const CLAUDE_NOT_FOUND = {
+  win32:
+    "ccdesk changes your user and local MCP servers through the claude command and could not start it from PATH. On Windows it runs claude.exe, or the claude.exe inside npm's package when only npm's claude.cmd is there; another installer's claude.cmd or claude.ps1 cannot be started without a shell.",
+  other:
+    "ccdesk changes your user and local MCP servers through the claude command, which is not on PATH.",
+};
+
 /** Runs the claude on `host`'s PATH, with `host`'s environment. */
 export function claudeRunner(host: Pick<ScanEnv, "platform" | "processEnv">): RunClaude {
   return async (args, cwd, configDir) => {
@@ -84,9 +95,7 @@ export function claudeRunner(host: Pick<ScanEnv, "platform" | "processEnv">): Ru
       execFile(program, args, { cwd, env, timeout: 30_000 }, (error, stdout, stderr) => {
         if ((error as NodeJS.ErrnoException | null)?.code === "ENOENT")
           return fail(
-            new RefusedError(
-              "ccdesk changes your user and local MCP servers through the claude command, which is not on PATH."
-            )
+            new RefusedError(CLAUDE_NOT_FOUND[host.platform === "win32" ? "win32" : "other"])
           );
         // Node's own message repeats the command, with the server's env and header values in it.
         if (error) {
