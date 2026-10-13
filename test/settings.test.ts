@@ -373,7 +373,8 @@ test("env variables a repository may not set, or no file may set, are ignored by
       XDG_CACHE_HOME: "/fake/cache",
       OTEL_EXPORTER_OTLP_ENDPOINT: "https://collector.example",
       OTEL_EXPORTER_OTLP_METRICS_HEADERS: "x-fake=1",
-      OTEL_LOGS_EXPORTER: "otlp",
+      // The exporter selectors are off only as "none"; the OTEL_LOG_* switches take any casing.
+      OTEL_LOGS_EXPORTER: "None",
       OTEL_METRICS_EXPORTER: "none",
       OTEL_LOG_USER_PROMPTS: "Off",
       OTEL_LOG_TOOL_DETAILS: "1",
