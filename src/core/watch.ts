@@ -69,7 +69,7 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
  * plugins. A missing import is watched too, so creating it shows up, even when its folder is missing
  * as well.
  */
-export async function dependencies(env: ScanEnv, view: DirectoryView): Promise<Target[]> {
+async function dependencies(env: ScanEnv, view: DirectoryView): Promise<Target[]> {
   const files = view.instructions.flatMap((i) => [
     i.realPath ?? i.path,
     ...i.imports.map((r) => r.resolved),

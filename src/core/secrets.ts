@@ -30,7 +30,7 @@ const KEY_PREFIX = /^(sk-|ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|xox[bp]-|glpat-|A
  * `--token value` or `--token=value`, a value that starts like a known key, and the credentials in
  * a URL are hidden.
  */
-export function shownArgs(args: unknown[]): unknown[] {
+function shownArgs(args: unknown[]): unknown[] {
   return args.map((arg, i) => {
     if (typeof arg !== "string") return arg;
     const previous = args[i - 1];

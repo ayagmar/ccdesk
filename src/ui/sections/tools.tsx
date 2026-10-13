@@ -3,11 +3,11 @@ import { EDITABLE_SCOPES } from "../../shared/scopes.ts";
 import {
   type BuiltinTool,
   type DirectoryView,
-  type Permission,
   type Scope,
   type Usage,
 } from "../../shared/types.ts";
 import { lineName } from "../../view/lines.ts";
+import { type Rule } from "../../view/sections/permissions.ts";
 import { outcome } from "../../view/sections/tools.ts";
 import { type RowOf } from "../../view/sections/types.ts";
 import { sessionsHere } from "../../view/usage.ts";
@@ -57,8 +57,6 @@ function startingMode(view: DirectoryView): string {
   const mode = view.permissions.find((p) => p.kind === "defaultMode" && p.inEffect);
   return mode?.kind === "defaultMode" ? mode.value : "default";
 }
-
-type Rule = Extract<Permission, { kind: "rule" }>;
 
 /** The rules in files that remove the whole tool, as the scan found them, with their files. */
 function removingRules(view: DirectoryView, tool: BuiltinTool): Rule[] {

@@ -33,16 +33,14 @@ export function useReviewedChange<E>(
     }
   };
   const confirm = async () => {
-    if (!review) return false;
+    if (!review) return;
     setBusy(true);
     try {
       const change = await save(review.edit, review.preview.revision);
       onSaved({ change, message: review.message });
       setReview(null);
-      return true;
     } catch (error) {
       setProblem(errorText(error));
-      return false;
     } finally {
       setBusy(false);
     }
@@ -70,7 +68,6 @@ export function useReviewedChange<E>(
   );
   return {
     start,
-    save: confirm,
     busy,
     reviewing: review !== null,
     cancel,

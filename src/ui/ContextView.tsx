@@ -1,4 +1,4 @@
-import { type FormEvent, useId, useState } from "react";
+import { type SubmitEvent, useId, useState } from "react";
 import { type ContextBlock, type DirectoryView, type PathTest } from "../shared/types.ts";
 import { MATCH_KIND } from "../view/path-test.ts";
 import { api, errorText } from "./api.ts";
@@ -130,7 +130,7 @@ function PathTester({ view }: { view: DirectoryView }) {
   const [problem, setProblem] = useState<string | null>(null);
   const inputId = useId();
 
-  const run = (e: FormEvent) => {
+  const run = (e: SubmitEvent) => {
     e.preventDefault();
     if (!file.trim()) return;
     setProblem(null);

@@ -55,7 +55,7 @@ export interface RuleInEffect {
 type Cache = Map<string, Transcript>;
 
 /** Roughly how many calls the cache keeps, beyond those of the directory counted last. */
-export const MAX_CACHED_CALLS = 100_000;
+const MAX_CACHED_CALLS = 100_000;
 
 /** A transcript is read in parts this size, so one huge file never becomes one huge string. */
 const CHUNK = 8 * 1024 * 1024;
