@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { valuesIn } from "../src/view/index.ts";
+import { plain } from "../src/view/sections/catalog.ts";
 
 test("documented values come from an inline list, without placeholders", () => {
   assert.deepEqual(valuesIn('string, one of `"60s"`, `"5m"`, `"10m"`, or `"never"`'), [
@@ -37,4 +38,14 @@ test("examples and remarks are not offered as values, and no value is offered tw
     "disabled",
   ]);
   assert.deepEqual(valuesIn('string, one of `"high"`, `"max"`, or `"max"`'), ["high", "max"]);
+});
+
+test("docs text made plain keeps what is inside code spans, asterisks included", () => {
+  // Catches emphasis stripping that also eats wildcards, turning `*.example.com` into a pattern
+  // that matches nothing an admin meant.
+  assert.equal(
+    plain("`*` matches any host, `*.example.com` matches **every** subdomain"),
+    "* matches any host, *.example.com matches every subdomain"
+  );
+  assert.equal(plain("see [`managed-mcp.json`](https://example.com/a)"), "see managed-mcp.json");
 });

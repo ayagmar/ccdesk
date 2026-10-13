@@ -21,9 +21,16 @@ export function valueHere(
   return value === undefined ? {} : { set, value };
 }
 
-/** Docs Markdown kept to one line of plain text, for a table cell. */
+/**
+ * Docs Markdown kept to one line of plain text, for a table cell. A code span loses only its
+ * backticks, so a pattern such as `*.example.com` keeps its asterisk.
+ */
 export function plain(text: string): string {
-  return text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/[`*]/g, "");
+  return text
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .split(/(`[^`]*`)/)
+    .map((part, i) => (i % 2 === 1 ? part.slice(1, -1) : part.replace(/\*/g, "")))
+    .join("");
 }
 
 export const catalog = defineSection<R>({
