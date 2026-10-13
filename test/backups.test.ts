@@ -2,13 +2,7 @@ import assert from "node:assert/strict";
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import {
-  listBackups,
-  previewPermissionEdit,
-  revisionOf,
-  savePermissionEdit,
-  StaleError,
-} from "../src/core/index.ts";
+import { createCore, listBackups, revisionOf, StaleError } from "../src/core/index.ts";
 import { recordChange, writeAtomic } from "../src/core/write.ts";
 import { type Fixture, makeFixture } from "./helpers/fixture.ts";
 
@@ -18,8 +12,8 @@ async function denyRule(f: Fixture, rule: string): Promise<void> {
     file: f.at("app/.claude/settings.json"),
     add: { list: "deny" as const, rule },
   };
-  const { revision } = await previewPermissionEdit(f.env, edit);
-  await savePermissionEdit(f.env, edit, revision);
+  const core = createCore(f.env);
+  await core.savePermissionEdit(edit, (await core.previewPermissionEdit(edit)).revision);
 }
 
 test("a file changed while ccdesk writes it is kept, and the change leaves no backup", async () => {

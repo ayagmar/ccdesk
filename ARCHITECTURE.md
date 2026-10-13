@@ -35,13 +35,13 @@ ccdesk is one npm package. `src/core` reads and writes Claude Code's configurati
 ScanEnv → scanDirectory(env, dir, profile) → DirectoryView → /api/directory → buildRows (src/view) → rows → cells (src/ui)
 ```
 
-`ScanEnv` holds every location ccdesk reads: home, the Claude folder, `.claude.json`, the managed folder, on macOS the configuration profiles that outrank it, the platform, and `processEnv`, the environment ccdesk finds an editor and `claude` in and passes to them. `scanEnvFromProcess` builds it from the real machine; tests build one around a throwaway folder with `makeFixture()`, whose `processEnv` is empty. Every read and write takes it as its first argument, so nothing in the core reads `homedir()`, `process.platform` or `process.env` itself; only the free `openInEditor` and `runClaude` still default to them. Biome's `noProcessEnv` rule fails the lint on any other `process.env` in `src/core`, `src/view`, `src/shared` and `src/ui`; `scanEnvFromProcess` and those two defaults carry a `biome-ignore` saying why.
+`ScanEnv` holds every location ccdesk reads: home, the Claude folder, `.claude.json`, the managed folder, on macOS the configuration profiles that outrank it, the platform, and `processEnv`, the environment ccdesk finds an editor and `claude` in and passes to them. `scanEnvFromProcess` builds it from the real machine; tests build one around a throwaway folder with `makeFixture()`, whose `processEnv` is empty. Every read and write takes it as its first argument, so nothing in the core reads `homedir()`, `process.platform` or `process.env` itself. Biome's `noProcessEnv` rule fails the lint on any other `process.env` in `src/core`, `src/view`, `src/shared` and `src/ui`; `scanEnvFromProcess` carries a `biome-ignore` saying why.
 
 `createCore(env, { runClaude?, openFile? })` binds `env` to every read and change and returns them as methods, such as `core.scanDirectory(dir)` and `core.saveSettingsEdit(edit, revision)`. The server takes a core; tests pass `runClaude` and `openFile` fakes so nothing is started.
 
 `scanDirectory` returns one `DirectoryView`: the instruction files, settings layers and effective settings, permissions, built-in tools, memory, hooks, MCP servers, extensions, context, trust, sharing and problems for one directory and session profile. A problem is a file the scan found but could not read or parse, such as `~/.claude.json`, a settings or MCP file, a plugin manifest or a memory file; a missing file is not one. A plugin's manifest is read once per scan, when the plugin is loaded, and the managed and effective settings are passed down to the readers that need them rather than read again. The page fetches it through `Watcher.scan`, which also records the files the scan read so a change to any of them wakes `/api/watch`. On the page, `useConfig` holds the view and `buildRows` from `src/view` turns it into rows, one list per section in page order. `src/ui/sections/index.ts` joins each view section to the page's cells and inspector by section id. Outside the page, `buildRows(view, { format: formatter(env.home), reference: REFERENCE })` gives the same rows.
 
-Usage counts arrive separately: the page posts the rules in effect to `/api/usage` after each scan, and `readUsage` counts calls in the transcripts. The settings schema and catalog are fetched once from `/api/reference`; no directory is shown before they arrive.
+Usage counts arrive separately: the page posts the rules in effect to `/api/usage` after each scan, and the core's `readUsage` counts calls in the transcripts. The settings schema and catalog are fetched once from `/api/reference`; no directory is shown before they arrive.
 
 ## Secrets
 
@@ -54,8 +54,8 @@ ccdesk never writes back a value the page saw as `•••`. Settings, hook and
 Every edit runs twice: once to show it, once to make it.
 
 1. `preview*(env, edit)` plans the edit from the file on disk and returns the diff and a `revision`, a fingerprint of what it read. A memory change binds two files (the memory and `MEMORY.md`) into one revision.
-2. `save*(env, edit, revision)` plans the same edit again and writes only if the revision still matches. It returns a `Change`: `id` (its backup folder), `target`, the file's `revision` after the change, and `created` when the file did not exist.
-3. Undo is `restoreBackup(env, change.id, change.revision)`. Recent changes uses `listBackups`, then `previewRestore(env, id)` for the diff and its revision, then `restoreBackup` with that revision.
+2. A core's `save*(edit, revision)` plans the same edit again and writes only if the revision still matches. It returns a `Change`: `id` (its backup folder), `target`, the file's `revision` after the change, and `created` when the file did not exist.
+3. Undo is `core.restoreBackup(change.id, change.revision)`. Recent changes uses `listBackups`, then `previewRestore(env, id)` for the diff and its revision, then `restoreBackup` with that revision.
 
 Each kind of edit plans its change as a `Planned` (the preview and a `save` that writes it), and its save goes through `saveReviewed` in `write.ts`: it plans again, refuses on errors or a changed revision, and writes, all in one turn of the change queue. On the page, every editor runs both steps through the `useReviewedChange` hook.
 
@@ -88,7 +88,7 @@ Each core has its own:
 - change queue (`changeQueue()` in `write.ts`), which runs its changes one at a time so two saves cannot both pass the revision check. Two cores on the same Claude folder do not wait for each other, so make one per folder.
 - usage counter (`usageCounter()` in `scan/usage.ts`): the transcript cache, its queue, and the requests waiting on a count.
 
-The free save functions and `readUsage`, kept for one release beside `createCore`, share one process-wide queue and counter. Calling them alongside a core on the same folder skips the core's queue.
+Saves, restores, memory changes and usage counts are exported only as a core's methods, so every change runs on a core's queue. Reads and previews are also exported as free functions that take the `ScanEnv` first; they keep no state.
 
 Still in module scope, and shared by every core:
 

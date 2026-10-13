@@ -4,10 +4,14 @@ import { appendFileSync, closeSync, openSync, statSync, utimesSync, writeFileSyn
 import { open } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
-import { CountStopped, readUsage } from "../src/core/index.ts";
+import { CountStopped } from "../src/core/index.ts";
+import { usageCounter } from "../src/core/scan/usage.ts";
 import { storeDirName } from "../src/shared/memory.ts";
 import { type PermissionList } from "../src/shared/types.ts";
 import { type Fixture, makeFixture } from "./helpers/fixture.ts";
+
+// One counter for the file, as a core keeps one: some tests rely on what earlier counts cached.
+const readUsage = usageCounter();
 
 let next = 0;
 

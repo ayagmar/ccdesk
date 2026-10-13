@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { previewPermissionEdit, restoreBackup, savePermissionEdit } from "../src/core/index.ts";
+import { createCore } from "../src/core/index.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
 // The review-then-save round trip through the core, where server.test.ts does not already make
@@ -19,6 +19,7 @@ const HAND_WRITTEN = `{
 test("undoing a permission change puts back the file's own text, layout included", async () => {
   // Catches a restore that writes the backup re-serialized instead of the saved bytes.
   const f = makeFixture();
+  const core = createCore(f.env);
   const dir = f.at("app");
   const file = f.write("app/.claude/settings.json", HAND_WRITTEN);
   const edit = {
@@ -28,30 +29,31 @@ test("undoing a permission change puts back the file's own text, layout included
     add: { list: "deny" as const, rule: "Bash(npm test:*)" },
   };
 
-  const { revision, reformats } = await previewPermissionEdit(f.env, edit);
+  const { revision, reformats } = await core.previewPermissionEdit(edit);
   assert.equal(reformats, true);
-  const change = await savePermissionEdit(f.env, edit, revision);
+  const change = await core.savePermissionEdit(edit, revision);
   assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).permissions, {
     allow: ["Read"],
     deny: ["Bash(npm test:*)"],
   });
 
-  await restoreBackup(f.env, change.id, change.revision);
+  await core.restoreBackup(change.id, change.revision);
   assert.equal(readFileSync(file, "utf8"), HAND_WRITTEN);
 });
 
 test("a settings file with a byte order mark can be edited, and undo puts the mark back", async () => {
   const f = makeFixture();
+  const core = createCore(f.env);
   const text = `\uFEFF${JSON.stringify({ permissions: { allow: ["Read"] } }, null, 2)}\n`;
   const file = f.write("app/.claude/settings.json", text);
   const edit = { dir: f.at("app"), file, add: { list: "deny" as const, rule: "Bash(rm:*)" } };
 
   // Saving writes ccdesk's own layout, without the mark, so the preview says it reformats.
-  const { revision, reformats } = await previewPermissionEdit(f.env, edit);
+  const { revision, reformats } = await core.previewPermissionEdit(edit);
   assert.equal(reformats, true);
-  const change = await savePermissionEdit(f.env, edit, revision);
+  const change = await core.savePermissionEdit(edit, revision);
   assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).permissions.deny, ["Bash(rm:*)"]);
 
-  await restoreBackup(f.env, change.id, change.revision);
+  await core.restoreBackup(change.id, change.revision);
   assert.equal(readFileSync(file, "utf8"), text);
 });

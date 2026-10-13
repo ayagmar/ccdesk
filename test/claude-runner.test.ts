@@ -2,19 +2,15 @@ import assert from "node:assert/strict";
 import { chmodSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import {
-  claudeProgram,
-  listBackups,
-  previewMcpEdit,
-  previewRestore,
-  runClaude,
-  saveMcpEdit,
-  scanEnvFromProcess,
-} from "../src/core/index.ts";
-import { makeFixture } from "./helpers/fixture.ts";
+import { claudeProgram, claudeRunner, createCore, scanEnvFromProcess } from "../src/core/index.ts";
+import { type Fixture, makeFixture } from "./helpers/fixture.ts";
 
 // The fake claude is a shell script.
 const notOnWindows = { skip: process.platform === "win32" };
+
+/** Runs the fake claude in the fixture's bin folder, with only `extra` beside PATH. */
+const runnerIn = (f: Fixture, extra: NodeJS.ProcessEnv = {}) =>
+  claudeRunner({ platform: process.platform, processEnv: { PATH: f.at("bin"), ...extra } });
 
 test(
   "a failed claude command reports why without repeating the server's secrets",
@@ -22,25 +18,19 @@ test(
   async () => {
     const f = makeFixture();
     chmodSync(f.write("bin/claude", "#!/bin/sh\nexit 3\n"), 0o755);
-    const path = process.env.PATH;
-    process.env.PATH = f.at("bin");
-    try {
-      const definition = { command: "db-mcp", env: { DB_PASSWORD: "s3cret" } };
-      await assert.rejects(
-        runClaude(
-          ["mcp", "add-json", "--scope", "user", "--", "db", JSON.stringify(definition)],
-          f.at(),
-          undefined
-        ),
-        (error: Error) => {
-          assert.doesNotMatch(error.message, /s3cret/);
-          assert.match(error.message, /exited with code 3/);
-          return true;
-        }
-      );
-    } finally {
-      process.env.PATH = path;
-    }
+    const definition = { command: "db-mcp", env: { DB_PASSWORD: "s3cret" } };
+    await assert.rejects(
+      runnerIn(f)(
+        ["mcp", "add-json", "--scope", "user", "--", "db", JSON.stringify(definition)],
+        f.at(),
+        undefined
+      ),
+      (error: Error) => {
+        assert.doesNotMatch(error.message, /s3cret/);
+        assert.match(error.message, /exited with code 3/);
+        return true;
+      }
+    );
   }
 );
 
@@ -50,27 +40,21 @@ test(
   async () => {
     const f = makeFixture();
     chmodSync(f.write("bin/claude", '#!/bin/sh\necho "invalid server: $*" >&2\nexit 1\n'), 0o755);
-    const path = process.env.PATH;
-    process.env.PATH = f.at("bin");
-    try {
-      const definition = {
-        type: "http",
-        url: "https://bot:hunter2@mcp.example.com/?key=abc123",
-        headers: { Authorization: "Bearer tok-999" },
-        command: "npx",
-        args: ["--api-key", "arg-777", "--token=arg-888"],
-      };
-      await assert.rejects(
-        runClaude(["mcp", "add-json", "--", "api", JSON.stringify(definition)], f.at(), undefined),
-        (error: Error) => {
-          assert.match(error.message, /invalid server/);
-          assert.doesNotMatch(error.message, /hunter2|abc123|tok-999|arg-777|arg-888/);
-          return true;
-        }
-      );
-    } finally {
-      process.env.PATH = path;
-    }
+    const definition = {
+      type: "http",
+      url: "https://bot:hunter2@mcp.example.com/?key=abc123",
+      headers: { Authorization: "Bearer tok-999" },
+      command: "npx",
+      args: ["--api-key", "arg-777", "--token=arg-888"],
+    };
+    await assert.rejects(
+      runnerIn(f)(["mcp", "add-json", "--", "api", JSON.stringify(definition)], f.at(), undefined),
+      (error: Error) => {
+        assert.match(error.message, /invalid server/);
+        assert.doesNotMatch(error.message, /hunter2|abc123|tok-999|arg-777|arg-888/);
+        return true;
+      }
+    );
   }
 );
 
@@ -80,23 +64,14 @@ test(
   async () => {
     const f = makeFixture();
     chmodSync(f.write("bin/claude", '#!/bin/sh\necho "profile=$CLAUDE_CONFIG_DIR"\n'), 0o755);
-    const path = process.env.PATH;
-    process.env.PATH = f.at("bin");
-    process.env.CLAUDE_CONFIG_DIR = f.at("shell-profile");
-    try {
-      const chosen = scanEnvFromProcess(f.at("work-profile")).configDir;
-      assert.equal(
-        (await runClaude(["mcp", "list"], f.at(), chosen)).trim(),
-        `profile=${f.at("work-profile")}`
-      );
-      delete process.env.CLAUDE_CONFIG_DIR;
-      // With no profile chosen, claude finds ~/.claude.json itself, as from a terminal.
-      const none = scanEnvFromProcess().configDir;
-      assert.equal((await runClaude(["mcp", "list"], f.at(), none)).trim(), "profile=");
-    } finally {
-      process.env.PATH = path;
-      delete process.env.CLAUDE_CONFIG_DIR;
-    }
+    const shell = runnerIn(f, { CLAUDE_CONFIG_DIR: f.at("shell-profile") });
+    const chosen = scanEnvFromProcess(f.at("work-profile")).configDir;
+    assert.equal(
+      (await shell(["mcp", "list"], f.at(), chosen)).trim(),
+      `profile=${f.at("work-profile")}`
+    );
+    // With no profile chosen, claude finds ~/.claude.json itself, as from a terminal.
+    assert.equal((await runnerIn(f)(["mcp", "list"], f.at(), undefined)).trim(), "profile=");
   }
 );
 
@@ -118,12 +93,14 @@ test("with a chosen profile, the claude commands ccdesk shows and records name i
   const ran = async () => "";
   const profile = `CLAUDE_CONFIG_DIR='${configDir}' claude mcp`;
 
-  const preview = await previewMcpEdit(env, edit, ran);
+  const core = createCore(env, { runClaude: ran });
+
+  const preview = await core.previewMcpEdit(edit);
   assert.deepEqual(preview.commands, [`${profile} remove --scope user -- 'api'`]);
-  await saveMcpEdit(env, edit, preview.revision, ran);
-  const [change] = (await listBackups(env, { limit: 1 })).changes;
+  await core.saveMcpEdit(edit, preview.revision);
+  const [change] = (await core.listBackups({ limit: 1 })).changes;
   assert.ok(change);
-  assert.deepEqual((await previewRestore(env, change.id)).undoCommands, [
+  assert.deepEqual((await core.previewRestore(change.id)).undoCommands, [
     `${profile} add-json --scope user -- 'api' '{"command":"api-mcp"}'`,
   ]);
 });

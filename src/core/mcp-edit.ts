@@ -17,7 +17,6 @@ import {
   recordClaudeMcpChange,
   type Serially,
   saveReviewed,
-  serially,
   writeAtomic,
 } from "./write.ts";
 
@@ -114,11 +113,6 @@ export function claudeRunner(host: Pick<ScanEnv, "platform" | "processEnv">): Ru
     });
   };
 }
-
-/** claudeRunner for this process's PATH and environment, read on each run; use a core's instead. */
-export const runClaude: RunClaude = (args, cwd, configDir) =>
-  // biome-ignore lint/style/noProcessEnv: the documented default of the free runClaude; a core passes its own.
-  claudeRunner({ platform: process.platform, processEnv: process.env })(args, cwd, configDir);
 
 /** Quotes a word for a POSIX shell, so a command shown to you can be pasted as it is. */
 function quoted(word: string): string {
@@ -355,7 +349,7 @@ export function saveMcpEdit(
   edit: McpEdit,
   expectedRevision: string,
   run: RunClaude,
-  queue: Serially = serially
+  queue: Serially
 ): Promise<Change | { target: string }> {
   return saveReviewed(
     queue,

@@ -21,7 +21,6 @@ import {
   SHOWN_AFTER,
   SNAPSHOT,
   StaleError,
-  serially,
   writeAtomic,
 } from "./write.ts";
 
@@ -310,7 +309,7 @@ export function restoreBackup(
   env: ScanEnv,
   id: string,
   expectedRevision: string,
-  queue: Serially = serially
+  queue: Serially
 ): Promise<{ target: string }> {
   return queue(async () => {
     const plan = await planRestore(env, id);

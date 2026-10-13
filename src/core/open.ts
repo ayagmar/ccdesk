@@ -167,15 +167,8 @@ function browserOpener(platform: NodeJS.Platform): Command {
   return ["xdg-open", []];
 }
 
-/**
- * Opens a file or folder in the first editor that starts on `host`; resolves with the command
- * used. Without `host` it uses this process's platform and environment; use a core's instead.
- */
-export async function openInEditor(
-  path: string,
-  // biome-ignore lint/style/noProcessEnv: the documented default of the free openInEditor; a core passes its own.
-  host: Host = { platform: process.platform, processEnv: process.env }
-): Promise<string> {
+/** Opens a file or folder in the first editor that starts on `host`; resolves with the command used. */
+export async function openInEditor(path: string, host: Host): Promise<string> {
   const failures: string[] = [];
   for (const command of editorCommands(host.processEnv, host.platform)) {
     const failure = await launch(command, path, host);
