@@ -149,6 +149,8 @@ async function nearestWatchable(target: Target): Promise<Target> {
 
 interface Subscription {
   watchers: FSWatcher[];
+  /** The latest (re)start of the watchers; they cover every current target once it settles. */
+  ready: Promise<void>;
   /** When a watched file last changed, in ms since the epoch. */
   changedAt: number;
   /** When a watcher last saw any change, before it settled; 0 for none. */
@@ -196,7 +198,7 @@ export class Watcher {
     this.scanned.set(view.path, extra);
     if (subscription && JSON.stringify(extra) !== JSON.stringify(subscription.extra)) {
       subscription.extra = extra;
-      void this.rewatch(view.path, subscription);
+      subscription.ready = this.rewatch(view.path, subscription);
     }
     return view;
   }
@@ -298,9 +300,14 @@ export class Watcher {
 
   private async watching(dir: string): Promise<Subscription> {
     const existing = this.subscriptions.get(dir);
-    if (existing) return existing;
+    if (existing) {
+      // Watchers moving to a new target after a change are not watching it yet.
+      await existing.ready;
+      return existing;
+    }
     const subscription: Subscription = {
       watchers: [],
+      ready: Promise.resolve(),
       changedAt: 0,
       touchedAt: 0,
       watchingSince: Number.POSITIVE_INFINITY,
@@ -309,7 +316,8 @@ export class Watcher {
       extra: this.scanned.get(dir) ?? [],
     };
     this.subscriptions.set(dir, subscription);
-    await this.rewatch(dir, subscription);
+    subscription.ready = this.rewatch(dir, subscription);
+    await subscription.ready;
     return subscription;
   }
 
@@ -342,7 +350,7 @@ export class Watcher {
           subscription.settle = setTimeout(() => {
             subscription.changedAt = Date.now();
             // First, so a subscriber that throws cannot leave the old watchers in place.
-            void this.rewatch(dir, subscription);
+            subscription.ready = this.rewatch(dir, subscription);
             for (const wake of [...subscription.waiters, ...subscription.listeners]) wake();
           }, SETTLE_MS);
         });
