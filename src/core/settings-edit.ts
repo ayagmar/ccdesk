@@ -1,5 +1,5 @@
 import { stat } from "node:fs/promises";
-import { type ValidateFunction } from "ajv";
+import { Compile, type Validator } from "typebox/compile";
 import HOOK_EVENTS from "../shared/hook-events.json" with { type: "json" };
 import { allowedScopes, ignoredReason } from "../shared/scopes.ts";
 import schema from "../shared/settings.schema.json" with { type: "json" };
@@ -16,7 +16,7 @@ import { revisionOf } from "./scan/files.ts";
 import { isRecord } from "./scan/data.ts";
 import { isSkippedMcpRule } from "./scan/permissions.ts";
 import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
-import { ajv, schemaErrors } from "./schema.ts";
+import { schemaErrors } from "./schema.ts";
 import { hasHiddenValues, jsonSyntaxError, redactSecrets, shown } from "./secrets.ts";
 import {
   RefusedError,
@@ -28,13 +28,13 @@ import {
 } from "./write.ts";
 
 const properties: Record<string, object> = schema.definitions.ClaudeCodeSettings.properties;
-const validators = new Map<string, ValidateFunction>();
+const validators = new Map<string, Validator>();
 
-function validatorFor(key: string): ValidateFunction | null {
+function validatorFor(key: string): Validator | null {
   if (!Object.hasOwn(properties, key)) return null;
   let validate = validators.get(key);
   if (!validate) {
-    validate = ajv.compile(properties[key] as object);
+    validate = Compile(properties[key] as object);
     validators.set(key, validate);
   }
   return validate;

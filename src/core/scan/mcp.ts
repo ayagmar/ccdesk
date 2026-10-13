@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { Compile } from "typebox/compile";
 import {
   type McpApproval,
   type McpServer,
@@ -14,10 +15,10 @@ import { readJsonObject, stringField, stringsIn, wildcard } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { manifestConfigs } from "./plugins.ts";
 import serverSchema from "../../shared/mcp-server.schema.json" with { type: "json" };
-import { ajv, schemaErrors } from "../schema.ts";
+import { schemaErrors } from "../schema.ts";
 import { readManagedSettings } from "./settings.ts";
 
-const validateServer = ajv.compile(serverSchema);
+const validateServer = Compile(serverSchema);
 
 /**
  * What makes a server definition one Claude Code cannot start: a missing command or url, a type it
