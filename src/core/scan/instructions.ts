@@ -1,4 +1,5 @@
-import { dirname, isAbsolute, join, matchesGlob, parse, resolve } from "node:path";
+import { dirname, isAbsolute, join, matchesGlob, parse, posix, resolve } from "node:path";
+import picomatch from "picomatch";
 import {
   type AgentsMdMode,
   type ImportRef,
@@ -43,14 +44,37 @@ export function agentsMdLoads(mode: AgentsMdMode, hasClaudeMd: boolean): boolean
   return mode === "claude-md-and-agents-md" || (mode === "claude-md-or-agents-md" && !hasClaudeMd);
 }
 
+/** Whether claudeMdExcludes matches a file by its own path or, for a link, its target's. */
+export type ExcludeMatcher = (path: string, realPath?: string) => boolean;
+
 /**
- * Whether a claudeMdExcludes glob matches a file by its own path or, for a link, its target's
- * (docs: memory#exclude-specific-claude-md-files).
+ * claudeMdExcludes globs matched against absolute paths (docs: memory#exclude-specific-claude-md-files)
+ * the way Claude Code matches them: with forward slashes, `*` and `**` also matching folders such
+ * as .claude, and each absolute glob also written from where the folder before its first wildcard
+ * really is, so a glob through a link matches the files it leads to (observed in v2.1.296). An
+ * invalid glob matches nothing.
  */
-export function isExcluded(excludes: string[], path: string, realPath?: string): boolean {
-  return excludes.some((glob) =>
-    [path, realPath].some((p) => p !== undefined && safeMatch(p, glob))
-  );
+export async function excludeMatcher(excludes: string[]): Promise<ExcludeMatcher> {
+  const globs = excludes.map((glob) => glob.replaceAll("\\", "/")).filter(Boolean);
+  for (const glob of [...globs]) {
+    if (!glob.startsWith("/")) continue;
+    const wildcard = glob.search(/[*?{[]/);
+    const parent = posix.dirname(wildcard === -1 ? glob : glob.slice(0, wildcard));
+    if (isNetworkPath(parent)) continue;
+    const real = (await resolvedPath(parent)).replaceAll("\\", "/");
+    if (real !== parent && !isNetworkPath(real)) globs.push(real + glob.slice(parent.length));
+  }
+  const matchers = globs.flatMap((glob) => {
+    try {
+      return [picomatch(glob, { dot: true })];
+    } catch {
+      return [];
+    }
+  });
+  return (path, realPath) =>
+    [path, realPath].some(
+      (p) => p !== undefined && matchers.some((matches) => matches(p.replaceAll("\\", "/")))
+    );
 }
 
 /**
@@ -150,7 +174,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
       ...claudeFiles.filter((f) => f.dir === dir),
       ...agentsFiles.filter((f) => f.dir === dir)
     );
-  applyLoadRules(out, ctx, mode, excludes, externalImports);
+  applyLoadRules(out, ctx, mode, await excludeMatcher(excludes), externalImports);
   addChecks(out);
   return out;
 }
@@ -321,7 +345,7 @@ function applyLoadRules(
   out: Instruction[],
   ctx: Ctx,
   mode: AgentsMdMode,
-  excludes: string[],
+  isExcluded: ExcludeMatcher,
   externalImports: Trust["externalImports"]
 ): void {
   const waiting =
@@ -333,7 +357,7 @@ function applyLoadRules(
     // Path-scoped rules still load on demand in managed-only mode (docs: memory#choose-which-instruction-files-load).
     if (mode === "managed-only" && file.status === "loaded") skip(file, skippedByMode(mode));
     // Managed files cannot be excluded.
-    if (isExcluded(excludes, file.path, file.realPath)) skip(file, "Skipped by claudeMdExcludes");
+    if (isExcluded(file.path, file.realPath)) skip(file, "Skipped by claudeMdExcludes");
     if (file.status !== "skipped" && file.bytes > MAX_TEXT_BYTES)
       skip(file, "Skipped: Claude Code does not load an instruction file over 4 MiB");
     // A project's links outside it need your approval, like its imports; your own files do not.
