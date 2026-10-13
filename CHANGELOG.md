@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.7](https://github.com/ayagmar/ccdesk/compare/v0.2.6...v0.2.7) (2026-10-13)
+
+### Bug Fixes
+
+* **release:** keep docs anchors plain in subjects and breaking notes too ([9cc2436](https://github.com/ayagmar/ccdesk/commit/9cc2436668569b37743aeab17d5f6ac7cb2a8168))
+* **release:** link only numbered issues in the changelog ([a43a9c3](https://github.com/ayagmar/ccdesk/commit/a43a9c36100fd6e0e3ce93a3d3d5c04f75d7ae9f))
+* **settings:** refuse a number too large for JSON in a number field ([71da4fc](https://github.com/ayagmar/ccdesk/commit/71da4fca973860a9694227493cfb411f9253f4ba))
+* **settings:** refuse a number too large for JSON in the JSON field too ([aa931e4](https://github.com/ayagmar/ccdesk/commit/aa931e427880040a37c5a8da7826ca4bd2cec3a8))
+* **settings:** say a number is too large instead of calling it invalid JSON ([77a6c29](https://github.com/ayagmar/ccdesk/commit/77a6c29bfab2ac556eeff5a658283eae1645db10))
+* **ui:** log why the Markdown renderer did not load ([7e04f22](https://github.com/ayagmar/ccdesk/commit/7e04f22ab941fa4ea9a7da4d5c95d011552dc256))
+* **ui:** show text as written when the Markdown chunk fails to load ([60cd738](https://github.com/ayagmar/ccdesk/commit/60cd73854ff9e92cb81629c81089738097b56386))
+
+### Performance Improvements
+
+* **ui:** load the Markdown renderer as its own chunk ([52e0de1](https://github.com/ayagmar/ccdesk/commit/52e0de1074c8c1c10a426e842475f97a50848bc3))
+
 ## [0.2.6](https://github.com/ayagmar/ccdesk/compare/v0.2.5...v0.2.6) (2026-10-13)
 
 ### Features
