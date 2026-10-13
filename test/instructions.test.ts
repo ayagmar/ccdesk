@@ -91,6 +91,30 @@ test("parent directory instructions load before the working directory's", async 
   ]);
 });
 
+test("in a worktree inside the main checkout, the main checkout's project files are not read again", async () => {
+  const f = makeFixture();
+  f.write("repo/CLAUDE.md", "shared");
+  f.write("repo/.claude/rules/style.md", "style");
+  f.write("repo/.gitignore", "CLAUDE.local.md\n.claude/worktrees/\n");
+  f.git("repo", "init", "-q");
+  f.git("repo", "add", ".");
+  f.git("repo", "commit", "-qm", "init");
+  f.write("repo/CLAUDE.local.md", "mine");
+  f.git("repo", "worktree", "add", "-q", f.at("repo/.claude/worktrees/feat"));
+
+  const view = await scanDirectory(f.env, f.at("repo/.claude/worktrees/feat"));
+
+  assert.deepEqual(loadedPaths(view, f.root), [
+    "repo/CLAUDE.local.md",
+    "repo/.claude/worktrees/feat/CLAUDE.md",
+    "repo/.claude/worktrees/feat/.claude/rules/style.md",
+  ]);
+  assert.deepEqual(
+    view.instructions.filter((i) => i.status === "skipped").map((i) => f.rel(i.path)),
+    ["repo/CLAUDE.md", "repo/.claude/rules/style.md"]
+  );
+});
+
 test("paths mentioned in code spans or fences are not treated as imports", async () => {
   const f = makeFixture();
   f.write(
