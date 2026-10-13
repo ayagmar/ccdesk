@@ -57,6 +57,8 @@ Every edit runs twice: once to show it, once to make it.
 2. `save*(env, edit, revision)` plans the same edit again and writes only if the revision still matches. It returns a `Change`: `id` (its backup folder), `target`, the file's `revision` after the change, and `created` when the file did not exist.
 3. Undo is `restoreBackup(env, change.id, change.revision)`. Recent changes uses `listBackups`, then `previewRestore(env, id)` for the diff and its revision, then `restoreBackup` with that revision.
 
+Each kind of edit plans its change as a `Planned` (the preview and a `save` that writes it), and its save goes through `saveReviewed` in `write.ts`: it plans again, refuses on errors or a changed revision, and writes, all in one turn of the change queue. On the page, every editor runs both steps through the `useReviewedChange` hook.
+
 Errors a front end should handle:
 
 - `InvalidEditError`: the input is not a well-formed edit (unknown scope, missing field). The server answers 400. Other malformed requests, such as a usage count with an unknown rule list or a relative path, are answered 400 by the server itself.
