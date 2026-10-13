@@ -295,7 +295,7 @@ export function agentProblems(text: string): string[] {
  * A file Claude Code skips takes no part in that.
  */
 async function readAgents(env: ScanEnv, projectDir: string, gitRoot: string | null) {
-  const sources: Array<[string, Source]> = [
+  const sources: [string, Source][] = [
     [join(env.managedDir, ".claude", "agents"), "managed"],
     ...projectFolders(env, projectDir, gitRoot, "agents")
       .reverse()
@@ -326,7 +326,7 @@ async function readAgents(env: ScanEnv, projectDir: string, gitRoot: string | nu
  * The docs order only the project folders; managed, project, then yours follows subagents.
  */
 async function readOutputStyles(env: ScanEnv, projectDir: string, gitRoot: string | null) {
-  const sources: Array<[string, Source]> = [
+  const sources: [string, Source][] = [
     [join(env.managedDir, ".claude", "output-styles"), "managed"],
     ...projectFolders(env, projectDir, gitRoot, "output-styles")
       .reverse()
@@ -368,7 +368,7 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
   ];
 
   // Project skills come from the start directory and every parent up to the repository root.
-  const skillDirs: Array<[string, Source]> = [
+  const skillDirs: [string, Source][] = [
     [join(env.managedDir, ".claude", "skills"), "managed"],
     [join(env.claudeDir, "skills"), "user"],
     ...(await listDir(join(env.claudeDir, "skills", "synced")))

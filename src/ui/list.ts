@@ -23,7 +23,7 @@ function compare(a: string | number, b: string | number): number {
 
 /** Each section's rows, filtered, sorted and cut to the number shown. */
 export function groupRows(
-  sections: Array<Section<Row>>,
+  sections: Section<Row>[],
   rows: Row[],
   state: ListState,
   shown: Partial<Record<SectionId, number>>

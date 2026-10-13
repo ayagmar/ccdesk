@@ -87,7 +87,7 @@ for (let i = 1; i < sections.length; i += 2) {
   if (about) entry.about = absolute(about);
   const fact = (name: string) => {
     const start = lines.findIndex((line) => line.startsWith(`* **${name}**:`));
-    if (start < 0) return undefined;
+    if (start < 0) return;
     const block = [lines[start]?.slice(`* **${name}**:`.length).trim() ?? ""];
     for (const line of lines.slice(start + 1)) {
       if (!line.startsWith("  ")) break;

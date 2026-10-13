@@ -116,7 +116,7 @@ function Facets({
   onPick,
 }: {
   label: string;
-  values: Array<[string, number]>;
+  values: [string, number][];
   current: string | undefined;
   render: ((value: string) => ReactNode) | undefined;
   onPick: (value: string | undefined) => void;

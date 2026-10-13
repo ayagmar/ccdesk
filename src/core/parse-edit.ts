@@ -34,7 +34,7 @@ export function parseSettingsEdit(body: unknown): SettingsEdit {
 export function parsePermissionEdit(body: unknown): PermissionEdit {
   const { dir, file } = stringFields(body, ["dir", "file"]);
   const rule = (value: unknown) => {
-    if (value === undefined) return undefined;
+    if (value === undefined) return;
     const { list, rule } = stringFields(value, ["list", "rule"]);
     if (!PERMISSION_LISTS.includes(list as PermissionList) || rule.trim() === "")
       throw new InvalidEditError("a rule needs a list (allow, ask or deny) and text");

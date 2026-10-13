@@ -8,7 +8,7 @@ import { ShowMore, SortHeaders } from "./SortHeaders.tsx";
 import { type Column } from "../view/sections/types.ts";
 import { NO_LIST_STATE, readListState, replaceListState, type Sort } from "./url.ts";
 
-const COLUMNS: Array<Column<ProjectSummary>> = [
+const COLUMNS: Column<ProjectSummary>[] = [
   { label: "Directory", sort: (p) => p.path },
   { label: "Sessions", sort: (p) => p.sessions },
   { label: "Memories", sort: (p) => p.memories },

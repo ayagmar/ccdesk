@@ -98,7 +98,7 @@ export function RouteStrip({ view, lit, filter, onFilter }: Props) {
 export function SharingStrip({ view }: { view: DirectoryView }) {
   const sharing = view.sharing;
   if (!sharing) return null;
-  const groups: Array<[string, string, string[]]> = [
+  const groups: [string, string, string[]][] = [
     ["tracked", "Tracked in git: everyone who clones gets these", sharing.tracked],
     ["untracked", "Not tracked yet", sharing.untracked],
     ["ignored", "Git-ignored: only you", sharing.ignored],

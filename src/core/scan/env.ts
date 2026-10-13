@@ -27,8 +27,11 @@ export interface ScanEnv {
 /** `configDirFlag`, from `--config-dir`, stands in for CLAUDE_CONFIG_DIR and wins over it. */
 export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
   const home = homedir();
+  // Kept as the object itself: on Windows it reads PATH and Path alike, which a copy would not.
+  // biome-ignore lint/style/noProcessEnv: building a ScanEnv from the real process is this function's job.
+  const processEnv = process.env;
   // Made absolute here, from the folder ccdesk started in, because claude runs elsewhere.
-  const chosen = configDirFlag ?? (process.env.CLAUDE_CONFIG_DIR || undefined);
+  const chosen = configDirFlag ?? (processEnv.CLAUDE_CONFIG_DIR || undefined);
   const configDir = chosen === undefined ? undefined : resolve(chosen);
   return {
     home,
@@ -38,10 +41,9 @@ export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
     claudeJson: configDir ? join(configDir, ".claude.json") : join(home, ".claude.json"),
     managedDir: managedDirFor(process.platform),
     platform: process.platform,
-    // Kept as the object itself: on Windows it reads PATH and Path alike, which a copy would not.
-    processEnv: process.env,
-    disableAutoMemory: process.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY,
-    projectDirName: configDir ? process.env.CLAUDE_CODE_PROJECT_DIR_NAME || undefined : undefined,
+    processEnv,
+    disableAutoMemory: processEnv.CLAUDE_CODE_DISABLE_AUTO_MEMORY,
+    projectDirName: configDir ? processEnv.CLAUDE_CODE_PROJECT_DIR_NAME || undefined : undefined,
   };
 }
 

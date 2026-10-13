@@ -264,7 +264,10 @@ export class Watcher {
   async subscribe(dir: string, onChange: () => void): Promise<() => void> {
     const subscription = await this.watching(dir);
     // Closed while its watchers were starting: nothing will change.
-    if (this.subscriptions.get(dir) !== subscription) return () => {};
+    if (this.subscriptions.get(dir) !== subscription)
+      return () => {
+        // Nothing was subscribed, so there is nothing to stop.
+      };
     clearTimeout(subscription.idle);
     // A function of its own, so the same onChange subscribed twice is unsubscribed twice.
     const listener = () => onChange();

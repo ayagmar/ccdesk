@@ -79,7 +79,7 @@ export interface ViewSection<R extends Row> {
   /** A shorter title for the section index, when the title is long. */
   short?: string;
   rows: (view: DirectoryView, context: ViewContext) => R[];
-  columns: Array<Column<R>>;
+  columns: Column<R>[];
   empty: (view: DirectoryView) => string;
   /** Rows that exist but do not take effect are drawn faded. */
   dimmed?: (row: R) => boolean;

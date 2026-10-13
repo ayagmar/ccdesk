@@ -16,7 +16,7 @@ const WHAT: Record<BackupKind, string> = {
 };
 
 /** Changes grouped under the day they were made, newest first, as they come from the server. */
-function byDay(changes: BackupSummary[]): Array<[string, BackupSummary[]]> {
+function byDay(changes: BackupSummary[]): [string, BackupSummary[]][] {
   const days = new Map<string, BackupSummary[]>();
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86_400_000).toDateString();

@@ -13,7 +13,7 @@ export function SortHeaders<R>({
   sort,
   onSort,
 }: {
-  columns: Array<Column<R>>;
+  columns: Column<R>[];
   sort: Sort | undefined;
   onSort: (sort: Sort | undefined) => void;
 }) {

@@ -105,6 +105,7 @@ export function claudeRunner(host: Pick<ScanEnv, "platform" | "processEnv">): Ru
 
 /** claudeRunner for this process's PATH and environment, read on each run; use a core's instead. */
 export const runClaude: RunClaude = (args, cwd, configDir) =>
+  // biome-ignore lint/style/noProcessEnv: the documented default of the free runClaude; a core passes its own.
   claudeRunner({ platform: process.platform, processEnv: process.env })(args, cwd, configDir);
 
 /** Quotes a word for a POSIX shell, so a command shown to you can be pasted as it is. */
@@ -148,7 +149,7 @@ function checked(servers: Record<string, unknown>, edit: McpEdit): void {
 function edited(servers: Record<string, unknown>, edit: McpEdit): Record<string, unknown> {
   const { remove, add } = edit;
   // Built with fromEntries: assigning a server named __proto__ would set the prototype instead.
-  const next = Object.entries(servers).flatMap(([name, config]): Array<[string, unknown]> => {
+  const next = Object.entries(servers).flatMap(([name, config]): [string, unknown][] => {
     if (name !== remove?.name) return [[name, config]];
     return add ? [[add.name, add.definition]] : [];
   });
