@@ -126,6 +126,18 @@ export interface SettingsLayer {
    * read, such as the server-managed settings cache or a macOS configuration profile.
    */
   higherSources?: string[];
+  /** For managed settings: entries that fail validation, which `data` holds as Claude Code reads them. */
+  repairs?: ManagedRepair[];
+}
+
+/** A managed settings entry Claude Code reads other than as written. */
+export interface ManagedRepair {
+  /** Where it is, such as `sandbox.network.allowedDomains`. */
+  field: string;
+  /** The entry as written, nested under its field, with secrets hidden. */
+  written: unknown;
+  /** What Claude Code does with it. */
+  note: string;
 }
 
 export interface EffectiveSetting {

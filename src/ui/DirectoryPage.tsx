@@ -157,6 +157,7 @@ export function DirectoryPage({
         <SessionSwitch profile={view.profile} onProfile={onProfile} />
         <Problems problems={view.problems} />
         <HigherManagedSources view={view} />
+        <ManagedRepairs view={view} />
         {seeing ? (
           <ContextView view={view} />
         ) : (
@@ -492,6 +493,32 @@ function HigherManagedSources({ view }: { view: DirectoryView }) {
           policy, and these come before the managed settings files, so the managed values shown here
           may not apply. <span className="mono">/status</span> in Claude Code names the source it
           uses.
+        </li>
+      </ul>
+    </section>
+  );
+}
+
+/** Managed settings entries that fail validation, each with what Claude Code does instead and what the file says. */
+function ManagedRepairs({ view }: { view: DirectoryView }) {
+  const managed = view.settings.find((l) => l.scope === "managed");
+  if (!managed?.repairs) return null;
+  return (
+    <section className="problems" aria-label="Managed settings Claude Code repairs">
+      <Icon name="warn" />
+      <ul className="plain">
+        <li>
+          Some managed settings in <span className="mono">{tilde(managed.path)}</span> fail
+          validation. The page shows them as Claude Code applies them:
+          <ul className="plain">
+            {managed.repairs.map((r, i) => (
+              // A field can be repaired twice, such as a list that lost an entry and was then withheld.
+              // biome-ignore lint/suspicious/noArrayIndexKey: the list never reorders.
+              <li key={`${r.field}:${i}`} title={JSON.stringify(r.written)}>
+                <span className="mono">{r.field}</span> {r.note}.
+              </li>
+            ))}
+          </ul>
         </li>
       </ul>
     </section>

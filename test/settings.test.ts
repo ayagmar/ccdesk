@@ -463,3 +463,108 @@ test("a project file with a value the schema rejects is skipped whole and report
     [f.at("app/.claude/settings.json")]
   );
 });
+
+test("managed settings that fail validation are read as Claude Code repairs them, and each repair is listed", async () => {
+  const f = makeFixture();
+  f.json("etc/claude-code/managed-settings.json", {
+    allowedMcpServers: "mistyped",
+    allowManagedHooksOnly: "true",
+    allowManagedPermissionRulesOnly: "yes",
+    disableAllHooks: "true",
+    model: null,
+    cleanupPeriodDays: "forever",
+    forceLoginOrgUUID: 7,
+    permissions: { deny: "Bash", allow: ["Read", 3], defaultMode: "careful" },
+    autoMode: { soft_deny: ["force push", 1], allow: ["tests"], environment: ["ci"] },
+    sandbox: {
+      enabled: "yes",
+      allowUnsandboxedCommands: "false",
+      failIfUnavailable: "maybe",
+      excludedCommands: [1],
+      network: { deniedDomains: [1], allowedDomains: ["corp.example"] },
+    },
+  });
+  f.json("home/.claude/settings.json", {
+    model: "opus",
+    hooks: { Stop: [{ hooks: [{ type: "command", command: "notify" }] }] },
+  });
+  f.json("home/.claude.json", { mcpServers: { db: { command: "db-mcp" } } });
+  f.json("app/.claude/settings.json", { sandbox: { allowUnsandboxedCommands: true } });
+
+  const view = await scanDirectory(f.env, f.at("app"), "print");
+  const managed = view.settings.find((l) => l.scope === "managed");
+
+  assert.deepEqual(managed?.data, {
+    allowedMcpServers: [],
+    allowManagedHooksOnly: true,
+    allowManagedPermissionRulesOnly: true,
+    permissions: { defaultMode: "default" },
+    autoMode: { soft_deny: ["force push"] },
+    sandbox: { enabled: true, allowUnsandboxedCommands: false },
+  });
+  assert.deepEqual(
+    managed?.repairs?.map((r) => r.field),
+    [
+      "allowedMcpServers",
+      "allowManagedHooksOnly",
+      "allowManagedPermissionRulesOnly",
+      "disableAllHooks",
+      "model",
+      "cleanupPeriodDays",
+      "forceLoginOrgUUID",
+      "permissions.deny",
+      "permissions.allow",
+      "permissions.defaultMode",
+      "permissions.allow",
+      "autoMode.soft_deny",
+      "autoMode.allow",
+      "autoMode.environment",
+      "sandbox.enabled",
+      "sandbox.allowUnsandboxedCommands",
+      "sandbox.failIfUnavailable",
+      "sandbox.excludedCommands",
+      "sandbox.network.deniedDomains",
+      "sandbox.network.allowedDomains",
+    ]
+  );
+  // What the file says stays visible beside each repair.
+  assert.deepEqual(managed?.repairs?.[0]?.written, { allowedMcpServers: "mistyped" });
+  assert.match(managed?.repairs?.[1]?.note ?? "", /quotes/);
+
+  assert.equal(setting(view, "model")?.value, "opus");
+  assert.equal(view.inventory.mcpServers.find((s) => s.name === "db")?.status, "blocked");
+  assert.match(view.inventory.hooks[0]?.note ?? "", /allowManagedHooksOnly/);
+  const sandbox = setting(view, "sandbox");
+  assert.deepEqual(
+    sandbox?.ignored.map((i) => [i.scope, i.value]),
+    [["project", { allowUnsandboxedCommands: true }]]
+  );
+});
+
+test("a quoted managed allowManagedMcpServersOnly holds, an invalid deny list is dropped, and a damaged credential entry still denies", async () => {
+  const f = makeFixture();
+  f.json("etc/claude-code/managed-settings.json", {
+    allowManagedMcpServersOnly: "true",
+    allowedMcpServers: [{ serverName: "corp" }],
+    deniedMcpServers: "everything",
+    sandbox: {
+      credentials: {
+        files: [{ path: "~/.aws/credentials", mode: "mask", extract: 5 }, { mode: "deny" }],
+      },
+    },
+  });
+  f.json("home/.claude/settings.json", { allowedMcpServers: [{ serverName: "db" }] });
+  f.json("home/.claude.json", { mcpServers: { db: { command: "db-mcp" } } });
+
+  const view = await scanDirectory(f.env, f.at("app"));
+  const managed = view.settings.find((l) => l.scope === "managed");
+
+  assert.equal(
+    view.inventory.mcpServers.find((s) => s.name === "db")?.note,
+    "Not in the managed allowedMcpServers"
+  );
+  assert.equal(managed?.data?.deniedMcpServers, undefined);
+  assert.deepEqual(managed?.data?.sandbox, {
+    credentials: { files: [{ path: "~/.aws/credentials", mode: "deny" }] },
+  });
+});

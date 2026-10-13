@@ -14,7 +14,8 @@ import { isRecord } from "./scan/data.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { resolvedPath, revisionOf } from "./scan/files.ts";
 import { isSkippedMcpRule } from "./scan/permissions.ts";
-import { type SettingsFile, settingsFiles, validatorFor } from "./scan/settings.ts";
+import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
+import { validatorFor } from "./scan/settings-schema.ts";
 import { schemaErrors } from "./schema.ts";
 import { hasHiddenValues, redactSecrets, shown } from "./secrets.ts";
 import {
