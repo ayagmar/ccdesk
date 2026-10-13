@@ -33,7 +33,17 @@ export function App() {
   const config = useConfig(page.kind === "directory" ? page.dir : null, profile);
   const { data, dir } = config;
   const overview = config.overview.state === "ready" ? config.overview.data : null;
-  const rows = useMemo(() => (data ? buildRows(data, pageContext()) : []), [data]);
+  // An error building the rows is drawn by the page, inside its error boundary, so the rail and the
+  // other pages stay usable; a reload would open the same directory and fail again.
+  const built = useMemo(() => {
+    if (!data) return { rows: [] };
+    try {
+      return { rows: buildRows(data, pageContext()) };
+    } catch (error) {
+      return { rows: [], error };
+    }
+  }, [data]);
+  const { rows } = built;
 
   const open = useCallback((next: Page) => {
     setPage(next);
@@ -96,6 +106,7 @@ export function App() {
             config={config}
             overview={overview}
             rows={rows}
+            rowsError={built.error}
             jump={jump}
             onJumped={() => setJump(null)}
             onToast={setToast}
@@ -168,6 +179,7 @@ function PageContent({
   config,
   overview,
   rows,
+  rowsError,
   jump,
   onJumped,
   onToast,
@@ -181,6 +193,8 @@ function PageContent({
   config: ReturnType<typeof useConfig>;
   overview: Overview | null;
   rows: Row[];
+  /** Why the rows could not be built; thrown here, inside the page's error boundary. */
+  rowsError?: unknown;
   jump: { id: string } | null;
   onJumped: () => void;
   onToast: (toast: ToastMessage) => void;
@@ -218,6 +232,7 @@ function PageContent({
     );
   if (view.state === "error") return <Problem message={view.message} />;
   if (!data) return <Loading />;
+  if (rowsError) throw rowsError;
   return (
     <DirectoryPage
       key={`${data.path}:${visit}`}
