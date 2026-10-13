@@ -106,8 +106,15 @@ interface ResolveOptions {
   externalImports: Trust["externalImports"];
   /** The managed settings' `claudeMd` text, which loads like a managed CLAUDE.md. */
   managedClaudeMd: { path: string; text: string } | null;
+  /** The roots of a worktree that lies inside its main checkout, such as one in .claude/worktrees. */
+  nestedWorktree: NestedWorktree | null;
   /** Receives instruction files and imports that exist but cannot be read. */
   problems: Problem[];
+}
+
+export interface NestedWorktree {
+  root: string;
+  mainRoot: string;
 }
 
 /** Shared by every file of one scan. */
@@ -116,6 +123,7 @@ interface Ctx {
   realCwd: string;
   env: ScanEnv;
   approved: boolean;
+  nestedWorktree: NestedWorktree | null;
   problems: Problem[];
 }
 
@@ -130,6 +138,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
     realCwd: await resolvedPath(resolve(cwd)),
     env,
     approved: externalImports === "approved",
+    nestedWorktree: options.nestedWorktree,
     problems,
   };
   const out = await readOwnFiles(ctx, managedClaudeMd);
@@ -231,6 +240,16 @@ async function readDirectoryFiles(
   return { claudeFiles, agentsFiles };
 }
 
+/**
+ * Whether `dir` is a folder of the main checkout above a worktree nested in it. Claude Code reads
+ * no project files there, only CLAUDE.local.md, so the worktree's own copies are not read twice
+ * (observed in v2.1.296; docs: memory#how-claude-md-files-load points to worktrees for this).
+ */
+function inMainCheckout(ctx: Ctx, dir: string): boolean {
+  const nested = ctx.nestedWorktree;
+  return nested !== null && isWithin(nested.mainRoot, dir) && !isWithin(nested.root, dir);
+}
+
 /** One folder's CLAUDE.md files, rules and CLAUDE.local.md, in the order Claude Code reads them. */
 async function readClaudeFiles(ctx: Ctx, dir: string): Promise<Instruction[]> {
   const { env } = ctx;
@@ -247,6 +266,12 @@ async function readClaudeFiles(ctx: Ctx, dir: string): Promise<Instruction[]> {
       const file = await readInstruction(ctx, path);
       if (file) out.push(await rule(file, "project", dir, ctx));
     }
+  if (inMainCheckout(ctx, dir))
+    for (const file of out)
+      skip(
+        file,
+        "Skipped: from a worktree inside the main checkout, Claude Code reads only the main checkout's CLAUDE.local.md"
+      );
   const local = await readInstruction(ctx, join(dir, "CLAUDE.local.md"));
   if (local) out.push(await instruction(local, "claude-local-md", "local", dir, ctx, ""));
   return out;
@@ -255,7 +280,7 @@ async function readClaudeFiles(ctx: Ctx, dir: string): Promise<Instruction[]> {
 /** Why each CLAUDE.md and CLAUDE.local.md loads; rules have their reason already. */
 function explainClaudeFiles(claudeFiles: Instruction[], cwd: string): void {
   for (const file of claudeFiles) {
-    if (file.kind === "rule") continue;
+    if (file.kind === "rule" || file.status === "skipped") continue;
     if (file.kind === "claude-local-md") file.reason = "Your private notes for this directory";
     else if (file.dir === resolve(cwd)) file.reason = "Instructions for this directory";
     else file.reason = "Inherited from a parent directory";

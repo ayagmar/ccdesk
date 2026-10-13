@@ -35,7 +35,8 @@ A file is skipped when:
 - your `claudeMdExcludes` setting matches its path;
 - it is larger than 4 MiB, which Claude Code does not load;
 - a plugin setting limits instruction files to `CLAUDE.md` only, or to managed files only;
-- it is a project or local rule that links to a file outside the project, and you have not approved imports from outside the project.
+- it is a project or local rule that links to a file outside the project, and you have not approved imports from outside the project;
+- the open directory is a git worktree inside its main checkout, such as one in `.claude/worktrees`, and the file is a `CLAUDE.md`, `.claude/CLAUDE.md` or rule of a main checkout folder above it. Claude Code reads the worktree's own copies instead; the main checkout's `CLAUDE.local.md` still loads.
 
 ## Imports
 

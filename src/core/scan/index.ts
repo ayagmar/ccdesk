@@ -15,7 +15,7 @@ import {
 } from "../../shared/types.ts";
 import { buildContext } from "./context.ts";
 import { isConfigHome, type ScanEnv } from "./env.ts";
-import { isDir, isFile, readJsonObject, stringsIn } from "./files.ts";
+import { isDir, isFile, isWithin, readJsonObject, stringsIn } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { claudeJsonKey, gitRoot, mainWorktreeRoot, trustKey, visibilityOf } from "./git.ts";
 import { AGENTS_MD_MODES, resolveInstructions } from "./instructions.ts";
@@ -96,6 +96,8 @@ export async function scanDirectory(
     excludes: stringsIn(excludes),
     externalImports: trust.externalImports,
     managedClaudeMd: managedClaudeMd(settings),
+    nestedWorktree:
+      root && mainRoot && root !== mainRoot && isWithin(mainRoot, root) ? { root, mainRoot } : null,
     problems,
   });
 
