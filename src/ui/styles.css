@@ -777,8 +777,6 @@ input::placeholder {
   padding: 0 8px;
   border-bottom: 1px solid var(--rule-strong);
   white-space: nowrap;
-  /* Covers the gap under the sticky directory header so rows never show above the column heads. */
-  box-shadow: 0 -16px 0 var(--paper);
 }
 
 .tt td {
