@@ -71,10 +71,13 @@ function managedDirFor(platform: NodeJS.Platform): string {
 
 /**
  * Whether `dir/.claude` is the user's Claude folder, as it is in the home folder. Compared by where
- * `dir` and the Claude folder's parent really are, which exist even before `.claude` does, so a
- * link to the home folder counts as the home folder and a Project change there is not one.
+ * the folders really are, so `dir/.claude` linking to a relocated Claude folder counts. Before
+ * `.claude` exists, `dir` is compared with the Claude folder's parent, so a link to the home folder
+ * counts as the home folder and a Project change there is not one.
  */
 export async function isUserClaudeFolder(env: ScanEnv, dir: string): Promise<boolean> {
+  if ((await resolvedPath(join(dir, ".claude"))) === (await resolvedPath(env.claudeDir)))
+    return true;
   if (basename(env.claudeDir) !== ".claude") return false;
   return (await resolvedPath(dir)) === (await resolvedPath(dirname(env.claudeDir)));
 }
