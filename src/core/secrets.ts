@@ -1,5 +1,5 @@
-import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { FRONTMATTER, isRecord, parseJson } from "./scan/data.ts";
+import { stringify as stringifyYaml } from "yaml";
+import { FRONTMATTER, isRecord, parseFrontmatterYaml, parseJson } from "./scan/data.ts";
 
 /**
  * A server URL as ccdesk shows it: a user name, password or query string can carry a key, so they
@@ -124,7 +124,7 @@ function shownFrontmatter(text: string): string {
   if (!match) return text;
   let data: unknown;
   try {
-    data = parseYaml(match[1] ?? "");
+    data = parseFrontmatterYaml(match[1] ?? "");
   } catch {
     return text;
   }

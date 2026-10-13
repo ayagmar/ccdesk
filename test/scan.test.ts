@@ -757,6 +757,60 @@ test("header and env values in an agent's inline MCP servers never reach the pag
   assert.match(agent.text, /Use the api tools\./);
 });
 
+test("frontmatter with an unquoted colon is read the way Claude Code reads it, by quoting the value and parsing again", async () => {
+  const f = makeFixture();
+  f.write(
+    "work/app/.claude/agents/reviewer.md",
+    "---\nname: reviewer\ndescription: Reviews code. Use when: the user asks for a review\n---\nReview.\n"
+  );
+  f.write(
+    "work/app/.claude/agents/broken.md",
+    "---\nname: broken\ndescription: ok\nmetadata:\n  note: a: b\n---\nx\n"
+  );
+  f.write(
+    "work/app/.claude/skills/deploy/SKILL.md",
+    "---\ndescription: Deploys. Use when: shipping\n---\nbody\n"
+  );
+
+  const view = await scanDirectory(f.env, f.at("work/app"));
+
+  const agents = view.inventory.agents.map((a) => [a.name, a.description, a.skipped ?? null]);
+  assert.deepEqual(agents, [
+    ["broken", "", "The frontmatter needs a name."],
+    ["reviewer", "Reviews code. Use when: the user asks for a review", null],
+  ]);
+  assert.equal(
+    view.inventory.skills.find((s) => s.name === "deploy")?.description,
+    "Deploys. Use when: shipping"
+  );
+});
+
+test("a header value in frontmatter that parses only once quoted still never reaches the page", async () => {
+  const f = makeFixture();
+  f.write(
+    "work/app/.claude/agents/api.md",
+    [
+      "---",
+      "name: api",
+      "description: Calls the API. Use when: the user asks",
+      "mcpServers:",
+      "  - api:",
+      "      type: http",
+      "      url: https://api.example/mcp",
+      "      headers:",
+      "        Authorization: Bearer quoted-header-secret",
+      "---",
+      "Use the api tools.",
+      "",
+    ].join("\n")
+  );
+
+  const view = await scanDirectory(f.env, f.at("work/app"));
+
+  assert.equal(view.inventory.agents.find((a) => a.name === "api")?.skipped, undefined);
+  assert.doesNotMatch(JSON.stringify(view), /quoted-header-secret/);
+});
+
 test("a managed settings file that is not JSON stops Claude Code from starting; an empty one is {}", async () => {
   const f = makeFixture();
   f.write("etc/claude-code/managed-settings.json", "");

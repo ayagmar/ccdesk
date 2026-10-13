@@ -124,6 +124,25 @@ test("a rule with paths frontmatter is listed but not loaded at session start", 
   );
 });
 
+test("a rule with unquoted globs, a tab-indented paths list or spaces after its opening --- is still path-scoped", async () => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/unquoted.md", "---\npaths: **/*.ts\n---\ntypes first");
+  f.write("app/.claude/rules/tabbed.md", '---\npaths:\n\t- "docs/**"\n---\ndocs rules');
+  f.write("app/.claude/rules/spaced.md", '--- \npaths: "src/**"\n---\nsource rules');
+
+  const view = await scanDirectory(f.env, f.at("app"));
+  const rules = view.instructions.filter((i) => i.kind === "rule");
+
+  assert.deepEqual(
+    rules.map((r) => [f.rel(r.path), r.status, r.paths ?? []]),
+    [
+      ["app/.claude/rules/spaced.md", "on-match", ["src/**"]],
+      ["app/.claude/rules/tabbed.md", "on-match", ["docs/**"]],
+      ["app/.claude/rules/unquoted.md", "on-match", ["**/*.ts"]],
+    ]
+  );
+});
+
 test("project instruction files report whether git tracks them", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "shared");
