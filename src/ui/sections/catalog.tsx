@@ -9,7 +9,7 @@ import { Icon } from "../Icon.tsx";
 import { SettingEditor } from "../SettingEditor.tsx";
 import { propertyFor } from "../settingsSchema.ts";
 import { Field, NameButton } from "./kit.tsx";
-import { type SectionUi } from "./types.ts";
+import { type Actions, type SectionUi } from "./types.ts";
 
 type R = RowOf<"catalog">;
 
@@ -36,6 +36,51 @@ function filesText(scopes: Line[]): string {
   if (scopes.length === 0) return "~/.claude.json only";
   if (scopes.length === 4) return "any settings file";
   return scopes.map((s) => lineName(s).toLowerCase()).join(", ");
+}
+
+/** The editor for a setting, or why ccdesk cannot set it. */
+function SetIt({
+  setting: s,
+  set,
+  actions,
+}: {
+  setting: R["item"];
+  set: ReturnType<typeof valueHere>["set"];
+  actions: Actions;
+}) {
+  const [top = s.key, field] = s.key.split(".", 2);
+  const editable = s.scopes.filter((scope) => EDITABLE_SCOPES.includes(scope));
+  if (s.scopes.length === 0)
+    return (
+      <p className="muted small">
+        Claude Code keeps this in ~/.claude.json, which ccdesk never changes. Use{" "}
+        <code>/config</code> in Claude Code.
+      </p>
+    );
+  if (editable.length === 0)
+    return <p className="muted small">Only managed settings can set this.</p>;
+  if (field)
+    return (
+      <p className="muted small">
+        It is a field of <code>{top}</code>; edit that setting to change it.
+      </p>
+    );
+  if (propertyFor(top) === undefined)
+    return (
+      <p className="muted small">
+        This key is not in the settings schema ccdesk ships, so it cannot be edited here.
+      </p>
+    );
+  const fallback = editable.includes("user") ? "user" : (editable[0] ?? "user");
+  return (
+    <SettingEditor
+      key={s.key}
+      view={actions.view}
+      settingKey={s.key}
+      defaultScope={[...(set?.from ?? [])].reverse().find((x) => editable.includes(x)) ?? fallback}
+      onSaved={actions.onSaved}
+    />
+  );
 }
 
 export const catalog: SectionUi<R> = {
@@ -73,9 +118,6 @@ export const catalog: SectionUi<R> = {
     const s = row.item;
     const { view } = actions;
     const { set, value } = valueHere(view, s.key);
-    const [top = s.key, field] = s.key.split(".", 2);
-    const editable = s.scopes.filter((scope) => EDITABLE_SCOPES.includes(scope));
-    const inSchema = propertyFor(top) !== undefined;
     return (
       <>
         <div className="verdict">
@@ -110,33 +152,7 @@ export const catalog: SectionUi<R> = {
         )}
         <section className="sub">
           <h3>{value === undefined ? "Set it" : "Change it"}</h3>
-          {s.scopes.length === 0 ? (
-            <p className="muted small">
-              Claude Code keeps this in ~/.claude.json, which ccdesk never changes. Use{" "}
-              <code>/config</code> in Claude Code.
-            </p>
-          ) : editable.length === 0 ? (
-            <p className="muted small">Only managed settings can set this.</p>
-          ) : field ? (
-            <p className="muted small">
-              It is a field of <code>{top}</code>; edit that setting to change it.
-            </p>
-          ) : !inSchema ? (
-            <p className="muted small">
-              This key is not in the settings schema ccdesk ships, so it cannot be edited here.
-            </p>
-          ) : (
-            <SettingEditor
-              key={s.key}
-              view={view}
-              settingKey={s.key}
-              defaultScope={
-                [...(set?.from ?? [])].reverse().find((x) => editable.includes(x)) ??
-                (editable.includes("user") ? "user" : (editable[0] ?? "user"))
-              }
-              onSaved={actions.onSaved}
-            />
-          )}
+          <SetIt setting={s} set={set} actions={actions} />
         </section>
         <p className="muted small">
           <a className="docs-link" href={s.docs} target="_blank" rel="noreferrer">

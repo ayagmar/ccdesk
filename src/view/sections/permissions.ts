@@ -27,6 +27,19 @@ export function unused(rule: Permission, usage: Usage | null | undefined): rule 
 
 const LIST_ORDER = ["deny", "ask", "allow"];
 
+/** Rules in the order Claude Code checks their lists, then other settings, then suggestions. */
+function listRank(row: R): number {
+  if (isSuggested(row)) return 4;
+  return row.item.kind === "rule" ? LIST_ORDER.indexOf(row.item.list) : 3;
+}
+
+/** A row as words: its list and rule, or the setting and its value. */
+function words(row: R): string {
+  if (isSuggested(row)) return `suggested allow ${row.item.rule}`;
+  const { item } = row;
+  return item.kind === "rule" ? `${item.list} ${item.rule}` : `${item.kind} ${item.value}`;
+}
+
 export const permissions = defineSection<R>({
   id: "permissions",
   title: "Permissions",
@@ -53,8 +66,7 @@ export const permissions = defineSection<R>({
     { label: "", sort: (r) => (isSuggested(r) ? "~" : r.item.scope) },
     {
       label: "List",
-      sort: (r) =>
-        isSuggested(r) ? 4 : r.item.kind === "rule" ? LIST_ORDER.indexOf(r.item.list) : 3,
+      sort: listRank,
     },
     {
       label: "Rule",
@@ -67,28 +79,18 @@ export const permissions = defineSection<R>({
   dimmed: (row) =>
     !isSuggested(row) &&
     (!row.item.inEffect || (row.item.kind === "rule" && row.item.decidedBy !== undefined)),
-  text: (row) =>
-    isSuggested(row)
-      ? `permission suggested allow ${row.item.rule}`
-      : row.item.kind === "rule"
-        ? `permission ${row.item.list} ${row.item.rule}`
-        : `permission ${row.item.kind} ${row.item.value}`,
-  label: (row) =>
-    isSuggested(row)
-      ? `suggested allow ${row.item.rule}`
-      : row.item.kind === "rule"
-        ? `${row.item.list} ${row.item.rule}`
-        : `${row.item.kind} ${row.item.value}`,
-  heading: (row) =>
-    "rule" in row.item
-      ? row.item.rule
-      : row.item.kind === "defaultMode"
-        ? "Default permission mode"
-        : "Extra folder",
+  text: (row) => `permission ${words(row)}`,
+  label: words,
+  heading: (row) => {
+    if ("rule" in row.item) return row.item.rule;
+    return row.item.kind === "defaultMode" ? "Default permission mode" : "Extra folder";
+  },
   facet: {
     label: "Filter permissions by list",
-    of: (row) =>
-      isSuggested(row) ? "suggested" : row.item.kind === "rule" ? row.item.list : "other",
+    of: (row) => {
+      if (isSuggested(row)) return "suggested";
+      return row.item.kind === "rule" ? row.item.list : "other";
+    },
     order: () => ["deny", "ask", "allow", "other", "suggested"],
   },
 });

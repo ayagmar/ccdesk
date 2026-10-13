@@ -34,6 +34,30 @@ function usedHere(usage: Usage | null | undefined, name: string): string {
   }`;
 }
 
+/** The outcome's class: what rules decide, or whether the tool asks by default. */
+function outcomeClass(t: BuiltinTool): string {
+  if (t.verdict !== "default") return t.verdict;
+  return t.asks ? "asks" : "free";
+}
+
+/** Red when a rule denies the tool, green when it runs without asking. */
+function verdictClass(t: BuiltinTool): string {
+  if (t.verdict === "denied") return "off";
+  return t.verdict === "allowed" || (!t.asks && t.verdict === "default") ? "ok" : "";
+}
+
+/** The calls counted, while counting, or when the count could not finish. */
+function Calls({ calls }: { calls: number | null | undefined }) {
+  if (calls === undefined) return "…";
+  if (calls === null)
+    return (
+      <span className="muted" title="ccdesk could not finish counting the transcripts">
+        ?
+      </span>
+    );
+  return calls;
+}
+
 function explanation(tool: BuiltinTool): string {
   const rule = tool.decidedBy;
   const where = rule ? `${rule.rule} in ${lineName(rule.scope).toLowerCase()} settings` : "";
@@ -208,11 +232,7 @@ export const tools: SectionUi<R> = {
           <NameButton onClick={select}>{t.name}</NameButton>
         </td>
         <td>
-          <span
-            className={`tool-outcome tool-${t.verdict === "default" ? (t.asks ? "asks" : "free") : t.verdict}`}
-          >
-            {outcome(t)}
-          </span>
+          <span className={`tool-outcome tool-${outcomeClass(t)}`}>{outcome(t)}</span>
         </td>
         <td className="checks">
           {checked.length > 0 && (
@@ -228,15 +248,7 @@ export const tools: SectionUi<R> = {
           {t.hooks > 0 && <span className="flag">{plural(t.hooks, "hook")}</span>}
         </td>
         <td className={`num${row.calls ? " used" : ""}`}>
-          {row.calls === undefined ? (
-            "…"
-          ) : row.calls === null ? (
-            <span className="muted" title="ccdesk could not finish counting the transcripts">
-              ?
-            </span>
-          ) : (
-            row.calls
-          )}
+          <Calls calls={row.calls} />
         </td>
         <td className="desc">
           <Described text={t.description.split(/(?<=\.)\s/)[0] ?? ""} />
@@ -253,11 +265,7 @@ export const tools: SectionUi<R> = {
     const t = row.item;
     return (
       <>
-        <p
-          className={`verdict ${t.verdict === "denied" ? "off" : t.verdict === "allowed" || (!t.asks && t.verdict === "default") ? "ok" : ""}`}
-        >
-          {explanation(t)}
-        </p>
+        <p className={`verdict ${verdictClass(t)}`}>{explanation(t)}</p>
         <p>
           <Described text={t.description} />
         </p>

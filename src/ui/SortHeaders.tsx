@@ -7,6 +7,14 @@ function nextSort(sort: Sort | undefined, column: number): Sort | undefined {
   return sort.descending ? undefined : { column, descending: true };
 }
 
+function ariaSort(sort: Sort): "ascending" | "descending" {
+  return sort.descending ? "descending" : "ascending";
+}
+
+function sortMark(sort: Sort): string {
+  return sort.descending ? "↓" : "↑";
+}
+
 /** A table's column heads; a sortable one is a button that cycles its order. */
 export function SortHeaders<R>({
   columns,
@@ -26,7 +34,7 @@ export function SortHeaders<R>({
             <th
               key={column.label || "scope"}
               scope="col"
-              aria-sort={on ? (sort.descending ? "descending" : "ascending") : undefined}
+              aria-sort={on ? ariaSort(sort) : undefined}
             >
               {column.sort ? (
                 <button
@@ -36,7 +44,7 @@ export function SortHeaders<R>({
                 >
                   {column.label || <span className="visually-hidden">Scope</span>}
                   <span className={`sort-mark${on ? " on" : ""}`} aria-hidden="true">
-                    {on ? (sort.descending ? "↓" : "↑") : "↕"}
+                    {on ? sortMark(sort) : "↕"}
                   </span>
                 </button>
               ) : (

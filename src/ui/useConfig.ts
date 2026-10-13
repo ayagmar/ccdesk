@@ -28,12 +28,8 @@ export function useConfig(requested: string | null | undefined, profile: Session
   // differ (a trailing slash, a link), so the two are not compared.
   const [viewFor, setViewFor] = useState<string | null>(null);
   // undefined asks for the directory ccdesk was started in; null for no directory.
-  const dir =
-    requested !== undefined
-      ? requested
-      : overview.state === "ready"
-        ? overview.data.launchDir
-        : null;
+  const launchDir = overview.state === "ready" ? overview.data.launchDir : null;
+  const dir = requested === undefined ? launchDir : requested;
 
   const refreshOverview = useCallback(() => {
     api.overview().then(
@@ -60,10 +56,10 @@ export function useConfig(requested: string | null | undefined, profile: Session
 
   // Only the latest request may land, so a slow answer for a folder you left cannot replace the new one.
   const generation = useRef(0);
-  const load = useCallback((path: string, profile: SessionProfile, quietly: boolean) => {
+  const load = useCallback((path: string, asked: SessionProfile, quietly: boolean) => {
     const current = ++generation.current;
     if (!quietly) setView({ state: "loading" });
-    api.directory(path, profile).then(
+    api.directory(path, asked).then(
       (data) => {
         if (current !== generation.current) return;
         setView({ state: "ready", data });
@@ -150,9 +146,15 @@ export function useConfig(requested: string | null | undefined, profile: Session
     return () => stop.abort();
   }, [scanned]);
 
-  const data = useMemo(
+  const withUsage = useMemo(
     () => (scanned && usage?.path === scanned.path ? { ...scanned, usage: usage.data } : scanned),
     [scanned, usage]
   );
-  return { overview, view: reference.state === "error" ? reference : view, data, dir, reload };
+  return {
+    overview,
+    view: reference.state === "error" ? reference : view,
+    data: withUsage,
+    dir,
+    reload,
+  };
 }

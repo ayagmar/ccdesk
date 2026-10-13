@@ -1,6 +1,6 @@
 type DiffLine = { kind: "same" | "add" | "remove"; text: string };
 
-function lines(text: string): string[] {
+function splitLines(text: string): string[] {
   return text === "" ? [] : text.replace(/\n$/, "").split("\n");
 }
 
@@ -12,8 +12,8 @@ const MAX_CELLS = 4_000_000;
  * longest common subsequence, unless it is too large for that.
  */
 export function diffLines(before: string, after: string): DiffLine[] {
-  const a = lines(before);
-  const b = lines(after);
+  const a = splitLines(before);
+  const b = splitLines(after);
   let start = 0;
   while (start < a.length && start < b.length && a[start] === b[start]) start++;
   let end = 0;
@@ -40,7 +40,7 @@ function middle(a: string[], b: string[]): DiffLine[] {
   const width = b.length + 1;
   // lcs[i * width + j] is the common length of a[i..] and b[j..].
   const lcs = new Int32Array((a.length + 1) * width);
-  const at = (i: number, j: number) => lcs[i * width + j] ?? 0;
+  const at = (row: number, col: number) => lcs[row * width + col] ?? 0;
   for (let i = a.length - 1; i >= 0; i--) {
     for (let j = b.length - 1; j >= 0; j--) {
       lcs[i * width + j] =
