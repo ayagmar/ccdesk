@@ -31,7 +31,14 @@ const backupManifest = Compile(BackupManifestSchema);
 async function readManifest(env: ScanEnv, id: string): Promise<BackupManifest | null> {
   // ccdesk's ids are letters, digits and dashes, so no id can name a folder outside the root.
   if (!/^[\w-]+$/.test(id)) return null;
-  const text = await readIfExists(env, join(backupRoot(env), id, MANIFEST)).catch(() => null);
+  let text: string | null;
+  try {
+    text = await readIfExists(env, join(backupRoot(env), id, MANIFEST));
+  } catch (error) {
+    // A stray file in the backup folder is not a backup; a folder ccdesk cannot read is an error.
+    if ((error as NodeJS.ErrnoException).code === "ENOTDIR") return null;
+    throw error;
+  }
   if (text === null) return null;
   let data: unknown;
   try {
@@ -42,12 +49,25 @@ async function readManifest(env: ScanEnv, id: string): Promise<BackupManifest | 
   return backupManifest.Check(data) ? data : null;
 }
 
+/**
+ * Backup folder names, newest first. No folder yet means no changes; one ccdesk cannot read, such
+ * as one a `sudo ccdesk` left owned by root, is an error rather than an empty list.
+ */
+async function backupIds(env: ScanEnv): Promise<string[]> {
+  try {
+    return (await readdir(backupRoot(env))).sort().reverse();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+}
+
 /** The changes ccdesk made, newest first, a page at a time. */
 export async function listBackups(
   env: ScanEnv,
   { before, limit }: { before?: string; limit: number }
 ): Promise<{ changes: BackupSummary[]; more: boolean }> {
-  const ids = (await readdir(backupRoot(env)).catch((): string[] => [])).sort().reverse();
+  const ids = await backupIds(env);
   const changes: BackupSummary[] = [];
   for (const id of ids) {
     if (before !== undefined && id >= before) continue;
