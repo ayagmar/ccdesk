@@ -8,22 +8,38 @@ test("SchemaStore fills only documented keys the SDK lacks, and never replaces t
   const sdk = { model: { type: "string" } };
   const schemastore = {
     model: { type: "number" },
-    autoMode: { type: "object", description: "SchemaStore's own account" },
+    autoMode: {
+      type: "object",
+      description: "SchemaStore's own account",
+      properties: {
+        classifyAllShell: { type: "boolean", description: "UNDOCUMENTED. SchemaStore's guess" },
+        allow: { type: "array", description: "Allow rules" },
+      },
+    },
     retiredKey: { type: "boolean" },
   };
 
   const { properties, borrowed, uncovered } = borrowMissingKeys(sdk, schemastore, {
     model: "The model",
     autoMode: "Rules for the auto mode classifier",
+    "autoMode.classifyAllShell": "Send every shell command through the classifier",
     copyOnSelect: "Copy selected text",
   });
 
-  // The shape comes from SchemaStore; what the editor tells the user comes from the docs.
+  // The shape comes from SchemaStore; what the editor tells the user comes from the docs, down to
+  // the fields the docs describe. A field they do not describe keeps SchemaStore's text.
   assert.deepEqual(properties, {
     model: { type: "string" },
     autoMode: {
       type: "object",
       description: "Rules for the auto mode classifier",
+      properties: {
+        classifyAllShell: {
+          type: "boolean",
+          description: "Send every shell command through the classifier",
+        },
+        allow: { type: "array", description: "Allow rules" },
+      },
       $comment: BORROWED_NOTE,
     },
   });

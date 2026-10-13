@@ -19,22 +19,44 @@ type Properties = Record<string, Record<string, unknown>>;
 /**
  * The SDK's properties plus SchemaStore's definition of each documented key the SDK lacks, and the
  * documented keys neither defines. `documented` maps each documented key to its description in the
- * docs. A borrowed key that points elsewhere in SchemaStore's schema would not resolve in ours, so
- * it stops the run for a person to look at.
+ * docs, a field by its dotted name such as autoMode.classifyAllShell; a borrowed field the docs
+ * describe gets their text too. A borrowed key that points elsewhere in SchemaStore's schema would
+ * not resolve in ours, so it stops the run for a person to look at.
  */
 export function borrowMissingKeys(
   sdk: Properties,
   schemastore: Properties,
   documented: Record<string, string>
 ): { properties: Properties; borrowed: string[]; uncovered: string[] } {
-  const missing = Object.keys(documented).filter((key) => !Object.hasOwn(sdk, key));
+  const missing = Object.keys(documented).filter(
+    (key) => !key.includes(".") && !Object.hasOwn(sdk, key)
+  );
   const borrowed = missing.filter((key) => Object.hasOwn(schemastore, key));
   const properties = { ...sdk };
   for (const key of borrowed) {
     const definition = schemastore[key] as Record<string, unknown>;
     if (JSON.stringify(definition).includes('"$ref"'))
       throw new Error(`SchemaStore's ${key} uses $ref, which the generated schema cannot resolve.`);
-    properties[key] = { ...definition, description: documented[key], $comment: BORROWED_NOTE };
+    properties[key] = { ...describedByDocs(definition, key, documented), $comment: BORROWED_NOTE };
   }
   return { properties, borrowed, uncovered: missing.filter((key) => !borrowed.includes(key)) };
+}
+
+/** A definition with the docs' description for it and for each field the docs describe. */
+function describedByDocs(
+  definition: Record<string, unknown>,
+  name: string,
+  documented: Record<string, string>
+): Record<string, unknown> {
+  const described: Record<string, unknown> = { ...definition };
+  if (Object.hasOwn(documented, name)) described.description = documented[name];
+  const fields = definition.properties as Properties | undefined;
+  if (fields)
+    described.properties = Object.fromEntries(
+      Object.entries(fields).map(([field, schema]) => [
+        field,
+        describedByDocs(schema, `${name}.${field}`, documented),
+      ])
+    );
+  return described;
 }
