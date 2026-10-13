@@ -12,11 +12,9 @@ import {
 } from "node:fs";
 import { type AddressInfo } from "node:net";
 import { join } from "node:path";
-import { after, before, test } from "node:test";
-import { createCore } from "../src/core/index.ts";
-import { revisionOf } from "../src/core/scan/files.ts";
+import { after, before, beforeEach, test } from "node:test";
+import { createCore, RefusedError, revisionOf } from "../src/core/index.ts";
 import { createCcdeskServer } from "../src/server/server.ts";
-import { RefusedError } from "../src/core/write.ts";
 import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
 const TOKEN = "test-token";
@@ -50,8 +48,12 @@ interface RestorePreview {
 let fixture: Fixture;
 let server: ReturnType<typeof createCcdeskServer>;
 let base: string;
+/** The files the current test opened in the editor. */
 const opened: string[] = [];
-/** The claude commands ccdesk ran; each entry in failing makes the next such command fail once. */
+/**
+ * The claude commands the current test ran; each entry in failing makes the next such command
+ * fail once.
+ */
 const claudeRuns: Array<{ args: string[]; cwd: string }> = [];
 const failing: string[] = [];
 
@@ -78,6 +80,22 @@ before(async () => {
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 after(() => server.close());
+// The tests share one server, so what one test opened or ran must not show up in the next.
+beforeEach(() => {
+  opened.length = 0;
+  claudeRuns.length = 0;
+  failing.length = 0;
+});
+
+/**
+ * ~/.claude/.credentials.json, removed first: tests turn it into a link or a hard link, and writing
+ * to it would then change the file it links to.
+ */
+function freshCredentials(): string {
+  const path = join(fixture.env.claudeDir, ".credentials.json");
+  rmSync(path, { force: true });
+  return path;
+}
 
 // The hermetic setup blocks fetch, so tests talk to the loopback server with node:http.
 async function call(
@@ -109,6 +127,12 @@ async function call(
     req.on("error", reject);
     req.end(payload);
   });
+}
+
+/** Checks a request was refused and why, so a refusal for another reason fails the test. */
+function assertRefused(res: { status: number; json: unknown }, status: number, reason: RegExp) {
+  assert.equal(res.status, status);
+  assert.match((res.json as { error: string }).error, reason);
 }
 
 function seedMemory() {
@@ -156,18 +180,19 @@ async function saveSetting(edit: Record<string, unknown>) {
 
 test("API calls without the session token are refused", async () => {
   const res = await call("/api/overview", { headers: { "x-ccdesk-token": "wrong" } });
-  assert.equal(res.status, 401);
+  assertRefused(res, 401, /Missing or wrong token/);
 });
 
 test("requests addressed to another host name are refused (DNS rebinding)", async () => {
   const res = await call("/api/overview", { headers: { host: "evil.example:80" } });
-  assert.equal(res.status, 421);
+  assertRefused(res, 421, /Unexpected host/);
 });
 
 test("the page gets the settings schema, catalog and hook events from the server, behind the token", async () => {
-  assert.equal(
-    (await call("/api/reference", { headers: { "x-ccdesk-token": "wrong" } })).status,
-    401
+  assertRefused(
+    await call("/api/reference", { headers: { "x-ccdesk-token": "wrong" } }),
+    401,
+    /Missing or wrong token/
   );
   const res = await call("/api/reference");
   assert.equal(res.status, 200);
@@ -218,7 +243,7 @@ test("a memory that changed since you looked at it is not deleted", async () => 
     body: { action: "delete", path: old, revision },
   });
 
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /changed since you reviewed this/);
   assert.match(readFileSync(old, "utf8"), /rewritten by Claude/);
 });
 
@@ -226,10 +251,12 @@ test("only memory topic files can be deleted", async () => {
   const { dir } = seedMemory();
   const outside = fixture.write("home/.claude/settings.json", "{}");
 
-  for (const path of [`${dir}/MEMORY.md`, outside, `${dir}/../../../settings.json`]) {
-    const res = await deleteMemory(path);
-    assert.equal(res.status, 409, path);
-  }
+  const refused: [string, RegExp][] = [
+    [`${dir}/MEMORY.md`, /MEMORY\.md is the index Claude maintains/],
+    [outside, /only changes auto memory under ~\/\.claude\/projects/],
+    [`${dir}/../../../settings.json`, /only changes auto memory under ~\/\.claude\/projects/],
+  ];
+  for (const [path, reason] of refused) assertRefused(await deleteMemory(path), 409, reason);
   assert.equal(existsSync(`${dir}/MEMORY.md`), true);
   assert.equal(existsSync(outside), true);
 });
@@ -242,7 +269,7 @@ test("a mutation from another web origin is refused", async () => {
     body: { action: "delete", path: old, revision },
     headers: { origin: "https://evil.example" },
   });
-  assert.equal(res.status, 403);
+  assertRefused(res, 403, /Cross-origin request refused/);
   assert.equal(existsSync(old), true);
 });
 
@@ -302,7 +329,7 @@ test("a settings value of the wrong type is reported and cannot be saved", async
 
   const { revision } = preview.json as Preview;
   const saved = await call("/api/settings/save", { method: "POST", body: { ...edit, revision } });
-  assert.equal(saved.status, 409);
+  assertRefused(saved, 409, /effortLevel must be equal to one of the allowed values/);
   assert.equal(readFileSync(file, "utf8"), "{}");
 });
 
@@ -315,22 +342,28 @@ test("saving refuses when the file changed after it was reviewed", async () => {
 
   fixture.json("work/raced/.claude/settings.json", { model: "haiku" });
   const saved = await call("/api/settings/save", { method: "POST", body: { ...edit, revision } });
-  assert.equal(saved.status, 409);
+  assertRefused(saved, 409, /changed since you reviewed this edit/);
   assert.deepEqual(JSON.parse(readFileSync(file, "utf8")), { model: "haiku" });
 });
 
 test("settings ccdesk cannot see or may not change are refused", async () => {
   const dir = fixture.at("work/guarded");
   fixture.json("work/guarded/.claude/settings.json", { env: { TOKEN: "secret" } });
-  const refused = [
-    { scope: "project", key: "env", value: {} },
-    { scope: "managed", key: "model", value: "opus" },
-    { scope: "project", key: "notARealSetting", value: 1 },
-    { scope: "local", key: "model", value: "opus", dir: fixture.at("work/missing") },
+  const refused: [Record<string, unknown>, RegExp][] = [
+    [{ scope: "project", key: "env", value: {} }, /env holds hidden values/],
+    [{ scope: "managed", key: "model", value: "opus" }, /set by your organisation/],
+    [
+      { scope: "project", key: "notARealSetting", value: 1 },
+      /not in Claude Code's settings schema/,
+    ],
+    [
+      { scope: "local", key: "model", value: "opus", dir: fixture.at("work/missing") },
+      /is not a directory on this machine/,
+    ],
   ];
-  for (const edit of refused) {
+  for (const [edit, reason] of refused) {
     const res = await call("/api/settings/preview", { method: "POST", body: { dir, ...edit } });
-    assert.equal(res.status, 409, edit.key);
+    assertRefused(res, 409, reason);
   }
 });
 
@@ -367,8 +400,10 @@ test("only index lines whose file is gone are removed, and only from the MEMORY.
   assert.equal(removed.status, 200);
   assert.equal(readFileSync(indexPath, "utf8"), "- [Here](here.md) — ok\n");
 
+  // Another line whose file is gone, added after the review: the reviewed removal is out of date.
+  fixture.write(indexPath, "- [Here](here.md) — ok\n- [Lost](lost.md) — deleted too\n");
   const stale = await call("/api/memory/change", { method: "POST", body });
-  assert.equal(stale.status, 409);
+  assertRefused(stale, 409, /changed since you reviewed this/);
 });
 
 test("index changes are refused outside a memory folder's MEMORY.md", async () => {
@@ -376,13 +411,13 @@ test("index changes are refused outside a memory folder's MEMORY.md", async () =
 
   const res = await changeMemory("remove-dead", target);
 
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /Only a memory folder's MEMORY\.md can be changed/);
   assert.equal(readFileSync(target, "utf8"), "keep me\n");
 });
 
 test("a file opens in the editor, but credentials and missing files do not", async () => {
   const file = fixture.write("home/.claude/CLAUDE.md", "x\n");
-  const credentials = fixture.write("home/.claude/.credentials.json", "{}");
+  const credentials = fixture.write(freshCredentials(), "{}");
 
   const ok = await call("/api/open", { method: "POST", body: { path: file } });
   const secret = await call("/api/open", { method: "POST", body: { path: credentials } });
@@ -394,8 +429,8 @@ test("a file opens in the editor, but credentials and missing files do not", asy
   const folder = await call("/api/open", { method: "POST", body: { path: fixture.at("home") } });
 
   assert.equal(ok.status, 200);
-  assert.equal(secret.status, 409);
-  assert.equal(missing.status, 409);
+  assertRefused(secret, 409, /does not open credentials/);
+  assertRefused(missing, 409, /no longer exists/);
   assert.equal(folder.status, 200, "a plugin's folder opens too");
   assert.deepEqual(opened, [file, fixture.at("home")]);
 });
@@ -425,7 +460,7 @@ test("an edit cannot add env or header values, which ccdesk never shows", async 
     body: { dir, scope: "project", key: "env", value: { TOKEN: "x" } },
   });
 
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /env holds hidden values/);
 });
 
 test("saving a settings file that is a symlink updates the linked file and keeps the link", async () => {
@@ -461,6 +496,8 @@ test("two saves reviewed against the same file: the second is refused, not lost"
   ]);
 
   assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
+  for (const res of results)
+    if (res.status === 409) assertRefused(res, 409, /changed since you reviewed this edit/);
   const written = JSON.parse(readFileSync(file, "utf8"));
   assert.equal(
     results[0]?.status === 200 ? written.model : written.effortLevel,
@@ -476,7 +513,7 @@ test("undoing an index change is refused when MEMORY.md changed again since", as
 
   fixture.write(`${dir}/MEMORY.md`, `${readFileSync(`${dir}/MEMORY.md`, "utf8")}- [new](new.md)\n`);
 
-  assert.equal((await undo(added)).status, 409);
+  assertRefused(await undo(added), 409, /changed since you reviewed this restore/);
   assert.match(readFileSync(`${dir}/MEMORY.md`, "utf8"), /new\.md/);
 });
 
@@ -497,7 +534,7 @@ test("an unreadable MEMORY.md is left alone instead of being replaced", {
 });
 
 test("a link to the credentials file is never opened", async () => {
-  const credentials = fixture.write("home/.claude/.credentials.json", "{}");
+  const credentials = fixture.write(freshCredentials(), "{}");
   fixture.link("home/notes.md", credentials);
 
   const res = await call("/api/open", {
@@ -505,19 +542,18 @@ test("a link to the credentials file is never opened", async () => {
     body: { path: fixture.at("home/notes.md") },
   });
 
-  assert.equal(res.status, 409);
-  assert.equal(opened.includes(fixture.at("home/notes.md")), false);
+  assertRefused(res, 409, /does not open credentials/);
+  assert.deepEqual(opened, []);
 });
 
 test("credentials kept under another name are never opened by that name", async () => {
   const tokens = fixture.write("home/.claude/token-store.json", '{"accessToken":"x"}');
-  rmSync(join(fixture.env.claudeDir, ".credentials.json"), { force: true });
-  fixture.link("home/.claude/.credentials.json", tokens);
+  fixture.link(freshCredentials(), tokens);
 
   const res = await call("/api/open", { method: "POST", body: { path: tokens } });
 
-  assert.equal(res.status, 409);
-  assert.equal(opened.includes(tokens), false);
+  assertRefused(res, 409, /does not open credentials/);
+  assert.deepEqual(opened, []);
 });
 
 test("a forged backup cannot restore over a file ccdesk does not change", async () => {
@@ -537,7 +573,7 @@ test("a forged backup cannot restore over a file ccdesk does not change", async 
     body: { id: "forged", revision: revisionOf("mine\n") },
   });
 
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /does not point at a settings file/);
   assert.equal(readFileSync(claudeMd, "utf8"), "mine\n");
 });
 
@@ -615,7 +651,7 @@ test("a restore is refused when the file changed after it was reviewed", async (
     body: { id, revision: shown.revision },
   });
 
-  assert.equal(restored.status, 409);
+  assertRefused(restored, 409, /changed since you reviewed this restore/);
   assert.equal(JSON.parse(readFileSync(file, "utf8")).model, "haiku");
 });
 
@@ -694,7 +730,7 @@ test("a delete that stopped halfway after Claude rewrote the memory can still pu
 
 test("a backup id cannot reach outside the backup folder", async () => {
   const res = await call("/api/backups/preview", { method: "POST", body: { id: "../../etc" } });
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /gone or was not made by ccdesk/);
 });
 
 /** Reviews a restore, then makes it with the reviewed revision, as Recent changes does. */
@@ -743,7 +779,7 @@ test("a file ccdesk created is not removed once something else changed it", asyn
   const { preview, res } = await restoreReviewed(id);
 
   assert.match(preview.blocked ?? "", /changed after ccdesk created it/);
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /changed after ccdesk created it/);
   assert.equal(readFileSync(file, "utf8"), '{ "model": "opus", "effortLevel": "high" }\n');
 });
 
@@ -784,7 +820,7 @@ test("comparing two directories lists each key's value in both, with the files t
   assert.equal(byKey.get("env")?.a, null);
   assert.doesNotMatch(JSON.stringify(res.json), /compare-secret/);
   const relative = await call("/api/compare?a=work&b=other");
-  assert.equal(relative.status, 400);
+  assertRefused(relative, 400, /a must be an absolute path/);
 });
 
 test("settings that differ only in the order of their keys compare the same", async () => {
@@ -824,7 +860,8 @@ test("a permission rule is moved in the file it is in, and a rule that is gone i
     method: "POST",
     body: { ...edit, revision },
   });
-  assert.equal(stale.status, 409, "a rule added meanwhile is not lost");
+  // Refused, so the rule added meanwhile is not lost.
+  assertRefused(stale, 409, /changed since you reviewed this edit/);
 
   const fresh = (await call("/api/permissions/preview", { method: "POST", body: edit }))
     .json as Preview;
@@ -839,7 +876,7 @@ test("a permission rule is moved in the file it is in, and a rule that is gone i
   });
 
   const again = await call("/api/permissions/preview", { method: "POST", body: edit });
-  assert.equal(again.status, 409);
+  assertRefused(again, 409, /is no longer in allow in this file/);
 });
 
 test("an edit cannot name an inherited object key or a settings file Claude Code does not read", async () => {
@@ -854,12 +891,12 @@ test("an edit cannot name an inherited object key or a settings file Claude Code
     body: { dir, file: fixture.at("home/.bashrc"), add: { list: "allow", rule: "Read" } },
   });
 
-  assert.equal(proto.status, 409);
-  assert.equal(elsewhere.status, 409);
+  assertRefused(proto, 409, /__proto__ is not in Claude Code's settings schema/);
+  assertRefused(elsewhere, 409, /not a settings file Claude Code reads here/);
 });
 
 test("a settings file that links to the credentials file is never written", async () => {
-  const credentials = fixture.write("home/.claude/.credentials.json", '{"token":"x"}');
+  const credentials = fixture.write(freshCredentials(), '{"token":"x"}');
   fixture.link("work/sneaky/.claude/settings.json", credentials);
 
   const edit = { dir: fixture.at("work/sneaky"), scope: "project", key: "model", value: "opus" };
@@ -869,8 +906,8 @@ test("a settings file that links to the credentials file is never written", asyn
     body: { ...edit, revision: revisionOf('{"token":"x"}') },
   });
 
-  assert.equal(preview.status, 409);
-  assert.equal(save.status, 409);
+  assertRefused(preview, 409, /does not read or change Claude Code's credentials/);
+  assertRefused(save, 409, /does not read or change Claude Code's credentials/);
   assert.equal(readFileSync(credentials, "utf8"), '{"token":"x"}');
 });
 
@@ -888,8 +925,7 @@ test("a settings file with another hard link is not saved, so the two names keep
     value: "opus",
   });
 
-  assert.equal(res.status, 409);
-  assert.match((res.json as { error: string }).error, /hard links/);
+  assertRefused(res, 409, /hard links/);
   assert.equal(readFileSync(settings, "utf8"), untouched);
   assert.equal(lstatSync(settings).ino, lstatSync(shared).ino);
 });
@@ -906,7 +942,7 @@ test("a settings file that links to ~/.claude.json is never written", async () =
 
   const saved = await saveSetting(edit);
 
-  assert.equal(saved.status, 409);
+  assertRefused(saved, 409, /does not change ~\/\.claude\.json/);
   assert.deepEqual(JSON.parse(readFileSync(state, "utf8")), { projects: {} });
 });
 
@@ -918,7 +954,7 @@ test("a MEMORY.md that links outside its memory folder is never rewritten", asyn
 
   const res = await changeMemory("add", lost);
 
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /links outside its memory folder/);
   assert.equal(readFileSync(notes, "utf8"), "my own notes\n");
 });
 
@@ -945,7 +981,7 @@ test("adding a memory to MEMORY.md is refused when its description changed after
     body: { action: "add", path: lost, revision },
   });
 
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /changed since you reviewed this/);
   assert.equal(readFileSync(`${dir}/MEMORY.md`, "utf8"), "");
 });
 
@@ -964,8 +1000,8 @@ test("restoring a MEMORY.md backup never writes through a link out of its memory
     body: { id, revision: revisionOf("my own notes\n") },
   });
 
-  assert.equal(preview.status, 409);
-  assert.equal(restore.status, 409);
+  assertRefused(preview, 409, /links outside its memory folder/);
+  assertRefused(restore, 409, /links outside its memory folder/);
   assert.equal(readFileSync(notes, "utf8"), "my own notes\n");
 });
 
@@ -980,7 +1016,7 @@ test("a settings link that ends at ~/.claude.json's real file is never written",
   const saved = await saveSetting(edit);
 
   rmSync(fixture.env.claudeJson);
-  assert.equal(saved.status, 409);
+  assertRefused(saved, 409, /does not change ~\/\.claude\.json/);
   assert.deepEqual(JSON.parse(readFileSync(state, "utf8")), { projects: {} });
 });
 
@@ -1035,7 +1071,7 @@ test("a restore that would put back an env value changed since the backup is ref
   });
 
   assert.ok(preview.blocked);
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /Hidden values in this file .* changed since the backup/);
   assert.equal(JSON.parse(readFileSync(file, "utf8")).env.API_KEY, "new");
 });
 
@@ -1070,7 +1106,7 @@ test("adding a permission rule the file already has changes nothing", async () =
     body: { dir, file, add: { list: "allow", rule: "Read" } },
   });
 
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /already says that/);
   assert.equal(readFileSync(file, "utf8"), untouched);
 });
 
@@ -1082,7 +1118,7 @@ test("undoing a memory delete is refused when MEMORY.md changed since", async ()
     "- [Keep](keep.md) — stays\n- [New](new.md) — added by Claude\n"
   );
 
-  assert.equal((await undo(deleted)).status, 409);
+  assertRefused(await undo(deleted), 409, /changed since you reviewed this restore/);
   assert.equal(existsSync(old), false);
 });
 
@@ -1135,9 +1171,9 @@ test("a key in a URL inside settings never reaches the page, its diffs or its re
 
 test("credentials that are themselves a link are never read through another link", async () => {
   fixture.write("home/.claude/tokens.json", '{"accessToken":"oauth-secret"}');
-  rmSync(join(fixture.env.claudeDir, ".credentials.json"), { force: true });
-  fixture.link("home/.claude/.credentials.json", join(fixture.env.claudeDir, "tokens.json"));
-  fixture.link("work/linked-creds/CLAUDE.md", join(fixture.env.claudeDir, ".credentials.json"));
+  const credentials = freshCredentials();
+  fixture.link(credentials, join(fixture.env.claudeDir, "tokens.json"));
+  fixture.link("work/linked-creds/CLAUDE.md", credentials);
 
   const view = await call(
     `/api/directory?path=${encodeURIComponent(fixture.at("work/linked-creds"))}`
@@ -1149,8 +1185,7 @@ test("credentials that are themselves a link are never read through another link
 
 test("credentials hard-linked under another name are never read, changed or removed", async () => {
   const token = '{"accessToken":"hardlinked-secret"}';
-  rmSync(join(fixture.env.claudeDir, ".credentials.json"), { force: true });
-  const credentials = fixture.write("home/.claude/.credentials.json", token);
+  const credentials = fixture.write(freshCredentials(), token);
   const claudeMd = fixture.at("work/hardlinked/CLAUDE.md");
   const settings = fixture.at("work/hardlinked/.claude/settings.json");
   const memory = join(memoryDirFor(fixture, fixture.at("work/hardlinked")), "notes.md");
@@ -1174,7 +1209,9 @@ test("credentials hard-linked under another name are never read, changed or remo
 
   assert.equal(view.status, 200);
   assert.doesNotMatch(JSON.stringify(view.json), /hardlinked-secret/);
-  for (const res of [save, removal, opening]) assert.equal(res.status, 409);
+  assertRefused(save, 409, /does not read or change Claude Code's credentials/);
+  assertRefused(removal, 409, /does not read or change Claude Code's credentials/);
+  assertRefused(opening, 409, /does not open credentials/);
   for (const path of [credentials, claudeMd, settings, memory])
     assert.equal(readFileSync(path, "utf8"), token);
 });
@@ -1298,7 +1335,7 @@ test("a hook that changed in the file since the scan is not removed", async () =
     file,
     remove: { event: hook.event, at: hook.at, definition: hook.definition },
   });
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /This hook changed in the file since ccdesk read it/);
   assert.match(readFileSync(file, "utf8"), /rm -rf build/);
 });
 
@@ -1311,12 +1348,17 @@ test("a hook Claude Code's schema rejects, or an unknown event, is not saved", a
     body: { dir, file, add: { event: "Stop", definition: { type: "command" } } },
   });
   assert.equal(preview.status, 200);
-  assert.ok((preview.json as Preview).errors.length > 0, "a command hook needs its command");
+  assert.ok(
+    (preview.json as Preview).errors.includes(
+      "hooks.Stop.0.hooks.0 must have required property 'command'"
+    ),
+    "a command hook needs its command"
+  );
   const unknown = await call("/api/hooks/preview", {
     method: "POST",
     body: { dir, file, add: { event: "BeforeLunch", definition: command("x") } },
   });
-  assert.equal(unknown.status, 400);
+  assertRefused(unknown, 400, /BeforeLunch is not a hook event Claude Code knows/);
   assert.equal(readFileSync(file, "utf8"), "{}");
 });
 
@@ -1351,7 +1393,7 @@ test("a hook that sends hidden header values is never rewritten, but others in i
     remove: { event: http.event, at: http.at, definition: http.definition },
     add: { event: "Stop", definition: { ...(http.definition as object), timeout: 5 } },
   });
-  assert.equal(changed.status, 409);
+  assertRefused(changed, 409, /sends header values ccdesk does not show/);
   assert.match(readFileSync(file, "utf8"), /s3cret/);
   assert.doesNotMatch(readFileSync(file, "utf8"), /•••/);
 });
@@ -1378,7 +1420,7 @@ test("a hook is not replaced by one that sends header values ccdesk would hide",
       },
     },
   });
-  assert.equal(replaced.status, 409);
+  assertRefused(replaced, 409, /does not write header values it would then hide/);
   assert.equal(readFileSync(file, "utf8"), untouched);
 });
 
@@ -1546,7 +1588,7 @@ test("a server that cannot start is not saved, and no name is taken twice", asyn
     scope: "project",
     add: { name: "docs", definition: { command: "other" } },
   });
-  assert.equal(taken.status, 409);
+  assertRefused(taken, 409, /already a server named docs/);
 });
 
 test("a server with hidden env values is not rewritten, but can be removed", async () => {
@@ -1567,7 +1609,7 @@ test("a server with hidden env values is not rewritten, but can be removed", asy
     remove: { name: "db", definition: db.definition },
     add: { name: "db", definition: db.definition },
   });
-  assert.equal(rewritten.status, 409);
+  assertRefused(rewritten, 409, /db has values ccdesk does not show/);
   assert.match(readFileSync(file, "utf8"), /s3cret/, "the password is never replaced by its mask");
 
   const removed = await saveMcp({
@@ -1612,7 +1654,7 @@ test("keys in a server's args are hidden, and such a server is not rewritten", a
 
   assert.doesNotMatch(JSON.stringify(view.json), /secret/);
   assert.equal(api.target, "npx -y some-mcp --api-key ••• --token=••• ••• --port 8080");
-  assert.equal(rewritten.status, 409);
+  assertRefused(rewritten, 409, /api has values ccdesk does not show/);
   assert.equal(readFileSync(file, "utf8"), untouched);
   assert.equal(userAdd.status, 200);
   assert.doesNotMatch(JSON.stringify(userAdd.json), /secret/);
@@ -1635,7 +1677,7 @@ test("a restore that would bring back a different key in a server's args is refu
   const { preview, res } = await restoreReviewed((added.json as Change).id);
 
   assert.match(preview.blocked ?? "", /Hidden values/);
-  assert.equal(res.status, 409);
+  assertRefused(res, 409, /Hidden values in this file .* changed since the backup/);
   assert.match(readFileSync(file, "utf8"), /rotated-key/);
 });
 
@@ -1650,7 +1692,6 @@ test("user and local servers are changed through claude mcp, never by writing ~/
     })
   );
   const untouched = readFileSync(fixture.env.claudeJson, "utf8");
-  claudeRuns.length = 0;
 
   const replaced = await saveMcp({
     dir,
@@ -1761,7 +1802,7 @@ test("claude mcp edits are listed in recent changes with values hidden, and are 
       method: "POST",
       body: { id: b.id, revision: "any" },
     });
-    assert.equal(restore.status, 409);
+    assertRefused(restore, 409, /through claude mcp, so ccdesk cannot undo it/);
   }
 });
 
@@ -1774,7 +1815,6 @@ test("a local server added from a repository subdirectory is added from the repo
     fixture.env.claudeJson,
     JSON.stringify({ projects: { [dir]: { mcpServers: { stale: { command: "stale" } } } } })
   );
-  claudeRuns.length = 0;
 
   const added = await saveMcp({
     dir,
@@ -1802,7 +1842,6 @@ test("removing a user server is refused when its hidden values changed after the
   const servers = (token: string) =>
     JSON.stringify({ mcpServers: { api: { command: "api-mcp", env: { TOKEN: token } } } });
   fixture.write(fixture.env.claudeJson, servers("old-token"));
-  claudeRuns.length = 0;
   const edit = {
     dir,
     scope: "user",
@@ -1817,7 +1856,7 @@ test("removing a user server is refused when its hidden values changed after the
     method: "POST",
     body: { ...edit, revision: (preview.json as Preview).revision },
   });
-  assert.equal(saved.status, 409);
+  assertRefused(saved, 409, /servers changed since you reviewed this edit/);
   assert.deepEqual(claudeRuns, [], "claude mcp remove did not run");
 });
 
@@ -1827,7 +1866,6 @@ test("a replaced server goes back as it was when claude refuses the new one", as
     fixture.env.claudeJson,
     JSON.stringify({ mcpServers: { notes: { command: "notes-mcp" } } })
   );
-  claudeRuns.length = 0;
   failing.push("add-json");
 
   const refused = await saveMcp({
@@ -1836,7 +1874,7 @@ test("a replaced server goes back as it was when claude refuses the new one", as
     remove: { name: "notes", definition: { command: "notes-mcp" } },
     add: { name: "notes", definition: { command: "notes-mcp", args: ["--v2"] } },
   });
-  assert.equal(refused.status, 409);
+  assertRefused(refused, 409, /claude add-json failed/);
   assert.deepEqual(
     claudeRuns.map((r) =>
       r.args.slice(1).filter((a) => a !== "--scope" && a !== "user" && a !== "--")
@@ -1868,7 +1906,7 @@ test("a replaced server that cannot be put back comes with a command that restor
     remove: { name: "notes", definition: original },
     add: { name: "notes", definition: { command: "node", args: ["--v2"] } },
   });
-  assert.equal(refused.status, 409);
+  assertRefused(refused, 409, /could not add it back/);
   const putBack = /put it back with: (.*) \(/.exec((refused.json as { error: string }).error)?.[1];
   assert.ok(putBack);
 
@@ -1964,13 +2002,20 @@ test("a new agent's file name may be typed with .md, and gets only one", async (
 
 test("an agent file Claude Code would skip is not saved", async () => {
   const dir = fixture.at("work/agents-invalid");
-  for (const text of [
-    "---\ndescription: no name\n---\nx\n",
-    "---\nname: plain\n---\nno description\n",
-    agentText("my-plugin:reviewer", "a plugin-scoped name"),
-  ]) {
+  const skipped: [string, string][] = [
+    ["---\ndescription: no name\n---\nx\n", "The frontmatter needs a name."],
+    [
+      "---\nname: plain\n---\nno description\n",
+      "The frontmatter needs a description: when Claude should use this agent.",
+    ],
+    [
+      agentText("my-plugin:reviewer", "a plugin-scoped name"),
+      "A name has at most 256 characters, no ':' and does not start with '-'.",
+    ],
+  ];
+  for (const [text, error] of skipped) {
     const res = await saveAgent({ dir, create: { scope: "user", file: "bad" }, text });
-    assert.ok((res.json as Preview).errors.length > 0, text);
+    assert.deepEqual((res.json as Preview).errors, [error], text);
   }
   assert.equal(existsSync(join(fixture.env.claudeDir, "agents", "bad.md")), false);
 });
@@ -1983,7 +2028,9 @@ test("an agent is not saved with header values its review would hide", async () 
   const res = await saveAgent({ dir, create: { scope: "user", file: "api" }, text });
 
   assert.equal(existsSync(join(fixture.env.claudeDir, "agents", "api.md")), false);
-  assert.ok((res.json as Preview).errors.length > 0);
+  assert.deepEqual((res.json as Preview).errors, [
+    "ccdesk does not write env, header or URL values it would then hide; add them in your editor instead.",
+  ]);
   assert.doesNotMatch(JSON.stringify(res.json), /s3cret/);
 });
 
@@ -1992,12 +2039,12 @@ test("only agents shown here can be changed, and a new one cannot leave its agen
   const other = fixture.write("work/elsewhere/notes.md", "keep me\n");
 
   const outside = await saveAgent({ dir, path: other, text: agentText("x", "y") });
-  assert.equal(outside.status, 409);
+  assertRefused(outside, 409, /That agent is no longer here/);
   const escaping = await saveAgent({
     dir,
     create: { scope: "user", file: "../../work/elsewhere/notes" },
     text: agentText("x", "y"),
   });
-  assert.equal(escaping.status, 409);
+  assertRefused(escaping, 409, /A file name has letters, digits/);
   assert.equal(readFileSync(other, "utf8"), "keep me\n");
 });
