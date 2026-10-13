@@ -987,3 +987,69 @@ test("a plugin's MCP server goes by its registered name plugin:<plugin>:<key> in
     ]
   );
 });
+
+test("MCP policy entries and server values match after variable expansion, each from its own environment", async () => {
+  const f = makeFixture();
+  // A ${NAME} reference, written without tripping the lint on template-like strings.
+  const ref = (name: string) => `\${${name}}`;
+  const env = {
+    ...f.env,
+    processEnv: { TOOLS: "/fake/tools", MCP_HOST: "evil.example", API_TOKEN: "fake-token-5" },
+  };
+  f.json("home/.claude/plugins/installed_plugins.json", {
+    plugins: { "kit@market": [{ scope: "user", installPath: f.at("plugins/kit") }] },
+  });
+  f.json("plugins/kit/.mcp.json", {
+    mcpServers: { srv: { command: `${ref("CLAUDE_PLUGIN_ROOT")}/srv` } },
+  });
+  f.json("home/.claude.json", {
+    mcpServers: {
+      expanded: { command: `${ref("TOOLS")}/bin/a`, args: ["--token", ref("API_TOKEN")] },
+      literal: { command: "/fake/tools/bin/b" },
+      filled: { command: "/fake/filled/c" },
+      kept: { command: `${ref("TOOLS")}/bin/kept` },
+      wide: { type: "http", url: "https://evil.example/mcp" },
+      docs: { type: "http", url: "https://docs.example/mcp" },
+    },
+  });
+  // A deny entry's variable with no startup value fills from your settings.
+  f.json("home/.claude/settings.json", {
+    env: { FILL_DIR: "/fake/filled" },
+    deniedMcpServers: [
+      { serverCommand: ["/fake/tools/bin/a", "--token", "fake-token-5"] },
+      { serverCommand: [`${ref("TOOLS")}/bin/b`] },
+      { serverCommand: [`${ref("FILL_DIR")}/c`] },
+      { serverCommand: [`${f.at("plugins/kit")}/srv`] },
+    ],
+  });
+  // An allow entry whose expansion changes its host is ignored.
+  f.json("etc/claude-code/managed-settings.json", {
+    allowedMcpServers: [
+      { serverUrl: `https://${ref("MCP_HOST")}/*` },
+      { serverUrl: "https://docs.example/*" },
+      ...["expanded", "literal", "filled", "kept"].map((serverName) => ({ serverName })),
+    ],
+  });
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(env, f.at("app"));
+
+  assert.deepEqual(
+    Object.fromEntries(view.inventory.mcpServers.map((s) => [s.name, s.note ?? s.status])),
+    {
+      expanded: "Blocked by deniedMcpServers",
+      literal: "Blocked by deniedMcpServers",
+      filled: "Blocked by deniedMcpServers",
+      kept: "active",
+      wide: "Not in allowedMcpServers",
+      docs: "active",
+      "plugin:kit:srv": "Blocked by deniedMcpServers",
+    }
+  );
+  // The page shows each value as written, never expanded.
+  assert.ok(!JSON.stringify(view).includes("/fake/tools/bin/kept"));
+  assert.match(
+    view.inventory.mcpServers.find((s) => s.name === "expanded")?.target ?? "",
+    /^\$\{TOOLS\}\/bin\/a /
+  );
+});
