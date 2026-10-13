@@ -22,12 +22,17 @@ export type {
 } from "./sections/types.ts";
 export {
   allowedValues,
+  asForm,
+  asJson,
   type Draft,
   type DraftObject,
   editKind,
   expects,
   type FieldKind,
   fieldKind,
+  type Form,
+  followFile,
+  formFor,
   fromDraft,
   parseJson,
   toDraft,
