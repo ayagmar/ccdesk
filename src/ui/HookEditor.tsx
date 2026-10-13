@@ -44,7 +44,7 @@ export function HookEditor({ view, hook, onSaved }: Props) {
   const review = () => {
     if (!file) return;
     const parsed = parseJson(text);
-    if ("error" in parsed) return change.fail(`The hook is not valid JSON: ${parsed.error}`);
+    if ("error" in parsed) return change.fail(parsed.error);
     const add = {
       event,
       ...(matcher.trim() ? { matcher: matcher.trim() } : {}),
