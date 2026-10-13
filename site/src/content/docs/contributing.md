@@ -16,7 +16,7 @@ pnpm check      # typecheck, lint, format check, tests, build
 
 `pnpm check` is what CI runs on Linux (Node 22 and 24), macOS and Windows. CI also packs the npm package, installs it into an empty folder, starts it in an empty home folder and loads the page, so a file missing from the package fails the build.
 
-Tests never touch your real `~/.claude`. Each test process gets a throwaway home folder, git configuration and environment, network access is blocked, and each test builds its own fixture.
+Tests never touch your real `~/.claude`. Each test process gets a throwaway home folder, git configuration and environment, network access is blocked, and each test builds its own fixture. `claude` and the editor resolve to stand-ins that fail without doing anything, so a test that wrongly uses your environment cannot start the real ones.
 
 ## How the code fits together
 
