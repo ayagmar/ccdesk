@@ -10,7 +10,7 @@ import {
   type Trust,
 } from "../../shared/types.ts";
 import { redactSecrets, shownUrl } from "../secrets.ts";
-import { localInConfigHome, type ScanEnv } from "./env.ts";
+import { type ScanEnv } from "./env.ts";
 import { readJsonOrReport, stringField, stringsIn, wildcard } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { claudeJsonKey } from "./git.ts";
@@ -242,6 +242,8 @@ interface Input {
   claudeJson: Record<string, unknown> | null;
   trust: Trust;
   profile: SessionProfile;
+  /** Whether a project or local file's grants wait for the trust dialog (see trustWaits). */
+  waitsForTrust: (scope: Scope, path: string) => boolean;
   /** Receives MCP files that are there but do not parse. */
   problems: Problem[];
 }
@@ -522,8 +524,10 @@ function policyOf(
 
 /**
  * The answers about a .mcp.json server, each with whether it counts here. A cloned repository
- * cannot approve its own servers: project and local approvals count once the folder is trusted,
- * your configuration home's own local file right away when started there (docs: mcp#project-server-approvals-and-workspace-trust).
+ * cannot approve its own servers: a project file's approvals count once the folder is trusted, and a
+ * local file's under the rule for its allow rules, which also covers a trusted parent folder,
+ * claude -p and your configuration home (docs: mcp#project-server-approvals-and-workspace-trust,
+ * permissions#when-your-local-settings-file-needs-trust).
  * A disabledMcpjsonServers entry in any file rejects the server. Your answers to the .mcp.json
  * prompt sit in the project entry: claude mcp list counts an enableAllProjectMcpServers there, and
  * claude mcp reset-project-choices clears it (v2.1.296).
@@ -532,11 +536,7 @@ function approvalAnswers(
   input: Input,
   project: Record<string, unknown>
 ): (name: string) => McpApproval[] {
-  const { env, projectDir, layers, trust } = input;
-  const approvalCounts = (scope: Scope, path: string) =>
-    (scope !== "project" && scope !== "local") ||
-    trust.trusted ||
-    (scope === "local" && localInConfigHome(env, projectDir, path));
+  const { env, layers, waitsForTrust } = input;
   const sources: Array<{
     source: McpApproval["source"];
     path: string;
@@ -547,7 +547,7 @@ function approvalAnswers(
   ];
   return (name) =>
     sources.flatMap(({ source, path, data }) => {
-      const counts = source === "claude-json" || approvalCounts(source, path);
+      const counts = source === "claude-json" || !waitsForTrust(source, path);
       const out: McpApproval[] = [];
       if (data.enableAllProjectMcpServers === true)
         out.push({ key: "enableAllProjectMcpServers", source, path, counts });

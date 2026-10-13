@@ -151,7 +151,7 @@ export interface EffectiveSetting {
   /** Values from lower layers that lost to `from`. */
   overridden: Array<{ scope: Scope; value: unknown }>;
   /** Values in files Claude Code does not read this key from. `from` is empty when all are. */
-  ignored: Array<{ scope: Scope; value: unknown; reason: string }>;
+  ignored: Array<{ scope: Scope; value: unknown; reason: string; waitsForTrust?: boolean }>;
   /** How this key resolves when that differs from plain precedence. */
   note?: string;
 }

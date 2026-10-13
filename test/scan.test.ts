@@ -721,6 +721,32 @@ test("an approval in settings.local.json waits until the folder is trusted", asy
   assert.equal(await status(), "active");
 });
 
+test("an untracked settings.local.json approval counts under a trusted parent folder and in claude -p; the project file's does not", async () => {
+  const f = makeFixture();
+  f.json("work/app/.mcp.json", {
+    mcpServers: { docs: { command: "docs-mcp" }, lib: { command: "lib-mcp" } },
+  });
+  f.json("work/app/.claude/settings.local.json", { enabledMcpjsonServers: ["docs"] });
+  f.json("work/app/.claude/settings.json", { enabledMcpjsonServers: ["lib"] });
+  const servers = async (profile: "interactive" | "print") =>
+    Object.fromEntries(
+      (await scanDirectory(f.env, f.at("work/app"), profile)).inventory.mcpServers.map((s) => [
+        s.name,
+        s.note ?? s.status,
+      ])
+    );
+
+  // claude -p counts as accepted, so it checks git and the untracked local file's approval counts.
+  const print = await servers("print");
+  assert.equal(print.docs, "active");
+  assert.match(print.lib ?? "", /claude -p connects/);
+
+  f.json("home/.claude.json", { projects: { [f.at("work")]: { hasTrustDialogAccepted: true } } });
+  const underParent = await servers("interactive");
+  assert.equal(underParent.docs, "active");
+  assert.match(underParent.lib ?? "", /counts once you trust this folder/);
+});
+
 test("a project agent file Claude Code skips does not hide your agent of the same name", async () => {
   const f = makeFixture();
   f.write(

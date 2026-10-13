@@ -15,7 +15,7 @@ import { isFile, listDir, readJsonObject } from "./files.ts";
 import { mainWorktreeRoot } from "./git.ts";
 import { repairManaged } from "./managed-repair.ts";
 import { type Dropped, sandboxFilter } from "./sandbox.ts";
-import { envFilter } from "./settings-env.ts";
+import { envFilter, heldForTrust } from "./settings-env.ts";
 import { hasSchemaType, validatorFor } from "./settings-schema.ts";
 
 /** Lowest precedence first, so later layers override earlier ones. */
@@ -80,9 +80,12 @@ function withoutIgnoredFields(
   scope: Scope,
   value: unknown,
   raw: unknown,
-  filterSandbox: ReturnType<typeof sandboxFilter>
+  filterSandbox: ReturnType<typeof sandboxFilter>,
+  envHeld: boolean
 ): { value: unknown; dropped: Dropped[] } {
   if (key === "sandbox") return filterSandbox(scope, value);
+  if (key === "env" && envHeld && (scope === "project" || scope === "local"))
+    return heldForTrust(envFilter(scope, value, raw));
   if (key === "env") return envFilter(scope, value, raw);
   if (key !== "permissions" || !isRecord(value)) return { value, dropped: [] };
   const reason = ignoredModeReason(scope, value.defaultMode);
@@ -334,8 +337,14 @@ function managedLayer(path: string, managed: ManagedSettings): SettingsLayer {
   return layer;
 }
 
-/** The value Claude Code ends up with for each top-level key, and where it came from. */
-export function effectiveSettings(layers: SettingsLayer[]): EffectiveSetting[] {
+/**
+ * The value Claude Code ends up with for each top-level key, and where it came from. With
+ * `envHeld`, the project and local `env` wait for the trust dialog (see hooksWait).
+ */
+export function effectiveSettings(
+  layers: SettingsLayer[],
+  { envHeld = false }: { envHeld?: boolean } = {}
+): EffectiveSetting[] {
   // Layers are highest first; a second layer of one scope (a legacy local file) sits under the first.
   const byScope = new Map<Scope, Record<string, unknown>>();
   const rawByScope = new Map<Scope, Record<string, unknown>>();
@@ -356,7 +365,8 @@ export function effectiveSettings(layers: SettingsLayer[]): EffectiveSetting[] {
       key,
       (scope) => byScope.get(scope)?.[key],
       (scope) => rawByScope.get(scope)?.[key],
-      filterSandbox
+      filterSandbox,
+      envHeld
     );
     return key === "modelSettings"
       ? withModelEffort(setting, (k, scope) => byScope.get(scope)?.[k])
@@ -431,7 +441,8 @@ function effectiveSetting(
   key: string,
   valueIn: (scope: Scope) => unknown,
   rawIn: (scope: Scope) => unknown,
-  filterSandbox: ReturnType<typeof sandboxFilter>
+  filterSandbox: ReturnType<typeof sandboxFilter>,
+  envHeld: boolean
 ): EffectiveSetting {
   const { defined, ignored } = scopesThatCount(key, valueIn);
   const values = defined.flatMap((scope) => {
@@ -440,7 +451,8 @@ function effectiveSetting(
       scope,
       valueIn(scope),
       rawIn(scope),
-      filterSandbox
+      filterSandbox,
+      envHeld
     );
     for (const d of dropped) ignored.push({ scope, ...d });
     return value === undefined ? [] : [{ scope, value }];

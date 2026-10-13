@@ -23,7 +23,12 @@ import { AGENTS_MD_MODES, resolveInstructions } from "./instructions.ts";
 import { readInventory } from "./inventory.ts";
 import { readMemoryStore } from "./memory.ts";
 import { enabledPluginsEntry } from "./plugins.ts";
-import { hooksWait, permissionsOf, type Options as TrustOptions } from "./permissions.ts";
+import {
+  hooksWait,
+  permissionsOf,
+  type Options as TrustOptions,
+  trustWaits,
+} from "./permissions.ts";
 import { listProjects } from "./projects.ts";
 import { effectiveSettings, readManagedSettings, readSettingsLayers } from "./settings.ts";
 import { builtinTools } from "./tools.ts";
@@ -88,13 +93,19 @@ export async function scanDirectory(
       });
     else if (l.warning) problems.push({ path: l.path, error: l.warning, partial: true });
   }
-  const effective = effectiveSettings(settings);
+  const mainRoot = exists ? await mainWorktreeRoot(path) : null;
+  const trust = trustOf(env, claudeJson, path, mainRoot, root);
+  const effective = effectiveSettings(settings, { envHeld: hooksWait(trust, profile) });
   const agentsMdOff = agentsMdPluginOff(settings);
   // Without the plugin, Claude Code reads CLAUDE.md files only (docs: memory#when-agents-md-support-is-unavailable).
   const mode = agentsMdOff ? "claude-md" : agentsMdMode(settings);
   const excludes = effective.find((s) => s.key === "claudeMdExcludes")?.value;
-  const mainRoot = exists ? await mainWorktreeRoot(path) : null;
-  const trust = trustOf(env, claudeJson, path, mainRoot, root);
+  const trustOptions = {
+    trust,
+    inConfigHome: (file: string) => localInConfigHome(env, path, file),
+    localFromRepository: await localFromRepository(root, settings),
+    profile,
+  };
   const instructions = await resolveInstructions({
     env,
     cwd: path,
@@ -118,17 +129,11 @@ export async function scanDirectory(
     claudeJson,
     trust,
     profile,
+    waitsForTrust: trustWaits(trustOptions),
     problems,
   });
 
   const sharing = await shareProjectFiles(path, root, instructions, settings, inventory);
-  const trustOptions = {
-    trust,
-    inConfigHome: (file: string) => localInConfigHome(env, path, file),
-    // Reads the visibility shareProjectFiles gave each layer.
-    localFromRepository: await localFromRepository(settings),
-    profile,
-  };
   const memory = await readMemory(env, mainRoot, path, effective, trustOptions, problems);
   const permissions = permissionsOf(settings, trustOptions);
 
@@ -226,15 +231,21 @@ async function shareProjectFiles(
  * Whether the local settings file counts as the repository's: tracked in git, or in a .claude
  * that is a link (docs: permissions#when-your-local-settings-file-needs-trust).
  */
-async function localFromRepository(settings: SettingsLayer[]): Promise<boolean> {
+async function localFromRepository(
+  root: string | null,
+  settings: SettingsLayer[]
+): Promise<boolean> {
+  const local = settings.filter((l) => l.scope === "local" && l.exists);
+  const visibility = await visibilityOf(
+    root,
+    local.map((l) => l.path)
+  );
   const fromRepository = await Promise.all(
-    settings
-      .filter((l) => l.scope === "local" && l.exists)
-      .map(
-        async (l) =>
-          l.visibility === "tracked" ||
-          ((await lstat(dirname(l.path)).catch(() => null))?.isSymbolicLink() ?? false)
-      )
+    local.map(
+      async (l) =>
+        visibility.get(l.path) === "tracked" ||
+        ((await lstat(dirname(l.path)).catch(() => null))?.isSymbolicLink() ?? false)
+    )
   );
   return fromRepository.some(Boolean);
 }

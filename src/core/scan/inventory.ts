@@ -302,6 +302,8 @@ interface InventoryInput {
   claudeJson: Record<string, unknown> | null;
   trust: Trust;
   profile: SessionProfile;
+  /** Whether a project or local file's grants wait for the trust dialog (see trustWaits). */
+  waitsForTrust: (scope: Scope, path: string) => boolean;
   /** Receives files that are there but cannot be read or parsed. */
   problems: Problem[];
 }

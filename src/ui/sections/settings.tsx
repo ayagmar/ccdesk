@@ -13,7 +13,10 @@ type R = RowOf<"settings">;
 
 /** Which file decides the value, or why none does. */
 function verdict(s: EffectiveSetting): string {
-  if (s.from.length === 0) return `Claude Code ignores this value: ${s.ignored[0]?.reason ?? ""}.`;
+  const first = s.ignored[0];
+  if (s.from.length === 0 && first?.waitsForTrust)
+    return `Claude Code holds this value until you trust the folder: ${first.reason}.`;
+  if (s.from.length === 0) return `Claude Code ignores this value: ${first?.reason ?? ""}.`;
   if (s.merged) return "Lists and objects from these files are combined.";
   return `${lineName(s.from[0] ?? "user")} settings decide this value.`;
 }
@@ -24,10 +27,19 @@ function layerOutcome(s: EffectiveSetting, scope: Scope, value: unknown): string
   return s.from.includes(scope) ? "wins" : "lost";
 }
 
+/** How the page marks a value Claude Code does not use. */
+function ignoredLabel(ignored: EffectiveSetting["ignored"][number]): string {
+  return ignored.waitsForTrust ? "waits for trust" : "ignored";
+}
+
 /** A scope's value as the table shows it. */
-function layerValue(value: unknown, exists: boolean, ignored: boolean): string {
+function layerValue(
+  value: unknown,
+  exists: boolean,
+  ignored: EffectiveSetting["ignored"][number] | undefined
+): string {
   if (value === undefined) return exists ? "not set" : "no file";
-  return `${preview(value)}${ignored ? " (ignored)" : ""}`;
+  return `${preview(value)}${ignored ? ` (${ignoredLabel(ignored)})` : ""}`;
 }
 
 export const settings: SectionUi<R> = {
@@ -45,7 +57,7 @@ export const settings: SectionUi<R> = {
         </td>
         <td className="mono value">
           {s.from.length === 0 ? (
-            <span className="muted">ignored</span>
+            <span className="muted">{s.ignored[0] ? ignoredLabel(s.ignored[0]) : "ignored"}</span>
           ) : (
             tildeAll(preview(s.value))
           )}
@@ -63,7 +75,7 @@ export const settings: SectionUi<R> = {
           {s.ignored.map((o) => (
             <span key={`ignored-${o.scope}`} className="beaten" title={o.reason}>
               <Bullet line={o.scope} hollow /> <s>{tildeAll(preview(o.value))}</s>{" "}
-              <span className="flag warn">ignored</span>
+              <span className="flag warn">{ignoredLabel(o)}</span>
             </span>
           ))}
         </td>
@@ -103,9 +115,7 @@ export const settings: SectionUi<R> = {
                   <th scope="row">
                     <Bullet line={scope} hollow={value === undefined} />
                   </th>
-                  <td className="mono">
-                    {layerValue(value, layer?.exists === true, ignored !== undefined)}
-                  </td>
+                  <td className="mono">{layerValue(value, layer?.exists === true, ignored)}</td>
                 </tr>
               );
             })}
