@@ -139,6 +139,34 @@
       }
     },
     {
+      "includes": ["src/ui/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "typebox": "The page validates nothing it receives; import request types from src/shared/types.ts.",
+                  "typebox/compile": "The page validates nothing it receives; import request types from src/shared/types.ts."
+                },
+                "patterns": [
+                  {
+                    "group": ["**/core/**", "**/server/**"],
+                    "message": "The page, view and shared types do not import the core or the server."
+                  },
+                  {
+                    "group": ["**/shared/requests.ts"],
+                    "message": "The request schemas would put TypeBox in the page; import their types from src/shared/types.ts."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["src/core/**"],
       "linter": {
         "rules": {

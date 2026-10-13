@@ -16,6 +16,11 @@ export function schemaErrors(validator: Validator, value: unknown, label: string
   );
 }
 
+/** The first thing wrong with a request body, such as "add.list must be string". */
+export function firstError(validator: Validator, value: unknown): string {
+  return schemaErrors(validator, value, "")[0] ?? "the request is not well formed";
+}
+
 /**
  * Every error, not TypeBox's first eight: a wrong hook lists what each kind of hook needs. Each
  * value checked is one setting, server or request body, so the list stays short. The limit is

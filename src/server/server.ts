@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
+import { type TProperties, type TSchema } from "typebox";
+import { Compile, type Validator } from "typebox/compile";
 import { type Core } from "../core/core.ts";
-import { PERMISSION_LISTS } from "../shared/scopes.ts";
-import { type PermissionList, SESSION_PROFILES, type SessionProfile } from "../shared/types.ts";
+import { BackupBody, MemoryBody, OpenBody, RevisionBody, UsageBody } from "../shared/requests.ts";
+import { SESSION_PROFILES } from "../shared/types.ts";
 import { isMemoryAction } from "../core/mutations.ts";
 import {
   InvalidEditError,
@@ -12,10 +14,10 @@ import {
   parseMcpEdit,
   parsePermissionEdit,
   parseSettingsEdit,
-  stringFields,
 } from "../core/parse-edit.ts";
 import { REFERENCE } from "../core/reference.ts";
 import { CountStopped } from "../core/scan/usage.ts";
+import { firstError } from "../core/schema.ts";
 import { Watcher } from "../core/watch.ts";
 import { RefusedError } from "../core/write.ts";
 
@@ -29,8 +31,10 @@ export interface ServerOptions {
   uiDir: string | null;
 }
 
+const HTML = "text/html; charset=utf-8";
+
 const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
+  ".html": HTML,
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml",
@@ -95,10 +99,29 @@ interface Route {
 }
 
 /** The query parameter `name`; a missing one is a 400. */
-function param(url: URL, name: string, message = `${name} is required`): string {
+function param(url: URL, name: string): string {
   const value = url.searchParams.get(name);
-  if (!value) throw new RequestError(400, message);
+  if (!value) throw new RequestError(400, `${name} is required`);
   return value;
+}
+
+/** The query parameter `name`, which must be an absolute path. */
+function absoluteParam(url: URL, name: string): string {
+  const value = param(url, name);
+  if (!isAbsolute(value)) throw new RequestError(400, `${name} must be an absolute path`);
+  return value;
+}
+
+const revisionBody = Compile(RevisionBody);
+const usageBody = Compile(UsageBody);
+const memoryBody = Compile(MemoryBody);
+const openBody = Compile(OpenBody);
+const backupBody = Compile(BackupBody);
+
+/** A POST body `validator` accepts; anything else is a 400 naming what is wrong. */
+function checked<T>(validator: Validator<TProperties, TSchema, T>, body: unknown): T {
+  if (!validator.Check(body)) throw new RequestError(400, firstError(validator, body));
+  return body;
 }
 
 /** Aborts when the page goes away or asks for something else. */
@@ -109,7 +132,7 @@ function stopOnClose(res: ServerResponse): AbortSignal {
 }
 
 function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
-  const revision = (body: unknown) => stringFields(body, ["revision"]).revision;
+  const revision = (body: unknown) => checked(revisionBody, body).revision;
   const get = (path: string, action: Route["action"]): Route => ({ method: "GET", path, action });
   const post = (path: string, action: Route["action"]): Route => ({ method: "POST", path, action });
   return [
@@ -117,36 +140,28 @@ function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
     // Sent instead of bundled with the page: the catalog and schema are most of its size.
     get("/api/reference", async () => REFERENCE),
     get("/api/directory", ({ url }) => {
-      const profile = url.searchParams.get("profile") ?? "interactive";
-      if (!SESSION_PROFILES.includes(profile as SessionProfile))
-        throw new RequestError(400, `profile is one of ${SESSION_PROFILES.join(", ")}`);
-      return watcher.scan(param(url, "path"), profile as SessionProfile);
+      const asked = url.searchParams.get("profile") ?? "interactive";
+      const profile = SESSION_PROFILES.find((p) => p === asked);
+      if (!profile) throw new RequestError(400, `profile is one of ${SESSION_PROFILES.join(", ")}`);
+      return watcher.scan(absoluteParam(url, "path"), profile);
     }),
     post("/api/usage", ({ body, res }) => {
-      const { path } = stringFields(body, ["path"]);
-      const rules = (body as Record<string, unknown>).rules;
-      if (!Array.isArray(rules)) throw new RequestError(400, "rules must be a list");
-      const inEffect = rules.map((r) => {
-        const { list, rule } = stringFields(r, ["list", "rule"]);
-        if (!PERMISSION_LISTS.includes(list as PermissionList))
-          throw new RequestError(400, "a rule needs a list: allow, ask or deny");
-        return { list: list as PermissionList, rule };
-      });
-      return core.readUsage(path, inEffect, { signal: stopOnClose(res) });
+      const { path, rules } = checked(usageBody, body);
+      return core.readUsage(path, rules, { signal: stopOnClose(res) });
     }),
     post("/api/memory/preview", async ({ body }) => {
-      const { action, path } = stringFields(body, ["action", "path"]);
+      const { action, path } = checked(memoryBody, body);
       if (!isMemoryAction(action)) throw new RequestError(400, "unknown memory action");
       return core.previewMemoryChange(action, path);
     }),
     post("/api/memory/change", async ({ body }) => {
-      const { action, path, revision } = stringFields(body, ["action", "path", "revision"]);
+      const { action, path } = checked(memoryBody, body);
       if (!isMemoryAction(action)) throw new RequestError(400, "unknown memory action");
-      return core.changeMemory(action, path, revision);
+      return core.changeMemory(action, path, revision(body));
     }),
     post("/api/open", async ({ body }) => {
-      const { path } = stringFields(body, ["path"]);
-      if (!isAbsolute(path)) throw new RequestError(400, "an absolute path is required");
+      const { path } = checked(openBody, body);
+      if (!isAbsolute(path)) throw new RequestError(400, "path must be an absolute path");
       return { editor: await core.openFile(path) };
     }),
     post("/api/settings/preview", async ({ body }) =>
@@ -172,26 +187,17 @@ function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
     post("/api/mcp/preview", async ({ body }) => core.previewMcpEdit(parseMcpEdit(body))),
     post("/api/mcp/save", async ({ body }) => core.saveMcpEdit(parseMcpEdit(body), revision(body))),
     get("/api/watch", async ({ url, res }) => {
-      const dir = url.searchParams.get("dir");
+      const dir = absoluteParam(url, "dir");
       const since = Number(url.searchParams.get("since") ?? "0");
-      if (!dir || !isAbsolute(dir) || !Number.isInteger(since))
-        throw new RequestError(400, "dir is required");
+      if (!Number.isInteger(since)) throw new RequestError(400, "since must be a whole number");
       return watcher.wait(resolve(dir), since, stopOnClose(res));
     }),
-    get("/api/compare", async ({ url }) => {
-      const a = url.searchParams.get("a");
-      const b = url.searchParams.get("b");
-      if (!a || !b || !isAbsolute(a) || !isAbsolute(b))
-        throw new RequestError(400, "a and b must be absolute paths");
-      return core.compareSettings(a, b);
-    }),
-    get("/api/path-test", async ({ url }) => {
-      const dir = url.searchParams.get("dir");
-      const file = url.searchParams.get("file");
-      if (!dir || !isAbsolute(dir) || !file)
-        throw new RequestError(400, "dir and file are required");
-      return core.testPath(dir, file, (cwd) => watcher.view(cwd));
-    }),
+    get("/api/compare", async ({ url }) =>
+      core.compareSettings(absoluteParam(url, "a"), absoluteParam(url, "b"))
+    ),
+    get("/api/path-test", async ({ url }) =>
+      core.testPath(absoluteParam(url, "dir"), param(url, "file"), (cwd) => watcher.view(cwd))
+    ),
     get("/api/backups", async ({ url }) => {
       const before = url.searchParams.get("before") ?? undefined;
       const limit = Number(url.searchParams.get("limit") ?? "50");
@@ -200,12 +206,11 @@ function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
       return core.listBackups({ ...(before ? { before } : {}), limit });
     }),
     post("/api/backups/preview", async ({ body }) =>
-      core.previewRestore(stringFields(body, ["id"]).id)
+      core.previewRestore(checked(backupBody, body).id)
     ),
-    post("/api/backups/restore", async ({ body }) => {
-      const { id, revision } = stringFields(body, ["id", "revision"]);
-      return core.restoreBackup(id, revision);
-    }),
+    post("/api/backups/restore", async ({ body }) =>
+      core.restoreBackup(checked(backupBody, body).id, revision(body))
+    ),
   ];
 }
 
@@ -256,9 +261,11 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req) {
-    size += (chunk as Buffer).length;
+    // A request without setEncoding yields Buffers.
+    const piece: Buffer = chunk;
+    size += piece.length;
     if (size > MAX_BODY) throw new RequestError(413, "Request too large");
-    chunks.push(chunk as Buffer);
+    chunks.push(piece);
   }
   try {
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
@@ -282,8 +289,8 @@ async function serveStatic(uiDir: string | null, pathname: string, res: ServerRe
   const file = await readFile(target).catch(() => null);
   // Unknown paths fall back to the app shell so client-side routes reload correctly.
   const body = file ?? (await readFile(join(uiDir, "index.html")));
-  const type = file ? (MIME[extname(target)] ?? "application/octet-stream") : MIME[".html"];
-  res.writeHead(200, { ...SECURITY_HEADERS, "Content-Type": type as string });
+  const type = file ? (MIME[extname(target)] ?? "application/octet-stream") : HTML;
+  res.writeHead(200, { ...SECURITY_HEADERS, "Content-Type": type });
   res.end(body);
 }
 

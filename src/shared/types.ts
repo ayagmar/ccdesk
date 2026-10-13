@@ -533,41 +533,14 @@ export interface DirectoryView {
   usage?: Usage | null;
 }
 
-/** Set one top-level key in one settings file; `value` undefined removes the key. */
-export interface SettingsEdit {
-  dir: string;
-  scope: Scope;
-  key: string;
-  value?: unknown;
-}
-
-/** Take one permission rule out of its list and/or add one, in one settings file. */
-export interface PermissionEdit {
-  dir: string;
-  file: string;
-  remove?: { list: PermissionList; rule: string };
-  add?: { list: PermissionList; rule: string };
-}
-
-/** A hook as a HookEdit writes it: the matcher group it goes in, and the hook itself. */
-interface HookPlacement {
-  event: string;
-  /** Empty or absent for a group without a matcher, which matches everything. */
-  matcher?: string;
-  definition: unknown;
-}
-
-/**
- * One hook change to a settings file. With both, the hook is replaced in place when it stays in
- * the same event and matcher, and moved otherwise.
- */
-export interface HookEdit {
-  dir: string;
-  file: string;
-  /** The hook to take out, as the scan showed it; refused when the file no longer has it there. */
-  remove?: { event: string; at: { group: number; index: number }; definition: unknown };
-  add?: HookPlacement;
-}
+// The edits a front end sends, each read from its schema.
+export type {
+  AgentEdit,
+  HookEdit,
+  McpEdit,
+  PermissionEdit,
+  SettingsEdit,
+} from "./requests.ts";
 
 export interface SettingsEditPreview {
   path: string;
@@ -587,29 +560,6 @@ export interface SettingsEditPreview {
    * reverse it, but is not backed up and cannot be undone from ccdesk.
    */
   commands?: string[];
-}
-
-/** One subagent file change: a new agent, a changed one, or one deleted. */
-export interface AgentEdit {
-  dir: string;
-  /** An agent the scan shows here; absent when creating one. */
-  path?: string;
-  /** Where a new agent goes, and its file name without .md. */
-  create?: { scope: "user" | "project"; file: string };
-  /** The whole file; null deletes the agent. */
-  text: string | null;
-}
-
-/**
- * One MCP server change. Project servers are changed in .mcp.json; user and local ones through
- * `claude mcp`. With both, the server is replaced, keeping its place in .mcp.json.
- */
-export interface McpEdit {
-  dir: string;
-  scope: "user" | "local" | "project";
-  /** The server to take out, as the scan showed it; refused when it changed since. */
-  remove?: { name: string; definition: unknown };
-  add?: { name: string; definition: unknown };
 }
 
 /** A setting's entry in Claude Code's settings schema, as far as the editor reads it. */
