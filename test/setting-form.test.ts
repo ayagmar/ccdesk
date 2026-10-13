@@ -13,7 +13,7 @@ import {
   followFile,
   formFor,
   fromDraft,
-  replacesBuiltIns,
+  replacedBuiltIns,
   toDraft,
 } from "../src/view/index.ts";
 
@@ -247,16 +247,18 @@ test("an empty field for a key the file lacks follows the file when the key appe
 });
 
 test("an autoMode list without $defaults is flagged as replacing the built-in rules", () => {
-  // Catches a custom hard_deny list silently dropping Claude Code's built-in block rules.
-  assert.equal(replacesBuiltIns("autoMode", "hard_deny", "Never push to main"), true);
-  assert.equal(replacesBuiltIns("autoMode", "hard_deny", "$defaults\nNever push to main"), false);
-  assert.equal(
-    replacesBuiltIns("autoMode", "allow", ""),
-    false,
-    "an empty list keeps the built-ins"
+  // Catches a custom hard_deny list silently dropping Claude Code's built-in block rules, in the
+  // form or in JSON: the check reads the value, not a control.
+  assert.deepEqual(replacedBuiltIns("autoMode", { hard_deny: ["Never push to main"] }), [
+    "hard_deny",
+  ]);
+  assert.deepEqual(
+    replacedBuiltIns("autoMode", { hard_deny: ["$defaults", "Never push to main"] }),
+    []
   );
-  assert.equal(replacesBuiltIns("autoMode", "classifyAllShell", "true"), false);
-  assert.equal(replacesBuiltIns("permissions", "allow", "Bash(npm test)"), false);
+  assert.deepEqual(replacedBuiltIns("autoMode", { allow: [] }), [], "an empty list keeps them");
+  assert.deepEqual(replacedBuiltIns("autoMode", { classifyAllShell: true }), []);
+  assert.deepEqual(replacedBuiltIns("permissions", { allow: ["Bash(npm test)"] }), []);
 });
 
 test("a field's description shows its first sentence, and an example's \"e.g.\" does not end it", () => {

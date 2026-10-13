@@ -22,7 +22,7 @@ import {
   followFile,
   formFor,
   fromDraft,
-  replacesBuiltIns,
+  replacedBuiltIns,
   toDraft,
 } from "../view/settings.ts";
 import { api } from "./api.ts";
@@ -211,20 +211,26 @@ function ValueForm({
   onReview: (removing: boolean) => void;
 }) {
   const documented = kind === "string" ? documentedValues(settingKey) : [];
+  const typed = fromDraft(kind, property, draft);
+  const replaced = "value" in typed ? replacedBuiltIns(settingKey, typed.value) : [];
   return (
     <>
       <Labeled label="Value in this file" kind={kind}>
-        {(id) => (
-          <Field
-            id={id}
-            settingKey={settingKey}
-            kind={kind}
-            property={property}
-            draft={draft}
-            onChange={onType}
-          />
-        )}
+        {(id) =>
+          kind === "object" ? (
+            <ObjectFields
+              id={id}
+              property={property}
+              draft={typeof draft === "object" && !Array.isArray(draft) ? draft : {}}
+              replaced={replaced}
+              onChange={onType}
+            />
+          ) : (
+            <Field id={id} kind={kind} property={property} draft={draft} onChange={onType} />
+          )
+        }
       </Labeled>
+      {kind === "json" && replaced.map((name) => <ReplacesBuiltIns key={name} name={name} />)}
       {kind === "json" && fieldKind(property) !== "json" && !fitsForm && (
         <p className="muted small">
           The value in this file does not fit the form, so it is shown as JSON.
@@ -301,9 +307,9 @@ function Labeled({
   );
 }
 
+/** The control for a value or a property of an object form; ObjectFields holds the object itself. */
 function Field({
   id,
-  settingKey,
   kind,
   property,
   draft,
@@ -311,7 +317,6 @@ function Field({
   inObject = false,
 }: {
   id: string;
-  settingKey: string;
   kind: FieldKind;
   property: SettingSchema;
   draft: Draft;
@@ -334,16 +339,6 @@ function Field({
         id={id}
         property={property}
         picked={Array.isArray(draft) ? draft : []}
-        onChange={onChange}
-      />
-    );
-  if (kind === "object")
-    return (
-      <ObjectFields
-        id={id}
-        settingKey={settingKey}
-        property={property}
-        draft={typeof draft === "object" && !Array.isArray(draft) ? draft : {}}
         onChange={onChange}
       />
     );
@@ -468,15 +463,16 @@ function Choices({
 /** One control per property the schema names, in the schema's order; an empty one is left unset. */
 function ObjectFields({
   id,
-  settingKey,
   property,
   draft,
+  replaced,
   onChange,
 }: {
   id: string;
-  settingKey: string;
   property: SettingSchema;
   draft: DraftObject;
+  /** The lists that replace Claude Code's built-in entries, from replacedBuiltIns. */
+  replaced: string[];
   onChange: (d: Draft) => void;
 }) {
   return (
@@ -499,7 +495,6 @@ function ObjectFields({
               {(fieldId) => (
                 <Field
                   id={fieldId}
-                  settingKey={settingKey}
                   kind={kind}
                   property={schema}
                   draft={value}
@@ -508,20 +503,29 @@ function ObjectFields({
                 />
               )}
             </Labeled>
-            {replacesBuiltIns(settingKey, name, value) && (
-              <p className="flag warn">
-                Without "$defaults", these entries replace Claude Code's built-in {name} entries
-                instead of adding to them.
-                <button type="button" onClick={() => set(`$defaults\n${value}`)}>
-                  Keep built-in entries
-                </button>
-              </p>
+            {replaced.includes(name) && (
+              <ReplacesBuiltIns name={name} onKeep={() => set(`$defaults\n${value}`)} />
             )}
             {schema.description && <About text={schema.description} />}
           </div>
         );
       })}
     </div>
+  );
+}
+
+/** The warning for a list without "$defaults", with a button that adds it where the form can. */
+function ReplacesBuiltIns({ name, onKeep }: { name: string; onKeep?: () => void }) {
+  return (
+    <p className="flag warn">
+      Without "$defaults", the {name} entries replace Claude Code's built-in ones instead of adding
+      to them.
+      {onKeep && (
+        <button type="button" onClick={onKeep}>
+          Keep built-in entries
+        </button>
+      )}
+    </p>
   );
 }
 
