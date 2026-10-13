@@ -179,7 +179,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
       ...claudeFiles.filter((f) => f.dir === dir),
       ...agentsFiles.filter((f) => f.dir === dir)
     );
-  applyLoadRules(out, ctx, mode, externalImports);
+  applyLoadRules(out, ctx, mode, externalImports, managedClaudeMd?.path);
   await skipRepeats(out);
   addChecks(out);
   return out;
@@ -363,28 +363,34 @@ function explainAgentsFiles(
 }
 
 /**
- * Skips what Claude Code leaves out of every file but managed ones: all of them in managed-only
- * mode, ones matched by claudeMdExcludes, ones over 4 MiB, and project rules linked from outside
- * the project that do not qualify.
+ * Skips what Claude Code leaves out: any file over 4 MiB, managed ones included (docs:
+ * memory#how-auto-memory-works), and of all but managed files, all of them in managed-only mode,
+ * ones matched by claudeMdExcludes, and project rules linked from outside the project that do not
+ * qualify.
  */
 function applyLoadRules(
   out: Instruction[],
   ctx: Ctx,
   mode: AgentsMdMode,
-  externalImports: Trust["externalImports"]
+  externalImports: Trust["externalImports"],
+  /** The managed claudeMd setting, which is no file and so has no size limit. */
+  settingPath: string | undefined
 ): void {
+  const tooLarge = "Skipped: Claude Code does not load an instruction file over 4 MiB";
   const waiting =
     externalImports === "declined"
       ? "You declined imports from outside this project"
       : "Waits for you to approve imports from outside this project";
   for (const file of out) {
-    if (file.scope === "managed") continue;
+    if (file.scope === "managed") {
+      if (file.path !== settingPath && file.bytes > MAX_TEXT_BYTES) skip(file, tooLarge);
+      continue;
+    }
     // Path-scoped rules still load on demand in managed-only mode (docs: memory#choose-which-instruction-files-load).
     if (mode === "managed-only" && file.status === "loaded") skip(file, skippedByMode(mode));
     // Managed files cannot be excluded.
     if (ctx.isExcluded(file.path, file.realPath)) skip(file, "Skipped by claudeMdExcludes");
-    if (file.status !== "skipped" && file.bytes > MAX_TEXT_BYTES)
-      skip(file, "Skipped: Claude Code does not load an instruction file over 4 MiB");
+    if (file.bytes > MAX_TEXT_BYTES) skip(file, tooLarge);
     // A project's links outside it need your approval, like its imports; your own files do not.
     if (file.scope !== "project" && file.scope !== "local") continue;
     if (file.kind !== "rule") continue;
