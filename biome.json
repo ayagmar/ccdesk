@@ -33,6 +33,14 @@
     "rules": {
       "preset": "recommended",
       "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "error",
+          "options": { "maxAllowedComplexity": 25 }
+        },
+        "noExcessiveLinesPerFunction": {
+          "level": "error",
+          "options": { "maxLines": 100, "skipBlankLines": true }
+        },
         "noImplicitCoercions": "error",
         "noUselessUndefined": "error"
       },
@@ -56,6 +64,7 @@
         "useNodejsImportProtocol": "error",
         "noNonNullAssertion": "error",
         "noParameterAssign": "error",
+        "noNestedTernary": "error",
         "noUselessElse": "error",
         "useThrowOnlyError": "error",
         "useConsistentArrayType": {
@@ -73,7 +82,8 @@
         "noImportCycles": "error",
         "noDeprecatedImports": "error",
         "noEmptyBlockStatements": "error",
-        "noEvolvingTypes": "error"
+        "noEvolvingTypes": "error",
+        "noShadow": "error"
       },
       "nursery": {
         "noFloatingPromises": "error",
@@ -100,6 +110,16 @@
         "rules": {
           "nursery": {
             "noFloatingPromises": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["test/**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveLinesPerFunction": "off"
           }
         }
       }

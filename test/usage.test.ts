@@ -417,10 +417,10 @@ test("a count nobody waits for any more stops without holding up the next one", 
 
   const page = new AbortController();
   const abandoned = readUsage(f.env, dir, [], { signal: page.signal });
-  const next = readUsage(f.env, other, []);
+  const waiting = readUsage(f.env, other, []);
   page.abort();
   await assert.rejects(abandoned, CountStopped);
-  assert.equal((await next).tools[0]?.calls, 1);
+  assert.equal((await waiting).tools[0]?.calls, 1);
   assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 4);
 });
 

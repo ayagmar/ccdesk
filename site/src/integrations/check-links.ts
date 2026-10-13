@@ -28,6 +28,28 @@ export function checkLinks(): AstroIntegration {
   };
 }
 
+/**
+ * The links a built file holds: every href, src and srcset entry of a page, and the links to this
+ * site in a Markdown or text file.
+ */
+function linksIn(path: string, site: string): string[] {
+  if (path.endsWith(".html")) {
+    // A canonical link names the page itself, and the 404 page's is a URL nothing serves.
+    const html = readFileSync(path, "utf8").replace(/<link rel="canonical"[^>]*>/g, "");
+    return [
+      ...[...html.matchAll(/\s(?:href|src)="([^"]+)"/g)].map((m) => m[1] ?? ""),
+      ...[...html.matchAll(/\ssrcset="([^"]+)"/g)].flatMap((m) =>
+        (m[1] ?? "").split(",").map((part) => part.trim().split(/\s+/)[0] ?? "")
+      ),
+    ];
+  }
+  if (!/\.(md|txt)$/.test(path)) return [];
+  const text = readFileSync(path, "utf8");
+  return [...text.matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)]
+    .map((m) => m[1] ?? "")
+    .filter((link) => link.startsWith(site));
+}
+
 function checker(): AstroIntegration {
   let base = "/";
   let site = "";
@@ -74,24 +96,7 @@ function checker(): AstroIntegration {
 
         for (const file of all) {
           const pageUrl = new URL(file.replace(/index\.html$/, ""), site);
-          if (file.endsWith(".html")) {
-            // A canonical link names the page itself, and the 404 page's is a URL nothing serves.
-            const html = readFileSync(join(root, file), "utf8").replace(
-              /<link rel="canonical"[^>]*>/g,
-              ""
-            );
-            for (const m of html.matchAll(/\s(?:href|src)="([^"]+)"/g))
-              check(file, m[1] ?? "", pageUrl);
-            for (const m of html.matchAll(/\ssrcset="([^"]+)"/g))
-              for (const part of (m[1] ?? "").split(","))
-                check(file, part.trim().split(/\s+/)[0] ?? "", pageUrl);
-          } else if (/\.(md|txt)$/.test(file)) {
-            const text = readFileSync(join(root, file), "utf8");
-            for (const m of text.matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)) {
-              const link = m[1] ?? "";
-              if (link.startsWith(site)) check(file, link, pageUrl);
-            }
-          }
+          for (const link of linksIn(join(root, file), site)) check(file, link, pageUrl);
         }
         if (broken.length)
           throw new Error(
