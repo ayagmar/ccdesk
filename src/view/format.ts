@@ -60,10 +60,11 @@ function compact(value: unknown): string {
 
 /**
  * A description's first sentence and the rest, which is empty for a single sentence. A sentence
- * ends at a full stop followed by a space, except the one in "e.g." or "i.e.".
+ * ends at a full stop followed by a space and a capital or a quote, as in "true. Default", but not
+ * at the one in "e.g." or "i.e.", or one listed as a character, as in "_ - . , only".
  */
 export function firstSentence(text: string): [first: string, rest: string] {
-  const [, first, rest] = /^(.+?(?<!\b(?:e\.g|i\.e))\.)\s+(.+)$/s.exec(text) ?? [];
+  const [, first, rest] = /^(.+?(?<!\b(?:e\.g|i\.e))\.)\s+(?=[A-Z"'`])(.+)$/s.exec(text) ?? [];
   return first && rest ? [first, rest] : [text, ""];
 }
 
