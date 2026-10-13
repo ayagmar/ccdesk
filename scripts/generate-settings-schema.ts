@@ -8,8 +8,8 @@
 // With a file path argument, also writes there the documented keys neither source defines, as a
 // Markdown list for the data update PR.
 import { readFileSync, writeFileSync } from "node:fs";
-import { HOOK_EVENTS } from "@anthropic-ai/claude-agent-sdk";
 import { fileURLToPath } from "node:url";
+import { HOOK_EVENTS } from "@anthropic-ai/claude-agent-sdk";
 import { createGenerator } from "ts-json-schema-generator";
 import catalog from "../src/shared/settings-catalog.json" with { type: "json" };
 import { plain } from "../src/view/sections/catalog.ts";
@@ -35,14 +35,14 @@ const schemastore: { properties: Record<string, Record<string, unknown>> } = JSO
   readFileSync(SCHEMASTORE_SNAPSHOT, "utf8")
 );
 
-// Fields such as autoMode.classifyAllShell are documented on their own but live in their parent.
 // The editor shows a key's description as its only explanation, so it gets the docs' full account
 // (what false does, that leaving out "$defaults" replaces the built-in rules), not the one-line
-// summary written for the settings index.
+// summary written for the settings index. Fields such as autoMode.classifyAllShell are documented
+// under their dotted name.
 const documented = Object.fromEntries(
-  Object.entries(catalog.keys as Record<string, { summary: string; about?: string }>)
-    .filter(([key]) => !key.includes("."))
-    .map(([key, entry]) => [key, plain(entry.about ?? entry.summary).replace(/\s+/g, " ")])
+  Object.entries(catalog.keys as Record<string, { summary: string; about?: string }>).map(
+    ([key, entry]) => [key, plain(entry.about ?? entry.summary).replace(/\s+/g, " ")]
+  )
 );
 const { properties, borrowed, uncovered } = borrowMissingKeys(
   settings.properties,
