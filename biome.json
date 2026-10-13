@@ -32,9 +32,15 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
+      "complexity": {
+        "noImplicitCoercions": "error",
+        "noUselessUndefined": "error"
+      },
       "correctness": {
         "noUnusedImports": "error",
-        "noUnusedVariables": "warn"
+        "noUnusedVariables": "warn",
+        "noUnusedFunctionParameters": "error",
+        "noUnusedPrivateClassMembers": "error"
       },
       "performance": {
         "noNamespaceImport": "error"
@@ -47,13 +53,32 @@
             "style": "inlineType"
           }
         },
-        "useNodejsImportProtocol": "error"
+        "useNodejsImportProtocol": "error",
+        "noNonNullAssertion": "error",
+        "noParameterAssign": "error",
+        "noUselessElse": "error",
+        "useThrowOnlyError": "error",
+        "useConsistentArrayType": {
+          "level": "error",
+          "options": {
+            "syntax": "shorthand"
+          }
+        }
       },
       "suspicious": {
-        "noExplicitAny": "error"
+        "noExplicitAny": "error",
+        "noDoubleEquals": "error",
+        "noConfusingVoidType": "error",
+        "useErrorMessage": "error",
+        "noImportCycles": "error",
+        "noDeprecatedImports": "error",
+        "noEmptyBlockStatements": "error",
+        "noEvolvingTypes": "error"
       },
       "nursery": {
-        "noFloatingPromises": "error"
+        "noFloatingPromises": "error",
+        "useExhaustiveSwitchCases": "error",
+        "noMisusedPromises": "error"
       }
     }
   },
@@ -85,6 +110,51 @@
         "rules": {
           "style": {
             "noDescendingSpecificity": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/shared/**", "src/view/**", "src/ui/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noNodejsModules": "error"
+          },
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/core/**", "**/server/**"],
+                    "message": "The page, view and shared types do not import the core or the server."
+                  }
+                ]
+              }
+            },
+            "noProcessEnv": "error"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/core/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "error",
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/server/**"],
+                    "message": "src/core imports nothing from src/server."
+                  }
+                ]
+              }
+            }
           }
         }
       }

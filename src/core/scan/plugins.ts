@@ -118,14 +118,13 @@ export async function manifestConfigs(
   return out;
 }
 
+type ManifestCommand = { name: string; path: string; description: string; text: string | null };
+
 /** The manifest's `commands` object form: command name to a file or inline content. */
-export async function manifestCommandMap(
-  env: ScanEnv,
-  plugin: Plugin
-): Promise<Array<{ name: string; path: string; description: string; text: string | null }>> {
+export async function manifestCommandMap(env: ScanEnv, plugin: Plugin): Promise<ManifestCommand[]> {
   const value = (await manifest(env, plugin)).commands;
   if (!isRecord(value)) return [];
-  const out = [];
+  const out: ManifestCommand[] = [];
   for (const [name, entry] of Object.entries(value)) {
     if (!isRecord(entry)) continue;
     const source = typeof entry.source === "string" ? await inside(plugin, entry.source) : null;

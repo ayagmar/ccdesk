@@ -20,9 +20,8 @@ export function unused(rule: Permission, usage: Usage | null | undefined): rule 
     rule.list === "allow" &&
     rule.inEffect &&
     !rule.decidedBy &&
-    !!usage &&
-    usage.sessions > 0 &&
-    usage.matches[rule.rule] === 0
+    (usage?.sessions ?? 0) > 0 &&
+    usage?.matches[rule.rule] === 0
   );
 }
 
@@ -66,7 +65,8 @@ export const permissions = defineSection<R>({
   empty: () =>
     "No settings file sets permissions here, so Claude asks before using tools that need it.",
   dimmed: (row) =>
-    !isSuggested(row) && (!row.item.inEffect || (row.item.kind === "rule" && !!row.item.decidedBy)),
+    !isSuggested(row) &&
+    (!row.item.inEffect || (row.item.kind === "rule" && row.item.decidedBy !== undefined)),
   text: (row) =>
     isSuggested(row)
       ? `permission suggested allow ${row.item.rule}`

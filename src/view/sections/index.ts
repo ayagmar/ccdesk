@@ -11,7 +11,7 @@ import { tools } from "./tools.ts";
 import { type Row, type ViewContext, type ViewSection } from "./types.ts";
 
 /** The sections of a directory page, in page order. */
-export const SECTIONS: Array<ViewSection<Row>> = [
+export const SECTIONS: ViewSection<Row>[] = [
   instructions,
   settings,
   permissions,

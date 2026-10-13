@@ -21,7 +21,9 @@ test("a change on one core does not wait for a change on another", {
   // waits for the second, until the time limit fails the test.
   const a = makeFixture();
   const b = makeFixture();
-  let release = () => {};
+  let release = () => {
+    // Replaced by the promise's resolve below.
+  };
   const released = new Promise<void>((resolve) => {
     release = resolve;
   });

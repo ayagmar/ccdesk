@@ -10,7 +10,7 @@ export const extensions = defineSection<R>({
   short: "Extensions",
   rows: (view) => {
     const inv = view.inventory;
-    const entries: Array<[EntryKind, typeof inv.agents]> = [
+    const entries: [EntryKind, typeof inv.agents][] = [
       ["agent", inv.agents],
       ["skill", inv.skills],
       ["command", inv.commands],

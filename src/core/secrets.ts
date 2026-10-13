@@ -184,5 +184,7 @@ export function secretTexts(value: unknown): string[] {
     const url = URL.parse(raw);
     return [url?.username, url?.password, url?.search.slice(1)];
   });
-  return found.filter((s): s is string => !!s).sort((a, b) => b.length - a.length);
+  return found
+    .filter((s): s is string => s !== undefined && s !== "")
+    .sort((a, b) => b.length - a.length);
 }

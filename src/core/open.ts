@@ -168,6 +168,7 @@ export function openBrowser(url: string, host: Host): Promise<string | null> {
  */
 export async function openInEditor(
   path: string,
+  // biome-ignore lint/style/noProcessEnv: the documented default of the free openInEditor; a core passes its own.
   host: Host = { platform: process.platform, processEnv: process.env }
 ): Promise<string> {
   const failures: string[] = [];

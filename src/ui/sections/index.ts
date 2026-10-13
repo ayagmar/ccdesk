@@ -34,7 +34,7 @@ const UI: { [S in SectionId]: SectionUi<RowOf<S>> } = {
  * The sections of a directory page, in page order: each view section with its cells and inspector.
  * The cast is sound because a row is only ever handed to the section that made it.
  */
-export const SECTIONS: Array<Section<Row>> = VIEW_SECTIONS.map((section) => ({
+export const SECTIONS: Section<Row>[] = VIEW_SECTIONS.map((section) => ({
   ...section,
   ...(UI[section.id] as unknown as SectionUi<Row>),
 }));
