@@ -224,8 +224,9 @@ export function fromDraft(
   if (typeof draft === "object") return objectFromDraft(property ?? {}, draft);
   if (kind === "boolean") return { value: draft === "true" };
   if (kind === "number") {
+    // JSON has no Infinity, so a number too large would reach the review as null.
     const n = Number(draft);
-    return draft.trim() === "" || Number.isNaN(n) ? { error: "Enter a number." } : { value: n };
+    return draft.trim() === "" || !Number.isFinite(n) ? { error: "Enter a number." } : { value: n };
   }
   if (kind === "lines")
     return {
