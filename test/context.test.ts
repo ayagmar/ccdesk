@@ -37,6 +37,62 @@ test("what Claude sees at start leaves out path rules and reads only the loaded 
   assert.equal(memory?.text?.split("\n").length, 200);
 });
 
+test("imports are read as Claude Code reads them: anchors cut, punctuation kept, and none from frontmatter, comments, code, non-text or excluded files", async () => {
+  const f = makeFixture();
+  f.write(
+    "app/CLAUDE.md",
+    [
+      "---",
+      "note: see @fm.md",
+      "---",
+      "See @docs/guide.md#setup for setup.",
+      "<!-- old: @old-notes.md -->",
+      "",
+      "    @indented.md",
+      "",
+      "- a list",
+      "",
+      "  ```",
+      "  @in-list-fence.md",
+      "  ```",
+      "",
+      "Logo: @logo.png and @excluded.md then read @later.md.",
+      "",
+    ].join("\n")
+  );
+  for (const name of [
+    "docs/guide.md",
+    "fm.md",
+    "old-notes.md",
+    "indented.md",
+    "in-list-fence.md",
+    "logo.png",
+    "excluded.md",
+  ])
+    f.write(`app/${name}`, `${name} text\n`);
+  f.json("app/.claude/settings.json", { claudeMdExcludes: ["**/excluded.md"] });
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  const imports = view.instructions[0]?.imports ?? [];
+  assert.deepEqual(
+    imports.map((i) => [i.raw, i.skipped ?? null]),
+    [
+      ["docs/guide.md", null],
+      ["logo.png", "not-text"],
+      ["excluded.md", "excluded"],
+      ["later.md.", "not-text"],
+    ]
+  );
+  assert.deepEqual(
+    counted(view.context).map((b) => [b.kind, f.rel(b.path)]),
+    [
+      ["import", "app/docs/guide.md"],
+      ["instruction", "app/CLAUDE.md"],
+    ]
+  );
+});
+
 test("a rule that CLAUDE.md also imports is counted once", async () => {
   const f = makeFixture();
   f.write("home/.claude/rules/style.md", "Early returns.\n");

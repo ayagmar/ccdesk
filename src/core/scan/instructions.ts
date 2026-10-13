@@ -1,4 +1,5 @@
-import { dirname, isAbsolute, join, matchesGlob, parse, posix, resolve } from "node:path";
+import { dirname, extname, isAbsolute, join, matchesGlob, parse, posix, resolve } from "node:path";
+import { Lexer, type Token } from "marked";
 import picomatch from "picomatch";
 import {
   type AgentsMdMode,
@@ -148,6 +149,7 @@ interface Ctx {
   env: ScanEnv;
   approved: boolean;
   nestedWorktree: NestedWorktree | null;
+  isExcluded: ExcludeMatcher;
   problems: Problem[];
 }
 
@@ -163,6 +165,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
     env,
     approved: externalImports === "approved",
     nestedWorktree: options.nestedWorktree,
+    isExcluded: await excludeMatcher(excludes),
     problems,
   };
   const out = await readOwnFiles(ctx, managedClaudeMd);
@@ -174,7 +177,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
       ...claudeFiles.filter((f) => f.dir === dir),
       ...agentsFiles.filter((f) => f.dir === dir)
     );
-  applyLoadRules(out, ctx, mode, await excludeMatcher(excludes), externalImports);
+  applyLoadRules(out, ctx, mode, externalImports);
   addChecks(out);
   return out;
 }
@@ -319,7 +322,10 @@ function explainAgentsFiles(
 ): void {
   const hasClaudeMd = claudeFiles.some((f) => f.kind !== "rule");
   const includedElsewhere = new Set(
-    claudeFiles.flatMap((f) => [f.realPath ?? f.path, ...f.imports.map((i) => i.resolved)])
+    claudeFiles.flatMap((f) => [
+      f.realPath ?? f.path,
+      ...f.imports.filter((i) => !i.skipped).map((i) => i.resolved),
+    ])
   );
   for (const file of agentsFiles) {
     if (!agentsMdLoads(mode, false)) skip(file, skippedByMode(mode));
@@ -345,7 +351,6 @@ function applyLoadRules(
   out: Instruction[],
   ctx: Ctx,
   mode: AgentsMdMode,
-  isExcluded: ExcludeMatcher,
   externalImports: Trust["externalImports"]
 ): void {
   const waiting =
@@ -357,7 +362,7 @@ function applyLoadRules(
     // Path-scoped rules still load on demand in managed-only mode (docs: memory#choose-which-instruction-files-load).
     if (mode === "managed-only" && file.status === "loaded") skip(file, skippedByMode(mode));
     // Managed files cannot be excluded.
-    if (isExcluded(file.path, file.realPath)) skip(file, "Skipped by claudeMdExcludes");
+    if (ctx.isExcluded(file.path, file.realPath)) skip(file, "Skipped by claudeMdExcludes");
     if (file.status !== "skipped" && file.bytes > MAX_TEXT_BYTES)
       skip(file, "Skipped: Claude Code does not load an instruction file over 4 MiB");
     // A project's links outside it need your approval, like its imports; your own files do not.
@@ -458,7 +463,7 @@ async function instruction(
 ): Promise<Instruction> {
   // Your own files' imports load without asking; a project's imports outside it wait for approval.
   const own = scope === "managed" || scope === "user";
-  const imports = await collectImports(file, ctx, own || ctx.approved);
+  const imports = await collectImports(file, ctx, own || ctx.approved, scope !== "managed");
   if (!own && !ctx.approved) for (const ref of imports) if (ref.external) ref.pending = true;
   return { ...file, kind, scope, dir, status: "loaded", reason, imports, checks: [] };
 }
@@ -466,12 +471,14 @@ async function instruction(
 /**
  * `@path` imports, depth first up to four hops, each with the file that imports it. An import
  * outside the project is read only when Claude Code would read it: from your own files, or once
- * you approved the project's external imports.
+ * you approved the project's external imports. Like the files themselves, imports of all but
+ * managed files can be excluded.
  */
 async function collectImports(
   file: TextFile,
   ctx: Ctx,
-  readExternal: boolean
+  readExternal: boolean,
+  excludable: boolean
 ): Promise<ImportRef[]> {
   const seen = new Set<string>([file.realPath ?? file.path]);
   const out: ImportRef[] = [];
@@ -483,23 +490,53 @@ async function collectImports(
       const real = await resolvedPath(target);
       if (seen.has(real)) continue;
       seen.add(real);
-      const external = !isWithin(ctx.realCwd, real);
-      const imported =
-        !external || readExternal ? await readTextFile(ctx.env, target, ctx.problems) : null;
-      const ref: ImportRef = {
-        raw,
-        resolved: real,
-        via,
-        exists: imported !== null || (await isFile(target)),
-        external,
-      };
-      if (imported && imported.bytes > MAX_TEXT_BYTES) ref.tooLarge = true;
+      const { ref, imported } = await readImport(
+        ctx,
+        { raw, target, real, via },
+        readExternal,
+        excludable
+      );
       out.push(ref);
       if (imported) await visit(imported, real, hop + 1);
     }
   };
   await visit(file, file.path, 0);
   return out;
+}
+
+/** One import, and its text when Claude Code would read it. */
+async function readImport(
+  ctx: Ctx,
+  found: { raw: string; target: string; real: string; via: string },
+  readExternal: boolean,
+  excludable: boolean
+): Promise<{ ref: ImportRef; imported: TextFile | null }> {
+  const { raw, target, real, via } = found;
+  const external = !isWithin(ctx.realCwd, real);
+  const skipped = importSkipped(ctx, target, real, excludable);
+  const unread = skipped !== undefined || (external && !readExternal);
+  const imported = unread ? null : await readTextFile(ctx.env, target, ctx.problems);
+  const ref: ImportRef = {
+    raw,
+    resolved: real,
+    via,
+    exists: imported !== null || (await isFile(target)),
+    external,
+  };
+  if (skipped) ref.skipped = skipped;
+  if (imported && imported.bytes > MAX_TEXT_BYTES) ref.tooLarge = true;
+  return { ref, imported };
+}
+
+/** Why Claude Code does not load an import it found, or undefined when it does. */
+function importSkipped(
+  ctx: Ctx,
+  target: string,
+  real: string,
+  excludable: boolean
+): ImportRef["skipped"] {
+  if (excludable && ctx.isExcluded(target, real)) return "excluded";
+  return isTextImport(target) ? undefined : "not-text";
 }
 
 function expandImport(raw: string, baseDir: string, home: string): string {
@@ -509,16 +546,63 @@ function expandImport(raw: string, baseDir: string, home: string): string {
 }
 
 /**
- * `@path` references outside code spans and fences; a backslash keeps a space in the path. A code
- * span opens with a run of backticks and closes at the next run of the same length.
+ * The extensions Claude Code reads an import with; it skips any other file, such as an image
+ * (observed in v2.1.296). A file without an extension is read.
+ */
+const TEXT_EXTENSIONS = new Set(
+  (
+    ".md .txt .text .json .yaml .yml .toml .xml .csv .html .htm .css .scss .sass .less .js .ts " +
+    ".tsx .jsx .mjs .cjs .mts .cts .py .pyi .pyw .rb .erb .rake .go .rs .java .kt .kts .scala .c " +
+    ".cpp .cc .cxx .h .hpp .hxx .cs .swift .sh .bash .zsh .fish .ps1 .bat .cmd .env .ini .cfg " +
+    ".conf .config .properties .sql .graphql .gql .proto .vue .svelte .astro .ejs .hbs .pug .jade " +
+    ".php .pl .pm .lua .r .dart .ex .exs .erl .hrl .clj .cljs .cljc .edn .hs .lhs .elm .ml .mli " +
+    ".f .f90 .f95 .for .cmake .make .makefile .gradle .sbt .rst .adoc .asciidoc .org .tex .latex " +
+    ".lock .log .diff .patch"
+  ).split(" ")
+);
+
+function isTextImport(path: string): boolean {
+  const extension = extname(path).toLowerCase();
+  return extension === "" || TEXT_EXTENSIONS.has(extension);
+}
+
+/**
+ * `@path` references as Claude Code finds them (docs: memory#import-additional-files; the details
+ * observed in v2.1.296): in the Markdown text after the frontmatter, never in code blocks, inline
+ * code or HTML other than comments, and in an HTML comment block only outside the comments. A
+ * `#` and what follows is cut, a backslash keeps a space in the path, and only a path that
+ * starts like one counts.
  */
 function importPaths(text: string): string[] {
-  const withoutFences = text.replace(/^(```|~~~)[\s\S]*?^\1/gm, "");
-  const withoutSpans = withoutFences.replace(/(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g, "");
-  const found: string[] = [];
-  for (const match of withoutSpans.matchAll(/(?:^|\s)@((?:[^\s\\]|\\ )+)/g)) {
-    const path = match[1]?.replace(/[.,;:!?)\]]+$/, "");
-    if (path) found.push(path);
-  }
-  return found;
+  const body = parseFrontmatter(text).body;
+  if (!body.includes("@")) return [];
+  const found = new Set<string>();
+  const scan = (part: string) => {
+    for (const match of part.matchAll(/(?:^|\s)@((?:[^\s\\]|\\ )+)/g)) {
+      const path = match[1]?.split("#")[0];
+      if (path && looksLikePath(path.replaceAll("\\ ", " "))) found.add(path);
+    }
+  };
+  const walk = (tokens: Token[]) => {
+    for (const token of tokens) {
+      if (token.type === "code" || token.type === "codespan") continue;
+      if (token.type === "html") {
+        const raw = token.raw.trimStart();
+        if (raw.startsWith("<!--") && raw.includes("-->"))
+          scan(token.raw.replace(/<!--[\s\S]*?-->/g, ""));
+        continue;
+      }
+      if (token.type === "text") scan(token.text);
+      if ("tokens" in token && token.tokens) walk(token.tokens);
+      if ("items" in token && Array.isArray(token.items)) walk(token.items);
+    }
+  };
+  walk(Lexer.lex(body, { gfm: false }));
+  return [...found];
+}
+
+function looksLikePath(path: string): boolean {
+  if (path.startsWith("./") || path.startsWith("~/")) return true;
+  if (path.startsWith("/")) return path !== "/";
+  return !path.startsWith("@") && !/^[#%^&*()]/.test(path) && /^[a-zA-Z0-9._-]/.test(path);
 }
