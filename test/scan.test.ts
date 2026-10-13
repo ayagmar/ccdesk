@@ -1046,6 +1046,7 @@ test("MCP policy entries and server values match after variable expansion, each 
       kept: { command: `${ref("TOOLS")}/bin/kept` },
       wide: { type: "http", url: "https://evil.example/mcp" },
       docs: { type: "http", url: "https://docs.example/mcp" },
+      stray: { command: "/fake/stray" },
     },
   });
   // A deny entry's variable with no startup value fills from your settings.
@@ -1079,6 +1080,8 @@ test("MCP policy entries and server values match after variable expansion, each 
       kept: "active",
       wide: "Not in allowedMcpServers; an allowedMcpServers entry was ignored because expanding its variables changes its scheme, host or path",
       docs: "active",
+      // The ignored entry is a URL one, so it could never have admitted a command.
+      stray: "Not in allowedMcpServers",
       "plugin:kit:srv": "Blocked by deniedMcpServers",
     }
   );

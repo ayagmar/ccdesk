@@ -441,6 +441,21 @@ test("each model's effort comes from the highest file that sets it, capped at th
   ]);
 });
 
+test("a saved model effort a higher file's top-level effortLevel overrides comes with the reason", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/settings.json", {
+    modelSettings: { "claude-sonnet-5": { effortLevel: "xhigh" } },
+  });
+  f.json("app/.claude/settings.json", { effortLevel: "low" });
+
+  const models = setting(await scanDirectory(f.env, f.at("app")), "modelSettings");
+
+  assert.deepEqual(models?.overridden, [
+    { scope: "user", value: { "claude-sonnet-5": { effortLevel: "xhigh" } } },
+  ]);
+  assert.match(models?.note ?? "", /highest file/);
+});
+
 test("a project file with a value the schema rejects is skipped whole and reported, not shown in effect", async () => {
   const f = makeFixture();
   f.json("home/.claude/settings.json", { model: "opus" });
@@ -581,7 +596,7 @@ test("a nested field Claude Code tolerates or may skip leaves the rest of the fi
     permissions: { deny: ["Bash"] },
     statusLine: { type: "command", command: "x", someNewerField: 1 },
   });
-  // A nested value the schema rejects is an entry Claude Code may skip, not a reason to skip the file.
+  // A nested value the schema rejects is reported; whether Claude Code skips it or the file is not settled.
   f.json("app/.claude/settings.json", {
     theme: "dark",
     permissions: { deny: ["Read"], defaultMode: "careful" },
@@ -608,17 +623,24 @@ test("a managed value of the wrong shape is dropped, and attribution is repaired
     env: ["FAKE_TOKEN=fake-list-secret"],
     attribution: { commit: 5, pr: "Reviewed" },
     disableSideloadFlags: "true",
+    strictPluginOnlyCustomization: ["skills", "bogus"],
   });
 
   const view = await scanDirectory(f.env, f.at("app"));
   const managed = view.settings.find((l) => l.scope === "managed");
 
-  assert.deepEqual(managed?.data, { attribution: { pr: "Reviewed" } });
+  assert.deepEqual(managed?.data, {
+    attribution: { pr: "Reviewed" },
+    strictPluginOnlyCustomization: ["skills"],
+  });
   assert.deepEqual(
     managed?.repairs?.map((r) => r.field),
-    ["env", "attribution.commit", "disableSideloadFlags"]
+    ["env", "attribution.commit", "disableSideloadFlags", "strictPluginOnlyCustomization"]
   );
+  const note = (field: string) => managed?.repairs?.find((r) => r.field === field)?.note ?? "";
   // The docs name fail-closed Booleans only by example, so the page cannot say it is simply dropped.
-  assert.match(managed?.repairs?.at(-1)?.note ?? "", /fail-closed/);
+  assert.match(note("disableSideloadFlags"), /fail-closed/);
+  // An unknown surface is ignored, not stripped as invalid.
+  assert.match(note("strictPluginOnlyCustomization"), /locks nothing/);
   assert.ok(!JSON.stringify(view).includes("fake-list-secret"));
 });
