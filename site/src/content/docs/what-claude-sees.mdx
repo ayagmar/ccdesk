@@ -18,7 +18,7 @@ import Screenshot from "../../components/Screenshot.astro";
 2. Your output style, if you picked a custom one. The built-in styles add nothing here.
 3. Each instruction file that loads, with its imports placed before it. Frontmatter and HTML comments are left out, because Claude Code strips them.
 4. The part of `MEMORY.md` that loads: the first 200 lines or 25 KiB, whichever ends first. Only when auto memory is on.
-5. The skill listing: the name and description of each skill and command Claude can pick by itself.
+5. The skill listing: the name and description of each skill and command Claude can pick by itself. A skill with `paths` joins it only once Claude works with a matching file, so it is not counted here.
 6. Your subagents' descriptions.
 7. The tool names of your MCP servers. Listed but not counted, because ccdesk does not connect to the servers.
 

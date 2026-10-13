@@ -200,11 +200,14 @@ async function importBlock(
   return block(fields, text ? injectedText(text.text) : null);
 }
 
-/** The skill listing, the subagent descriptions and the MCP tool names Claude sees. */
+/**
+ * The skill listing, the subagent descriptions and the MCP tool names Claude sees. A skill with
+ * paths joins the listing only once Claude works with a matching file (docs: skills#frontmatter-reference).
+ */
 function listingBlocks(inventory: Inventory): ContextBlock[] {
   const blocks: ContextBlock[] = [];
   const listed = [...inventory.skills, ...inventory.commands].filter(
-    (s) => s.listed !== false && !s.shadowedBy
+    (s) => s.listed !== false && !s.shadowedBy && !s.paths
   );
   const listing = skillListing(listed);
   if (listing)
