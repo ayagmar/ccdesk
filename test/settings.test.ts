@@ -369,7 +369,9 @@ test("a project or local env waits for the trust dialog in an interactive sessio
   f.json("app/.claude/settings.local.json", { env: { FAKE_LOCAL_FLAG: "fake-local-value" } });
   const env = async (profile: "interactive" | "print") => {
     const view = await scanDirectory(f.env, f.at("app"), profile);
-    assert.ok(!JSON.stringify(view).includes("fake-project-value"));
+    const shown = JSON.stringify(view);
+    assert.ok(!shown.includes("fake-project-value"));
+    assert.ok(!shown.includes("fake-local-value"));
     return setting(view, "env");
   };
 
@@ -390,6 +392,17 @@ test("a project or local env waits for the trust dialog in an interactive sessio
     "FAKE_USER_FLAG",
   ]);
   assert.deepEqual(print?.ignored, []);
+});
+
+test("under a trusted parent folder outside git, a project env applies without its own trust", async () => {
+  const f = makeFixture();
+  f.json("home/.claude.json", { projects: { [f.at("work")]: { hasTrustDialogAccepted: true } } });
+  f.json("work/app/.claude/settings.json", { env: { FAKE_PROJECT_FLAG: "1" } });
+
+  const env = setting(await scanDirectory(f.env, f.at("work/app")), "env");
+
+  assert.deepEqual(env?.from, ["project"]);
+  assert.deepEqual(env?.ignored, []);
 });
 
 test("env variables a repository may not set, or no file may set, are ignored by name", async () => {
