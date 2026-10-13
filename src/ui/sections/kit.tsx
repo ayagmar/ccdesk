@@ -139,7 +139,13 @@ export function Contents({ text, markdown = true }: { text: string; markdown?: b
   );
 }
 
-const MarkdownText = lazy(() => import("../MarkdownText.tsx"));
+// A tab left open across an upgrade or rebuild asks for a chunk that is gone; show the text as written
+// rather than unmounting the page.
+const MarkdownText = lazy(() =>
+  import("../MarkdownText.tsx").catch(() => ({
+    default: ({ text }: { text: string }) => <pre className="raw">{text}</pre>,
+  }))
+);
 
 /** Markdown in the page's prose style. The renderer comes from this server, so it shows at once. */
 export function Prose({
