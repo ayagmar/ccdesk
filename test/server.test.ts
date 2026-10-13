@@ -19,6 +19,7 @@ import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/f
 
 const TOKEN = "test-token";
 interface Preview {
+  path: string;
   before: string | null;
   after: string;
   revision: string;
@@ -297,7 +298,12 @@ test("a Project edit through a link to your home folder is refused, since that f
   fixture.link("work/home-alias", fixture.env.home);
   const res = await call("/api/settings/preview", {
     method: "POST",
-    body: { dir: fixture.at("work/home-alias"), scope: "project", key: "effortLevel", value: "high" },
+    body: {
+      dir: fixture.at("work/home-alias"),
+      scope: "project",
+      key: "effortLevel",
+      value: "high",
+    },
   });
   assertRefused(res, 409, /edit it as User/);
 });

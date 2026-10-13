@@ -192,8 +192,7 @@ export async function readSettingsLayers(
     if (result.ok) {
       layer.data = redactSecrets(result.data);
       unredacted.set(layer, result.data);
-    }
-    else if (result.missing) layer.exists = false;
+    } else if (result.missing) layer.exists = false;
     else layer.error = result.error;
     layers.push(layer);
   }
