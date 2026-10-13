@@ -23,7 +23,7 @@ import { AGENTS_MD_MODES, resolveInstructions } from "./instructions.ts";
 import { readInventory } from "./inventory.ts";
 import { readMemoryStore } from "./memory.ts";
 import { enabledPluginsEntry } from "./plugins.ts";
-import { permissionsOf, type Options as TrustOptions, trustWaits } from "./permissions.ts";
+import { hooksWait, permissionsOf, type Options as TrustOptions } from "./permissions.ts";
 import { listProjects } from "./projects.ts";
 import { effectiveSettings, readManagedSettings, readSettingsLayers } from "./settings.ts";
 import { builtinTools } from "./tools.ts";
@@ -122,7 +122,8 @@ export async function scanDirectory(
   const sharing = await shareProjectFiles(path, root, instructions, settings, inventory);
   const trustOptions = {
     trust,
-    inConfigHome: isConfigHome(env, path),
+    // The local file at <folder>/.claude/settings.local.json, where <folder> is a configuration home.
+    inConfigHome: (file: string) => isConfigHome(env, dirname(dirname(file))),
     // Reads the visibility shareProjectFiles gave each layer.
     localFromRepository: await localFromRepository(settings),
     profile,
@@ -296,10 +297,10 @@ async function readMemory(
 ): Promise<MemoryStore> {
   const key = mainRoot ?? path;
   const setting = effective.find((s) => s.key === "autoMemoryDirectory");
-  // A value from a repository file counts once the folder is trusted, like hooks (docs:
+  // A value from a repository file counts under the same trust rule as hooks (docs:
   // settings-reference#automemorydirectory); until then the next file down that sets it decides.
-  // claude -p and the SDK treat the folder as trusted for hooks, so for this too.
-  const waitsForTrust = trustOptions.profile === "print" ? () => false : trustWaits(trustOptions);
+  const hooksHeld = hooksWait(trustOptions.trust, trustOptions.profile);
+  const waitsForTrust = (scope: Scope) => (scope === "project" || scope === "local") && hooksHeld;
   const candidates = setting
     ? [{ scope: setting.from[0], value: setting.value }, ...setting.overridden]
     : [];

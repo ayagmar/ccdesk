@@ -925,3 +925,35 @@ test("under a trusted parent, a local file in a .claude that is a link waits for
   assert.equal(await allowed("work/own"), true);
   assert.equal(await allowed("work/linked"), false);
 });
+
+test("with CLAUDE_CONFIG_DIR inside a repository, the root's local file waits for trust; the config home's own does not", async () => {
+  const f = makeFixture();
+  const env = {
+    ...f.env,
+    claudeDir: f.at("app/profile/.claude"),
+    claudeJson: f.at("app/profile/.claude/.claude.json"),
+  };
+  f.write("app/README.md", "x");
+  f.git("app", "init", "-q");
+  f.json("app/.claude/settings.local.json", { permissions: { allow: ["Bash"] } });
+  f.json("app/profile/.claude/settings.local.json", { permissions: { allow: ["Read"] } });
+
+  const view = await scanDirectory(env, f.at("app/profile"));
+
+  const allowed = (rule: string) =>
+    view.permissions.find((p) => p.kind === "rule" && p.rule === rule)?.inEffect;
+  assert.equal(allowed("Bash"), false);
+  assert.equal(allowed("Read"), true);
+});
+
+test("a project autoMemoryDirectory applies under a trusted parent folder, as hooks do", async () => {
+  const f = makeFixture();
+  f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
+  f.json("app/sub/.claude/settings.json", { autoMemoryDirectory: f.at("custom-memory") });
+
+  const view = await scanDirectory(f.env, f.at("app/sub"));
+
+  assert.equal(view.trust.inheritedFrom, f.at("app"));
+  assert.equal(view.memory.dir, f.at("custom-memory"));
+  assert.equal(view.memory.custom, true);
+});

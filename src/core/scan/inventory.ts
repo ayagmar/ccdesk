@@ -28,6 +28,7 @@ import {
 import { isRecord, parseFrontmatter } from "./data.ts";
 import { ancestorsRootFirst } from "./instructions.ts";
 import { readMcpServers } from "./mcp.ts";
+import { hooksWait } from "./permissions.ts";
 import {
   type LoadedPlugin,
   manifestCommandMap,
@@ -516,10 +517,9 @@ async function readHooks(input: InventoryInput, plugins: LoadedPlugin[]): Promis
     plugins.filter((p) => p.plugin.enabledIn === "managed").map((p) => p.plugin.id)
   );
   // An interactive session holds back hooks from every settings file, managed and yours included,
-  // until the folder or a parent covering it is trusted; -p and the SDK do not (docs:
-  // hooks#workspace-trust, permissions#what-runs-before-you-trust-a-folder). The docs say nothing
-  // of plugin hooks, so those are left as they are.
-  const heldBack = profile === "interactive" && !trust.trusted && !trust.inheritedFrom;
+  // until the folder or a parent covering it is trusted. The docs say nothing of plugin hooks, so
+  // those are left as they are.
+  const heldBack = hooksWait(trust, profile);
   for (const hook of out) {
     const organisation =
       hook.source === "managed" || (hook.plugin !== undefined && forcedByManaged.has(hook.plugin));
