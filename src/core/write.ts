@@ -12,7 +12,8 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { type BackupKind } from "../shared/types.ts";
+import { type Static, Type } from "typebox";
+import { BACKUP_KINDS, type BackupKind } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isCredentials, isSecretPath, revisionOf } from "./scan/files.ts";
 
@@ -163,20 +164,22 @@ export async function removeExactly(path: string, expected: string): Promise<boo
   return false;
 }
 
-export interface BackupManifest {
-  kind: BackupKind;
+/** What a backup folder records about its change, in its manifest. */
+export const BackupManifestSchema = Type.Object({
+  kind: Type.Enum(BACKUP_KINDS),
   /** The file that changed (for a deleted memory: the memory file). */
-  target: string;
-  createdAt: string;
+  target: Type.String(),
+  createdAt: Type.String(),
   /** Revision of the target before the change; "missing" when ccdesk created it. */
-  before: string;
+  before: Type.String(),
   /** Revision of the target right after the change; "pending" while it runs, "partial" when it failed halfway. */
-  after: string;
+  after: Type.String(),
   /** For a deleted memory: the MEMORY.md lines removed with it. */
-  removedIndexLines?: string[];
+  removedIndexLines: Type.Optional(Type.Array(Type.String())),
   /** For a change made through `claude mcp`: the commands that put it back, values hidden. */
-  undoCommands?: string[];
-}
+  undoCommands: Type.Optional(Type.Array(Type.String())),
+});
+export type BackupManifest = Static<typeof BackupManifestSchema>;
 
 export const MANIFEST = "ccdesk-backup.json";
 

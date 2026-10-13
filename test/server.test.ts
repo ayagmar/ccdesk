@@ -541,6 +541,31 @@ test("a forged backup cannot restore over a file ccdesk does not change", async 
   assert.equal(readFileSync(claudeMd, "utf8"), "mine\n");
 });
 
+test("a backup folder whose manifest ccdesk did not write is not listed", async () => {
+  // Catches the manifest check letting through a kind ccdesk does not know, which a restore would
+  // then treat as some other kind of file, or a field of the wrong type.
+  const root = join(fixture.env.claudeDir, "backups", "ccdesk");
+  const manifest = {
+    kind: "settings",
+    target: fixture.at("work/odd/.claude/settings.json"),
+    createdAt: new Date().toISOString(),
+    before: revisionOf(null),
+    after: revisionOf("{}\n"),
+  };
+  fixture.json(join(root, "odd-kind", "ccdesk-backup.json"), { ...manifest, kind: "elsewhere" });
+  fixture.json(join(root, "odd-lines", "ccdesk-backup.json"), {
+    ...manifest,
+    removedIndexLines: "- [Old](old.md)",
+  });
+  fixture.json(join(root, "odd-ok", "ccdesk-backup.json"), manifest);
+
+  const ids = (await backups()).map((b) => b.id);
+
+  assert.ok(ids.includes("odd-ok"));
+  assert.equal(ids.includes("odd-kind"), false);
+  assert.equal(ids.includes("odd-lines"), false);
+});
+
 test("a saved settings change shows up in recent changes and can be restored after review", async () => {
   const dir = fixture.at("work/restore");
   const file = fixture.json("work/restore/.claude/settings.json", {

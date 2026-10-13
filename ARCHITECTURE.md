@@ -74,7 +74,7 @@ Changes that cannot be undone from ccdesk:
 Each change gets a folder in `<Claude folder>/backups/ccdesk/<id>/`, readable only by you. The id is the time, a random suffix and the kind, such as `2026-10-12T19-15-02-123Z-a1b2c3-settings`, so ids sort by time.
 
 - `before`: the file before the change. Absent when the change created the file.
-- `ccdesk-backup.json`: the manifest. `kind`, `target`, `createdAt`, the `before` revision (`missing` for a created file) and the `after` revision. `after` is `pending` while the change runs and `partial` if it failed after writing something. A deleted memory also records the `MEMORY.md` lines removed with it.
+- `ccdesk-backup.json`: the manifest, checked against `BackupManifestSchema` in `write.ts` when read; a folder whose manifest does not match is not listed. `kind` (one of `BACKUP_KINDS` in `src/shared/types.ts`), `target`, `createdAt`, the `before` revision (`missing` for a created file) and the `after` revision. `after` is `pending` while the change runs and `partial` if it failed after writing something. A deleted memory also records the `MEMORY.md` lines removed with it.
 - `after`, for `claude mcp` changes only: the affected servers after the change, values hidden. Their manifest holds `undoCommands`.
 
 The manifest and `before` are written before the change, so an interrupted change can still be restored. A change that fails without changing the file removes its folder.
@@ -90,7 +90,7 @@ The free save functions and `readUsage`, kept for one release beside `createCore
 
 Still in module scope, and shared by every core:
 
-- The compiled TypeBox validators in `settings-edit.ts`, `scan/mcp.ts`, `parse-edit.ts` and `server.ts`. They come from bundled schemas and never change, so sharing them changes no result. `schemaErrors` lifts TypeBox's process-wide limit of eight errors while it lists them and puts it back after.
+- The compiled TypeBox validators in `settings-edit.ts`, `scan/mcp.ts`, `parse-edit.ts`, `backups.ts` and `server.ts`. They come from bundled schemas and never change, so sharing them changes no result. `schemaErrors` lifts TypeBox's process-wide limit of eight errors while it lists them and puts it back after.
 - In the page: `format.ts` keeps the formatter for the home folder the overview names, and `reference.ts` keeps the data from `/api/reference`. `src/view` keeps neither; its callers pass them in a `ViewContext`.
 
 `Watcher` is per instance; the server makes one from its core's `env`.

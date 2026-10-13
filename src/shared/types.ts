@@ -135,15 +135,19 @@ export interface EffectiveSetting {
   note?: string;
 }
 
-export type BackupKind =
-  | "settings"
-  | "mcp"
-  | "agent"
-  | "memory-index"
-  | "memory-delete"
-  | "memory-restore"
-  /** A user or local MCP server change made through `claude mcp`, which ccdesk cannot undo. */
-  | "mcp-claude";
+/** The kinds of change ccdesk records, one per kind of file it changes. */
+export const BACKUP_KINDS = [
+  "settings",
+  "mcp",
+  "agent",
+  "memory-index",
+  "memory-delete",
+  "memory-restore",
+  // A user or local MCP server change made through `claude mcp`, which ccdesk cannot undo.
+  "mcp-claude",
+] as const;
+
+export type BackupKind = (typeof BACKUP_KINDS)[number];
 
 /** One change ccdesk made, from its backup folder. */
 export interface BackupSummary {
