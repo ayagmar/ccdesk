@@ -104,7 +104,11 @@ test("a property that is not a number is refused by name", () => {
 });
 
 test("a number too large for JSON is refused rather than sent as null", () => {
-  assert.deepEqual(fromDraft("number", { type: "number" }, "1e400"), { error: "Enter a number." });
+  for (const draft of ["1e400", "-1e400", "Infinity"])
+    assert.deepEqual(fromDraft("number", { type: "number" }, draft), { error: "Enter a number." });
+  assert.deepEqual(fromDraft("json", lines, "[1, 1e400]"), {
+    error: "Not valid JSON: a number is too large to save",
+  });
 });
 
 test("a value a form cannot hold exactly is edited as JSON, so saving loses nothing", () => {
