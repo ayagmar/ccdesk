@@ -15,7 +15,9 @@ import { readJsonOrReport, stringField, stringsIn, wildcard } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { claudeJsonKey } from "./git.ts";
 import { type LoadedPlugin, manifestConfigs, pluginNamespace } from "./plugins.ts";
+import { hooksWait } from "./permissions.ts";
 import { unredactedData } from "./settings.ts";
+import { envFilter } from "./settings-env.ts";
 import serverSchema from "../../shared/mcp-server.schema.json" with { type: "json" };
 import { schemaErrors } from "../schema.ts";
 
@@ -51,6 +53,8 @@ interface Defined {
   url: string | null;
   /** From managed-mcp.json or managedMcpServers, which skip the allowlist. */
   organisation: boolean;
+  /** A plugin server's path placeholders, such as CLAUDE_PLUGIN_ROOT. */
+  placeholders?: Record<string, string>;
 }
 
 /** What the page shows a server connects to: its URL, or its command line with values hidden. */
@@ -259,7 +263,9 @@ export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Pro
   // A managed-mcp.json that does not parse is reported; ccdesk cannot tell which servers it lists,
   // so it does not show it taking control.
   const exclusive = managedJson !== null;
-  const policy = policyOf(layers);
+  const environments = environmentsOf(input);
+  expandServers(defined, environments);
+  const policy = policyOf(layers, environments);
   const disabledHere = stringsIn(project.disabledMcpServers);
   const answersFor = approvalAnswers(input, project);
 
@@ -340,28 +346,140 @@ async function pluginServers(
     if (file) add(define(file.mcpServers ?? file, "plugin", path));
     for (const part of await manifestConfigs(env, loaded, "mcpServers", problems))
       add(define(part.value, "plugin", part.path));
+    // The path placeholders a plugin's servers may use (docs: plugins-reference#environment-variables).
+    const placeholders = {
+      CLAUDE_PLUGIN_ROOT: plugin.installPath,
+      CLAUDE_PLUGIN_DATA: join(env.claudeDir, "plugins", "data", plugin.id.replace(/[^\w-]/g, "-")),
+    };
     // Claude Code registers each under plugin:<plugin>:<key>, the name policy entries and /mcp use
     // (docs: mcp#plugin-provided-mcp-servers).
     for (const [key, d] of own) {
       d.server.name = `plugin:${pluginNamespace(loaded)}:${key}`;
       d.server.plugin = plugin.id;
+      d.placeholders = placeholders;
     }
     defined.push(...own.values());
   }
   return defined;
 }
 
+type Vars = (name: string) => string | undefined;
+
+/** Expands the ${VAR} references in each server's command and URL for matching; the page keeps them as written. */
+function expandServers(defined: Defined[], environments: Environments): void {
+  for (const d of defined) {
+    const vars = (name: string) => d.placeholders?.[name] ?? environments.live(name);
+    d.command = d.command?.map((part) => expand(part, vars)) ?? null;
+    d.url = d.url === null ? null : expand(d.url, vars);
+  }
+}
+
+/**
+ * `text` with each ${VAR} and ${VAR:-default} expanded from `vars`; `fill` gives a value for a
+ * reference with neither a value nor a default. One with none of them stays as written (docs:
+ * mcp#supported-syntax, #unset-variables-without-a-default).
+ */
+function expand(text: string, vars: Vars, fill?: Vars): string {
+  return text.replace(
+    /\$\{([A-Za-z_]\w*)(?::-([^}]*))?\}/g,
+    (reference, name: string, fallback: string | undefined) => {
+      const value = vars(name);
+      if (value) return value;
+      return fallback ?? value ?? fill?.(name) ?? reference;
+    }
+  );
+}
+
+/** The environments ${VAR} references expand from, each a lookup by name. */
+interface Environments {
+  /** A server's own values: the environment Claude Code runs in, settings env included. */
+  live: Vars;
+  /** allowedMcpServers entries: the environment Claude Code started with, plus managed env. */
+  pinned: Vars;
+  /** What fills a deniedMcpServers reference that has no value and no default: user and managed env. */
+  denyFill: Vars;
+}
+
+/**
+ * The environment ccdesk runs in stands for the one Claude Code starts with. Each file's env is
+ * applied as Claude Code applies it: without the variables it ignores from that file, and from a
+ * repository's files under the trust rule for hooks (docs: settings-reference#when-claude-code-applies-env-values,
+ * permissions#what-runs-before-you-trust-a-folder, managed-mcp#how-policy-entries-expand).
+ */
+function environmentsOf({ env, layers, trust, profile }: Input): Environments {
+  const envOf = (layer: SettingsLayer): Record<string, unknown> => {
+    const raw = unredactedData(layer)?.env;
+    const kept = envFilter(layer.scope, raw, raw).value;
+    return isRecord(kept) ? kept : {};
+  };
+  const repositoryHeld = hooksWait(trust, profile);
+  // Lowest precedence first, so a higher file's value wins.
+  const lowestFirst = [...layers].reverse();
+  const settingsEnv = Object.assign(
+    {},
+    ...lowestFirst
+      .filter((l) => !(l.scope === "project" || l.scope === "local") || !repositoryHeld)
+      .map(envOf)
+  );
+  const managedEnv = Object.assign({}, ...layers.filter((l) => l.scope === "managed").map(envOf));
+  const userAndManaged = Object.assign(
+    {},
+    ...lowestFirst.filter((l) => l.scope === "user" || l.scope === "managed").map(envOf)
+  );
+  const text = (value: unknown) => (typeof value === "string" ? value : undefined);
+  const pinned: Vars = (name) => text(managedEnv[name]) ?? env.processEnv[name];
+  return {
+    live: (name) => text(settingsEnv[name]) ?? env.processEnv[name],
+    pinned,
+    denyFill: (name) =>
+      env.processEnv[name] === undefined ? text(userAndManaged[name]) : undefined,
+  };
+}
+
+/** A serverUrl pattern's scheme, host and path, which an allow entry's expansion may not change. */
+function urlScope(pattern: string): string {
+  const p = /^([^:/]+):\/\/([^/:]+)(?::[^/]*)?(\/.*)?$/.exec(pattern);
+  return p ? JSON.stringify([p[1], p[2], p[3]]) : pattern;
+}
+
+/** A policy entry with its serverCommand or serverUrl expanded, or null when Claude Code ignores it. */
+function expandEntry(
+  entry: PolicyEntry,
+  list: "allow" | "deny",
+  envs: Environments
+): PolicyEntry | null {
+  const fill = list === "deny" ? envs.denyFill : undefined;
+  if ("serverCommand" in entry)
+    return { serverCommand: entry.serverCommand.map((part) => expand(part, envs.pinned, fill)) };
+  if (!("serverUrl" in entry)) return entry;
+  const serverUrl = expand(entry.serverUrl, envs.pinned, fill);
+  // An allow entry whose expansion would change its scheme, host or path is ignored; a deny entry
+  // still matches.
+  if (list === "allow" && urlScope(serverUrl) !== urlScope(entry.serverUrl)) return null;
+  return { serverUrl };
+}
+
 /**
  * deniedMcpServers and allowedMcpServers across the settings: why a server is blocked, if it is.
- * Entries are read unredacted, since they match a server's command or URL secrets and all.
+ * Entries are read unredacted, since they match a server's command or URL secrets and all, and
+ * matched with their ${VAR} references expanded.
  */
-function policyOf(layers: SettingsLayer[]): { blocks: (d: Defined) => string | null } {
-  const denied = layers.flatMap((l) => policyEntries(unredactedData(l)?.deniedMcpServers));
+function policyOf(
+  layers: SettingsLayer[],
+  envs: Environments
+): { blocks: (d: Defined) => string | null } {
+  const entries = (list: "allow" | "deny", from: SettingsLayer[]) =>
+    from.flatMap((l) =>
+      policyEntries(
+        unredactedData(l)?.[list === "allow" ? "allowedMcpServers" : "deniedMcpServers"]
+      ).flatMap((e) => expandEntry(e, list, envs) ?? [])
+    );
+  const denied = entries("deny", layers);
   const managedOnly =
     layers.find((l) => l.scope === "managed")?.data?.allowManagedMcpServersOnly === true;
   const allowLayers = layers.filter((l) => !managedOnly || l.scope === "managed");
   const allowSet = allowLayers.some((l) => Array.isArray(l.data?.allowedMcpServers));
-  const allowList = allowLayers.flatMap((l) => policyEntries(unredactedData(l)?.allowedMcpServers));
+  const allowList = entries("allow", allowLayers);
   return {
     blocks: (d) => {
       if (denied.some((e) => matches(e, d))) return "Blocked by deniedMcpServers";

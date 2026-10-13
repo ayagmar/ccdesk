@@ -30,7 +30,7 @@ When two scopes define a server with the same name, the first one wins and the o
 - **needs approval**: a project server you have not approved yet. Approvals come from `enableAllProjectMcpServers` or `enabledMcpjsonServers` in your settings, or from answering Claude Code's prompt. Approvals in project and local files count only once you trust the folder. `claude -p` and the SDK connect these servers without asking, so they show as **configured** in the **claude -p / SDK** view.
 - **rejected**: listed in `disabledMcpjsonServers`.
 - **turned off**: switched off for this project in Claude Code.
-- **blocked**: excluded by `deniedMcpServers` or `allowedMcpServers` in your settings.
+- **blocked**: excluded by `deniedMcpServers` or `allowedMcpServers` in your settings. As in Claude Code, `${VAR}` and `${VAR:-default}` references in a server's command, arguments or URL and in a policy entry's `serverCommand` or `serverUrl` are expanded before they are compared: a server's from the environment ccdesk runs in plus the `env` of your settings files, a policy entry's from that environment plus managed `env`. An `allowedMcpServers` URL entry whose expansion changes its scheme, host or path counts for nothing. The page shows every value as written, never expanded.
 - **overridden**: another scope defines a server with this name first (see above).
 - **invalid**: Claude Code cannot use the definition as written: a `url` without a `type`, which Claude Code reads as a stdio server; a `type` it does not know, or `sdk`, which only an SDK application can register; or a field from Claude Code's MCP docs holding the wrong kind of value, such as `args` written as one string instead of a list. ccdesk checks the same rules before it adds or changes a server.
 
