@@ -67,6 +67,8 @@ function shownArg(arg: string, previous: unknown): string {
 /**
  * Replace values that commonly hold secrets with a placeholder, keeping the keys: env and headers
  * values, the user, password and query of a `url`, and secret values in the `args` of a command.
+ * MCP policy entries repeat a server's command or URL to match it, so a `serverCommand`'s arguments
+ * and a `serverUrl`'s credentials are hidden the same way.
  */
 export function redactSecrets(value: Record<string, unknown>): Record<string, unknown>;
 export function redactSecrets(value: unknown): unknown;
@@ -78,7 +80,9 @@ export function redactSecrets(value: unknown): unknown {
     Object.entries(value).map(([key, inner]) => {
       if ((key === "env" || key === "headers") && isRecord(inner))
         return [key, Object.fromEntries(Object.keys(inner).map((k) => [k, "•••"]))];
-      if (key === "url" && typeof inner === "string") return [key, shownUrl(inner)];
+      if ((key === "url" || key === "serverUrl") && typeof inner === "string")
+        return [key, shownUrl(inner)];
+      if (key === "serverCommand" && Array.isArray(inner)) return [key, shownArgs(inner)];
       if (key === "args" && "command" in value && Array.isArray(inner))
         return [key, shownArgs(inner)];
       return [key, redactSecrets(inner)];

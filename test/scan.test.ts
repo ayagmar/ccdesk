@@ -573,6 +573,31 @@ test("MCP policy: denied servers are blocked, an allowlist blocks the rest, mana
   assert.equal(exclusive.github, "blocked");
 });
 
+test("MCP policy entries never show the secrets they match on, and still match", async () => {
+  const f = makeFixture();
+  // A command policy is an exact match of the whole command, so it repeats the server's token.
+  const token = "tok-policy-secret-1";
+  f.json("home/.claude.json", {
+    mcpServers: {
+      db: { command: "node", args: ["db.js", "--token", token] },
+      api: { type: "http", url: "https://api.example/mcp" },
+    },
+  });
+  f.json("home/.claude/settings.json", {
+    deniedMcpServers: [
+      { serverCommand: ["node", "db.js", "--token", token] },
+      { serverUrl: "https://user:pass-secret-2@other.example/mcp?key=q-secret-3" },
+    ],
+  });
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+  const status = Object.fromEntries(view.inventory.mcpServers.map((s) => [s.name, s.status]));
+  assert.deepEqual(status, { api: "active", db: "blocked" });
+  const shown = JSON.stringify(view);
+  for (const secret of [token, "pass-secret-2", "q-secret-3"]) assert.ok(!shown.includes(secret));
+});
+
 test("a rules folder linked from outside the project waits for the external-imports approval", async () => {
   const f = makeFixture();
   f.write("shared-rules/style.md", "Early returns.\n");

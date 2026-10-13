@@ -15,6 +15,7 @@ import { readJsonOrReport, stringField, stringsIn, wildcard } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { claudeJsonKey } from "./git.ts";
 import { type LoadedPlugin, manifestConfigs } from "./plugins.ts";
+import { unredactedData } from "./settings.ts";
 import serverSchema from "../../shared/mcp-server.schema.json" with { type: "json" };
 import { schemaErrors } from "../schema.ts";
 
@@ -345,14 +346,17 @@ async function pluginServers(
   return defined;
 }
 
-/** deniedMcpServers and allowedMcpServers across the settings: why a server is blocked, if it is. */
+/**
+ * deniedMcpServers and allowedMcpServers across the settings: why a server is blocked, if it is.
+ * Entries are read unredacted, since they match a server's command or URL secrets and all.
+ */
 function policyOf(layers: SettingsLayer[]): { blocks: (d: Defined) => string | null } {
-  const denied = layers.flatMap((l) => policyEntries(l.data?.deniedMcpServers));
+  const denied = layers.flatMap((l) => policyEntries(unredactedData(l)?.deniedMcpServers));
   const managedOnly =
     layers.find((l) => l.scope === "managed")?.data?.allowManagedMcpServersOnly === true;
   const allowLayers = layers.filter((l) => !managedOnly || l.scope === "managed");
   const allowSet = allowLayers.some((l) => Array.isArray(l.data?.allowedMcpServers));
-  const allowList = allowLayers.flatMap((l) => policyEntries(l.data?.allowedMcpServers));
+  const allowList = allowLayers.flatMap((l) => policyEntries(unredactedData(l)?.allowedMcpServers));
   return {
     blocks: (d) => {
       if (denied.some((e) => matches(e, d))) return "Blocked by deniedMcpServers";

@@ -185,12 +185,27 @@ export async function readSettingsLayers(
     if (file.legacy && !result.ok && result.missing) continue;
     const layer: SettingsLayer = { scope: file.scope, path: file.path, exists: true, data: null };
     if (file.legacy) layer.legacy = true;
-    if (result.ok) layer.data = redactSecrets(result.data);
+    if (result.ok) {
+      layer.data = redactSecrets(result.data);
+      unredacted.set(layer, result.data);
+    }
     else if (result.missing) layer.exists = false;
     else layer.error = result.error;
     layers.push(layer);
   }
   return layers;
+}
+
+/**
+ * Each layer's data as the file has it, for the checks that must compare real values: an MCP policy
+ * entry matches a server's command or URL exactly, secrets included. Kept beside the layer rather
+ * than on it, so it never reaches the page with the rest of the view.
+ */
+const unredacted = new WeakMap<SettingsLayer, Record<string, unknown>>();
+
+/** A layer's data with nothing hidden; only for comparing, never for showing. */
+export function unredactedData(layer: SettingsLayer): Record<string, unknown> | null {
+  return unredacted.get(layer) ?? null;
 }
 
 export interface ManagedSettings {
@@ -240,7 +255,10 @@ export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings
 function managedLayer(path: string, managed: ManagedSettings): SettingsLayer {
   const { data, sources, dropIns, higher, errors, blocksStart } = managed;
   const layer: SettingsLayer = { scope: "managed", path, exists: false, data: null };
-  if (data) layer.data = redactSecrets(data);
+  if (data) {
+    layer.data = redactSecrets(data);
+    unredacted.set(layer, data);
+  }
   layer.exists = sources.length > 0 || errors.length > 0;
   if (sources.length > 1 || dropIns.length > 0) layer.sources = sources;
   if (errors.length > 0) layer.error = errors.join("; ");
