@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { delimiter, join, posix, win32 } from "node:path";
 import { type ScanEnv } from "./scan/env.ts";
+import { RefusedError } from "./write.ts";
 
 /** Editors that need a terminal; started from a background server they would have none. */
 const TERMINAL_EDITORS = new Set([
@@ -177,5 +178,7 @@ export async function openInEditor(
     if (failure === null) return command[0];
     failures.push(failure);
   }
-  throw new Error(`Could not open it (${failures.join("; ")}). Set CCDESK_EDITOR to your editor.`);
+  throw new RefusedError(
+    `Could not open it (${failures.join("; ")}). Set CCDESK_EDITOR to your editor.`
+  );
 }

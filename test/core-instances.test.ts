@@ -100,6 +100,20 @@ test("a core never opens the credentials file, whatever opener it is given", asy
   assert.deepEqual(opened, []);
 });
 
+test("an editor that will not start is refused with how to set one, not a server error", async () => {
+  // Catches the failure being a plain Error, which the web server answers as a 500 with no hint
+  // that CCDESK_EDITOR fixes it.
+  const f = makeFixture();
+  const env = { ...f.env, processEnv: { PATH: f.at("bin"), CCDESK_EDITOR: "no-such-editor" } };
+  const target = f.write("app/CLAUDE.md", "# Rules\n");
+
+  await assert.rejects(createCore(env).openFile(target), (error) => {
+    assert.ok(error instanceof RefusedError);
+    assert.match(error.message, /^Could not open it \(no-such-editor: .*\)\. Set CCDESK_EDITOR/);
+    return true;
+  });
+});
+
 // The fake programs are shell scripts.
 const notOnWindows = { skip: process.platform === "win32" };
 

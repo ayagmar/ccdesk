@@ -60,7 +60,7 @@ Every edit runs twice: once to show it, once to make it.
 Errors a front end should handle:
 
 - `InvalidEditError`: the input is not a well-formed edit (unknown scope, missing field). The server answers 400. Other malformed requests, such as a usage count with an unknown rule list or a relative path, are answered 400 by the server itself.
-- `RefusedError`: ccdesk will not make the change. That covers a file changed since the preview, schema errors, hidden values, managed settings, credentials and `~/.claude.json`, so the message says which. The server answers 409.
+- `RefusedError`: ccdesk will not make the change. That covers a file changed since the preview, schema errors, hidden values, managed settings, credentials and `~/.claude.json`, so the message says which. `openFile` also throws it when no editor starts, naming `CCDESK_EDITOR`. The server answers 409.
 - `StaleError`, a subclass of `RefusedError`: the file changed while ccdesk was writing it, after the revision check. Nothing was written and no backup is kept. A front end treats it like any `RefusedError`: review again.
 
 Changes that cannot be undone from ccdesk:
