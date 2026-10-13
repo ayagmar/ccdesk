@@ -9,7 +9,7 @@ import {
 } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
 import { isDir, listDir, readTextFile, revisionOf, shortHash, stringField } from "./files.ts";
-import { parseFrontmatter } from "./data.ts";
+import { isRecord, parseFrontmatter } from "./data.ts";
 
 const INDEX_FILE = "MEMORY.md";
 /** Claude Code reads only this much of MEMORY.md at session start (docs: memory#auto-memory). */
@@ -33,17 +33,14 @@ export async function readMemoryStore(
     const text = await readTextFile(env, join(dir, file), problems);
     if (!text) continue;
     const { data, body } = parseFrontmatter(text.text);
-    const metadata =
-      typeof data.metadata === "object" && data.metadata !== null
-        ? (data.metadata as Record<string, unknown>)
-        : {};
+    const metadata = isRecord(data.metadata) ? data.metadata : {};
     const rawType = stringField(metadata, "type") || stringField(data, "type");
     memories.push({
       file,
       path: text.path,
       name: stringField(data, "name") || file.replace(/\.md$/, ""),
       description: stringField(data, "description"),
-      type: TYPES.includes(rawType as MemoryType) ? (rawType as MemoryType) : "unknown",
+      type: TYPES.find((t) => t === rawType) ?? "unknown",
       body,
       mtime: text.mtime,
       bytes: text.bytes,

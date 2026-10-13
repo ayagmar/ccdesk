@@ -57,13 +57,11 @@ export interface Options {
  */
 export function permissionsOf(layers: SettingsLayer[], options: Options): Permission[] {
   const sources = HIGHEST_FIRST.flatMap((scope) =>
-    layers
-      .filter((l) => l.scope === scope && isRecord(l.data?.permissions))
-      .map((l) => ({
-        scope,
-        path: l.path,
-        permissions: l.data?.permissions as Record<string, unknown>,
-      }))
+    layers.flatMap((l) =>
+      l.scope === scope && isRecord(l.data?.permissions)
+        ? [{ scope, path: l.path, permissions: l.data.permissions }]
+        : []
+    )
   );
   const managedOnly = layers.some(
     (l) => l.scope === "managed" && l.data?.allowManagedPermissionRulesOnly === true
