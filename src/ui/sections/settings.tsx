@@ -11,9 +11,16 @@ import { type SectionUi } from "./types.ts";
 
 type R = RowOf<"settings">;
 
+type Ignored = EffectiveSetting["ignored"][number];
+
+/** The entry that speaks for several: one held for trust, since it applies once you trust the folder. */
+function leading(entries: Ignored[]): Ignored | undefined {
+  return entries.find((i) => i.waitsForTrust) ?? entries[0];
+}
+
 /** Which file decides the value, or why none does. */
 function verdict(s: EffectiveSetting): string {
-  const first = s.ignored[0];
+  const first = leading(s.ignored);
   if (s.from.length === 0 && first?.waitsForTrust)
     return `Claude Code holds this value until you trust the folder: ${first.reason}.`;
   if (s.from.length === 0) return `Claude Code ignores this value: ${first?.reason ?? ""}.`;
@@ -28,16 +35,12 @@ function layerOutcome(s: EffectiveSetting, scope: Scope, value: unknown): string
 }
 
 /** How the page marks a value Claude Code does not use. */
-function ignoredLabel(ignored: EffectiveSetting["ignored"][number]): string {
-  return ignored.waitsForTrust ? "waits for trust" : "ignored";
+function ignoredLabel(ignored: Ignored | undefined): string {
+  return ignored?.waitsForTrust ? "waits for trust" : "ignored";
 }
 
 /** A scope's value as the table shows it. */
-function layerValue(
-  value: unknown,
-  exists: boolean,
-  ignored: EffectiveSetting["ignored"][number] | undefined
-): string {
+function layerValue(value: unknown, exists: boolean, ignored: Ignored | undefined): string {
   if (value === undefined) return exists ? "not set" : "no file";
   return `${preview(value)}${ignored ? ` (${ignoredLabel(ignored)})` : ""}`;
 }
@@ -57,7 +60,7 @@ export const settings: SectionUi<R> = {
         </td>
         <td className="mono value">
           {s.from.length === 0 ? (
-            <span className="muted">{s.ignored[0] ? ignoredLabel(s.ignored[0]) : "ignored"}</span>
+            <span className="muted">{ignoredLabel(leading(s.ignored))}</span>
           ) : (
             tildeAll(preview(s.value))
           )}
@@ -109,7 +112,7 @@ export const settings: SectionUi<R> = {
             {HIGHEST_FIRST.map((scope) => {
               const layer = layerOf(scope);
               const value = layer?.data?.[s.key];
-              const ignored = s.ignored.find((i) => i.scope === scope);
+              const ignored = leading(s.ignored.filter((i) => i.scope === scope));
               return (
                 <tr key={scope} className={layerOutcome(s, scope, value)} title={ignored?.reason}>
                   <th scope="row">

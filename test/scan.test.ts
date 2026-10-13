@@ -747,6 +747,20 @@ test("an untracked settings.local.json approval counts under a trusted parent fo
   assert.match(underParent.lib ?? "", /counts once you trust this folder/);
 });
 
+test("under a trusted parent folder, a local file in a linked .claude still cannot approve MCP servers", {
+  skip: process.platform === "win32",
+}, async () => {
+  const f = makeFixture();
+  f.json("home/.claude.json", { projects: { [f.at("work")]: { hasTrustDialogAccepted: true } } });
+  f.json("work/app/.mcp.json", { mcpServers: { docs: { command: "docs-mcp" } } });
+  f.json("shared/.claude/settings.local.json", { enabledMcpjsonServers: ["docs"] });
+  f.link("work/app/.claude", f.at("shared/.claude"));
+
+  const view = await scanDirectory(f.env, f.at("work/app"));
+
+  assert.equal(view.inventory.mcpServers.find((s) => s.name === "docs")?.status, "pending");
+});
+
 test("a project agent file Claude Code skips does not hide your agent of the same name", async () => {
   const f = makeFixture();
   f.write(
