@@ -1,10 +1,25 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { allowedScopes, EDITABLE_SCOPES } from "../shared/scopes.ts";
-import { type DirectoryView, type Scope, type SettingsEdit } from "../shared/types.ts";
+import {
+  type DirectoryView,
+  type Scope,
+  type SettingSchema,
+  type SettingsEdit,
+} from "../shared/types.ts";
 import { lineName } from "../view/lines.ts";
-import { type FieldKind, fieldKind } from "../view/settings.ts";
+import {
+  allowedValues,
+  type Draft,
+  type DraftObject,
+  editKind,
+  expects,
+  type FieldKind,
+  fieldKind,
+  fromDraft,
+  toDraft,
+} from "../view/settings.ts";
 import { api } from "./api.ts";
-import { parseJson, ScopeButtons } from "./editorKit.tsx";
+import { ScopeButtons } from "./editorKit.tsx";
 import { tilde } from "./format.ts";
 import { documentedValues } from "./settingsCatalog.ts";
 import { propertyFor, schemaSource, settingKeys } from "./settingsSchema.ts";
@@ -18,38 +33,6 @@ interface Props {
   onSaved: (saved: Saved) => void;
 }
 
-/** A value as the form holds it: text for inputs, a boolean for checkboxes. */
-type Draft = string | boolean;
-
-function toDraft(kind: FieldKind, value: unknown): Draft {
-  if (kind === "boolean") return value === true;
-  if (value === undefined) return "";
-  if (kind === "lines") return Array.isArray(value) ? value.join("\n") : "";
-  if (kind === "json") return JSON.stringify(value, null, 2);
-  return String(value);
-}
-
-function fromDraft(kind: FieldKind, draft: Draft): { value: unknown } | { error: string } {
-  if (typeof draft === "boolean") return { value: draft };
-  if (kind === "number") {
-    const n = Number(draft);
-    return draft.trim() === "" || Number.isNaN(n) ? { error: "Enter a number." } : { value: n };
-  }
-  if (kind === "lines")
-    return {
-      value: draft
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean),
-    };
-  if (kind === "json") {
-    const parsed = parseJson(draft);
-    return "error" in parsed ? { error: `Not valid JSON: ${parsed.error}` } : parsed;
-  }
-  if (kind === "enum" && draft === "") return { error: "Pick a value." };
-  return { value: draft };
-}
-
 function isHidden(value: unknown): boolean {
   return JSON.stringify(value ?? null).includes("•••");
 }
@@ -58,16 +41,16 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
   const [key, setKey] = useState(settingKey ?? "");
   const [scope, setScope] = useState<Scope>(defaultScope);
   const property = propertyFor(key);
-  const kind = fieldKind(property);
   const layer = view.settings.find((l) => l.scope === scope && !l.legacy);
   const current = layer?.data?.[key];
+  const kind = editKind(property, current);
   // The edit is kept with its review, so Save writes exactly what the diff showed.
   const change = useReviewedChange<SettingsEdit>(
     api.previewSettings,
     api.saveSettings,
     (saved, edit) => onSaved({ ...saved, select: `set:${edit.key}` })
   );
-  const [draft, setDraft] = useDraft(key, kind, current, change);
+  const [draft, setDraft] = useDraft(key, kind, property, current, change);
 
   const allowed = allowedScopes(key);
   // Start on a file Claude Code reads this key from.
@@ -91,7 +74,7 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
   };
 
   const startReview = (removing: boolean) => {
-    const parsed = removing ? { value: undefined } : fromDraft(kind, draft);
+    const parsed = removing ? { value: undefined } : fromDraft(kind, property, draft);
     if ("error" in parsed) return change.fail(parsed.error);
     const where = `${lineName(scope)} settings`;
     void change.start(
@@ -137,7 +120,7 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
             <ValueForm
               settingKey={key}
               kind={kind}
-              options={property.enum}
+              property={property}
               draft={draft}
               onType={type}
               busy={change.busy}
@@ -163,10 +146,11 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
 function useDraft(
   key: string,
   kind: FieldKind,
+  property: SettingSchema | undefined,
   current: unknown,
   change: Pick<ReviewedChange<SettingsEdit>, "cancel" | "fail">
 ): [Draft, (draft: Draft) => void] {
-  const [draft, setDraft] = useState<Draft>(() => toDraft(kind, current));
+  const [draft, setDraft] = useState<Draft>(() => toDraft(kind, property, current));
   const currentText = JSON.stringify(current);
   const base = useRef({ key, kind, text: currentText });
   // biome-ignore lint/correctness/useExhaustiveDependencies: the draft is read, not a trigger.
@@ -176,8 +160,9 @@ function useDraft(
     if (was.key === key && was.kind === kind && was.text === currentText) return;
     change.cancel();
     const parse = (text: string | undefined) => (text === undefined ? undefined : JSON.parse(text));
-    const now = toDraft(kind, parse(currentText));
-    const edited = JSON.stringify(draft) !== JSON.stringify(toDraft(kind, parse(was.text)));
+    const now = toDraft(kind, property, parse(currentText));
+    const edited =
+      JSON.stringify(draft) !== JSON.stringify(toDraft(kind, property, parse(was.text)));
     // A draft that matches the file, as after saving it, is in step with it, not edited.
     const differs = JSON.stringify(draft) !== JSON.stringify(now);
     if (was.key === key && was.kind === kind && edited && differs) {
@@ -193,7 +178,7 @@ function useDraft(
 function ValueForm({
   settingKey,
   kind,
-  options,
+  property,
   draft,
   onType,
   busy,
@@ -203,7 +188,7 @@ function ValueForm({
 }: {
   settingKey: string;
   kind: FieldKind;
-  options: unknown[] | undefined;
+  property: SettingSchema;
   draft: Draft;
   onType: (draft: Draft) => void;
   busy: boolean;
@@ -211,14 +196,18 @@ function ValueForm({
   canRemove: boolean;
   onReview: (removing: boolean) => void;
 }) {
-  const fieldId = useId();
   const documented = kind === "string" ? documentedValues(settingKey) : [];
   return (
     <>
-      <label className="field" htmlFor={fieldId}>
-        <span>Value in this file</span>
-        <Field id={fieldId} kind={kind} options={options} draft={draft} onChange={onType} />
-      </label>
+      <Labeled label="Value in this file" kind={kind}>
+        {(id) => <Field id={id} kind={kind} property={property} draft={draft} onChange={onType} />}
+      </Labeled>
+      {kind === "json" && fieldKind(property) !== "json" && (
+        <p className="muted small">
+          The value in this file does not fit the form, so it is shown as JSON.
+        </p>
+      )}
+      {kind === "json" && <p className="muted small">Takes {expects(property)}.</p>}
       {documented.length > 0 && (
         <fieldset className="suggestions" aria-label="Values from the settings reference">
           <span className="muted small">Documented values</span>
@@ -255,49 +244,86 @@ function ValueForm({
   );
 }
 
+/**
+ * A control and its label. Choices and object forms hold several controls, so they are a group
+ * named by the label: a label element would pass its clicks to the first of them.
+ */
+function Labeled({
+  label,
+  kind,
+  children,
+}: {
+  label: ReactNode;
+  kind: FieldKind;
+  children: (id: string) => ReactNode;
+}) {
+  const id = useId();
+  if (kind === "choices" || kind === "object")
+    return (
+      <fieldset className="field" aria-labelledby={id}>
+        <span id={id}>{label}</span>
+        {children(`${id}-control`)}
+      </fieldset>
+    );
+  return (
+    <label className="field" htmlFor={id}>
+      <span>{label}</span>
+      {children(id)}
+    </label>
+  );
+}
+
 function Field({
   id,
   kind,
-  options,
+  property,
   draft,
   onChange,
+  inObject = false,
 }: {
   id: string;
   kind: FieldKind;
-  options: unknown[] | undefined;
+  property: SettingSchema;
   draft: Draft;
   onChange: (d: Draft) => void;
+  inObject?: boolean;
 }) {
-  if (kind === "boolean")
-    return (
-      <span className="check">
-        <input
-          id={id}
-          type="checkbox"
-          checked={draft === true}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-        {draft === true ? "on" : "off"}
-      </span>
-    );
-  if (kind === "enum")
+  if (kind === "boolean" && !inObject)
+    return <Checkbox id={id} checked={draft === true} onChange={onChange} />;
+  // A boolean inside an object can be left unset, so it is a choice of three.
+  if (kind === "enum" || kind === "boolean")
     return (
       <select id={id} value={String(draft)} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Pick a value</option>
-        {(options ?? []).map((o) => (
-          <option key={String(o)} value={String(o)}>
-            {String(o)}
-          </option>
-        ))}
+        <option value="">{inObject ? "Not set" : "Pick a value"}</option>
+        <Options values={kind === "boolean" ? [true, false] : (allowedValues(property) ?? [])} />
       </select>
+    );
+  if (kind === "choices")
+    return (
+      <Choices
+        id={id}
+        property={property}
+        picked={Array.isArray(draft) ? draft : []}
+        onChange={onChange}
+      />
+    );
+  if (kind === "object")
+    return (
+      <ObjectFields
+        id={id}
+        property={property}
+        draft={typeof draft === "object" && !Array.isArray(draft) ? draft : {}}
+        onChange={onChange}
+      />
     );
   if (kind === "lines" || kind === "json")
     return (
       <textarea
         id={id}
         className="mono"
-        rows={Math.min(14, Math.max(4, String(draft).split("\n").length + 1))}
+        rows={Math.min(14, Math.max(inObject ? 2 : 4, String(draft).split("\n").length + 1))}
         spellCheck={false}
+        placeholder={kind === "lines" && inObject ? "One entry per line" : undefined}
         value={String(draft)}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -310,6 +336,116 @@ function Field({
       value={String(draft)}
       onChange={(e) => onChange(e.target.value)}
     />
+  );
+}
+
+function Checkbox({
+  id,
+  checked,
+  onChange,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (d: Draft) => void;
+}) {
+  return (
+    <span className="check">
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      {checked ? "on" : "off"}
+    </span>
+  );
+}
+
+function Options({ values }: { values: unknown[] }) {
+  return values.map((o) => (
+    <option key={String(o)} value={String(o)}>
+      {String(o)}
+    </option>
+  ));
+}
+
+/** A button per value a list may hold, pressed for the values it does; picking adds to the end. */
+function Choices({
+  id,
+  property,
+  picked,
+  onChange,
+}: {
+  id: string;
+  property: SettingSchema;
+  picked: string[];
+  onChange: (d: Draft) => void;
+}) {
+  const values = (property.items && allowedValues(property.items)) ?? [];
+  return (
+    <div id={id} className="suggestions">
+      {values.map(String).map((value) => (
+        <button
+          key={value}
+          type="button"
+          className="mono"
+          aria-pressed={picked.includes(value)}
+          onClick={() =>
+            onChange(
+              picked.includes(value) ? picked.filter((v) => v !== value) : [...picked, value]
+            )
+          }
+        >
+          {value}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** One control per property the schema names, in the schema's order; an empty one is left unset. */
+function ObjectFields({
+  id,
+  property,
+  draft,
+  onChange,
+}: {
+  id: string;
+  property: SettingSchema;
+  draft: DraftObject;
+  onChange: (d: Draft) => void;
+}) {
+  return (
+    <div id={id} className="object-fields">
+      {Object.entries(property.properties ?? {}).map(([name, schema]) => {
+        const kind = fieldKind(schema);
+        return (
+          <div key={name} className="object-field">
+            <Labeled
+              kind={kind}
+              label={
+                <>
+                  <span className="mono">{name}</span>
+                  {property.required?.includes(name) && <span className="muted"> required</span>}
+                </>
+              }
+            >
+              {(fieldId) => (
+                <Field
+                  id={fieldId}
+                  kind={kind}
+                  property={schema}
+                  draft={draft[name] ?? toDraft(kind, schema, undefined, true)}
+                  onChange={(next) => onChange({ ...draft, [name]: next })}
+                  inObject
+                />
+              )}
+            </Labeled>
+            {schema.description && <p className="muted small">{schema.description}</p>}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

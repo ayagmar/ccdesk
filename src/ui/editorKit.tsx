@@ -13,15 +13,6 @@ export function projectOrUser(view: DirectoryView): Scope {
   return fileFor(view, "project") ? "project" : "user";
 }
 
-/** JSON typed into a form, or why it does not parse. */
-export function parseJson(text: string): { value: unknown } | { error: string } {
-  try {
-    return { value: JSON.parse(text) };
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : String(error) };
-  }
-}
-
 /**
  * One button per scope, the picked one with a filled bullet. `unavailable` says why a scope cannot
  * be picked; it is undefined for one that can.

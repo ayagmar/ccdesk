@@ -20,5 +20,17 @@ export type {
   ViewContext,
   ViewSection,
 } from "./sections/types.ts";
-export { type FieldKind, fieldKind, valuesIn } from "./settings.ts";
+export {
+  allowedValues,
+  type Draft,
+  type DraftObject,
+  editKind,
+  expects,
+  type FieldKind,
+  fieldKind,
+  fromDraft,
+  parseJson,
+  toDraft,
+  valuesIn,
+} from "./settings.ts";
 export { sessionsHere, suggestedRules } from "./usage.ts";

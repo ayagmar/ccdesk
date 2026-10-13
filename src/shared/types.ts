@@ -575,7 +575,12 @@ export interface SettingsEditPreview {
 export interface SettingSchema {
   type?: string | string[];
   enum?: unknown[];
+  const?: unknown;
   items?: SettingSchema;
+  anyOf?: SettingSchema[];
+  properties?: Record<string, SettingSchema>;
+  required?: string[];
+  additionalProperties?: boolean | SettingSchema;
   description?: string;
   deprecated?: boolean;
   /** Set on a key whose schema comes from SchemaStore, saying so. */
