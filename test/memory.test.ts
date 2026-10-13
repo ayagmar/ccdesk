@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { scanDirectory, scanOverview } from "../src/core/index.ts";
+import { storeDirName } from "../src/shared/memory.ts";
 import { makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
 test("a worktree and a subdirectory of a repository share the main repository's memory", async () => {
@@ -124,4 +125,11 @@ test("a link loop where a memory file should be is reported as a problem", async
     view.problems.map((p) => [p.path, p.error]),
     [[loop, "cannot be read (ELOOP)"]]
   );
+});
+
+test("a project path over 200 characters gets the store name Claude Code gives it", () => {
+  const deep = `/home/dev/${"monorepo/packages/".repeat(10)}service-with-a-long-name/src`;
+  // Worked out with the SDK 0.3.296's own function for this path: cut at 200, then a hash.
+  assert.equal(storeDirName(deep), `-home-dev-${"monorepo-packages-".repeat(10)}service-wi-9nhroh`);
+  assert.equal(storeDirName("/home/dev/app"), "-home-dev-app");
 });

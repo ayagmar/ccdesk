@@ -14,7 +14,7 @@ Claude Code's auto memory is a folder of Markdown files per project, with a `MEM
 
 ## Where memory lives
 
-By default the folder is `~/.claude/projects/<project path with every character other than letters and digits turned into ->/memory`. Every worktree and subfolder of a repository shares the main checkout's folder. ccdesk also follows:
+By default the folder is `~/.claude/projects/<project path with every character other than letters and digits turned into ->/memory`. When that name is longer than 200 characters, Claude Code keeps the first 200 and adds `-` and a short hash of the path, and ccdesk does the same. Every worktree and subfolder of a repository shares the main checkout's folder. ccdesk also follows:
 
 - `autoMemoryDirectory`, an absolute path or one starting with `~/`. Set in a project or local file, it takes effect only once you trust the folder. ccdesk shows a memory folder set this way but does not change it.
 - `CLAUDE_CODE_PROJECT_DIR_NAME`, when you use it with `CLAUDE_CONFIG_DIR`.
