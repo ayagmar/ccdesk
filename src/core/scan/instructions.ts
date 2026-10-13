@@ -307,6 +307,11 @@ async function readClaudeFiles(ctx: Ctx, dir: string): Promise<Instruction[]> {
       );
   const local = await readInstruction(ctx, join(dir, "CLAUDE.local.md"));
   if (local) out.push(await instruction(local, "claude-local-md", "local", dir, ctx, ""));
+  // Claude Code's walk up stops below the filesystem root (observed in v2.1.296). The files are
+  // still listed and still count for AGENTS.md, which its built-in plugin decides apart from this walk.
+  if (dir === parse(dir).root)
+    for (const file of out)
+      skip(file, "Skipped: Claude Code does not read instruction files at the filesystem root");
   return out;
 }
 
