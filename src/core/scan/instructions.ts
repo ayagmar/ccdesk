@@ -228,7 +228,7 @@ async function readOwnFiles(
   }
   // Like a project's, the managed folder's .claude/rules load next (observed in v2.1.296; the
   // docs do not say), and as managed files cannot be excluded.
-  for (const path of await walkMarkdown(join(env.managedDir, ".claude", "rules"))) {
+  for (const path of await walkMarkdown(join(env.managedDir, ".claude", "rules"), ctx.problems)) {
     const file = await readInstruction(ctx, path);
     if (file) out.push(await rule(file, "managed", env.managedDir, ctx));
   }
@@ -245,7 +245,7 @@ async function readOwnFiles(
         "Your instructions for every project"
       )
     );
-  for (const path of await walkMarkdown(join(env.claudeDir, "rules"))) {
+  for (const path of await walkMarkdown(join(env.claudeDir, "rules"), ctx.problems)) {
     const file = await readInstruction(ctx, path);
     if (file) out.push(await rule(file, "user", env.claudeDir, ctx));
   }
@@ -295,7 +295,7 @@ async function readClaudeFiles(ctx: Ctx, dir: string): Promise<Instruction[]> {
     if (file) out.push(await instruction(file, "claude-md", "project", dir, ctx, ""));
   }
   if (!holdsClaudeDir && dir !== env.claudeDir)
-    for (const path of await walkMarkdown(join(dir, ".claude", "rules"))) {
+    for (const path of await walkMarkdown(join(dir, ".claude", "rules"), ctx.problems)) {
       const file = await readInstruction(ctx, path);
       if (file) out.push(await rule(file, "project", dir, ctx));
     }
