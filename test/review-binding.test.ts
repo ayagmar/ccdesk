@@ -118,3 +118,30 @@ test("a new local MCP server is not added after its folder moved to a new reposi
   await assert.rejects(core.saveMcpEdit(edit, revision), STALE);
   assert.deepEqual(ran, []);
 });
+
+test("a Project change in the home folder is refused when ~/.claude links to a relocated Claude folder", async () => {
+  // CLAUDE_CONFIG_DIR moved to ~/.config/claude, with ~/.claude left as a link to it.
+  const f = makeFixture();
+  rmSync(f.env.claudeDir, { recursive: true });
+  f.write("home/.config/claude/.keep", "");
+  f.link("home/.claude", f.at("home/.config/claude"));
+  const core = createCore({ ...f.env, claudeDir: f.at("home/.config/claude") });
+
+  await assert.rejects(
+    core.previewSettingsEdit({
+      dir: f.env.home,
+      scope: "project",
+      key: "effortLevel",
+      value: "high",
+    }),
+    /edit it as User/
+  );
+  await assert.rejects(
+    core.previewAgentEdit({
+      dir: f.env.home,
+      create: { scope: "project", file: "rev" },
+      text: "---\nname: rev\ndescription: Reviews.\n---\nReview.\n",
+    }),
+    /create it as User/
+  );
+});
