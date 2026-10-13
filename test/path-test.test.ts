@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { basename } from "node:path";
 import { test } from "node:test";
-import { scanDirectory } from "../src/core/scan/index.ts";
-import { testPath } from "../src/core/scan/path-test.ts";
+import { scanDirectory, testPath } from "../src/core/index.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
 test("touching a file brings in matching path rules, skills and the CLAUDE.md files of the folders on the way", async () => {

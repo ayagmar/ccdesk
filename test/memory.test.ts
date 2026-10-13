@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { scanDirectory, scanOverview } from "../src/core/scan/index.ts";
+import { scanDirectory, scanOverview } from "../src/core/index.ts";
 import { makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
 test("a worktree and a subdirectory of a repository share the main repository's memory", async () => {

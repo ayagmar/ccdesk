@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { chmodSync } from "node:fs";
 import { relative, sep } from "node:path";
 import { test } from "node:test";
-import { scanDirectory } from "../src/core/scan/index.ts";
+import { scanDirectory } from "../src/core/index.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
 function loadedPaths(view: Awaited<ReturnType<typeof scanDirectory>>, root: string) {
