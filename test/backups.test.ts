@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import {
   listBackups,
@@ -58,4 +59,21 @@ test("recent changes come a page at a time, newest first, and the last page says
   assert.equal(second.more, false);
   const ids = [...first.changes, ...second.changes].map((c) => c.id);
   assert.deepEqual(ids, [...new Set(ids)].sort().reverse());
+});
+
+test("a backup folder ccdesk cannot read is an error, not an empty list", {
+  // Root reads any folder, and Windows ignores the mode bits that make a folder unreadable.
+  skip: process.getuid?.() === 0 || process.platform === "win32",
+}, async () => {
+  const f = makeFixture();
+  f.json("app/.claude/settings.json", {});
+  await denyRule(f, "Bash(rm:*)");
+  const root = join(f.env.claudeDir, "backups", "ccdesk");
+  chmodSync(root, 0o000);
+
+  try {
+    await assert.rejects(listBackups(f.env, { limit: 10 }), { code: "EACCES" });
+  } finally {
+    chmodSync(root, 0o700);
+  }
 });
