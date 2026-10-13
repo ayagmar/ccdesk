@@ -166,12 +166,19 @@ export async function settingsFiles(env: ScanEnv, dir: string): Promise<Settings
   return files;
 }
 
-/** Settings files that apply in `dir`, highest precedence first. */
-export async function readSettingsLayers(env: ScanEnv, dir: string): Promise<SettingsLayer[]> {
+/**
+ * Settings files that apply in `dir`, highest precedence first. `managed` is what
+ * readManagedSettings read, so a scan reads the managed files once.
+ */
+export async function readSettingsLayers(
+  env: ScanEnv,
+  dir: string,
+  managed: ManagedSettings
+): Promise<SettingsLayer[]> {
   const layers: SettingsLayer[] = [];
   for (const file of await settingsFiles(env, dir)) {
     if (file.scope === "managed") {
-      layers.push(await readManagedLayer(env, file.path));
+      layers.push(managedLayer(file.path, managed));
       continue;
     }
     const result = await readJsonObject(env, file.path);
@@ -186,19 +193,21 @@ export async function readSettingsLayers(env: ScanEnv, dir: string): Promise<Set
   return layers;
 }
 
-/**
- * managed-settings.json, then every *.json in managed-settings.d in alphabetical order, merged, with
- * nothing hidden: for checks such as managedMcpServers that must see header values. Never sent to the
- * page as is.
- */
-export async function readManagedSettings(env: ScanEnv): Promise<{
+export interface ManagedSettings {
   data: Record<string, unknown> | null;
   sources: string[];
   dropIns: string[];
   errors: string[];
   /** A managed file that is there but not a JSON object: Claude Code refuses to start (docs: managed-settings#find-entries-claude-code-dropped). */
   blocksStart: boolean;
-}> {
+}
+
+/**
+ * managed-settings.json, then every *.json in managed-settings.d in alphabetical order, merged, with
+ * nothing hidden: for checks such as managedMcpServers that must see header values. Never sent to the
+ * page as is.
+ */
+export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings> {
   const dropInDir = join(env.managedDir, "managed-settings.d");
   const dropIns = (await listDir(dropInDir))
     .filter((name) => name.endsWith(".json") && !name.startsWith("."))
@@ -221,8 +230,8 @@ export async function readManagedSettings(env: ScanEnv): Promise<{
   return { data, sources, dropIns, errors, blocksStart };
 }
 
-async function readManagedLayer(env: ScanEnv, path: string): Promise<SettingsLayer> {
-  const { data, sources, dropIns, errors, blocksStart } = await readManagedSettings(env);
+function managedLayer(path: string, managed: ManagedSettings): SettingsLayer {
+  const { data, sources, dropIns, errors, blocksStart } = managed;
   const layer: SettingsLayer = { scope: "managed", path, exists: false, data: null };
   if (data) layer.data = redactSecrets(data) as Record<string, unknown>;
   layer.exists = sources.length > 0 || errors.length > 0;

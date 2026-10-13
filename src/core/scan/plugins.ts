@@ -1,41 +1,57 @@
 import { join, resolve } from "node:path";
 import { HIGHEST_FIRST } from "../../shared/scopes.ts";
-import { type Plugin, type SettingsLayer } from "../../shared/types.ts";
+import { type Plugin, type Problem, type SettingsLayer } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isWithin, readJsonObject, resolvedPath, stringField } from "./files.ts";
+import { isWithin, readJsonOrReport, resolvedPath, stringField } from "./files.ts";
 import { isRecord } from "./data.ts";
 
 function manifestPath(plugin: Plugin): string {
   return join(plugin.installPath, ".claude-plugin", "plugin.json");
 }
 
-async function manifest(env: ScanEnv, plugin: Plugin): Promise<Record<string, unknown>> {
-  const result = await readJsonObject(env, manifestPath(plugin));
-  return result.ok ? result.data : {};
+/** A plugin with its manifest, which a scan reads once. */
+export interface LoadedPlugin {
+  plugin: Plugin;
+  /** `.claude-plugin/plugin.json`, or `{}` when there is none or it does not parse. */
+  manifest: Record<string, unknown>;
+}
+
+/** Reads a plugin's manifest; one that is there but does not parse goes into `problems`. */
+export async function loadPlugin(
+  env: ScanEnv,
+  plugin: Plugin,
+  problems: Problem[]
+): Promise<LoadedPlugin> {
+  return { plugin, manifest: (await readJsonOrReport(env, manifestPath(plugin), problems)) ?? {} };
 }
 
 /**
  * The prefix of a plugin's skills, commands and agents: the manifest's name, which wins over the
  * name the plugin is enabled under (docs: plugins-reference#name, #metadata-precedence).
  */
-export async function pluginNamespace(env: ScanEnv, plugin: Plugin): Promise<string> {
-  return stringField(await manifest(env, plugin), "name") || (plugin.id.split("@")[0] ?? plugin.id);
+export function pluginNamespace({ plugin, manifest }: LoadedPlugin): string {
+  return stringField(manifest, "name") || (plugin.id.split("@")[0] ?? plugin.id);
 }
 
-/** Installed plugins that apply in `projectDir`, with whether each is enabled and by which file. */
+/**
+ * Installed plugins that apply in `projectDir`, with whether each is enabled and by which file. An
+ * install list or manifest that is there but does not parse goes into `problems`.
+ */
 export async function readPlugins(
   env: ScanEnv,
   layers: SettingsLayer[],
   projectDir: string,
-  gitRoot: string | null
-): Promise<Plugin[]> {
-  const installed = await readJsonObject(
+  gitRoot: string | null,
+  problems: Problem[]
+): Promise<LoadedPlugin[]> {
+  const installed = await readJsonOrReport(
     env,
-    join(env.claudeDir, "plugins", "installed_plugins.json")
+    join(env.claudeDir, "plugins", "installed_plugins.json"),
+    problems
   );
-  if (!installed.ok || !isRecord(installed.data.plugins)) return [];
-  const out: Plugin[] = [];
-  for (const [id, installs] of Object.entries(installed.data.plugins)) {
+  if (!installed || !isRecord(installed.plugins)) return [];
+  const out: LoadedPlugin[] = [];
+  for (const [id, installs] of Object.entries(installed.plugins)) {
     if (!Array.isArray(installs)) continue;
     // A project or local install applies only in its own project; it beats a user install there.
     const records = installs.filter((i): i is Record<string, unknown> => isRecord(i));
@@ -52,6 +68,7 @@ export async function readPlugins(
       enabled: true,
       note: "",
     };
+    const loaded = await loadPlugin(env, plugin, problems);
     const setting = HIGHEST_FIRST.flatMap((scope) =>
       layers
         .filter((l) => l.scope === scope)
@@ -65,12 +82,12 @@ export async function readPlugins(
       plugin.enabledIn = setting.scope;
       plugin.note = `${plugin.enabled ? "Enabled" : "Turned off"} in ${setting.scope} settings`;
     } else {
-      plugin.enabled = (await manifest(env, plugin)).defaultEnabled !== false;
+      plugin.enabled = loaded.manifest.defaultEnabled !== false;
       plugin.note = plugin.enabled
         ? "On by default (no enabledPlugins entry)"
         : "Off by default (no enabledPlugins entry)";
     }
-    out.push(plugin);
+    out.push(loaded);
   }
   return out;
 }
@@ -84,11 +101,10 @@ async function inside(plugin: Plugin, path: string): Promise<string | null> {
 
 /** The paths a manifest key names (one path or a list), inside the plugin; null when unset. */
 export async function manifestPaths(
-  env: ScanEnv,
-  plugin: Plugin,
+  { plugin, manifest }: LoadedPlugin,
   key: string
 ): Promise<string[] | null> {
-  const value = (await manifest(env, plugin))[key];
+  const value = manifest[key];
   const list = typeof value === "string" ? [value] : Array.isArray(value) ? value : null;
   if (!list) return null;
   const out: string[] = [];
@@ -100,20 +116,24 @@ export async function manifestPaths(
   return out;
 }
 
-/** The value of a manifest key that is a path, an inline object, or a list of either. */
+/**
+ * The value of a manifest key that is a path, an inline object, or a list of either. A file it
+ * names that is there but does not parse goes into `problems`.
+ */
 export async function manifestConfigs(
   env: ScanEnv,
-  plugin: Plugin,
-  key: string
+  { plugin, manifest }: LoadedPlugin,
+  key: string,
+  problems: Problem[]
 ): Promise<Array<{ value: unknown; path: string }>> {
-  const value = (await manifest(env, plugin))[key];
+  const value = manifest[key];
   const out: Array<{ value: unknown; path: string }> = [];
   for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) {
     if (isRecord(item)) out.push({ value: item, path: manifestPath(plugin) });
     if (typeof item !== "string") continue;
     const path = await inside(plugin, item);
-    const file = path ? await readJsonObject(env, path) : null;
-    if (path && file?.ok) out.push({ value: file.data[key] ?? file.data, path });
+    const file = path ? await readJsonOrReport(env, path, problems) : null;
+    if (path && file) out.push({ value: file[key] ?? file, path });
   }
   return out;
 }
@@ -121,8 +141,11 @@ export async function manifestConfigs(
 type ManifestCommand = { name: string; path: string; description: string; text: string | null };
 
 /** The manifest's `commands` object form: command name to a file or inline content. */
-export async function manifestCommandMap(env: ScanEnv, plugin: Plugin): Promise<ManifestCommand[]> {
-  const value = (await manifest(env, plugin)).commands;
+export async function manifestCommandMap({
+  plugin,
+  manifest,
+}: LoadedPlugin): Promise<ManifestCommand[]> {
+  const value = manifest.commands;
   if (!isRecord(value)) return [];
   const out: ManifestCommand[] = [];
   for (const [name, entry] of Object.entries(value)) {

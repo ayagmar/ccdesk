@@ -6,11 +6,11 @@ import {
   type SettingsComparison,
 } from "../../shared/compare.ts";
 import { type ScanEnv } from "./env.ts";
-import { effectiveSettings, readSettingsLayers } from "./settings.ts";
+import { effectiveSettings, readManagedSettings, readSettingsLayers } from "./settings.ts";
 
 /** Each key Claude Code applies in `dir`, with its value and the files it comes from. */
 async function valuesIn(env: ScanEnv, dir: string): Promise<Map<string, ComparedValue>> {
-  const layers = await readSettingsLayers(env, dir);
+  const layers = await readSettingsLayers(env, dir, await readManagedSettings(env));
   const values = new Map<string, ComparedValue>();
   for (const setting of effectiveSettings(layers)) {
     // A key every file sets where Claude Code does not read it applies nowhere.

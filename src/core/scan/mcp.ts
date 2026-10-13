@@ -3,7 +3,7 @@ import { Compile } from "typebox/compile";
 import {
   type McpApproval,
   type McpServer,
-  type Plugin,
+  type Problem,
   type Scope,
   type SessionProfile,
   type SettingsLayer,
@@ -11,12 +11,11 @@ import {
 } from "../../shared/types.ts";
 import { redactSecrets, shownUrl } from "../secrets.ts";
 import { isConfigHome, type ScanEnv } from "./env.ts";
-import { readJsonObject, stringField, stringsIn, wildcard } from "./files.ts";
+import { readJsonOrReport, stringField, stringsIn, wildcard } from "./files.ts";
 import { isRecord } from "./data.ts";
-import { manifestConfigs } from "./plugins.ts";
+import { type LoadedPlugin, manifestConfigs } from "./plugins.ts";
 import serverSchema from "../../shared/mcp-server.schema.json" with { type: "json" };
 import { schemaErrors } from "../schema.ts";
-import { readManagedSettings } from "./settings.ts";
 
 const validateServer = Compile(serverSchema);
 
@@ -216,9 +215,13 @@ interface Input {
   env: ScanEnv;
   projectDir: string;
   layers: SettingsLayer[];
+  /** Managed settings as written, nothing hidden. */
+  managed: Record<string, unknown> | null;
   claudeJson: Record<string, unknown> | null;
   trust: Trust;
   profile: SessionProfile;
+  /** Receives MCP files that are there but do not parse. */
+  problems: Problem[];
 }
 
 /**
@@ -226,8 +229,8 @@ interface Input {
  * (docs: mcp#scope-hierarchy-and-precedence, managed-mcp). ccdesk never connects, so an active
  * server is one that is configured and allowed, not one that is known to work.
  */
-export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<McpServer[]> {
-  const { env, projectDir, layers, claudeJson, trust, profile } = input;
+export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Promise<McpServer[]> {
+  const { env, projectDir, layers, claudeJson, trust, profile, problems } = input;
   const projects = isRecord(claudeJson?.projects) ? claudeJson.projects : {};
   // Local servers live in the entry under the trust key, even from a subdirectory: claude mcp add
   // --scope local writes there and claude mcp list reads only that entry, ignoring one for the
@@ -237,34 +240,37 @@ export async function readMcpServers(input: Input, plugins: Plugin[]): Promise<M
 
   const managed = layers.find((l) => l.scope === "managed");
   // Checked as written: the layer has header values hidden, which would hide a ${VAR} in one.
-  const managedServers = (await readManagedSettings(env)).data?.managedMcpServers;
+  const managedServers = input.managed?.managedMcpServers;
   const managedFile = join(env.managedDir, "managed-mcp.json");
-  const managedJson = await readJsonObject(env, managedFile);
+  const managedJson = await readJsonOrReport(env, managedFile, problems);
   const mcpJson = join(projectDir, ".mcp.json");
-  const shared = await readJsonObject(env, mcpJson);
+  const shared = await readJsonOrReport(env, mcpJson, problems);
   const defined: Defined[] = [
-    ...(managedJson.ok ? define(managedJson.data.mcpServers, "managed", managedFile, true) : []),
+    ...(managedJson ? define(managedJson.mcpServers, "managed", managedFile, true) : []),
     ...defineManaged(managedServers, managed?.path ?? ""),
     ...define(project.mcpServers, "local", env.claudeJson),
-    ...(shared.ok ? define(shared.data.mcpServers, "project", mcpJson) : []),
+    ...(shared ? define(shared.mcpServers, "project", mcpJson) : []),
     ...define(claudeJson?.mcpServers, "user", env.claudeJson),
   ];
-  for (const plugin of plugins) {
+  for (const loaded of plugins) {
+    const { plugin } = loaded;
     const path = join(plugin.installPath, ".mcp.json");
-    const file = await readJsonObject(env, path);
+    const file = await readJsonOrReport(env, path, problems);
     // A server name declared later in the same plugin replaces an earlier one.
     const own = new Map<string, Defined>();
     const add = (list: Defined[]) => {
       for (const d of list) own.set(d.server.name, d);
     };
-    if (file.ok) add(define(file.data.mcpServers ?? file.data, "plugin", path));
-    for (const part of await manifestConfigs(env, plugin, "mcpServers"))
+    if (file) add(define(file.mcpServers ?? file, "plugin", path));
+    for (const part of await manifestConfigs(env, loaded, "mcpServers", problems))
       add(define(part.value, "plugin", part.path));
     for (const d of own.values()) d.server.plugin = plugin.id;
     defined.push(...own.values());
   }
 
-  const exclusive = managedJson.ok;
+  // A managed-mcp.json that does not parse is reported; ccdesk cannot tell which servers it lists,
+  // so it does not show it taking control.
+  const exclusive = managedJson !== null;
   const denied = layers.flatMap((l) => policyEntries(l.data?.deniedMcpServers));
   const managedOnly = managed?.data?.allowManagedMcpServersOnly === true;
   const allowLayers = layers.filter((l) => !managedOnly || l.scope === "managed");

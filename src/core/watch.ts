@@ -7,7 +7,7 @@ import { type ScanEnv } from "./scan/env.ts";
 import { isDir, isFile, isNetworkPath } from "./scan/files.ts";
 import { mainWorktreeRoot } from "./scan/git.ts";
 import { scanDirectory } from "./scan/index.ts";
-import { manifestCommandMap, manifestPaths } from "./scan/plugins.ts";
+import { loadPlugin, manifestCommandMap, manifestPaths } from "./scan/plugins.ts";
 
 /** How long one request waits for a change before answering "nothing changed". */
 const WAIT_MS = 25_000;
@@ -102,8 +102,10 @@ async function pluginTargets(env: ScanEnv, view: DirectoryView, plugin: Plugin):
   const root = plugin.installPath;
   // A path from installed_plugins.json that is not absolute names no folder Claude Code would load.
   if (!isAbsolute(root)) return [];
-  const named = await Promise.all(PLUGIN_KEYS.map((key) => manifestPaths(env, plugin, key)));
-  const commands = await manifestCommandMap(env, plugin);
+  // The scan reports a manifest that does not parse; here it only names paths to watch.
+  const loaded = await loadPlugin(env, plugin, []);
+  const named = await Promise.all(PLUGIN_KEYS.map((key) => manifestPaths(loaded, key)));
+  const commands = await manifestCommandMap(loaded);
   // Without a skills folder, each folder at the root holding SKILL.md is a skill.
   const rootSkills = view.inventory.skills
     .filter((s) => s.plugin === plugin.id && s.folder && dirname(s.folder) === root)
