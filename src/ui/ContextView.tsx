@@ -167,31 +167,40 @@ function PathTester({ view }: { view: DirectoryView }) {
       )}
       {result && (
         <div role="status">
-          {!result.inside ? (
-            <p className="muted small">
-              {tilde(result.file)} is outside {tilde(view.path)}, so nothing here applies to it.
-            </p>
-          ) : result.matches.length === 0 ? (
-            <p className="muted small">
-              Nothing more loads for {relativeTo(result.file, view.path)}
-              {result.exists ? "" : " (the file does not exist yet; paths are checked anyway)"}.
-            </p>
-          ) : (
-            <ul className="plain path-matches">
-              {result.matches.map((m) => (
-                <li key={`${m.kind}:${m.path}`}>
-                  <Bullet line={m.scope} />
-                  <span className="muted">{MATCH_KIND[m.kind]}</span>
-                  <span className="mono wrap" title={tilde(m.path)}>
-                    {m.name ?? relativeTo(m.path, view.path)}
-                  </span>
-                  {m.glob && <span className="muted small mono">matches {m.glob}</span>}
-                </li>
-              ))}
-            </ul>
-          )}
+          <PathResult result={result} dir={view.path} />
         </div>
       )}
     </section>
+  );
+}
+
+/** What the path tester found for one file. */
+function PathResult({ result, dir }: { result: PathTest; dir: string }) {
+  if (!result.inside)
+    return (
+      <p className="muted small">
+        {tilde(result.file)} is outside {tilde(dir)}, so nothing here applies to it.
+      </p>
+    );
+  if (result.matches.length === 0)
+    return (
+      <p className="muted small">
+        Nothing more loads for {relativeTo(result.file, dir)}
+        {result.exists ? "" : " (the file does not exist yet; paths are checked anyway)"}.
+      </p>
+    );
+  return (
+    <ul className="plain path-matches">
+      {result.matches.map((m) => (
+        <li key={`${m.kind}:${m.path}`}>
+          <Bullet line={m.scope} />
+          <span className="muted">{MATCH_KIND[m.kind]}</span>
+          <span className="mono wrap" title={tilde(m.path)}>
+            {m.name ?? relativeTo(m.path, dir)}
+          </span>
+          {m.glob && <span className="muted small mono">matches {m.glob}</span>}
+        </li>
+      ))}
+    </ul>
   );
 }

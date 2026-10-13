@@ -1,5 +1,5 @@
 import { EDITABLE_SCOPES, HIGHEST_FIRST } from "../../shared/scopes.ts";
-import { type Scope } from "../../shared/types.ts";
+import { type EffectiveSetting, type Scope } from "../../shared/types.ts";
 import { lineName } from "../../view/lines.ts";
 import { type RowOf } from "../../view/sections/types.ts";
 import { Bullet } from "../Bullet.tsx";
@@ -10,6 +10,25 @@ import { Field, NameButton, PathValue } from "./kit.tsx";
 import { type SectionUi } from "./types.ts";
 
 type R = RowOf<"settings">;
+
+/** Which file decides the value, or why none does. */
+function verdict(s: EffectiveSetting): string {
+  if (s.from.length === 0) return `Claude Code ignores this value: ${s.ignored[0]?.reason ?? ""}.`;
+  if (s.merged) return "Lists and objects from these files are combined.";
+  return `${lineName(s.from[0] ?? "user")} settings decide this value.`;
+}
+
+/** Whether a scope's value is the one used, one that lost to a higher file, or unset. */
+function layerOutcome(s: EffectiveSetting, scope: Scope, value: unknown): string {
+  if (value === undefined) return "unset";
+  return s.from.includes(scope) ? "wins" : "lost";
+}
+
+/** A scope's value as the table shows it. */
+function layerValue(value: unknown, exists: boolean, ignored: boolean): string {
+  if (value === undefined) return exists ? "not set" : "no file";
+  return `${preview(value)}${ignored ? " (ignored)" : ""}`;
+}
 
 export const settings: SectionUi<R> = {
   cells: (row, _actions, select) => {
@@ -71,13 +90,7 @@ export const settings: SectionUi<R> = {
     };
     return (
       <>
-        <p className={`verdict ${s.from.length === 0 ? "off" : "ok"}`}>
-          {s.from.length === 0
-            ? `Claude Code ignores this value: ${s.ignored[0]?.reason ?? ""}.`
-            : s.merged
-              ? "Lists and objects from these files are combined."
-              : `${lineName(s.from[0] ?? "user")} settings decide this value.`}
-        </p>
+        <p className={`verdict ${s.from.length === 0 ? "off" : "ok"}`}>{verdict(s)}</p>
         <h3 className="sub-title">Every file that sets it</h3>
         <table className="layers">
           <tbody>
@@ -86,22 +99,12 @@ export const settings: SectionUi<R> = {
               const value = layer?.data?.[s.key];
               const ignored = s.ignored.find((i) => i.scope === scope);
               return (
-                <tr
-                  key={scope}
-                  className={
-                    value === undefined ? "unset" : s.from.includes(scope) ? "wins" : "lost"
-                  }
-                  title={ignored?.reason}
-                >
+                <tr key={scope} className={layerOutcome(s, scope, value)} title={ignored?.reason}>
                   <th scope="row">
                     <Bullet line={scope} hollow={value === undefined} />
                   </th>
                   <td className="mono">
-                    {value === undefined
-                      ? layer?.exists
-                        ? "not set"
-                        : "no file"
-                      : `${preview(value)}${ignored ? " (ignored)" : ""}`}
+                    {layerValue(value, layer?.exists === true, ignored !== undefined)}
                   </td>
                 </tr>
               );

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { EDITABLE_SCOPES } from "../../shared/scopes.ts";
-import { type Scope, type Usage } from "../../shared/types.ts";
+import { type Permission, type Scope, type Usage } from "../../shared/types.ts";
 import { lineName } from "../../view/lines.ts";
 import { isSuggested, type Rule, type Suggested, unused } from "../../view/sections/permissions.ts";
 import { type RowOf } from "../../view/sections/types.ts";
@@ -54,23 +54,7 @@ export const permissions: SectionUi<R> = {
           <NameButton onClick={select}>{p.kind === "rule" ? p.rule : tildeAll(p.value)}</NameButton>
         </td>
         <td className="desc">
-          {!p.inEffect ? (
-            <span className="flag warn">{p.note ?? "not in effect"}</span>
-          ) : p.kind === "rule" && p.decidedBy ? (
-            <span className="flag warn">
-              {p.decidedBy.list === "deny" ? "denied" : "asks first"}: same rule in{" "}
-              {p.decidedBy.list} ({p.decidedBy.scope})
-            </span>
-          ) : p.kind === "rule" ? (
-            <>
-              {OUTCOME[p.list]}
-              {unused(p, actions.view.usage) && <span className="flag">covered no call here</span>}
-            </>
-          ) : p.kind === "defaultMode" ? (
-            "how sessions start"
-          ) : (
-            "Claude may read and edit here"
-          )}
+          <Outcome p={p} usage={actions.view.usage} />
         </td>
       </>
     );
@@ -93,26 +77,7 @@ export const permissions: SectionUi<R> = {
         : view.settings.find((l) => l.scope === p.scope && !l.legacy)?.path;
     return (
       <>
-        {!p.inEffect ? (
-          <p className="verdict off">{p.note}</p>
-        ) : p.kind === "rule" ? (
-          <p className={`verdict ${p.decidedBy ? "off" : p.list === "deny" ? "" : "ok"}`}>
-            {p.decidedBy
-              ? `This ${p.list} rule never applies: the same rule is in ${p.decidedBy.list} (${p.decidedBy.scope} settings), which is checked first.`
-              : {
-                  allow:
-                    "Claude uses matching tools without asking, unless a deny or ask rule matches first.",
-                  ask: "Claude asks before using matching tools, unless a deny rule matches first.",
-                  deny: "Claude may not use matching tools. No allow rule in any file can undo this.",
-                }[p.list]}
-          </p>
-        ) : (
-          <p className="verdict">
-            {p.kind === "defaultMode"
-              ? `Sessions here start in ${p.value} mode.`
-              : "Claude may read and edit files in this folder as well as the project."}
-          </p>
-        )}
+        <Verdict p={p} />
         <dl className="fields">
           {p.kind === "rule" && <Field label="List">{p.list}</Field>}
           <Field label={p.kind === "rule" ? "Rule" : "Value"}>
@@ -158,6 +123,52 @@ export const permissions: SectionUi<R> = {
     );
   },
 };
+
+const VERDICTS = {
+  allow: "Claude uses matching tools without asking, unless a deny or ask rule matches first.",
+  ask: "Claude asks before using matching tools, unless a deny rule matches first.",
+  deny: "Claude may not use matching tools. No allow rule in any file can undo this.",
+} as const;
+
+/** What a rule or setting does here, in the table. */
+function Outcome({ p, usage }: { p: Permission; usage: Usage | null | undefined }) {
+  if (!p.inEffect) return <span className="flag warn">{p.note ?? "not in effect"}</span>;
+  if (p.kind === "defaultMode") return "how sessions start";
+  if (p.kind !== "rule") return "Claude may read and edit here";
+  if (p.decidedBy)
+    return (
+      <span className="flag warn">
+        {p.decidedBy.list === "deny" ? "denied" : "asks first"}: same rule in {p.decidedBy.list} (
+        {p.decidedBy.scope})
+      </span>
+    );
+  return (
+    <>
+      {OUTCOME[p.list]}
+      {unused(p, usage) && <span className="flag">covered no call here</span>}
+    </>
+  );
+}
+
+/** What a rule or setting does here, in the inspector. */
+function Verdict({ p }: { p: Permission }) {
+  if (!p.inEffect) return <p className="verdict off">{p.note}</p>;
+  if (p.kind === "defaultMode")
+    return <p className="verdict">{`Sessions here start in ${p.value} mode.`}</p>;
+  if (p.kind !== "rule")
+    return (
+      <p className="verdict">
+        Claude may read and edit files in this folder as well as the project.
+      </p>
+    );
+  if (p.decidedBy)
+    return (
+      <p className="verdict off">
+        {`This ${p.list} rule never applies: the same rule is in ${p.decidedBy.list} (${p.decidedBy.scope} settings), which is checked first.`}
+      </p>
+    );
+  return <p className={`verdict ${p.list === "deny" ? "" : "ok"}`}>{VERDICTS[p.list]}</p>;
+}
 
 /** How many of the calls counted here a rule covers. */
 function CoveredCalls({ rule, usage }: { rule: Rule; usage: Usage | null | undefined }) {

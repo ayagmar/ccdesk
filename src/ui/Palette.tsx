@@ -30,6 +30,71 @@ function typedPath(query: string, home: string | undefined): string | null {
   return q.startsWith("/") || /^[A-Za-z]:[\\/]/.test(q) ? q : null;
 }
 
+/**
+ * What the query finds: when comparing, other directories and a path typed in full; otherwise rows
+ * here, memories of other directories, then directories.
+ */
+function paletteResults(
+  query: string,
+  overview: Overview | null,
+  rows: Row[],
+  compareFrom: string | undefined
+): Result[] {
+  const q = query.trim().toLowerCase();
+  const dirs: Result[] = (overview?.projects ?? [])
+    .filter(
+      (p) => !p.ephemeral && p.path !== compareFrom && (!q || p.path.toLowerCase().includes(q))
+    )
+    .map((p) => ({ kind: "dir", key: `dir:${p.path}`, label: tilde(p.path), path: p.path }));
+  if (compareFrom !== undefined) {
+    const typed = typedPath(query, overview?.home);
+    const known = dirs.some((d) => d.kind === "dir" && d.path === typed);
+    return [
+      ...(typed && !known
+        ? [{ kind: "dir" as const, key: `typed:${typed}`, label: tilde(typed), path: typed }]
+        : []),
+      ...dirs,
+    ].slice(0, 40);
+  }
+  const items: Result[] = rows
+    .filter((r) => q && sectionOf(r.section).text(r).toLowerCase().includes(q))
+    .map((r) => ({
+      kind: "row",
+      key: r.id,
+      label: sectionOf(r.section).label(r, pageContext()),
+      row: r,
+    }));
+  const here = new Set(rows.map((r) => r.id));
+  const memories: Result[] = (overview?.memoryCatalog ?? [])
+    .filter(
+      (m) =>
+        q &&
+        !here.has(`mem:${m.path}`) &&
+        `${m.name} ${m.description} ${m.type}`.toLowerCase().includes(q)
+    )
+    .map((m) => ({
+      kind: "memory",
+      key: `cat:${m.path}`,
+      label: `memory ${m.name} · ${tilde(m.projectPath)}`,
+      projectPath: m.projectPath,
+      path: m.path,
+    }));
+  return [...items, ...memories, ...dirs].slice(0, 40);
+}
+
+function emptyText(query: string, compareFrom: string | undefined): string {
+  if (query.trim()) return `Nothing matches “${query}”.`;
+  if (compareFrom === undefined) return "Type to search directories, files, settings and memories.";
+  return "No other directories yet. Type a full path.";
+}
+
+/** A row's bullet, or an icon for a directory or a row without one. */
+function ResultIcon({ result }: { result: Result }) {
+  if (result.kind === "memory") return <Bullet line="memory" />;
+  if (result.kind === "dir") return <Icon name="folder" />;
+  return result.row.line ? <Bullet line={result.row.line} /> : <Icon name="command" />;
+}
+
 /** Jump to any directory, any row in the current one, or a memory saved for any directory. */
 export function Palette({
   overview,
@@ -49,48 +114,10 @@ export function Palette({
     document.getElementById(`pal-${active}`)?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
-  const results = useMemo<Result[]>(() => {
-    const q = query.trim().toLowerCase();
-    const dirs: Result[] = (overview?.projects ?? [])
-      .filter(
-        (p) => !p.ephemeral && p.path !== compareFrom && (!q || p.path.toLowerCase().includes(q))
-      )
-      .map((p) => ({ kind: "dir", key: `dir:${p.path}`, label: tilde(p.path), path: p.path }));
-    if (compareFrom !== undefined) {
-      const typed = typedPath(query, overview?.home);
-      const known = dirs.some((d) => d.kind === "dir" && d.path === typed);
-      return [
-        ...(typed && !known
-          ? [{ kind: "dir" as const, key: `typed:${typed}`, label: tilde(typed), path: typed }]
-          : []),
-        ...dirs,
-      ].slice(0, 40);
-    }
-    const items: Result[] = rows
-      .filter((r) => q && sectionOf(r.section).text(r).toLowerCase().includes(q))
-      .map((r) => ({
-        kind: "row",
-        key: r.id,
-        label: sectionOf(r.section).label(r, pageContext()),
-        row: r,
-      }));
-    const here = new Set(rows.map((r) => r.id));
-    const memories: Result[] = (overview?.memoryCatalog ?? [])
-      .filter(
-        (m) =>
-          q &&
-          !here.has(`mem:${m.path}`) &&
-          `${m.name} ${m.description} ${m.type}`.toLowerCase().includes(q)
-      )
-      .map((m) => ({
-        kind: "memory",
-        key: `cat:${m.path}`,
-        label: `memory ${m.name} · ${tilde(m.projectPath)}`,
-        projectPath: m.projectPath,
-        path: m.path,
-      }));
-    return [...items, ...memories, ...dirs].slice(0, 40);
-  }, [query, overview, rows, compareFrom]);
+  const results = useMemo(
+    () => paletteResults(query, overview, rows, compareFrom),
+    [query, overview, rows, compareFrom]
+  );
 
   const choose = (result: Result | undefined) => {
     if (!result) return;
@@ -147,13 +174,7 @@ export function Palette({
         </label>
         <div id="palette-results" className="palette-results" role="listbox" aria-label="Results">
           {results.length === 0 && (
-            <div className="palette-empty">
-              {query.trim()
-                ? `Nothing matches “${query}”.`
-                : compareFrom === undefined
-                  ? "Type to search directories, files, settings and memories."
-                  : "No other directories yet. Type a full path."}
-            </div>
+            <div className="palette-empty">{emptyText(query, compareFrom)}</div>
           )}
           {results.map((r, i) => (
             // biome-ignore lint/a11y/useKeyWithClickEvents: arrow keys and Enter are handled by the combobox input.
@@ -167,17 +188,7 @@ export function Palette({
               onMouseEnter={() => setActive(i)}
               onClick={() => choose(r)}
             >
-              {r.kind === "row" ? (
-                r.row.line ? (
-                  <Bullet line={r.row.line} />
-                ) : (
-                  <Icon name="command" />
-                )
-              ) : r.kind === "memory" ? (
-                <Bullet line="memory" />
-              ) : (
-                <Icon name="folder" />
-              )}
+              <ResultIcon result={r} />
               <span className={r.kind === "dir" ? "mono" : ""}>{r.label}</span>
             </div>
           ))}

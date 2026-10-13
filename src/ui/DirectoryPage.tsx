@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Change,
   type DirectoryView,
@@ -10,7 +10,7 @@ import { ContextView } from "./ContextView.tsx";
 import { tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
 import { Inspector } from "./Inspector.tsx";
-import { groupRows, isFiltered, PAGE } from "./list.ts";
+import { type Group, groupRows, isFiltered, PAGE } from "./list.ts";
 import { RouteStrip, SharingStrip } from "./RouteStrip.tsx";
 import { type Saved } from "./useReviewedChange.tsx";
 import { SECTIONS } from "./sections/index.ts";
@@ -117,200 +117,45 @@ export function DirectoryPage({
     requestAnimationFrame(() => select(jump.id));
   }, [jump]);
 
-  useEffect(() => {
-    const jumpTo = (id: string | undefined) =>
-      id && document.getElementById(`section-${id}`)?.scrollIntoView({ block: "start" });
-    const onKey = (e: KeyboardEvent) => {
-      if (isTyping(e.target) || e.altKey || e.ctrlKey || e.metaKey) return;
-      if (e.key === "/") {
-        e.preventDefault();
-        setSeeing(false);
-        requestAnimationFrame(() => filterInput.current?.focus());
-      } else if ((e.key === "j" || e.key === "k") && !seeing) {
-        const index = visible.findIndex((r) => r.id === selected);
-        const next = visible[e.key === "j" ? index + 1 : Math.max(index - 1, 0)] ?? visible[0];
-        if (next) select(next.id, true);
-      } else if (/^[1-9]$/.test(e.key) && !seeing) {
-        jumpTo(SECTIONS[Number(e.key) - 1]?.id);
-      } else if (e.key === "Escape") {
-        setSelected(null);
-        setAdding(null);
-      }
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, [visible, selected, select, seeing]);
+  useListKeys({
+    visible,
+    selected,
+    select,
+    seeing,
+    setSeeing,
+    setSelected,
+    setAdding,
+    filterInput,
+  });
 
-  const undo = useCallback(
-    async (change: Change) => {
-      try {
-        await api.restore(change.id, change.revision);
-        const name = change.target.split(/[/\\]/).pop();
-        onToast({ text: change.created ? `Removed ${name}` : `Put ${name} back` });
-      } catch (error) {
-        onToast({ text: `Could not undo: ${errorText(error)}. Recent changes keeps the backup.` });
-      }
-      reload();
-    },
-    [onToast, reload]
-  );
+  const actions = usePageActions({
+    view,
+    overview,
+    onOpenDirectory,
+    onCompare,
+    onToast,
+    reload,
+    setSelected,
+    setAdding,
+  });
 
-  const saved = useCallback(
-    ({ change, message, select }: Saved) => {
-      setAdding(null);
-      if (select !== undefined) setSelected(select);
-      onToast({ text: message, ...(change ? { undo: () => undo(change) } : {}) });
-      reload();
-    },
-    [onToast, reload, undo]
-  );
-
-  const actions = useMemo<Actions>(
-    () => ({
-      view,
-      overview,
-      sharedNames: new Set(overview?.sharedMemories.map((s) => s.name) ?? []),
-      onOpenDirectory,
-      onCompare: () => onCompare(view.path),
-      onAdd: (what) => {
-        setSelected(null);
-        setAdding(what);
-      },
-      onSaved: saved,
-      onChange: async (run, message, select) => {
-        try {
-          saved({ change: await run(), message, ...(select === undefined ? {} : { select }) });
-        } catch (error) {
-          onToast({ text: `Could not do that: ${errorText(error)}` });
-          reload();
-        }
-      },
-    }),
-    [view, overview, onOpenDirectory, onCompare, saved, onToast, reload]
-  );
-
-  const { trust } = view;
   return (
     <div className={`workspace${selectedRow || adding ? "" : " no-details"}`}>
       <div className="work-main">
         <header className="dir-head">
-          <div className="dir-title">
-            <h1 className="mono" title={tilde(view.path)}>
-              {tilde(view.path)}
-            </h1>
-            {!view.exists && <span className="flag bad">folder no longer exists</span>}
-            {view.gitRoot && view.gitRoot !== view.path && (
-              <span className="flag">inside {tilde(view.gitRoot)}</span>
-            )}
-            {trust.sessionOnly ? (
-              <span
-                className="flag"
-                title="In your home directory Claude Code asks for trust each session and saves no answer."
-              >
-                trust asked each session
-              </span>
-            ) : (
-              !trust.trusted && (
-                <span
-                  className="flag warn"
-                  title={
-                    view.profile === "print"
-                      ? `claude -p and the SDK never show the trust dialog. Until you accept it for ${tilde(trust.root)} in an interactive session, they leave out allow rules and extra folders from repository settings.`
-                      : `Until you accept Claude Code's trust dialog for ${tilde(trust.root)}, ${trust.inheritedFrom ? `its allow rules, extra folders and .mcp.json approvals wait. You trusted ${tilde(trust.inheritedFrom)}, which covers hooks but not those grants.` : "hooks from every settings file, its allow rules, extra folders and .mcp.json approvals wait."}`
-                  }
-                >
-                  not trusted yet
-                </span>
-              )
-            )}
-          </div>
-          <div className="toolbar">
-            <fieldset className="segmented view-switch" aria-label="View">
-              <button type="button" aria-pressed={!seeing} onClick={() => setSeeing(false)}>
-                Config
-              </button>
-              <button type="button" aria-pressed={seeing} onClick={() => setSeeing(true)}>
-                <Icon name="eye" /> What Claude sees
-              </button>
-            </fieldset>
-            <label className={`filter${seeing ? " hidden" : ""}`}>
-              <Icon name="search" />
-              <input
-                ref={filterInput}
-                value={list.query}
-                onChange={(e) => changeList({ ...list, query: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key !== "Escape") return;
-                  changeList({ ...list, query: "" });
-                  e.currentTarget.blur();
-                }}
-                placeholder="Filter rows"
-                aria-label="Filter rows"
-              />
-              <kbd>/</kbd>
-            </label>
-            <button
-              type="button"
-              className="palette-button"
-              aria-label="Jump to"
-              onClick={onOpenPalette}
-            >
-              <span className="palette-label">Jump to</span> <kbd>Ctrl K</kbd>
-            </button>
-          </div>
-          <nav className={`section-index${seeing ? " hidden" : ""}`} aria-label="Sections">
-            {groups.map(({ section, all }, index) => (
-              <a
-                key={section.id}
-                href={`#section-${section.id}`}
-                className={all.length === 0 ? "empty" : ""}
-                onClick={(e) => {
-                  e.preventDefault();
-                  document
-                    .getElementById(`section-${section.id}`)
-                    ?.scrollIntoView({ block: "start" });
-                }}
-              >
-                <kbd>{index + 1}</kbd> {section.short ?? section.title}
-                <span className="seg-count">{all.length}</span>
-              </a>
-            ))}
-          </nav>
+          <DirectoryTitle view={view} />
+          <Toolbar
+            seeing={seeing}
+            onSeeing={setSeeing}
+            query={list.query}
+            onQuery={(query) => changeList({ ...list, query })}
+            filterInput={filterInput}
+            onOpenPalette={onOpenPalette}
+          />
+          <SectionIndex groups={groups} hidden={seeing} />
         </header>
-        <div className="session-line">
-          <span>Describes</span>
-          <fieldset
-            className="segmented small profile-switch"
-            aria-label="Session"
-            title="Interactive claude asks for workspace trust and .mcp.json approval. claude -p and the SDK never show the trust dialog: they run settings-file hooks and connect .mcp.json servers without asking."
-          >
-            {(["interactive", "print"] as const).map((profile) => (
-              <button
-                key={profile}
-                type="button"
-                aria-pressed={view.profile === profile}
-                onClick={() => onProfile(profile)}
-              >
-                {profile === "print" ? "claude -p / SDK" : "interactive session"}
-              </button>
-            ))}
-          </fieldset>
-        </div>
-        {view.problems.length > 0 && (
-          <section className="problems" role="alert" aria-label="Files ccdesk could not read">
-            <Icon name="warn" />
-            <ul className="plain">
-              {view.problems.map((p) => (
-                <li key={p.path}>
-                  <span className="mono">{tilde(p.path)}</span>: {p.error}.{" "}
-                  {p.blocksStart
-                    ? "Claude Code refuses to start until your organisation's settings are fixed, so nothing below applies yet."
-                    : "Claude Code may skip this file."}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        <SessionSwitch profile={view.profile} onProfile={onProfile} />
+        <Problems problems={view.problems} />
         {seeing ? (
           <ContextView view={view} />
         ) : (
@@ -360,5 +205,288 @@ export function DirectoryPage({
         }}
       />
     </div>
+  );
+}
+
+/** What the rows and the inspector can do here: open, add, save and change, each with its toast. */
+function usePageActions({
+  view,
+  overview,
+  onOpenDirectory,
+  onCompare,
+  onToast,
+  reload,
+  setSelected,
+  setAdding,
+}: Pick<Props, "view" | "overview" | "onOpenDirectory" | "onCompare" | "onToast" | "reload"> & {
+  setSelected: (id: string | null) => void;
+  setAdding: (adding: Adding | null) => void;
+}): Actions {
+  const undo = useCallback(
+    async (change: Change) => {
+      try {
+        await api.restore(change.id, change.revision);
+        const name = change.target.split(/[/\\]/).pop();
+        onToast({ text: change.created ? `Removed ${name}` : `Put ${name} back` });
+      } catch (error) {
+        onToast({ text: `Could not undo: ${errorText(error)}. Recent changes keeps the backup.` });
+      }
+      reload();
+    },
+    [onToast, reload]
+  );
+
+  const saved = useCallback(
+    ({ change, message, select: row }: Saved) => {
+      setAdding(null);
+      if (row !== undefined) setSelected(row);
+      onToast({ text: message, ...(change ? { undo: () => undo(change) } : {}) });
+      reload();
+    },
+    [onToast, reload, undo, setAdding, setSelected]
+  );
+
+  return useMemo<Actions>(
+    () => ({
+      view,
+      overview,
+      sharedNames: new Set(overview?.sharedMemories.map((s) => s.name) ?? []),
+      onOpenDirectory,
+      onCompare: () => onCompare(view.path),
+      onAdd: (what) => {
+        setSelected(null);
+        setAdding(what);
+      },
+      onSaved: saved,
+      onChange: async (run, message, row) => {
+        try {
+          saved({ change: await run(), message, ...(row === undefined ? {} : { select: row }) });
+        } catch (error) {
+          onToast({ text: `Could not do that: ${errorText(error)}` });
+          reload();
+        }
+      },
+    }),
+    [view, overview, onOpenDirectory, onCompare, saved, onToast, reload, setSelected, setAdding]
+  );
+}
+
+/** The directory's path, with whether it exists, its repository and its trust. */
+function DirectoryTitle({ view }: { view: DirectoryView }) {
+  return (
+    <div className="dir-title">
+      <h1 className="mono" title={tilde(view.path)}>
+        {tilde(view.path)}
+      </h1>
+      {!view.exists && <span className="flag bad">folder no longer exists</span>}
+      {view.gitRoot && view.gitRoot !== view.path && (
+        <span className="flag">inside {tilde(view.gitRoot)}</span>
+      )}
+      <TrustFlag view={view} />
+    </div>
+  );
+}
+
+/** Config or what Claude sees, the row filter, and the palette button. */
+function Toolbar({
+  seeing,
+  onSeeing,
+  query,
+  onQuery,
+  filterInput,
+  onOpenPalette,
+}: {
+  seeing: boolean;
+  onSeeing: (seeing: boolean) => void;
+  query: string;
+  onQuery: (query: string) => void;
+  filterInput: RefObject<HTMLInputElement | null>;
+  onOpenPalette: () => void;
+}) {
+  return (
+    <div className="toolbar">
+      <fieldset className="segmented view-switch" aria-label="View">
+        <button type="button" aria-pressed={!seeing} onClick={() => onSeeing(false)}>
+          Config
+        </button>
+        <button type="button" aria-pressed={seeing} onClick={() => onSeeing(true)}>
+          <Icon name="eye" /> What Claude sees
+        </button>
+      </fieldset>
+      <label className={`filter${seeing ? " hidden" : ""}`}>
+        <Icon name="search" />
+        <input
+          ref={filterInput}
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") return;
+            onQuery("");
+            e.currentTarget.blur();
+          }}
+          placeholder="Filter rows"
+          aria-label="Filter rows"
+        />
+        <kbd>/</kbd>
+      </label>
+      <button type="button" className="palette-button" aria-label="Jump to" onClick={onOpenPalette}>
+        <span className="palette-label">Jump to</span> <kbd>Ctrl K</kbd>
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The page's keys outside a text field: / filters, j and k move the selection, 1 to 9 jump to a
+ * section, Escape closes the inspector.
+ */
+function useListKeys({
+  visible,
+  selected,
+  select,
+  seeing,
+  setSeeing,
+  setSelected,
+  setAdding,
+  filterInput,
+}: {
+  visible: Row[];
+  selected: string | null;
+  select: (id: string, focus?: boolean) => void;
+  seeing: boolean;
+  setSeeing: (seeing: boolean) => void;
+  setSelected: (id: string | null) => void;
+  setAdding: (adding: Adding | null) => void;
+  filterInput: RefObject<HTMLInputElement | null>;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTyping(e.target) || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.key === "Escape") {
+        setSelected(null);
+        setAdding(null);
+      } else if (e.key === "/") {
+        e.preventDefault();
+        setSeeing(false);
+        requestAnimationFrame(() => filterInput.current?.focus());
+      } else if (!seeing) moveInTables(e.key, visible, selected, select);
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [visible, selected, select, seeing, setSeeing, setSelected, setAdding, filterInput]);
+}
+
+/** j and k select the next or previous row on screen; 1 to 9 scroll to that section. */
+function moveInTables(
+  key: string,
+  visible: Row[],
+  selected: string | null,
+  select: (id: string, focus?: boolean) => void
+): void {
+  if (key === "j" || key === "k") {
+    const index = visible.findIndex((r) => r.id === selected);
+    const next = visible[key === "j" ? index + 1 : Math.max(index - 1, 0)] ?? visible[0];
+    if (next) select(next.id, true);
+  } else if (/^[1-9]$/.test(key)) {
+    const id = SECTIONS[Number(key) - 1]?.id;
+    if (id) document.getElementById(`section-${id}`)?.scrollIntoView({ block: "start" });
+  }
+}
+
+/** Whether Claude Code trusts this folder yet, and what waits until it does. */
+function TrustFlag({ view }: { view: DirectoryView }) {
+  const { trust } = view;
+  if (trust.sessionOnly)
+    return (
+      <span
+        className="flag"
+        title="In your home directory Claude Code asks for trust each session and saves no answer."
+      >
+        trust asked each session
+      </span>
+    );
+  if (trust.trusted) return null;
+  const waits = trust.inheritedFrom
+    ? `its allow rules, extra folders and .mcp.json approvals wait. You trusted ${tilde(trust.inheritedFrom)}, which covers hooks but not those grants.`
+    : "hooks from every settings file, its allow rules, extra folders and .mcp.json approvals wait.";
+  return (
+    <span
+      className="flag warn"
+      title={
+        view.profile === "print"
+          ? `claude -p and the SDK never show the trust dialog. Until you accept it for ${tilde(trust.root)} in an interactive session, they leave out allow rules and extra folders from repository settings.`
+          : `Until you accept Claude Code's trust dialog for ${tilde(trust.root)}, ${waits}`
+      }
+    >
+      not trusted yet
+    </span>
+  );
+}
+
+/** Links to each section, numbered as their keys. */
+function SectionIndex({ groups, hidden }: { groups: Group[]; hidden: boolean }) {
+  return (
+    <nav className={`section-index${hidden ? " hidden" : ""}`} aria-label="Sections">
+      {groups.map(({ section, all }, index) => (
+        <a
+          key={section.id}
+          href={`#section-${section.id}`}
+          className={all.length === 0 ? "empty" : ""}
+          onClick={(e) => {
+            e.preventDefault();
+            document.getElementById(`section-${section.id}`)?.scrollIntoView({ block: "start" });
+          }}
+        >
+          <kbd>{index + 1}</kbd> {section.short ?? section.title}
+          <span className="seg-count">{all.length}</span>
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+/** Which kind of session the page describes. */
+function SessionSwitch({
+  profile,
+  onProfile,
+}: {
+  profile: SessionProfile;
+  onProfile: (profile: SessionProfile) => void;
+}) {
+  return (
+    <div className="session-line">
+      <span>Describes</span>
+      <fieldset
+        className="segmented small profile-switch"
+        aria-label="Session"
+        title="Interactive claude asks for workspace trust and .mcp.json approval. claude -p and the SDK never show the trust dialog: they run settings-file hooks and connect .mcp.json servers without asking."
+      >
+        {(["interactive", "print"] as const).map((p) => (
+          <button key={p} type="button" aria-pressed={profile === p} onClick={() => onProfile(p)}>
+            {p === "print" ? "claude -p / SDK" : "interactive session"}
+          </button>
+        ))}
+      </fieldset>
+    </div>
+  );
+}
+
+/** The files ccdesk could not read or parse here. */
+function Problems({ problems }: { problems: DirectoryView["problems"] }) {
+  if (problems.length === 0) return null;
+  return (
+    <section className="problems" role="alert" aria-label="Files ccdesk could not read">
+      <Icon name="warn" />
+      <ul className="plain">
+        {problems.map((p) => (
+          <li key={p.path}>
+            <span className="mono">{tilde(p.path)}</span>: {p.error}.{" "}
+            {p.blocksStart
+              ? "Claude Code refuses to start until your organisation's settings are fixed, so nothing below applies yet."
+              : "Claude Code may skip this file."}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

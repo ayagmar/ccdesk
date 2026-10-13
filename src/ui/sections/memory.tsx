@@ -148,25 +148,7 @@ function MemoryReview({
 
   return (
     <section className="review memory-review" aria-label="Review memory change">
-      {problem ? (
-        <p className="flag bad" role="alert">
-          {problem}
-        </p>
-      ) : !preview ? (
-        <p className="muted small">Reading the files…</p>
-      ) : (
-        preview.files.map((file) => (
-          <div key={file.path} className="memory-review-file">
-            <p className="sub-title small" title={tilde(file.path)}>
-              <span className="mono">{fileName(file.path)}</span>
-              {file.after === null && (
-                <span className="muted"> is deleted; a backup is kept and you can undo it</span>
-              )}
-            </p>
-            <DiffView before={file.before ?? ""} after={file.after ?? ""} />
-          </div>
-        ))
-      )}
+      <MemoryFiles preview={preview} problem={problem} />
       <div className="editor-buttons">
         {preview && !problem && (
           <button
@@ -190,6 +172,34 @@ function MemoryReview({
       </div>
     </section>
   );
+}
+
+/** Each file a memory change touches, as a diff, once the preview is read. */
+function MemoryFiles({
+  preview,
+  problem,
+}: {
+  preview: MemoryChangePreview | null;
+  problem: string | null;
+}) {
+  if (problem)
+    return (
+      <p className="flag bad" role="alert">
+        {problem}
+      </p>
+    );
+  if (!preview) return <p className="muted small">Reading the files…</p>;
+  return preview.files.map((file) => (
+    <div key={file.path} className="memory-review-file">
+      <p className="sub-title small" title={tilde(file.path)}>
+        <span className="mono">{fileName(file.path)}</span>
+        {file.after === null && (
+          <span className="muted"> is deleted; a backup is kept and you can undo it</span>
+        )}
+      </p>
+      <DiffView before={file.before ?? ""} after={file.after ?? ""} />
+    </div>
+  ));
 }
 
 function MemoryDetails({ row, actions }: { row: R; actions: Actions }) {

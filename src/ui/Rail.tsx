@@ -73,13 +73,13 @@ export function Rail({
           <span>ccdesk</span>
         </a>
         <fieldset className="segmented small text-size" aria-label="Text size">
-          {TEXT_SIZES.map(({ size, label }) => (
+          {TEXT_SIZES.map(({ size, label: name }) => (
             <button
               key={size}
               type="button"
               className={size}
-              aria-label={label}
-              title={label}
+              aria-label={name}
+              title={name}
               aria-pressed={textSize === size}
               onClick={() => onTextSize(size)}
             >
