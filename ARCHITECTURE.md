@@ -19,6 +19,7 @@ ccdesk is one npm package. `src/core` reads and writes Claude Code's configurati
 | `src/core/backups.ts` | Lists, previews and restores backups (Recent changes and Undo). |
 | `src/core/secrets.ts` | What the page may see: `redactSecrets`, `shownText`, `shown`, `hasHiddenValues`. |
 | `src/core/watch.ts` | `Watcher`: scans a directory, watches the files the scan read, answers the page's long poll, and calls subscribers when one of them changes. |
+| `src/core/schema.ts` | `schemaErrors`: what a TypeBox validator found wrong, each led by where, such as `sandbox.network must NOT have additional properties`. Settings edits and MCP servers are checked with it. |
 | `src/core/reference.ts` | The settings schema, settings catalog and hook events, served by `/api/reference`. |
 | `src/core/open.ts` | Opens a file in the editor the `ScanEnv`'s environment names, or a URL in the default browser, the way its platform starts one. |
 | `src/core/core.ts` | `createCore(env, options)`: every read and change with `env` bound, its own change queue and usage cache, and the editor and `claude` it starts. |
@@ -89,7 +90,7 @@ The free save functions and `readUsage`, kept for one release beside `createCore
 
 Still in module scope, and shared by every core:
 
-- `settings-edit.ts`: compiled schema validators, and `schema.ts`: the Ajv instance. Both are compiled from the bundled schema and never change, so sharing them changes no result.
+- The compiled TypeBox validators in `settings-edit.ts` and `scan/mcp.ts`. They come from bundled schemas and never change, so sharing them changes no result. `schemaErrors` lifts TypeBox's process-wide limit of eight errors while it lists them and puts it back after.
 - In the page: `format.ts` keeps the formatter for the home folder the overview names, and `reference.ts` keeps the data from `/api/reference`. `src/view` keeps neither; its callers pass them in a `ViewContext`.
 
 `Watcher` is per instance; the server makes one from its core's `env`.
