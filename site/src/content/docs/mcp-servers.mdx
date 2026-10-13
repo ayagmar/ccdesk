@@ -36,7 +36,9 @@ When two scopes define a server with the same name, the first one wins and the o
 
 For a `.mcp.json` server, the inspector's **Approval** field lists each settings file, and your saved answers in `~/.claude.json`, that approve or reject it, with a note on any approval that waits for you to trust the folder.
 
-Values under `env` and `headers`, and the user name, password and query string of a `url`, are shown as `•••`. So are secrets in `args`: the value after `--token`, `--api-key`, `--apikey`, `--password`, `--secret`, `--auth` or `--key` (as `--token value` or `--token=value`), a value that starts like a common key (`sk-`, `ghp_`, `github_pat_`, `xoxb-`, `glpat-`, `AKIA`), and the credentials in a URL. The Target column hides them the same way.
+Values under `env` and `headers`, and the user name, password and query string of a `url`, are shown as `•••`. So are secrets in `args`: the value after a flag ending in `token`, `api-key`, `apikey`, `password`, `secret` or `key`, or starting with `--auth`, such as `--token`, `--access-token`, `--client-secret` or `--authorization` (as `--token value` or `--token=value`); a header's value after `--header` or `-H`, as in `mcp-remote … --header "Authorization: Bearer •••"`, where the header's name stays; an `Authorization`, `Cookie`, API key or token header, or a `Bearer` or `Basic` value, passed on its own; a value that starts like a common key (`sk-`, `ghp_`, `github_pat_`, `xoxb-`, `glpat-`, `AKIA`); and the credentials in a URL. The Target column hides them the same way.
+
+A key written into a URL's path, as some hosted MCP services do (`https://example.com/mcp/<key>/sse`), is not recognised and stays visible. Keep such a URL in an environment variable and write `${VAR}` in the file.
 
 ## Changing servers
 
