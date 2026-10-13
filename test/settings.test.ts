@@ -439,3 +439,27 @@ test("each model's effort comes from the highest file that sets it, capped at th
     { scope: "user", value: { "claude-sonnet-5": { effortLevel: "xhigh" } } },
   ]);
 });
+
+test("a project file with a value the schema rejects is skipped whole and reported, not shown in effect", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/settings.json", { model: "opus" });
+  f.json("app/.claude/settings.json", {
+    model: "sonnet",
+    permissions: { deny: ["Read"], defaultMode: "manual" },
+    cleanupPeriodDays: "forever",
+  });
+  // "manual" is a documented alias for "default", not an error.
+  f.json("app/.claude/settings.local.json", { permissions: { defaultMode: "manual" } });
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.equal(setting(view, "model")?.value, "opus");
+  assert.ok(!view.permissions.some((p) => p.kind === "rule" && p.rule === "Read"));
+  const problem = view.problems.find((p) => p.path === f.at("app/.claude/settings.json"));
+  assert.match(problem?.error ?? "", /cleanupPeriodDays/);
+  assert.match(problem?.error ?? "", /claude -p/);
+  assert.deepEqual(
+    view.problems.map((p) => p.path),
+    [f.at("app/.claude/settings.json")]
+  );
+});

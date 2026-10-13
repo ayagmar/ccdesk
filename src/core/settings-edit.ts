@@ -1,6 +1,5 @@
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
-import { Compile, type Validator } from "typebox/compile";
 import HOOK_EVENTS from "../shared/hook-events.json" with { type: "json" };
 import { allowedScopes, ignoredReason } from "../shared/scopes.ts";
 import schema from "../shared/settings.schema.json" with { type: "json" };
@@ -15,7 +14,7 @@ import { isRecord } from "./scan/data.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { resolvedPath, revisionOf } from "./scan/files.ts";
 import { isSkippedMcpRule } from "./scan/permissions.ts";
-import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
+import { type SettingsFile, settingsFiles, validatorFor } from "./scan/settings.ts";
 import { schemaErrors } from "./schema.ts";
 import { hasHiddenValues, redactSecrets, shown } from "./secrets.ts";
 import {
@@ -28,19 +27,6 @@ import {
   saveReviewed,
   writeAtomic,
 } from "./write.ts";
-
-const properties: Record<string, object> = schema.definitions.ClaudeCodeSettings.properties;
-const validators = new Map<string, Validator>();
-
-function validatorFor(key: string): Validator | null {
-  if (!Object.hasOwn(properties, key)) return null;
-  let validate = validators.get(key);
-  if (!validate) {
-    validate = Compile(properties[key] as object);
-    validators.set(key, validate);
-  }
-  return validate;
-}
 
 type PlannedEdit = Planned<SettingsEditPreview, Change>;
 

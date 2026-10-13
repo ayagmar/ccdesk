@@ -53,7 +53,7 @@ What happens on save:
 - The old file is copied to the backup folder first, and the change can be undone from the toast or from [Recent changes](../recent-changes/).
 - If the settings file is a link, for example into a dotfiles repository, ccdesk writes through it and the link stays a link.
 
-A key whose value holds hidden parts, such as a non-empty `env`, or an `allowedMcpServers` or `deniedMcpServers` entry with a token in its command, cannot be changed from ccdesk; edit it in the file. A settings file that is not valid JSON is listed at the top of the page with the line and column of the error, and ccdesk will not write to it until you fix it.
+A key whose value holds hidden parts, such as a non-empty `env`, or an `allowedMcpServers` or `deniedMcpServers` entry with a token in its command, cannot be changed from ccdesk; edit it in the file. A settings file that is not valid JSON is listed at the top of the page with the line and column of the error, and ccdesk will not write to it until you fix it. A user, project or local file with a value Claude Code's settings schema rejects, such as text where a number belongs, is listed there too: Claude Code skips the whole file (an interactive session asks at startup whether to fix it, exit or continue without it; `claude -p` skips it without asking), so ccdesk shows the settings without it.
 
 ## Comparing two directories
 

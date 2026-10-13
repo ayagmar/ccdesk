@@ -1,7 +1,10 @@
 import { lstat } from "node:fs/promises";
 import { join } from "node:path";
+import { Compile, type Validator } from "typebox/compile";
+import schema from "../../shared/settings.schema.json" with { type: "json" };
 import { allowedScopes, EVERY_FILE, ignoredReason } from "../../shared/scopes.ts";
 import { type EffectiveSetting, type Scope, type SettingsLayer } from "../../shared/types.ts";
+import { schemaErrors } from "../schema.ts";
 import { redactSecrets } from "../secrets.ts";
 import { isRecord } from "./data.ts";
 import { isUserClaudeFolder, type ScanEnv } from "./env.ts";
@@ -9,6 +12,34 @@ import { isFile, listDir, readJsonObject } from "./files.ts";
 import { mainWorktreeRoot } from "./git.ts";
 import { type Dropped, sandboxFilter } from "./sandbox.ts";
 import { envFilter } from "./settings-env.ts";
+
+const properties: Record<string, object> = schema.definitions.ClaudeCodeSettings.properties;
+const validators = new Map<string, Validator>();
+
+/** The settings schema's validator for one top-level key, or null for a key it does not define. */
+export function validatorFor(key: string): Validator | null {
+  if (!Object.hasOwn(properties, key)) return null;
+  let validate = validators.get(key);
+  if (!validate) {
+    validate = Compile(properties[key] as object);
+    validators.set(key, validate);
+  }
+  return validate;
+}
+
+/** What the settings schema rejects in a file, each led by the key, such as `cleanupPeriodDays must be number`. */
+function settingsErrors(data: Record<string, unknown>): string[] {
+  return Object.entries(data).flatMap(([key, value]) => {
+    const validate = validatorFor(key);
+    if (!validate) return [];
+    // "manual" is an alias Claude Code accepts for "default" (docs: permission-modes).
+    const checked =
+      key === "permissions" && isRecord(value) && value.defaultMode === "manual"
+        ? { ...value, defaultMode: "default" }
+        : value;
+    return schemaErrors(validate, checked, key);
+  });
+}
 
 /** Lowest precedence first, so later layers override earlier ones. */
 const PRECEDENCE: Scope[] = ["user", "project", "local", "managed"];
@@ -192,7 +223,14 @@ export async function readSettingsLayers(
     if (file.legacy && !result.ok && result.missing) continue;
     const layer: SettingsLayer = { scope: file.scope, path: file.path, exists: true, data: null };
     if (file.legacy) layer.legacy = true;
-    if (result.ok) {
+    const errors = result.ok ? settingsErrors(result.data) : [];
+    if (result.ok && errors.length > 0) {
+      // A user, project or local file with a value the schema rejects is not applied at all: an
+      // interactive session offers to fix it, exit, or continue without it, and claude -p skips it
+      // (docs: settings#fix-a-broken-settings-file, managed-settings#find-entries-claude-code-dropped).
+      const shown = errors.slice(0, 3).join("; ") + (errors.length > 3 ? "; …" : "");
+      layer.error = `has a value Claude Code's settings schema rejects (${shown}), so Claude Code skips the whole file: an interactive session asks at startup whether to fix it, exit or continue without it, and claude -p skips it`;
+    } else if (result.ok) {
       layer.data = redactSecrets(result.data);
       unredacted.set(layer, result.data);
     } else if (result.missing) layer.exists = false;
