@@ -40,7 +40,7 @@ A file is skipped when:
 
 ## Imports
 
-A file can pull in others with `@path/to/file` lines. ccdesk follows them the way Claude Code does: outside code blocks and inline code, relative to the importing file, `~/` for your home folder, up to four levels deep. The inspector lists each file's imports and marks the ones that are missing, larger than 4 MiB, outside the project, or waiting for your approval.
+A file can pull in others with `@path/to/file` lines. ccdesk follows them the way Claude Code does: after the frontmatter, outside code blocks, inline code and HTML comments, relative to the importing file, `~/` for your home folder, up to four levels deep. A `#` and what follows it are left out, so `@docs/guide.md#setup` imports `docs/guide.md`, but punctuation is not: `@README.md.` names a file called `README.md.`. The inspector lists each file's imports and marks the ones that are missing, larger than 4 MiB, outside the project, or waiting for your approval, and the ones Claude Code does not load because they are not text files, such as images, or because `claudeMdExcludes` matches them.
 
 Imports from your user or managed files load without asking. Imports in project or local files that point outside the project wait until you accept Claude Code's prompt for external imports, which it records in `~/.claude.json`.
 

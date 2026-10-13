@@ -155,7 +155,8 @@ async function instructionBlocks(
   // first, then the rest"), and its own imports before it.
   const importsOf = async (file: Instruction, via: string) => {
     for (const ref of file.imports.filter((r) => r.via === via)) {
-      if (!ref.exists || loaded.has(ref.resolved) || added.has(ref.resolved)) continue;
+      if (!ref.exists || ref.skipped || loaded.has(ref.resolved) || added.has(ref.resolved))
+        continue;
       added.add(ref.resolved);
       await importsOf(file, ref.resolved);
       blocks.push(await importBlock(env, projectRoot, file, ref, via));

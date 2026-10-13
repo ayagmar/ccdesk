@@ -90,6 +90,12 @@ export const instructions: SectionUi<R> = {
                   )}
                   {!imp.exists && <span className="flag bad">missing</span>}
                   {imp.tooLarge && <span className="flag warn">over 4 MiB, not loaded</span>}
+                  {imp.skipped === "excluded" && (
+                    <span className="flag">excluded by claudeMdExcludes, not loaded</span>
+                  )}
+                  {imp.skipped === "not-text" && (
+                    <span className="flag">not a text file, not loaded</span>
+                  )}
                   {imp.external && <span className="flag">outside this project</span>}
                   {imp.pending && (
                     <span

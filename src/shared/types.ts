@@ -34,6 +34,8 @@ export interface ImportRef {
   pending?: boolean;
   /** Over 4 MiB, which Claude Code does not load. */
   tooLarge?: boolean;
+  /** Not loaded: matched by claudeMdExcludes, or not a text file. */
+  skipped?: "excluded" | "not-text";
 }
 
 /** Whether a file loads at session start, once Claude works with matching files, or not at all. */
