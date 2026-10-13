@@ -424,7 +424,10 @@ function approvals(calls: Call[], rules: RuleInEffect[]): Approval[] {
   const groups = new Map<string, Call[]>();
   for (const c of calls) {
     if (c.byYou !== true) continue;
-    if (c.rule) groups.set(c.rule, [...(groups.get(c.rule) ?? []), c]);
+    if (!c.rule) continue;
+    const group = groups.get(c.rule);
+    if (group) group.push(c);
+    else groups.set(c.rule, [c]);
   }
   const refused = calls.filter((c) => c.byYou === false);
   const out: Approval[] = [];
