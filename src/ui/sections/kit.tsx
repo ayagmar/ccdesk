@@ -1,6 +1,4 @@
-import { type ReactNode, useState } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { lazy, type ReactNode, Suspense, useState } from "react";
 import { type Scope, type Visibility } from "../../shared/types.ts";
 import { api, errorText } from "../api.ts";
 import { sharedWithAgents, tilde } from "../format.ts";
@@ -136,15 +134,31 @@ export function Contents({ text, markdown = true }: { text: string; markdown?: b
           </fieldset>
         )}
       </div>
-      {raw ? (
-        <pre className="raw">{text}</pre>
-      ) : (
-        // react-markdown never renders raw HTML, so a cloned repo's AGENTS.md cannot inject script here.
-        <div className="prose">
-          <Markdown remarkPlugins={[remarkGfm]}>{text}</Markdown>
-        </div>
-      )}
+      {raw ? <pre className="raw">{text}</pre> : <Prose text={text} gfm />}
     </section>
+  );
+}
+
+const MarkdownText = lazy(() => import("../MarkdownText.tsx"));
+
+/** Markdown in the page's prose style. The renderer comes from this server, so it shows at once. */
+export function Prose({
+  text,
+  className = "prose",
+  gfm = false,
+  linksInNewTab = false,
+}: {
+  text: string;
+  className?: string;
+  gfm?: boolean;
+  linksInNewTab?: boolean;
+}) {
+  return (
+    <div className={className}>
+      <Suspense fallback={null}>
+        <MarkdownText text={text} gfm={gfm} linksInNewTab={linksInNewTab} />
+      </Suspense>
+    </div>
   );
 }
 
