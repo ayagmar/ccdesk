@@ -31,6 +31,58 @@ export const AGENTS_MD_MODES: AgentsMdMode[] = [
   "managed-only",
 ];
 
+/** The CLAUDE.md and AGENTS.md files each folder can hold, in the order Claude Code reads them. */
+export const CLAUDE_MD_NAMES = ["CLAUDE.md", ".claude/CLAUDE.md"];
+export const AGENTS_MD_NAMES = ["AGENTS.md", ".claude/AGENTS.md"];
+
+/**
+ * Whether AGENTS.md loads, given the instruction mode and whether a CLAUDE.md or CLAUDE.local.md
+ * is there (docs: memory#choose-which-instruction-files-load).
+ */
+export function agentsMdLoads(mode: AgentsMdMode, hasClaudeMd: boolean): boolean {
+  return mode === "claude-md-and-agents-md" || (mode === "claude-md-or-agents-md" && !hasClaudeMd);
+}
+
+/**
+ * Whether a claudeMdExcludes glob matches a file by its own path or, for a link, its target's
+ * (docs: memory#exclude-specific-claude-md-files).
+ */
+export function isExcluded(excludes: string[], path: string, realPath?: string): boolean {
+  return excludes.some((glob) =>
+    [path, realPath].some((p) => p !== undefined && safeMatch(p, glob))
+  );
+}
+
+/**
+ * Where a rule in `dir` really is when that is outside both the project and `dir`: a link's
+ * target, or the file a linked folder leads to. Undefined for a rule that stays inside.
+ */
+export async function ruleTarget(
+  file: TextFile,
+  dir: string,
+  realCwd: string
+): Promise<string | undefined> {
+  if (file.realPath) return file.realPath;
+  const real = await resolvedPath(file.path);
+  return isWithin(realCwd, real) || isWithin(await resolvedPath(dir), real) ? undefined : real;
+}
+
+/**
+ * Why a project rule linked from outside the project does not load, or null when it does: it waits
+ * for your approval of outside imports, and once approved loads only without a paths field
+ * (docs: memory#share-rules-across-projects-with-symlinks).
+ */
+export function linkedRuleBlock(
+  target: string | undefined,
+  realCwd: string,
+  approved: boolean,
+  hasPaths: boolean
+): "needs-approval" | "has-paths" | null {
+  if (target === undefined || isWithin(realCwd, target)) return null;
+  if (!approved) return "needs-approval";
+  return hasPaths ? "has-paths" : null;
+}
+
 /** Directories from the filesystem root down to `cwd`, the order Claude Code concatenates them in. */
 export function ancestorsRootFirst(cwd: string): string[] {
   const dirs: string[] = [];
@@ -143,7 +195,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
   for (const dir of ancestorsRootFirst(cwd)) {
     // ~/.claude/CLAUDE.md and ~/.claude/rules are the user files above, not the home's project files.
     const holdsClaudeDir = join(dir, ".claude") === env.claudeDir;
-    for (const name of ["CLAUDE.md", ".claude/CLAUDE.md"]) {
+    for (const name of CLAUDE_MD_NAMES) {
       if (holdsClaudeDir && name === ".claude/CLAUDE.md") continue;
       const file = await readInstruction(join(dir, name));
       if (file) claudeFiles.push(await instruction(file, "claude-md", "project", dir, ctx, ""));
@@ -155,7 +207,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
       }
     const local = await readInstruction(join(dir, "CLAUDE.local.md"));
     if (local) claudeFiles.push(await instruction(local, "claude-local-md", "local", dir, ctx, ""));
-    for (const name of ["AGENTS.md", ".claude/AGENTS.md"]) {
+    for (const name of AGENTS_MD_NAMES) {
       const file = await readInstruction(join(dir, name));
       if (file) agentsFiles.push(await instruction(file, "agents-md", "project", dir, ctx, ""));
     }
@@ -176,16 +228,16 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
     claudeFiles.flatMap((f) => [f.realPath ?? f.path, ...f.imports.map((i) => i.resolved)])
   );
   for (const file of agentsFiles) {
-    if (mode === "managed-only" || mode === "claude-md") skip(file, skippedByMode);
+    if (!agentsMdLoads(mode, false)) skip(file, skippedByMode);
     else if (includedElsewhere.has(file.realPath ?? file.path))
       skip(file, "Already included through a CLAUDE.md import or symlink");
-    else if (mode === "claude-md-and-agents-md")
-      file.reason = "Loaded alongside CLAUDE.md (instruction mode claude-md-and-agents-md)";
-    else if (hasClaudeMd)
+    else if (!agentsMdLoads(mode, hasClaudeMd))
       skip(
         file,
         "Ignored: a CLAUDE.md or CLAUDE.local.md exists here or above, so Claude Code reads that instead"
       );
+    else if (mode === "claude-md-and-agents-md")
+      file.reason = "Loaded alongside CLAUDE.md (instruction mode claude-md-and-agents-md)";
     else file.reason = "Loaded because there is no CLAUDE.md here or above";
   }
 
@@ -203,22 +255,22 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
     if (file.scope === "managed") continue;
     // Path-scoped rules still load on demand in managed-only mode (docs: memory#choose-which-instruction-files-load).
     if (managedOnly && file.status === "loaded") skip(file, skippedByMode);
-    // Managed files cannot be excluded; a linked file is excluded by its own path or its target's
-    // (docs: memory#exclude-specific-claude-md-files).
-    const excluded = excludes.some((glob) =>
-      [file.path, file.realPath].some((p) => p !== undefined && safeMatch(p, glob))
-    );
-    if (excluded) skip(file, "Skipped by claudeMdExcludes");
+    // Managed files cannot be excluded.
+    if (isExcluded(excludes, file.path, file.realPath)) skip(file, "Skipped by claudeMdExcludes");
     if (file.status !== "skipped" && file.bytes > MAX_TEXT_BYTES)
       skip(file, "Skipped: Claude Code does not load an instruction file over 4 MiB");
     // A project's links outside it need your approval, like its imports; your own files do not.
     if (file.scope !== "project" && file.scope !== "local") continue;
-    if (file.kind === "rule" && file.realPath && !isWithin(ctx.realCwd, file.realPath)) {
-      if (!ctx.approved) skip(file, `${waiting}; this rule links outside it`);
-      // docs: memory#share-rules-across-projects-with-symlinks
-      else if (file.paths)
-        skip(file, "Links outside this project, and such a rule loads only without a paths field");
-    }
+    if (file.kind !== "rule") continue;
+    const block = linkedRuleBlock(
+      file.realPath,
+      ctx.realCwd,
+      ctx.approved,
+      file.paths !== undefined
+    );
+    if (block === "needs-approval") skip(file, `${waiting}; this rule links outside it`);
+    else if (block === "has-paths")
+      skip(file, "Links outside this project, and such a rule loads only without a paths field");
   }
   addChecks(out);
   return out;
@@ -231,7 +283,7 @@ function skip(file: Instruction, reason: string) {
 }
 
 /** An invalid pattern matches nothing. */
-function safeMatch(path: string, glob: string): boolean {
+export function safeMatch(path: string, glob: string): boolean {
   try {
     return matchesGlob(path, glob);
   } catch {
@@ -288,9 +340,8 @@ async function rule(file: TextFile, scope: Scope, dir: string, ctx: Ctx) {
     entry.status = "on-match";
   }
   // A rule reached through a linked folder is not a link itself, but its target can be outside.
-  const real = await resolvedPath(file.path);
-  if (!entry.realPath && !isWithin(ctx.realCwd, real) && !isWithin(await resolvedPath(dir), real))
-    entry.realPath = real;
+  const target = await ruleTarget(file, dir, ctx.realCwd);
+  if (target) entry.realPath = target;
   return entry;
 }
 

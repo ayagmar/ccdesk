@@ -51,6 +51,15 @@ export async function mainWorktreeRoot(dir: string): Promise<string | null> {
   }
 }
 
+/**
+ * The key ~/.claude.json keeps a folder's trust answers and local MCP servers under: the main
+ * checkout's root, else the repository root, else the folder itself outside git. The scan reads
+ * under it and `claude mcp add --scope local` writes under it, so both take it from here.
+ */
+export function trustKey(dir: string, mainRoot: string | null, root: string | null): string {
+  return mainRoot ?? root ?? dir;
+}
+
 /** Git visibility of each path, batched into two git calls per repository. */
 export async function visibilityOf(
   root: string | null,

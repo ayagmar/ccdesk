@@ -5,7 +5,7 @@ import { type Change, type McpEdit, type SettingsEditPreview } from "../shared/t
 import { type ScanEnv } from "./scan/env.ts";
 import { revisionOf } from "./scan/files.ts";
 import { isRecord } from "./scan/data.ts";
-import { gitRoot, mainWorktreeRoot } from "./scan/git.ts";
+import { gitRoot, mainWorktreeRoot, trustKey } from "./scan/git.ts";
 import { serverProblems } from "./scan/mcp.ts";
 import { hasHiddenValues, jsonSyntaxError, redactSecrets, secretTexts, shown } from "./secrets.ts";
 import {
@@ -212,10 +212,10 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
   } catch (error) {
     throw new RefusedError(`${env.claudeJson} is ${jsonSyntaxError(error)}; fix it by hand first.`);
   }
-  // Local servers are kept per project, under the key the scan reads them from: the main
-  // checkout's root, or this folder outside git. Claude Code files them there from any folder below.
+  // Local servers are kept per project, under the key the scan reads them from. Claude Code files
+  // them there from any folder below.
   const projects = isRecord(data.projects) ? data.projects : {};
-  const root = (await mainWorktreeRoot(dir)) ?? (await gitRoot(dir)) ?? dir;
+  const root = trustKey(dir, await mainWorktreeRoot(dir), await gitRoot(dir));
   // User servers do not depend on the folder, so claude runs in your home directory for them.
   const cwd = edit.scope === "user" ? env.home : root;
   if (!(await stat(cwd).catch(() => null))?.isDirectory())
