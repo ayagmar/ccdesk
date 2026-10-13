@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { type BackupKind, type BackupSummary, type RestorePreview } from "../shared/types.ts";
-import { api } from "./api.ts";
+import { api, errorText } from "./api.ts";
 import { DiffView } from "./DiffView.tsx";
 import { tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
@@ -34,10 +34,6 @@ function byDay(changes: BackupSummary[]): Array<[string, BackupSummary[]]> {
   return [...days];
 }
 
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 /** Every change ccdesk made, from its backups, with a reviewed restore for each. */
 export function ChangesPage({ onRestored }: { onRestored: (text: string) => void }) {
   const [backups, setBackups] = useState<BackupSummary[] | null>(null);
@@ -45,14 +41,14 @@ export function ChangesPage({ onRestored }: { onRestored: (text: string) => void
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
-  const fail = (error: unknown) => setProblem(messageOf(error));
+  const fail = (error: unknown) => setProblem(errorText(error));
   const load = useCallback(() => {
     api.backups().then(
       (page) => {
         setBackups(page.changes);
         setMore(page.more);
       },
-      (error: unknown) => setProblem(messageOf(error))
+      (error: unknown) => setProblem(errorText(error))
     );
   }, []);
   useEffect(load, [load]);
@@ -154,10 +150,7 @@ function Restore({ id, onDone }: { id: string; onDone: (text: string) => void })
   const [preview, setPreview] = useState<RestorePreview | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const fail = useCallback(
-    (error: unknown) => setProblem(error instanceof Error ? error.message : String(error)),
-    []
-  );
+  const fail = useCallback((error: unknown) => setProblem(errorText(error)), []);
 
   useEffect(() => {
     api.previewRestore(id).then(setPreview, fail);

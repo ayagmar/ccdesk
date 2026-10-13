@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { storeDirName } from "../../shared/memory.ts";
 import { type MemoryAction, type MemoryChangePreview } from "../../shared/types.ts";
 import { type RowOf } from "../../view/sections/types.ts";
-import { api } from "../api.ts";
+import { api, errorText } from "../api.ts";
 import { Bullet } from "../Bullet.tsx";
 import { DiffView } from "../DiffView.tsx";
 import { ago, tilde } from "../format.ts";
@@ -143,9 +143,7 @@ function MemoryReview({
   useEffect(() => {
     api
       .previewMemory(action, path)
-      .then(setPreview, (error: unknown) =>
-        setProblem(error instanceof Error ? error.message : String(error))
-      );
+      .then(setPreview, (error: unknown) => setProblem(errorText(error)));
   }, [action, path]);
 
   return (

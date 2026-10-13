@@ -9,7 +9,7 @@ import {
 } from "../shared/types.ts";
 import { lineName } from "../view/lines.ts";
 import { type FieldKind, fieldKind } from "../view/settings.ts";
-import { api } from "./api.ts";
+import { api, errorText } from "./api.ts";
 import { Bullet } from "./Bullet.tsx";
 import { DiffView } from "./DiffView.tsx";
 import { tilde } from "./format.ts";
@@ -133,7 +133,7 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
       const edit = { dir: view.path, scope, key, ...(removing ? {} : { value: parsed.value }) };
       setReview({ preview: await api.previewSettings(edit), edit, removing });
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(errorText(error));
     } finally {
       setBusy(false);
     }
@@ -153,7 +153,7 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
       });
       setReview(null);
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(errorText(error));
     } finally {
       setBusy(false);
     }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { type ComparedValue, type SettingsComparison } from "../shared/compare.ts";
-import { api } from "./api.ts";
+import { api, errorText } from "./api.ts";
 import { Bullet } from "./Bullet.tsx";
 import { preview, relativeTo, tilde, tildeAll } from "./format.ts";
 
@@ -37,11 +37,7 @@ export function ComparePage({ dir, other, onOpen, onPickOther }: Props) {
   const [problem, setProblem] = useState<string | null>(null);
   const [all, setAll] = useState(false);
   useEffect(() => {
-    api
-      .compare(dir, other)
-      .then(setComparison, (error: unknown) =>
-        setProblem(error instanceof Error ? error.message : String(error))
-      );
+    api.compare(dir, other).then(setComparison, (error: unknown) => setProblem(errorText(error)));
   }, [dir, other]);
 
   const settings = comparison?.settings ?? [];

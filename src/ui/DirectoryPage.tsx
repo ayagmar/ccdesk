@@ -5,7 +5,7 @@ import {
   type Overview,
   type SessionProfile,
 } from "../shared/types.ts";
-import { api } from "./api.ts";
+import { api, errorText } from "./api.ts";
 import { ContextView } from "./ContextView.tsx";
 import { tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
@@ -19,7 +19,6 @@ import { type Actions, type Adding } from "./sections/types.ts";
 import { Timetable } from "./Timetable.tsx";
 import { type ToastMessage } from "./Toast.tsx";
 import { type ListState, NO_LIST_STATE, readListState, replaceListState } from "./url.ts";
-import { errorText } from "./useConfig.ts";
 
 interface Props {
   view: DirectoryView;
