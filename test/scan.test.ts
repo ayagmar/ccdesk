@@ -321,6 +321,26 @@ test("a rules folder that links back to itself is read once, not forever", async
   assert.equal(view.instructions.filter((i) => i.path.endsWith("style.md")).length, 1);
 });
 
+test("a rules folder that links to a network location is reported and not followed", {
+  // A link to /net is a local path on Windows, where network locations are UNC paths.
+  skip: process.platform === "win32",
+}, async () => {
+  const f = makeFixture();
+  f.link("app/.claude/rules", "/net/ccdesk-fixture-host/rules");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    view.problems.map((p) => [f.rel(p.path), p.error]),
+    [
+      [
+        "app/.claude/rules",
+        "links to a network location, which Claude Code does not follow, so ccdesk does not read it either",
+      ],
+    ]
+  );
+});
+
 test("a broken .mcp.json is reported as a problem", async () => {
   const f = makeFixture();
   f.write("app/.mcp.json", "{ nope");

@@ -261,10 +261,19 @@ export function shortHash(text: string): string {
 
 /**
  * Markdown files under `dir`. A symlinked folder is entered once, so a link loop ends, and a link
- * to a network location is not followed. Depth and count are bounded by ccdesk, since a link can
- * lead anywhere; Claude Code's own limits are not documented.
+ * to a network location is not followed, `dir` and the folder holding it included; such a `dir`
+ * goes into `problems`. Depth and count are bounded by ccdesk, since a link can lead anywhere;
+ * Claude Code's own limits are not documented.
  */
-export async function walkMarkdown(dir: string): Promise<string[]> {
+export async function walkMarkdown(dir: string, problems?: Problem[]): Promise<string[]> {
+  if ((await linksToNetwork(dir)) || (await linksToNetwork(dirname(dir)))) {
+    problems?.push({
+      path: dir,
+      error:
+        "links to a network location, which Claude Code does not follow, so ccdesk does not read it either",
+    });
+    return [];
+  }
   const out: string[] = [];
   const seen = new Set<string>();
   const walk = async (folder: string, depth: number) => {
