@@ -235,14 +235,27 @@ export function stringsIn(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
 }
 
-/** A frontmatter list given as a YAML list or a comma-separated string, such as `paths`. */
+/**
+ * A frontmatter list given as a YAML list or a comma-separated string, such as `paths`. Like
+ * Claude Code, it splits a string and each list item at commas outside braces, so
+ * `src/*.{ts,tsx}` stays one glob (docs: memory#rules-frontmatter-reference).
+ */
 export function toStringList(value: unknown): string[] {
-  if (typeof value === "string")
-    return value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  return stringsIn(value);
+  if (Array.isArray(value)) return value.flatMap(toStringList);
+  if (typeof value !== "string") return [];
+  const out: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of value) {
+    if (char === "{") depth++;
+    else if (char === "}") depth--;
+    if (char === "," && depth === 0) {
+      out.push(current.trim());
+      current = "";
+    } else current += char;
+  }
+  out.push(current.trim());
+  return out.filter(Boolean);
 }
 
 export function stringField(data: Record<string, unknown>, key: string): string {
