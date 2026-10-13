@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.6](https://github.com/ayagmar/ccdesk/compare/v0.2.5...v0.2.6) (2026-10-13)
+
+### Features
+
+* **settings:** edit objects, limited lists and nullable keys with typed fields ([0463dd4](https://github.com/ayagmar/ccdesk/commit/0463dd4692d4589fe31aeba23b4615fb9018f3e0))
+* **settings:** warn when an autoMode list drops the built-in rules ([ae80080](https://github.com/ayagmar/ccdesk/commit/ae8008008a6ee4773789820c108c97e072c87344))
+
+### Bug Fixes
+
+* **settings:** describe SchemaStore keys' fields with the docs too ([9ed89a5](https://github.com/ayagmar/ccdesk/commit/9ed89a5c681bdf37d0a8cd2a36f6d591ea882e29))
+* **settings:** end a field's first sentence only where a sentence starts ([3288b4a](https://github.com/ayagmar/ccdesk/commit/3288b4a01313a929adda943fd3db930a3af10b9e))
+* **settings:** follow the file when a form switched to JSON holds its value ([630020b](https://github.com/ayagmar/ccdesk/commit/630020bb0421de46e3689c8007a94b7453a88628))
+* **settings:** keep "e.g." inside a field's first sentence ([72f5e84](https://github.com/ayagmar/ccdesk/commit/72f5e8469a4f38b476998cf964029c5e5c02fa2d))
+* **settings:** keep unsaved edits, line breaks and empty lists in typed forms ([0d347d5](https://github.com/ayagmar/ccdesk/commit/0d347d5d0863593e573ac107dbdd58f35a647ae8))
+* **settings:** switching the target file keeps a typed value quietly ([2f3fc53](https://github.com/ayagmar/ccdesk/commit/2f3fc539ecf1eadcefa64d1eb01a77deb17582dd))
+* **settings:** warn about an empty autoMode list too ([7ff1882](https://github.com/ayagmar/ccdesk/commit/7ff18824fa96bfa7bc2966d63f3cc24b8d52a3c3)), references [auto-mode-config#override-the-block-and-allow-rules](https://github.com/auto-mode-config/issues/override-the-block-and-allow-rules)
+* **settings:** warn about autoMode lists without $defaults in JSON too ([16b75ac](https://github.com/ayagmar/ccdesk/commit/16b75acabd6615417d549158fe88dbdc58baf6f8))
+
 ## [0.2.5](https://github.com/ayagmar/ccdesk/compare/v0.2.4...v0.2.5) (2026-10-13)
 
 ### Features
