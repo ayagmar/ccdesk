@@ -18,6 +18,8 @@ A plugin's skills and commands are named with the plugin first, such as `my-plug
 
 A skill with `disable-model-invocation` is marked as one that runs only when you call it. The `skillOverrides` setting can turn a skill off, keep it out of the listing Claude sees, or show only its name; ccdesk applies it to user, project and managed skills and to commands. [What Claude sees](../what-claude-sees/) shows the skill listing as Claude gets it.
 
+When managed settings set `strictPluginOnlyCustomization` to `true`, or to a list naming `skills`, Claude Code loads skills and commands only from plugins and the managed folder: your skills and commands, synced ones included, and the project's are marked as skipped and left out of the listing.
+
 ## Commands and output styles
 
 Custom slash commands come from `~/.claude/commands` and the open directory's `.claude/commands`; output styles from `~/.claude/output-styles` and the open directory's `.claude/output-styles`. Plugins can add both. Commands in subfolders are named with `:`, such as `frontend:test`.

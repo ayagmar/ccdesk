@@ -1053,3 +1053,53 @@ test("MCP policy entries and server values match after variable expansion, each 
     /^\$\{TOOLS\}\/bin\/a /
   );
 });
+
+test("managed strictPluginOnlyCustomization withholds your and the project's skills, commands, agents, hooks and MCP servers", async () => {
+  const f = makeFixture();
+  const skill = (name: string, description: string) =>
+    `---\nname: ${name}\ndescription: ${description}\n---\n`;
+  f.json("etc/claude-code/managed-settings.json", {
+    strictPluginOnlyCustomization: true,
+    hooks: { Stop: [{ hooks: [{ type: "command", command: "audit" }] }] },
+  });
+  f.write("etc/claude-code/.claude/skills/policy/SKILL.md", skill("policy", "managed skill"));
+  f.write("home/.claude/skills/mine/SKILL.md", skill("mine", "your skill"));
+  f.write("app/.claude/skills/theirs/SKILL.md", skill("theirs", "project skill"));
+  f.write("home/.claude/commands/ship.md", "---\ndescription: ship it\n---\n");
+  f.write("app/.claude/agents/review.md", skill("review", "project agent"));
+  f.json("home/.claude/settings.json", {
+    hooks: { Stop: [{ hooks: [{ type: "command", command: "notify" }] }] },
+  });
+  f.json("home/.claude.json", { mcpServers: { db: { command: "db-mcp" } } });
+
+  const view = await scanDirectory(f.env, f.at("app"), "print");
+  const { skills, commands, agents, hooks, mcpServers } = view.inventory;
+
+  assert.deepEqual(
+    skills.map((s) => [s.name, s.skipped !== undefined]),
+    [
+      ["policy", false],
+      ["mine", true],
+      ["theirs", true],
+    ]
+  );
+  assert.ok(commands[0]?.skipped);
+  assert.ok(agents[0]?.skipped);
+  assert.deepEqual(
+    hooks.map((h) => [h.command, h.active]),
+    [
+      ["audit", true],
+      ["notify", false],
+    ]
+  );
+  assert.equal(mcpServers[0]?.status, "blocked");
+  const listing = view.context.find((b) => b.kind === "skills")?.text ?? "";
+  assert.match(listing, /managed skill/);
+  assert.doesNotMatch(listing, /your skill|project skill|ship it/);
+
+  // A list locks only the surfaces it names.
+  f.json("etc/claude-code/managed-settings.json", { strictPluginOnlyCustomization: ["hooks"] });
+  const hooksOnly = await scanDirectory(f.env, f.at("app"), "print");
+  assert.ok(hooksOnly.inventory.skills.every((s) => s.skipped === undefined));
+  assert.equal(hooksOnly.inventory.hooks[0]?.active, false);
+});

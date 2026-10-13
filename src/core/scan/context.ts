@@ -207,7 +207,7 @@ async function importBlock(
 function listingBlocks(inventory: Inventory): ContextBlock[] {
   const blocks: ContextBlock[] = [];
   const listed = [...inventory.skills, ...inventory.commands].filter(
-    (s) => s.listed !== false && !s.shadowedBy && !s.paths
+    (s) => s.listed !== false && !s.shadowedBy && !s.skipped && !s.paths
   );
   const listing = skillListing(listed);
   if (listing)

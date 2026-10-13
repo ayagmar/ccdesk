@@ -24,6 +24,7 @@ import {
   safeMatch,
 } from "./instructions.ts";
 import { applySkillOverrides, readSkill } from "./inventory.ts";
+import { pluginOnlySurfaces } from "./plugins.ts";
 
 /** Globs are written with forward slashes on every platform. */
 function slashed(path: string): string {
@@ -67,6 +68,9 @@ export async function testPath(
     startSkills: new Set(
       view.inventory.skills.filter((s) => s.scope !== "plugin").map((s) => s.name)
     ),
+    skillsLocked: pluginOnlySurfaces(
+      view.settings.find((l) => l.scope === "managed")?.data ?? null
+    ).has("skills"),
   };
   const matches = startRuleMatches(view, target, projectRoot);
   // Folders below the start directory load their own instructions, rules and skills on demand.
@@ -94,6 +98,8 @@ interface FolderTest {
   overrides: unknown;
   /** Names of the skills loaded at startup, which a nested skill of the same name is told from. */
   startSkills: Set<string>;
+  /** Managed settings keep skills to plugins and the managed folder, so no project skill loads. */
+  skillsLocked: boolean;
 }
 
 /** Path rules Claude Code would use at all: not excluded, not waiting for approval. */
@@ -159,8 +165,9 @@ async function nestedRules(test: FolderTest, folder: string): Promise<PathMatch[
  * folder like a rule's.
  */
 async function nestedSkills(test: FolderTest, folder: string): Promise<PathMatch[]> {
-  const { env, cwd, target, overrides, startSkills } = test;
+  const { env, cwd, target, overrides, startSkills, skillsLocked } = test;
   const matches: PathMatch[] = [];
+  if (skillsLocked) return matches;
   for (const name of await listDir(join(folder, ".claude", "skills"))) {
     const skill = await readSkill(env, join(folder, ".claude", "skills", name), "project");
     if (!skill) continue;
@@ -184,7 +191,7 @@ async function nestedSkills(test: FolderTest, folder: string): Promise<PathMatch
 /** Skills Claude can pick on its own; one with disable-model-invocation only runs when you call it. */
 function startSkillMatches(view: DirectoryView, target: string, projectRoot: string): PathMatch[] {
   return view.inventory.skills.flatMap((skill): PathMatch[] => {
-    if (!skill.paths || skill.listed === false || skill.shadowedBy) return [];
+    if (!skill.paths || skill.listed === false || skill.shadowedBy || skill.skipped) return [];
     const glob = firstMatch(skill.paths, slashed(relative(projectRoot, target)));
     if (!glob) return [];
     return [

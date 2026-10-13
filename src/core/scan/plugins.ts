@@ -33,6 +33,25 @@ export function pluginNamespace({ plugin, manifest }: LoadedPlugin): string {
   return stringField(manifest, "name") || (plugin.id.split("@")[0] ?? plugin.id);
 }
 
+/** A part of Claude Code that managed strictPluginOnlyCustomization can lock to plugins and managed settings. */
+export type Surface = "skills" | "agents" | "hooks" | "mcp";
+
+/**
+ * The surfaces managed settings lock: true locks all four, a list the ones it names; an entry
+ * naming no surface locks nothing (docs: settings-reference#strictpluginonlycustomization).
+ */
+export function pluginOnlySurfaces(managed: Record<string, unknown> | null): Set<Surface> {
+  const value = managed?.strictPluginOnlyCustomization;
+  if (value === true) return new Set(["skills", "agents", "hooks", "mcp"]);
+  const all: Surface[] = ["skills", "agents", "hooks", "mcp"];
+  return new Set(all.filter((surface) => Array.isArray(value) && value.includes(surface)));
+}
+
+/** Why Claude Code does not load an entry from your or the project's files on a locked surface. */
+export function pluginOnlyNote(surface: Surface): string {
+  return `Managed settings allow ${surface === "mcp" ? "MCP servers" : surface} only from plugins and managed settings (strictPluginOnlyCustomization)`;
+}
+
 /**
  * The enabledPlugins entry that decides a plugin: from the highest-precedence settings file that
  * names it under any of `ids`, the first id it names winning there. An installed plugin is on

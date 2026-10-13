@@ -14,7 +14,13 @@ import { isConfigHome, type ScanEnv } from "./env.ts";
 import { readJsonOrReport, stringField, stringsIn, wildcard } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { claudeJsonKey } from "./git.ts";
-import { type LoadedPlugin, manifestConfigs, pluginNamespace } from "./plugins.ts";
+import {
+  type LoadedPlugin,
+  manifestConfigs,
+  pluginNamespace,
+  pluginOnlyNote,
+  pluginOnlySurfaces,
+} from "./plugins.ts";
 import { hooksWait } from "./permissions.ts";
 import { unredactedData } from "./settings.ts";
 import { envFilter } from "./settings-env.ts";
@@ -263,6 +269,7 @@ export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Pro
   // A managed-mcp.json that does not parse is reported; ccdesk cannot tell which servers it lists,
   // so it does not show it taking control.
   const exclusive = managedJson !== null;
+  const locked = pluginOnlySurfaces(input.managed).has("mcp");
   const environments = environmentsOf(input);
   expandServers(defined, environments);
   const policy = policyOf(layers, environments);
@@ -274,8 +281,9 @@ export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Pro
   for (const d of defined) {
     const { server } = d;
     if (server.status === "invalid") continue;
-    if (exclusive && !d.organisation && server.scope !== "managed") {
-      set(server, "blocked", "managed-mcp.json takes exclusive control of MCP servers");
+    const controlled = managedControl(d, exclusive, locked);
+    if (controlled) {
+      set(server, "blocked", controlled);
       continue;
     }
     // Scopes dedupe by name; plugins by endpoint against the enabled servers above them.
@@ -299,6 +307,18 @@ export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Pro
       enabledEndpoints.set(endpoint(d), d);
   }
   return defined.map((d) => d.server);
+}
+
+/**
+ * Why your organisation keeps a server from loading at all: a managed-mcp.json, which takes
+ * exclusive control, or managed settings that keep MCP servers to plugins and managed settings.
+ */
+function managedControl(d: Defined, exclusive: boolean, locked: boolean): string | null {
+  const { scope } = d.server;
+  if (exclusive && !d.organisation && scope !== "managed")
+    return "managed-mcp.json takes exclusive control of MCP servers";
+  if (locked && scope !== "managed" && scope !== "plugin") return pluginOnlyNote("mcp");
+  return null;
 }
 
 function set(server: McpServer, status: McpServer["status"], note: string): void {

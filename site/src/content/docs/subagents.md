@@ -10,7 +10,7 @@ Subagents are listed in the **Agents, skills & plugins** section with the kind *
 3. `~/.claude/agents`;
 4. enabled plugins, named `plugin:agent`.
 
-Subfolders are read too. When two files define an agent with the same name, the higher one wins and the other is marked as shadowed. Select an agent to read its file.
+Subfolders are read too. When two files define an agent with the same name, the higher one wins and the other is marked as shadowed. When managed settings set `strictPluginOnlyCustomization` to `true`, or to a list naming `agents`, your agents and the project's are marked as skipped: only managed and plugin agents load. Select an agent to read its file.
 
 ## Creating an agent
 
