@@ -1407,6 +1407,59 @@ async function serversIn(dir: string): Promise<ScannedServer[]> {
   return (view.json as { inventory: { mcpServers: ScannedServer[] } }).inventory.mcpServers;
 }
 
+test("a request body that is not well formed is answered 400, naming what is wrong", async () => {
+  // Catches a route passing a malformed body on to the core, which then fails with a 500 or
+  // counts and changes the wrong thing.
+  const post = async (path: string, body: unknown) => {
+    const res = await call(path, { method: "POST", body });
+    return [res.status, (res.json as { error: string }).error];
+  };
+
+  assert.deepEqual(
+    await post("/api/usage", {
+      path: fixture.at("work"),
+      rules: [{ list: "maybe", rule: "Bash" }],
+    }),
+    [400, "rules.0.list must be equal to one of the allowed values: allow, ask, deny"]
+  );
+  assert.deepEqual(await post("/api/usage", { path: fixture.at("work"), rules: "Bash" }), [
+    400,
+    "rules must be array",
+  ]);
+  assert.deepEqual(await post("/api/backups/restore", { id: "x" }), [
+    400,
+    "must have required property 'revision'",
+  ]);
+  assert.deepEqual(await post("/api/memory/preview", { action: "delete" }), [
+    400,
+    "must have required property 'path'",
+  ]);
+  assert.deepEqual(await post("/api/open", { path: "CLAUDE.md" }), [
+    400,
+    "path must be an absolute path",
+  ]);
+});
+
+test("paths in the address must be absolute, and a bad since is reported as such", async () => {
+  // Catches a relative directory being read from wherever the server was started, and the watch
+  // route blaming dir for a since that is not a whole number.
+  const error = async (path: string) => {
+    const res = await call(path);
+    return [res.status, (res.json as { error: string }).error];
+  };
+  const dir = encodeURIComponent(fixture.at("work"));
+
+  assert.deepEqual(await error("/api/directory?path=work"), [400, "path must be an absolute path"]);
+  assert.deepEqual(await error(`/api/watch?dir=${dir}&since=soon`), [
+    400,
+    "since must be a whole number",
+  ]);
+  assert.deepEqual(await error(`/api/path-test?dir=work&file=CLAUDE.md`), [
+    400,
+    "dir must be an absolute path",
+  ]);
+});
+
 test("the directory route describes the session profile it is asked for", async () => {
   const dir = fixture.at("work/profile");
   fixture.json("work/profile/.mcp.json", { mcpServers: { docs: { command: "docs-mcp" } } });

@@ -14,7 +14,7 @@ ccdesk is one npm package. `src/core` reads and writes Claude Code's configurati
 | `src/core/scan/` | Reads. `index.ts` has `scanOverview` and `scanDirectory`; the other files each read one part (settings, instructions, memory, MCP, plugins, permissions, tools, context, usage, compare, path-test). `env.ts` defines `ScanEnv`, `files.ts` reads files (never the credentials file), `data.ts` has `isRecord` and frontmatter parsing, and `git.ts` asks git for roots, worktrees and what is tracked. |
 | `src/core/settings-edit.ts` | Settings, permission and hook edits, all in settings files. |
 | `src/core/agent-edit.ts`, `mcp-edit.ts`, `mutations.ts` | Subagent files, MCP servers, and auto memory. |
-| `src/core/parse-edit.ts` | Turns untrusted input (a JSON body) into a typed edit, or throws `InvalidEditError`. |
+| `src/core/parse-edit.ts` | Turns untrusted input (a JSON body) into a typed edit, or throws `InvalidEditError`. It checks the body against its schema in `src/shared/requests.ts`, then the rules a schema cannot state, such as a known hook event. |
 | `src/core/write.ts` | What every write shares: atomic writes through links, the backup folder and its manifest, the queue that runs changes one at a time, `RefusedError` and `StaleError`. |
 | `src/core/backups.ts` | Lists, previews and restores backups (Recent changes and Undo). |
 | `src/core/secrets.ts` | What the page may see: `redactSecrets`, `shownText`, `shown`, `hasHiddenValues`. |
@@ -26,7 +26,7 @@ ccdesk is one npm package. `src/core` reads and writes Claude Code's configurati
 | `src/core/index.ts` | The import entry point; re-exports `createCore` and the free functions. |
 | `src/view/sections/` | Each section's rows, columns and sort keys, filter text, labels, facets and empty text, as a `ViewSection`; `index.ts` lists them in page order and has `buildRows`. `rows`, `label`, `heading` and `facet.order` take a `ViewContext`: a formatter for the home folder and the settings reference. |
 | `src/view/` | What the page shows without React: `formatter(home)` and the other text helpers, the scope lines, the diff, the usage sentences, and `fieldKind` and `valuesIn` for settings. `index.ts` is `ccdesk/view`. |
-| `src/shared/` | Types (`types.ts`), scope lists, and the JSON generated from Claude Code's SDK and docs. No Node or DOM imports. |
+| `src/shared/` | Types (`types.ts`), scope lists, the request schemas (`requests.ts`), and the JSON generated from Claude Code's SDK and docs. No Node or DOM imports. Each edit type is read from its TypeBox schema and re-exported by `types.ts`, so the page imports only types and TypeBox stays out of its bundle; `biome.json` fails the lint if `src/ui` imports `typebox` or `requests.ts`. |
 | `src/ui/` | The page. Imports `src/shared` and `src/view`, and calls the server through `api.ts`. `sections/` adds each table's cells, heading notes and inspector to the view's section. |
 
 ## From disk to the page
@@ -59,7 +59,7 @@ Every edit runs twice: once to show it, once to make it.
 
 Errors a front end should handle:
 
-- `InvalidEditError`: the input is not a well-formed edit (unknown scope, missing field). The server answers 400.
+- `InvalidEditError`: the input is not a well-formed edit (unknown scope, missing field). The server answers 400. Other malformed requests, such as a usage count with an unknown rule list or a relative path, are answered 400 by the server itself.
 - `RefusedError`: ccdesk will not make the change. That covers a file changed since the preview, schema errors, hidden values, managed settings, credentials and `~/.claude.json`, so the message says which. The server answers 409.
 - `StaleError`, a subclass of `RefusedError`: the file changed while ccdesk was writing it, after the revision check. Nothing was written and no backup is kept. A front end treats it like any `RefusedError`: review again.
 
@@ -90,7 +90,7 @@ The free save functions and `readUsage`, kept for one release beside `createCore
 
 Still in module scope, and shared by every core:
 
-- The compiled TypeBox validators in `settings-edit.ts` and `scan/mcp.ts`. They come from bundled schemas and never change, so sharing them changes no result. `schemaErrors` lifts TypeBox's process-wide limit of eight errors while it lists them and puts it back after.
+- The compiled TypeBox validators in `settings-edit.ts`, `scan/mcp.ts`, `parse-edit.ts` and `server.ts`. They come from bundled schemas and never change, so sharing them changes no result. `schemaErrors` lifts TypeBox's process-wide limit of eight errors while it lists them and puts it back after.
 - In the page: `format.ts` keeps the formatter for the home folder the overview names, and `reference.ts` keeps the data from `/api/reference`. `src/view` keeps neither; its callers pass them in a `ViewContext`.
 
 `Watcher` is per instance; the server makes one from its core's `env`.
