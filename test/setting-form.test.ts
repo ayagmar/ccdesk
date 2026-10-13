@@ -103,6 +103,10 @@ test("a property that is not a number is refused by name", () => {
   });
 });
 
+test("a number too large for JSON is refused rather than sent as null", () => {
+  assert.deepEqual(fromDraft("number", { type: "number" }, "1e400"), { error: "Enter a number." });
+});
+
 test("a value a form cannot hold exactly is edited as JSON, so saving loses nothing", () => {
   // A property the schema does not name.
   assert.equal(editKind(rules, { allow: ["$defaults"] }), "object");
