@@ -358,11 +358,12 @@ const AGENTS_MD_PLUGIN_IDS = ["cc-plugin-agents-md@builtin", "agents-md@builtin"
 
 /**
  * The settings file that turns the built-in AGENTS.md plugin off, as /plugin does, or null. Unlike
- * its options, any settings file can (observed in v2.1.296).
+ * its options, any settings file can, and unlike an installed plugin, any value but true turns it
+ * off (observed in v2.1.296).
  */
 function agentsMdPluginOff(layers: SettingsLayer[]): Scope | null {
   const entry = enabledPluginsEntry(layers, AGENTS_MD_PLUGIN_IDS);
-  return entry?.value === false ? entry.scope : null;
+  return entry && entry.value !== true ? entry.scope : null;
 }
 
 /** Read from user, --settings or managed settings only; project and local files are ignored for it. */

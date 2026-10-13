@@ -35,8 +35,8 @@ export function pluginNamespace({ plugin, manifest }: LoadedPlugin): string {
 
 /**
  * The enabledPlugins entry that decides a plugin: from the highest-precedence settings file that
- * names it under any of `ids`, the first id it names winning there. A plugin is on unless that
- * entry is false.
+ * names it under any of `ids`, the first id it names winning there. An installed plugin is on
+ * unless that entry is false.
  */
 export function enabledPluginsEntry(
   layers: SettingsLayer[],
