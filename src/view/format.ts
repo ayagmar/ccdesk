@@ -58,6 +58,15 @@ function compact(value: unknown): string {
   return JSON.stringify(value) ?? String(value);
 }
 
+/**
+ * A description's first sentence and the rest, which is empty for a single sentence. A sentence
+ * ends at a full stop followed by a space, except the one in "e.g." or "i.e.".
+ */
+export function firstSentence(text: string): [first: string, rest: string] {
+  const [, first, rest] = /^(.+?(?<!\b(?:e\.g|i\.e))\.)\s+(.+)$/s.exec(text) ?? [];
+  return first && rest ? [first, rest] : [text, ""];
+}
+
 export function plural(n: number, word: string, many = `${word}s`): string {
   return `${n} ${n === 1 ? word : many}`;
 }
