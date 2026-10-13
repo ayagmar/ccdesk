@@ -59,7 +59,7 @@ test("managed availableModels replaces the list instead of adding your entries",
 
 test("a key set in a file Claude Code does not read it from is shown as ignored", async () => {
   const f = makeFixture();
-  f.json("app/.claude/settings.json", { modelPicker: { hidden: ["haiku"] } });
+  f.json("app/.claude/settings.json", { modelPicker: { options: [{ model: "haiku" }] } });
 
   const view = await scanDirectory(f.env, f.at("app"));
 
