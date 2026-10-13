@@ -149,9 +149,6 @@ export function usageCounter() {
   };
 }
 
-/** Counts with a cache and queue shared by every caller in the process; use a core's instead. */
-export const readUsage = usageCounter();
-
 function stoppedBecause(signal: AbortSignal): CountStopped {
   return new CountStopped(
     signal.reason instanceof DOMException && signal.reason.name === "TimeoutError"

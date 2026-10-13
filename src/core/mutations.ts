@@ -14,7 +14,6 @@ import {
   removeExactly,
   type Serially,
   saveReviewed,
-  serially,
   writeAtomic,
 } from "./write.ts";
 
@@ -233,7 +232,7 @@ export function changeMemory(
   action: MemoryAction,
   path: string,
   expectedRevision: string,
-  queue: Serially = serially
+  queue: Serially
 ): Promise<Change> {
   return saveReviewed(queue, () => PLANS[action](env, path), expectedRevision, REVIEW_AGAIN);
 }

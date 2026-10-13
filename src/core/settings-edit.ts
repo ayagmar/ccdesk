@@ -24,7 +24,6 @@ import {
   recordChange,
   type Serially,
   saveReviewed,
-  serially,
   writeAtomic,
 } from "./write.ts";
 
@@ -258,7 +257,7 @@ export function saveSettingsEdit(
   env: ScanEnv,
   edit: SettingsEdit,
   expectedRevision: string,
-  queue: Serially = serially
+  queue: Serially
 ): Promise<Change> {
   return saveReviewed(queue, () => planSettingsEdit(env, edit), expectedRevision, CHANGED);
 }
@@ -274,7 +273,7 @@ export function savePermissionEdit(
   env: ScanEnv,
   edit: PermissionEdit,
   expectedRevision: string,
-  queue: Serially = serially
+  queue: Serially
 ): Promise<Change> {
   return saveReviewed(queue, () => planPermissionEdit(env, edit), expectedRevision, CHANGED);
 }
@@ -287,7 +286,7 @@ export function saveHookEdit(
   env: ScanEnv,
   edit: HookEdit,
   expectedRevision: string,
-  queue: Serially = serially
+  queue: Serially
 ): Promise<Change> {
   return saveReviewed(queue, () => planHookEdit(env, edit), expectedRevision, CHANGED);
 }

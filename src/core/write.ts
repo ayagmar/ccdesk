@@ -44,9 +44,6 @@ export function changeQueue(): Serially {
   };
 }
 
-/** The queue the save functions use when they are called without a core's. */
-export const serially = changeQueue();
-
 /** What every change's review has: the revision it was worked out from and why it cannot be saved. */
 interface Review {
   /** Fingerprint of everything the change was worked out from. */

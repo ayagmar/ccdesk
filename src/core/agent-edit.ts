@@ -15,7 +15,6 @@ import {
   type Serially,
   StaleError,
   saveReviewed,
-  serially,
   writeAtomic,
 } from "./write.ts";
 
@@ -99,7 +98,7 @@ export function saveAgentEdit(
   env: ScanEnv,
   edit: AgentEdit,
   expectedRevision: string,
-  queue: Serially = serially
+  queue: Serially
 ): Promise<Change> {
   return saveReviewed(
     queue,
