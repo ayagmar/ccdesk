@@ -35,7 +35,7 @@ export {
   formFor,
   fromDraft,
   parseJson,
-  replacesBuiltIns,
+  replacedBuiltIns,
   toDraft,
   valuesIn,
 } from "./settings.ts";

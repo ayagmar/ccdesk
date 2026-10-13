@@ -115,20 +115,22 @@ export function asForm(form: Form, property: SettingSchema | undefined): Form | 
 }
 
 /**
- * Lists that replace Claude Code's built-in entries unless they include "$defaults", by setting
- * (docs: settings-reference#automode).
+ * autoMode's lists, each of which replaces Claude Code's built-in entries unless it includes
+ * "$defaults" (docs: settings-reference#automode).
  */
-const BUILT_IN_LISTS = new Map([["autoMode", ["allow", "soft_deny", "environment", "hard_deny"]]]);
+const AUTO_MODE_LISTS = ["allow", "soft_deny", "environment", "hard_deny"];
 
 /**
- * Whether a list field, as typed, replaces Claude Code's built-in entries instead of adding to
- * them: it has entries, none of them "$defaults". An empty field leaves the built-in ones alone.
+ * The lists in a setting's value that replace Claude Code's built-in entries instead of adding to
+ * them: autoMode lists with entries, none of them "$defaults". A list left out keeps the built-in
+ * ones. Read from the value, so the form and JSON warn alike.
  */
-export function replacesBuiltIns(key: string, field: string, draft: Draft): boolean {
-  if (!BUILT_IN_LISTS.get(key)?.includes(field)) return false;
-  const parsed = fromDraft("lines", undefined, draft);
-  if (!("value" in parsed) || !Array.isArray(parsed.value)) return false;
-  return parsed.value.length > 0 && !parsed.value.includes("$defaults");
+export function replacedBuiltIns(key: string, value: unknown): string[] {
+  if (key !== "autoMode" || !isObject(value)) return [];
+  return AUTO_MODE_LISTS.filter((name) => {
+    const list = value[name];
+    return Array.isArray(list) && list.length > 0 && !list.includes("$defaults");
+  });
 }
 
 /** The values a schema allows, when it lists them: its enum, or its const as a list of one. */
