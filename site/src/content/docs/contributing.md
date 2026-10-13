@@ -73,4 +73,4 @@ The site is deployed to GitHub Pages from `master` by the Pages workflow, which 
 
 Releases are made by the Release workflow on GitHub, started by hand from `master`. It runs `pnpm check`, then release-it bumps the version from the Conventional Commits since the last tag (or by the increment you pick), writes `CHANGELOG.md`, commits, tags and creates the GitHub release. The workflow then publishes to npm with trusted publishing, so no npm token is stored. A dry run does everything except push and publish.
 
-Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages, since they decide the version and the changelog.
+Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages, since they decide the version and the changelog. In a commit body, only `#` and a number links an issue in the changelog; a docs anchor such as `hooks#workspace-trust` stays plain text (`.release-it.ts`).
