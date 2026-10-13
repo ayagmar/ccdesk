@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.5](https://github.com/ayagmar/ccdesk/compare/v0.2.4...v0.2.5) (2026-10-13)
+
+### Features
+
+* **settings:** edit documented keys the SDK schema lacks, via SchemaStore ([d764c0e](https://github.com/ayagmar/ccdesk/commit/d764c0e0c84a80fe5a9d386ef83b11497e6e809c))
+
+### Bug Fixes
+
+* **settings:** describe borrowed keys with the docs, not SchemaStore ([fbcd686](https://github.com/ayagmar/ccdesk/commit/fbcd68678c24c277fe721332b88303b62d0b2504))
+* **settings:** give borrowed keys the docs' full text, not the summary ([5cd93c4](https://github.com/ayagmar/ccdesk/commit/5cd93c44612b0bc082d42fe6dfb0601050470a1a))
+* **ui:** stop column heads covering section titles in Firefox ([7ccfce7](https://github.com/ayagmar/ccdesk/commit/7ccfce747c6271c282b3bc71c3b5a76acfa182d7))
+* **view:** keep asterisks inside code spans when making docs text plain ([6c3255b](https://github.com/ayagmar/ccdesk/commit/6c3255b540811b062107c93675e8f178deaf8a17))
+
 ## [0.2.4](https://github.com/ayagmar/ccdesk/compare/v0.2.3...v0.2.4) (2026-10-13)
 
 ### Features
