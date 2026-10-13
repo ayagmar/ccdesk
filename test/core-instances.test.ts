@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { chmodSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { createCore, storeDirName } from "../src/core/index.ts";
+import { createCore, RefusedError, storeDirName } from "../src/core/index.ts";
 import { type Fixture, makeFixture } from "./helpers/fixture.ts";
 
 // What createCore promises a front end beside the web server: each core keeps its own queue and
@@ -75,6 +75,27 @@ test("one core's usage counts do not evict another core's cache", async () => {
   utimesSync(file, atime, mtime);
 
   assert.equal((await first.readUsage(app, [])).tools[0]?.tool, "Bash");
+});
+
+test("a core never opens the credentials file, whatever opener it is given", async () => {
+  // Catches the credentials check living only in the web server's route, so a CLI or library
+  // front end calling core.openFile would open the file ccdesk promises never to read.
+  const f = makeFixture();
+  const opened: string[] = [];
+  const core = createCore(f.env, {
+    openFile: async (path) => {
+      opened.push(path);
+      return "fake";
+    },
+  });
+  const credentials = f.write(join(f.env.claudeDir, ".credentials.json"), "{}");
+
+  await assert.rejects(core.openFile(credentials), (error) => {
+    assert.ok(error instanceof RefusedError);
+    assert.equal(error.message, "ccdesk does not open credentials.");
+    return true;
+  });
+  assert.deepEqual(opened, []);
 });
 
 // The fake programs are shell scripts.

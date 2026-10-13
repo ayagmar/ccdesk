@@ -44,7 +44,7 @@ Usage counts arrive separately: the page posts the rules in effect to `/api/usag
 
 ## Secrets
 
-Values under `env` and `headers`, keys in URLs, and secret-looking arguments of MCP servers are replaced with `•••` by `redactSecrets` in `secrets.ts`. The scan applies it before a value goes into a `DirectoryView`, and every preview and restore preview shows files through `shownText` or `shown`, so a hidden value never reaches the browser, diffs included. Files named like the credentials file, or linked to it, are never read (`isSecretPath`, `isCredentials`).
+Values under `env` and `headers`, keys in URLs, and secret-looking arguments of MCP servers are replaced with `•••` by `redactSecrets` in `secrets.ts`. The scan applies it before a value goes into a `DirectoryView`, and every preview and restore preview shows files through `shownText` or `shown`, so a hidden value never reaches the browser, diffs included. Files named like the credentials file, or linked to it, are never read (`isSecretPath`, `isCredentials`), and a core's `openFile` refuses to open them, whatever opener it was given.
 
 ccdesk never writes back a value the page saw as `•••`. Settings, hook and agent edits refuse when the value they change holds a hidden value, or when the new value would be hidden (`settings-edit.ts`, `agent-edit.ts`). Restoring a settings or MCP file is refused when its hidden values changed since the backup, unless the file no longer parses. A new MCP server may hold the env values and headers you type for it.
 

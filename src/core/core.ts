@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import { previewAgentEdit, saveAgentEdit } from "./agent-edit.ts";
 import { listBackups, previewRestore, restoreBackup } from "./backups.ts";
 import { claudeRunner, previewMcpEdit, type RunClaude, saveMcpEdit } from "./mcp-edit.ts";
@@ -5,6 +6,7 @@ import { changeMemory, previewMemoryChange } from "./mutations.ts";
 import { openInEditor } from "./open.ts";
 import { compareSettings } from "./scan/compare.ts";
 import { type ScanEnv } from "./scan/env.ts";
+import { isCredentials } from "./scan/files.ts";
 import { scanDirectory, scanOverview } from "./scan/index.ts";
 import { testPath } from "./scan/path-test.ts";
 import { usageCounter } from "./scan/usage.ts";
@@ -16,7 +18,7 @@ import {
   savePermissionEdit,
   saveSettingsEdit,
 } from "./settings-edit.ts";
-import { changeQueue } from "./write.ts";
+import { changeQueue, RefusedError } from "./write.ts";
 import {
   type AgentEdit,
   type HookEdit,
@@ -29,7 +31,10 @@ import {
 export interface CoreOptions {
   /** Runs `claude` for user and local MCP servers. By default, the claude on `env`'s PATH. */
   runClaude?: RunClaude;
-  /** Opens a file or folder and resolves with the command used. By default, the editor `env` names or has. */
+  /**
+   * Opens a file or folder and resolves with the command used. By default, the editor `env` names
+   * or has. The core refuses a missing path and the credentials file before calling it.
+   */
   openFile?: (path: string) => Promise<string>;
 }
 
@@ -40,6 +45,7 @@ export interface CoreOptions {
  */
 export function createCore(env: ScanEnv, options: CoreOptions = {}) {
   const run = options.runClaude ?? claudeRunner(env);
+  const open = options.openFile ?? ((path: string) => openInEditor(path, env));
   const queue = changeQueue();
   const bound =
     <A extends unknown[], R>(read: (env: ScanEnv, ...args: A) => R) =>
@@ -47,7 +53,14 @@ export function createCore(env: ScanEnv, options: CoreOptions = {}) {
       read(env, ...args);
   return {
     env,
-    openFile: options.openFile ?? ((path: string) => openInEditor(path, env)),
+    openFile: async (path: string) => {
+      const info = await stat(path).catch(() => null);
+      if (!info?.isFile() && !info?.isDirectory())
+        throw new RefusedError("That file or folder no longer exists.");
+      if (await isCredentials(env, path))
+        throw new RefusedError("ccdesk does not open credentials.");
+      return open(path);
+    },
 
     scanOverview: bound(scanOverview),
     scanDirectory: bound(scanDirectory),
