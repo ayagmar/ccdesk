@@ -197,6 +197,28 @@ test("a file reached under two names, such as .claude/CLAUDE.md linked to CLAUDE
   assert.equal(view.context.filter((b) => b.kind === "instruction").length, 1);
 });
 
+test("a managed CLAUDE.md over 4 MiB does not load either; the claudeMd setting has no such limit", async () => {
+  const f = makeFixture();
+  const limit = 4 * 1024 * 1024;
+  f.write("etc/claude-code/CLAUDE.md", "x".repeat(limit + 1));
+  f.json("etc/claude-code/managed-settings.json", { claudeMd: "Use the approved registry." });
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    view.instructions.map((i) => [f.rel(i.path), i.status]),
+    [
+      ["etc/claude-code/CLAUDE.md", "skipped"],
+      ["etc/claude-code/managed-settings.json#claudeMd", "loaded"],
+    ]
+  );
+  assert.deepEqual(
+    view.context.filter((b) => b.kind === "instruction").map((b) => f.rel(b.path)),
+    ["etc/claude-code/managed-settings.json#claudeMd"]
+  );
+});
+
 test("paths mentioned in code spans or fences are not treated as imports", async () => {
   const f = makeFixture();
   f.write(
