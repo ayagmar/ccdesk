@@ -26,7 +26,7 @@ Rule folders are searched in subfolders too. Instruction files in folders below 
 Each file has one of three statuses:
 
 - **loaded**: in context from the start of every session here.
-- **on match**: a rule with a `paths` field in its frontmatter. It loads only when Claude reads or edits a file that matches.
+- **on match**: a rule with a `paths` field in its frontmatter. It loads only when Claude reads or edits a file that matches. A rule whose `paths` only match everything, such as `**`, loads every session instead, as Claude Code treats it like one without the field.
 - **skipped**: present, but Claude Code does not load it. The **Why** column says which rule applies.
 
 A file is skipped when:

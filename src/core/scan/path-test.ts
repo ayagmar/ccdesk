@@ -9,10 +9,8 @@ import {
   readTextFile,
   resolvedPath,
   stringsIn,
-  toStringList,
   walkMarkdown,
 } from "./files.ts";
-import { parseFrontmatter } from "./data.ts";
 import { scanDirectory } from "./index.ts";
 import {
   AGENTS_MD_NAMES,
@@ -21,6 +19,7 @@ import {
   type ExcludeMatcher,
   excludeMatcher,
   linkedRuleBlock,
+  rulePaths,
   ruleTarget,
   safeMatch,
 } from "./instructions.ts";
@@ -144,7 +143,7 @@ async function nestedRules(test: FolderTest, folder: string): Promise<PathMatch[
     // waits for your approval, then loads only without paths.
     const linked = await ruleTarget(text, folder, realCwd);
     if (isExcluded(path, linked)) continue;
-    const globs = toStringList(parseFrontmatter(text.text).data.paths);
+    const globs = rulePaths(text.text);
     if (linkedRuleBlock(linked, realCwd, approved, globs.length > 0)) continue;
     const glob =
       globs.length === 0 ? undefined : firstMatch(globs, slashed(relative(folder, target)));

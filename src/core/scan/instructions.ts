@@ -437,8 +437,20 @@ function addChecks(files: Instruction[]) {
   }
 }
 
+/**
+ * A rule's `paths` globs, or none when it loads every session: without the field, or when each
+ * glob, once a trailing `/**` is cut, is empty or `**` (observed in v2.1.296; the docs do not
+ * say). The globs are kept as written, since the cut ones match differently (docs:
+ * memory#path-specific-rules).
+ */
+export function rulePaths(text: string): string[] {
+  const paths = toStringList(parseFrontmatter(text).data.paths);
+  const cut = paths.map((p) => (p.endsWith("/**") ? p.slice(0, -3) : p)).filter(Boolean);
+  return cut.every((p) => p === "**") ? [] : paths;
+}
+
 async function rule(file: TextFile, scope: Scope, dir: string, ctx: Ctx) {
-  const paths = toStringList(parseFrontmatter(file.text).data.paths);
+  const paths = rulePaths(file.text);
   const entry = await instruction(
     file,
     "rule",
