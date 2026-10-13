@@ -8,6 +8,7 @@ import {
   type MemoryStore,
   type Overview,
   type Problem,
+  type Scope,
   type SessionProfile,
   type SettingsLayer,
   type Sharing,
@@ -21,6 +22,7 @@ import { claudeJsonKey, gitRoot, mainWorktreeRoot, trustKey, visibilityOf } from
 import { AGENTS_MD_MODES, resolveInstructions } from "./instructions.ts";
 import { readInventory } from "./inventory.ts";
 import { readMemoryStore } from "./memory.ts";
+import { enabledPluginsEntry } from "./plugins.ts";
 import { permissionsOf, type Options as TrustOptions, trustWaits } from "./permissions.ts";
 import { listProjects } from "./projects.ts";
 import { effectiveSettings, readManagedSettings, readSettingsLayers } from "./settings.ts";
@@ -85,7 +87,9 @@ export async function scanDirectory(
         ...(l.blocksStart ? { blocksStart: true } : {}),
       });
   const effective = effectiveSettings(settings);
-  const mode = agentsMdMode(settings);
+  const agentsMdOff = agentsMdPluginOff(settings);
+  // Without the plugin, Claude Code reads CLAUDE.md files only (docs: memory#when-agents-md-support-is-unavailable).
+  const mode = agentsMdOff ? "claude-md" : agentsMdMode(settings);
   const excludes = effective.find((s) => s.key === "claudeMdExcludes")?.value;
   const mainRoot = exists ? await mainWorktreeRoot(path) : null;
   const trust = trustOf(env, claudeJson, path, mainRoot, root);
@@ -96,6 +100,7 @@ export async function scanDirectory(
     excludes: stringsIn(excludes),
     externalImports: trust.externalImports,
     managedClaudeMd: managedClaudeMd(settings),
+    agentsMdOff,
     nestedWorktree:
       root && mainRoot && root !== mainRoot && isWithin(mainRoot, root) ? { root, mainRoot } : null,
     problems,
@@ -348,12 +353,24 @@ function expandHome(env: ScanEnv, path: string): string | null {
   return isAbsolute(path) ? path : null;
 }
 
+/** The ids Claude Code's built-in AGENTS.md plugin is known by; the second is its name before v2.1.285. */
+const AGENTS_MD_PLUGIN_IDS = ["cc-plugin-agents-md@builtin", "agents-md@builtin"];
+
+/**
+ * The settings file that turns the built-in AGENTS.md plugin off, as /plugin does, or null. Unlike
+ * its options, any settings file can (observed in v2.1.296).
+ */
+function agentsMdPluginOff(layers: SettingsLayer[]): Scope | null {
+  const entry = enabledPluginsEntry(layers, AGENTS_MD_PLUGIN_IDS);
+  return entry?.value === false ? entry.scope : null;
+}
+
 /** Read from user, --settings or managed settings only; project and local files are ignored for it. */
 function agentsMdMode(layers: DirectoryView["settings"]): AgentsMdMode {
   for (const scope of ["managed", "user"] as const) {
     const configs = layers.find((l) => l.scope === scope)?.data?.pluginConfigs;
     if (!isRecord(configs)) continue;
-    for (const id of ["cc-plugin-agents-md@builtin", "agents-md@builtin"]) {
+    for (const id of AGENTS_MD_PLUGIN_IDS) {
       const entry = configs[id];
       const value =
         isRecord(entry) && isRecord(entry.options) ? entry.options.instructionFiles : undefined;

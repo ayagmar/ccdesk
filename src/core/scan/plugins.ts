@@ -1,6 +1,6 @@
 import { join, resolve } from "node:path";
 import { HIGHEST_FIRST } from "../../shared/scopes.ts";
-import { type Plugin, type Problem, type SettingsLayer } from "../../shared/types.ts";
+import { type Plugin, type Problem, type Scope, type SettingsLayer } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
 import { isWithin, readJsonOrReport, resolvedPath, stringField } from "./files.ts";
 import { isRecord } from "./data.ts";
@@ -31,6 +31,25 @@ export async function loadPlugin(
  */
 export function pluginNamespace({ plugin, manifest }: LoadedPlugin): string {
   return stringField(manifest, "name") || (plugin.id.split("@")[0] ?? plugin.id);
+}
+
+/**
+ * The enabledPlugins entry that decides a plugin: from the highest-precedence settings file that
+ * names it under any of `ids`, the first id it names winning there. A plugin is on unless that
+ * entry is false.
+ */
+export function enabledPluginsEntry(
+  layers: SettingsLayer[],
+  ids: string[]
+): { scope: Scope; value: unknown } | undefined {
+  for (const scope of HIGHEST_FIRST)
+    for (const layer of layers.filter((l) => l.scope === scope)) {
+      const flags = layer.data?.enabledPlugins;
+      if (!isRecord(flags)) continue;
+      const id = ids.find((i) => flags[i] !== undefined);
+      if (id) return { scope, value: flags[id] };
+    }
+  return undefined;
 }
 
 /**
@@ -69,14 +88,7 @@ export async function readPlugins(
       note: "",
     };
     const loaded = await loadPlugin(env, plugin, problems);
-    const setting = HIGHEST_FIRST.flatMap((scope) =>
-      layers
-        .filter((l) => l.scope === scope)
-        .map((l) => l.data?.enabledPlugins)
-        .filter(isRecord)
-        .filter((flags) => flags[id] !== undefined)
-        .map((flags) => ({ scope, value: flags[id] }))
-    )[0];
+    const setting = enabledPluginsEntry(layers, [id]);
     if (setting) {
       plugin.enabled = setting.value !== false;
       plugin.enabledIn = setting.scope;

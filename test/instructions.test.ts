@@ -61,6 +61,36 @@ test("instruction mode claude-md-and-agents-md from user settings loads both fil
   assert.deepEqual(loadedPaths(view, f.root), ["app/CLAUDE.md", "app/AGENTS.md"]);
 });
 
+test("turning off the built-in AGENTS.md plugin leaves CLAUDE.md files only, under either of its ids", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/settings.json", {
+    enabledPlugins: { "cc-plugin-agents-md@builtin": false },
+  });
+  f.write("app/AGENTS.md", "agent rules");
+  f.json("other/.claude/settings.local.json", { enabledPlugins: { "agents-md@builtin": false } });
+  f.write("other/AGENTS.md", "agent rules");
+
+  const app = await scanDirectory(f.env, f.at("app"));
+  const other = await scanDirectory(f.env, f.at("other"));
+
+  assert.equal(app.agentsMdMode, "claude-md");
+  assert.deepEqual(
+    [...app.instructions, ...other.instructions].map((i) => [f.rel(i.path), i.status, i.reason]),
+    [
+      [
+        "app/AGENTS.md",
+        "skipped",
+        "Skipped: the built-in plugin that reads AGENTS.md is off in user settings",
+      ],
+      [
+        "other/AGENTS.md",
+        "skipped",
+        "Skipped: the built-in plugin that reads AGENTS.md is off in local settings",
+      ],
+    ]
+  );
+});
+
 test("the instruction mode is ignored when set in a project settings file", async () => {
   const f = makeFixture();
   f.json("app/.claude/settings.json", {

@@ -131,6 +131,8 @@ interface ResolveOptions {
   externalImports: Trust["externalImports"];
   /** The managed settings' `claudeMd` text, which loads like a managed CLAUDE.md. */
   managedClaudeMd: { path: string; text: string } | null;
+  /** The settings file that turns off the built-in plugin that reads AGENTS.md, or null. */
+  agentsMdOff: Scope | null;
   /** The roots of a worktree that lies inside its main checkout, such as one in .claude/worktrees. */
   nestedWorktree: NestedWorktree | null;
   /** Receives instruction files and imports that exist but cannot be read. */
@@ -171,7 +173,7 @@ export async function resolveInstructions(options: ResolveOptions): Promise<Inst
   const out = await readOwnFiles(ctx, managedClaudeMd);
   const { claudeFiles, agentsFiles } = await readDirectoryFiles(ctx, cwd);
   explainClaudeFiles(claudeFiles, cwd);
-  explainAgentsFiles(agentsFiles, claudeFiles, mode);
+  explainAgentsFiles(agentsFiles, claudeFiles, mode, options.agentsMdOff);
   for (const dir of ancestorsRootFirst(cwd))
     out.push(
       ...claudeFiles.filter((f) => f.dir === dir),
@@ -330,7 +332,8 @@ function explainClaudeFiles(claudeFiles: Instruction[], cwd: string): void {
 function explainAgentsFiles(
   agentsFiles: Instruction[],
   claudeFiles: Instruction[],
-  mode: AgentsMdMode
+  mode: AgentsMdMode,
+  pluginOff: Scope | null
 ): void {
   const hasClaudeMd = claudeFiles.some((f) => f.kind !== "rule");
   const includedElsewhere = new Set(
@@ -340,7 +343,12 @@ function explainAgentsFiles(
     ])
   );
   for (const file of agentsFiles) {
-    if (!agentsMdLoads(mode, false)) skip(file, skippedByMode(mode));
+    if (pluginOff)
+      skip(
+        file,
+        `Skipped: the built-in plugin that reads AGENTS.md is off in ${pluginOff} settings`
+      );
+    else if (!agentsMdLoads(mode, false)) skip(file, skippedByMode(mode));
     else if (includedElsewhere.has(file.realPath ?? file.path))
       skip(file, "Already included through a CLAUDE.md import or symlink");
     else if (!agentsMdLoads(mode, hasClaudeMd))
