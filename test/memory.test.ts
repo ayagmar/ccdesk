@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import { scanDirectory, scanOverview } from "../src/core/scan/index.ts";
 import { makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
@@ -88,4 +89,39 @@ test("the overview finds the same memory saved in two projects and whether it dr
     ["/work/one", "/work/two"]
   );
   assert.equal(shared?.stores[0]?.hash, shared?.stores[1]?.hash);
+});
+
+test("a memory file that cannot be read is reported as a problem, not dropped silently", {
+  // Root reads any file, and Windows ignores the mode bits that make a file unreadable.
+  skip: process.getuid?.() === 0 || process.platform === "win32",
+}, async () => {
+  const f = makeFixture();
+  mkdirSync(f.at("app"));
+  const dir = memoryDirFor(f, f.at("app"));
+  f.write(`${dir}/a.md`, memoryFile("a", "user", "first", "Readable."));
+  const locked = f.write(`${dir}/b.md`, memoryFile("b", "user", "second", "Locked."));
+  chmodSync(locked, 0o000);
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  chmodSync(locked, 0o644);
+  assert.deepEqual(
+    view.problems.map((p) => [p.path, p.error]),
+    [[locked, "cannot be read (EACCES)"]]
+  );
+});
+
+test("a link loop where a memory file should be is reported as a problem", async () => {
+  const f = makeFixture();
+  mkdirSync(f.at("app"));
+  const dir = memoryDirFor(f, f.at("app"));
+  const loop = join(dir, "loop.md");
+  f.link(loop, loop);
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    view.problems.map((p) => [p.path, p.error]),
+    [[loop, "cannot be read (ELOOP)"]]
+  );
 });

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { type BigIntStats } from "node:fs";
 import { type FileHandle, lstat, open, readdir, readlink, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { type TextFile } from "../../shared/types.ts";
+import { type Problem, type TextFile } from "../../shared/types.ts";
 import { jsonSyntaxError, shownJsonFile, shownText } from "../secrets.ts";
 import { isRecord } from "./data.ts";
 import { type ScanEnv } from "./env.ts";
@@ -54,7 +54,10 @@ export async function isCredentials(env: ScanEnv, path: string): Promise<boolean
  * Opens a file to read, or null for the credentials file. The open file is checked again, so a
  * file swapped in after the first check is not read either.
  */
-async function openUnlessCredentials(env: ScanEnv, path: string): Promise<FileHandle | null> {
+export async function openUnlessCredentials(
+  env: ScanEnv,
+  path: string
+): Promise<FileHandle | null> {
   if (await isCredentials(env, path)) return null;
   const handle = await open(path, "r");
   if (sameFile(await handle.stat({ bigint: true }), await credentialsIdentity(env))) {
@@ -129,7 +132,16 @@ export async function listDir(path: string): Promise<string[]> {
   }
 }
 
-export async function readTextFile(env: ScanEnv, path: string): Promise<TextFile | null> {
+/**
+ * A text file, or null when there is none to read: nothing at the path, a folder, a link to a
+ * network location, or the credentials file. A file that is there but cannot be read, such as one
+ * without read permission or a link loop, also goes into `problems`.
+ */
+export async function readTextFile(
+  env: ScanEnv,
+  path: string,
+  problems?: Problem[]
+): Promise<TextFile | null> {
   try {
     if (await linksToNetwork(path)) return null;
     const real = await realpath(path);
@@ -155,7 +167,10 @@ export async function readTextFile(env: ScanEnv, path: string): Promise<TextFile
     };
     if ((await lstat(path)).isSymbolicLink()) ref.realPath = real;
     return ref;
-  } catch {
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT" && code !== "ENOTDIR")
+      problems?.push({ path, error: `cannot be read (${code ?? String(error)})` });
     return null;
   }
 }

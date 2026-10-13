@@ -5,6 +5,7 @@ import {
   type Hook,
   type Inventory,
   type Plugin,
+  type Problem,
   type Scope,
   type SessionProfile,
   type SettingsLayer,
@@ -37,6 +38,14 @@ import { effectiveSettings } from "./settings.ts";
 
 type Source = Scope | "plugin";
 
+interface ReadOptions {
+  plugin?: string | undefined;
+  /** Joins the folders of a file in a subfolder into its name; commands use ":". */
+  separator?: string;
+  /** Receives files that are there but cannot be read. */
+  problems?: Problem[] | undefined;
+}
+
 function isTrue(value: unknown): boolean {
   return value === true || (typeof value === "string" && /^(true|yes|on|1)$/i.test(value));
 }
@@ -50,9 +59,9 @@ async function readEntry(
   path: string,
   fileName: string,
   scope: Source,
-  { plugin, isCommand = false }: { plugin?: string | undefined; isCommand?: boolean } = {}
+  { plugin, isCommand = false, problems }: ReadOptions & { isCommand?: boolean } = {}
 ): Promise<Entry | null> {
-  const file = await readTextFile(env, path);
+  const file = await readTextFile(env, path, problems);
   if (!file) return null;
   const { data } = parseFrontmatter(file.text);
   const entry: Entry = {
@@ -78,7 +87,7 @@ async function readFileEntries(
   env: ScanEnv,
   dir: string,
   scope: Source,
-  { plugin, separator = "/" }: { plugin?: string | undefined; separator?: string } = {},
+  options: ReadOptions = {},
   base = dir,
   depth = 0
 ): Promise<Entry[]> {
@@ -88,17 +97,17 @@ async function readFileEntries(
     const path = join(dir, name);
     if (await isDir(path)) {
       if (depth < 4)
-        out.push(
-          ...(await readFileEntries(env, path, scope, { plugin, separator }, base, depth + 1))
-        );
+        out.push(...(await readFileEntries(env, path, scope, options, base, depth + 1)));
       continue;
     }
     if (!name.endsWith(".md")) continue;
+    const separator = options.separator ?? "/";
     const fileName = relative(base, path).replace(/\.md$/, "").split(/[/\\]/).join(separator);
     // Commands are the entries joined with ":".
     const entry = await readEntry(env, path, fileName, scope, {
-      plugin,
+      plugin: options.plugin,
       isCommand: separator === ":",
+      problems: options.problems,
     });
     if (entry) out.push(entry);
   }
@@ -106,12 +115,7 @@ async function readFileEntries(
 }
 
 /** Files or folders of `.md` files. */
-async function readPaths(
-  env: ScanEnv,
-  paths: string[],
-  scope: Source,
-  options: { plugin?: string | undefined; separator?: string }
-) {
+async function readPaths(env: ScanEnv, paths: string[], scope: Source, options: ReadOptions) {
   const out: Entry[] = [];
   for (const path of paths) {
     if (await isDir(path)) out.push(...(await readFileEntries(env, path, scope, options)));
@@ -119,6 +123,7 @@ async function readPaths(
       const entry = await readEntry(env, path, basename(path, ".md"), scope, {
         plugin: options.plugin,
         isCommand: options.separator === ":",
+        problems: options.problems,
       });
       if (entry) out.push(entry);
     }
@@ -130,10 +135,10 @@ export async function readSkill(
   env: ScanEnv,
   folder: string,
   scope: Source,
-  plugin?: string
+  { plugin, problems }: ReadOptions = {}
 ): Promise<Entry | null> {
   const path = join(folder, "SKILL.md");
-  const file = await readTextFile(env, path);
+  const file = await readTextFile(env, path, problems);
   if (!file) return null;
   const { data, body } = parseFrontmatter(file.text);
   const entry: Entry = {
@@ -165,25 +170,25 @@ async function readSkills(
   env: ScanEnv,
   dir: string,
   scope: Source,
-  plugin?: string
+  options: ReadOptions
 ): Promise<Entry[]> {
-  if (plugin && (await isFile(join(dir, "SKILL.md")))) {
-    const skill = await readSkill(env, dir, scope, plugin);
+  if (options.plugin && (await isFile(join(dir, "SKILL.md")))) {
+    const skill = await readSkill(env, dir, scope, options);
     return skill ? [skill] : [];
   }
   const out: Entry[] = [];
   for (const name of await listDir(dir)) {
     if (name.startsWith(".") || (scope === "user" && name === "synced")) continue;
-    const skill = await readSkill(env, join(dir, name), scope, plugin);
+    const skill = await readSkill(env, join(dir, name), scope, options);
     if (skill) out.push(skill);
   }
   return out;
 }
 
 /** A plugin's skills, agents, commands and output styles, from its folders and its manifest. */
-async function pluginEntries(env: ScanEnv, plugin: Plugin) {
+async function pluginEntries(env: ScanEnv, plugin: Plugin, problems: Problem[]) {
   const root = plugin.installPath;
-  const options = { plugin: plugin.id };
+  const options = { plugin: plugin.id, problems };
   // `skills` adds to the default folder; the other keys replace theirs (docs: plugins-reference).
   const extraSkills = await manifestPaths(env, plugin, "skills");
   const skillDirs = [join(root, "skills"), ...(extraSkills ?? [])];
@@ -191,13 +196,13 @@ async function pluginEntries(env: ScanEnv, plugin: Plugin) {
   const namespace = await pluginNamespace(env, plugin);
   const skills: Entry[] = [];
   if (rootSkill)
-    for (const skill of await readSkills(env, root, "plugin", plugin.id)) {
+    for (const skill of await readSkills(env, root, "plugin", options)) {
       // Without a name, a root SKILL.md is named after the plugin (docs: skills#how-a-skill-gets-its-command-name).
       if (skill.folder === root && !stringField(parseFrontmatter(skill.text).data, "name"))
         skill.name = namespace;
       skills.push(skill);
     }
-  for (const dir of skillDirs) skills.push(...(await readSkills(env, dir, "plugin", plugin.id)));
+  for (const dir of skillDirs) skills.push(...(await readSkills(env, dir, "plugin", options)));
   const listed = async (key: string, folder: string, separator = "/") =>
     readPaths(env, (await manifestPaths(env, plugin, key)) ?? [join(root, folder)], "plugin", {
       ...options,
@@ -207,10 +212,7 @@ async function pluginEntries(env: ScanEnv, plugin: Plugin) {
   for (const c of await manifestCommandMap(env, plugin))
     commands.push(
       c.text === null
-        ? ((await readEntry(env, c.path, c.name, "plugin", {
-            plugin: plugin.id,
-            isCommand: true,
-          })) ?? {
+        ? ((await readEntry(env, c.path, c.name, "plugin", { ...options, isCommand: true })) ?? {
             name: c.name,
             description: c.description,
             path: c.path,
@@ -259,6 +261,8 @@ interface InventoryInput {
   claudeJson: Record<string, unknown> | null;
   trust: Trust;
   profile: SessionProfile;
+  /** Receives files that are there but cannot be read or parsed. */
+  problems: Problem[];
 }
 
 /**
@@ -294,7 +298,12 @@ export function agentProblems(text: string): string[] {
  * yours. A name defined again lower down is marked as shadowed (docs: sub-agents#choose-the-subagent-scope).
  * A file Claude Code skips takes no part in that.
  */
-async function readAgents(env: ScanEnv, projectDir: string, gitRoot: string | null) {
+async function readAgents(
+  env: ScanEnv,
+  projectDir: string,
+  gitRoot: string | null,
+  problems: Problem[]
+) {
   const sources: [string, Source][] = [
     [join(env.managedDir, ".claude", "agents"), "managed"],
     ...projectFolders(env, projectDir, gitRoot, "agents")
@@ -305,7 +314,7 @@ async function readAgents(env: ScanEnv, projectDir: string, gitRoot: string | nu
   const agents: Entry[] = [];
   const winners = new Map<string, Entry>();
   for (const [dir, scope] of sources)
-    for (const agent of await readFileEntries(env, dir, scope)) {
+    for (const agent of await readFileEntries(env, dir, scope, { problems })) {
       const [problem] = agentProblems(agent.text);
       if (problem) {
         agent.skipped = problem;
@@ -325,7 +334,12 @@ async function readAgents(env: ScanEnv, projectDir: string, gitRoot: string | nu
  * repository root (the closest wins) and yours (docs: output-styles#create-a-custom-output-style).
  * The docs order only the project folders; managed, project, then yours follows subagents.
  */
-async function readOutputStyles(env: ScanEnv, projectDir: string, gitRoot: string | null) {
+async function readOutputStyles(
+  env: ScanEnv,
+  projectDir: string,
+  gitRoot: string | null,
+  problems: Problem[]
+) {
   const sources: [string, Source][] = [
     [join(env.managedDir, ".claude", "output-styles"), "managed"],
     ...projectFolders(env, projectDir, gitRoot, "output-styles")
@@ -334,7 +348,8 @@ async function readOutputStyles(env: ScanEnv, projectDir: string, gitRoot: strin
     [join(env.claudeDir, "output-styles"), "user"],
   ];
   const styles: Entry[] = [];
-  for (const [dir, scope] of sources) styles.push(...(await readFileEntries(env, dir, scope)));
+  for (const [dir, scope] of sources)
+    styles.push(...(await readFileEntries(env, dir, scope, { problems })));
   return styles;
 }
 
@@ -354,16 +369,18 @@ export function applySkillOverrides(entries: Entry[], overrides: unknown) {
 }
 
 export async function readInventory(input: InventoryInput): Promise<Inventory> {
-  const { env, projectDir, gitRoot, layers } = input;
+  const { env, projectDir, gitRoot, layers, problems } = input;
   const plugins = await readPlugins(env, layers, projectDir, gitRoot);
   const active = plugins.filter((p) => p.enabled);
-  const fromPlugins = await Promise.all(active.map((plugin) => pluginEntries(env, plugin)));
+  const fromPlugins = await Promise.all(
+    active.map((plugin) => pluginEntries(env, plugin, problems))
+  );
   const projectClaude = join(projectDir, ".claude");
   const hasProjectDir = projectClaude !== env.claudeDir;
   const files = async (sub: string, separator = "/") => [
-    ...(await readFileEntries(env, join(env.claudeDir, sub), "user", { separator })),
+    ...(await readFileEntries(env, join(env.claudeDir, sub), "user", { separator, problems })),
     ...(hasProjectDir
-      ? await readFileEntries(env, join(projectClaude, sub), "project", { separator })
+      ? await readFileEntries(env, join(projectClaude, sub), "project", { separator, problems })
       : []),
   ];
 
@@ -385,7 +402,7 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
   // (docs: skills#resolve-skills-that-share-a-name).
   const winners = new Map<string, Entry>();
   for (const [dir, scope] of skillDirs) {
-    for (const skill of await readSkills(env, dir, scope)) {
+    for (const skill of await readSkills(env, dir, scope, { problems })) {
       // A folder that several locations link to loads once.
       const real = skill.realPath ?? skill.folder ?? skill.path;
       if (seenFolders.has(real)) continue;
@@ -411,13 +428,13 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
 
   return {
     agents: [
-      ...(await readAgents(env, projectDir, gitRoot)),
+      ...(await readAgents(env, projectDir, gitRoot, problems)),
       ...fromPlugins.flatMap((p) => p.agents),
     ],
     skills: [...skills, ...fromPlugins.flatMap((p) => p.skills)],
     commands: [...commands, ...fromPlugins.flatMap((p) => p.commands)],
     outputStyles: [
-      ...(await readOutputStyles(env, projectDir, gitRoot)),
+      ...(await readOutputStyles(env, projectDir, gitRoot, problems)),
       ...fromPlugins.flatMap((p) => p.outputStyles),
     ],
     hooks: await readHooks(env, layers, active, input.trust, input.profile),
