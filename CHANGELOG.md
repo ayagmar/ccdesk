@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.2.3](https://github.com/ayagmar/ccdesk/compare/v0.2.2...v0.2.3) (2026-10-13)
+
+### Features
+
+* **cli:** add read-only scan --json and explain subcommands ([fc59aed](https://github.com/ayagmar/ccdesk/commit/fc59aed4935371e2a979991a03a94cf01c0e2e68))
+* **core:** add Watcher.subscribe to push changes ([3eb360e](https://github.com/ayagmar/ccdesk/commit/3eb360e286fa34eede2c23aa1b3fe69f2fb6b129))
+* **core:** make the core importable as the package entry point ([82a4107](https://github.com/ayagmar/ccdesk/commit/82a41075f88c6b0ab475eb559afe1cf13aacc25a))
+* **view:** export the view logic as ccdesk/view ([b0e4365](https://github.com/ayagmar/ccdesk/commit/b0e436513da85184e9e141d2502fba1d297f39ee))
+
+### Bug Fixes
+
+* **core:** refuse to open a file when no editor starts, instead of failing ([a359842](https://github.com/ayagmar/ccdesk/commit/a359842ecd33db582b565878e56a63ac00ad664e))
+* **core:** refuse to open credentials or missing paths in createCore ([9562aab](https://github.com/ayagmar/ccdesk/commit/9562aab75961097c97b193f9edac8f5a34f8c701))
+* **core:** report broken ~/.claude.json, managed-mcp.json and plugin files ([03710a6](https://github.com/ayagmar/ccdesk/commit/03710a6ff76557bde8e3b935244b700c8b1daf37))
+* **core:** report memory, agent and skill files the scan cannot read ([3b91804](https://github.com/ayagmar/ccdesk/commit/3b9180401fd0479aa584c86f56dead7aa12b6dbf))
+* **core:** resolve Watcher.subscribe and wait once moved watchers start ([039bb73](https://github.com/ayagmar/ccdesk/commit/039bb73282c014f2389ad37c37b5b80f6a91511e))
+* **ui:** disable Undo while it runs and clear stale errors in Recent changes ([2c0c1e5](https://github.com/ayagmar/ccdesk/commit/2c0c1e5e381b49b40c1d99a5b9b3cfd1ce2d25a7))
+* **ui:** say how to recover from an expired token wherever a call fails ([f9864a2](https://github.com/ayagmar/ccdesk/commit/f9864a24cf105691e8396de369c4167aa92f9750))
+* **ui:** stop warning that the file changed after saving a setting ([e807947](https://github.com/ayagmar/ccdesk/commit/e80794746c9eed8503baa5a6cfa694568ab37740))
+* **watch:** rewatch before calling subscribers, so one that throws cannot skip it ([d63fa49](https://github.com/ayagmar/ccdesk/commit/d63fa49cdf947795c8cafabc8e76458f91689601))
+
+### Performance Improvements
+
+* **ui:** load the settings schema and catalog from the server ([34ba654](https://github.com/ayagmar/ccdesk/commit/34ba654ca9d5513a792ed5c44a50490a9d79dd54))
+
 ## [0.2.2](https://github.com/ayagmar/ccdesk/compare/v0.2.1...v0.2.2) (2026-10-12)
 
 ### Bug Fixes
