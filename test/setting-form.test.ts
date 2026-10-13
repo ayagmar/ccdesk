@@ -261,11 +261,20 @@ test("an autoMode list without $defaults is flagged as replacing the built-in ru
   assert.deepEqual(replacedBuiltIns("permissions", { allow: ["Bash(npm test)"] }), []);
 });
 
-test("a field's description shows its first sentence, and an example's \"e.g.\" does not end it", () => {
+test('a field\'s description shows its first sentence, not cut at "e.g." or a listed full stop', () => {
   assert.deepEqual(
-    firstSentence('Dictionary to use, passed to the checker as-is, e.g. "en_GB". Names vary.'),
-    ['Dictionary to use, passed to the checker as-is, e.g. "en_GB".', "Names vary."]
+    firstSentence(
+      'Dictionary to use, e.g. "en_GB"; names use letters, digits and _ - . , only. Default: the checker\'s.'
+    ),
+    [
+      'Dictionary to use, e.g. "en_GB"; names use letters, digits and _ - . , only.',
+      "Default: the checker's.",
+    ]
   );
+  assert.deepEqual(firstSentence("'hold' (default): hold to talk. 'tap': tap to start."), [
+    "'hold' (default): hold to talk.",
+    "'tap': tap to start.",
+  ]);
   assert.deepEqual(firstSentence("Which ref new worktrees branch from."), [
     "Which ref new worktrees branch from.",
     "",
