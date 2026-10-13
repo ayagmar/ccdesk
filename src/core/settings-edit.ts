@@ -1,4 +1,5 @@
 import { stat } from "node:fs/promises";
+import { join } from "node:path";
 import { Compile, type Validator } from "typebox/compile";
 import HOOK_EVENTS from "../shared/hook-events.json" with { type: "json" };
 import { allowedScopes, ignoredReason } from "../shared/scopes.ts";
@@ -12,7 +13,7 @@ import {
 } from "../shared/types.ts";
 import { isRecord } from "./scan/data.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { revisionOf } from "./scan/files.ts";
+import { resolvedPath, revisionOf } from "./scan/files.ts";
 import { isSkippedMcpRule } from "./scan/permissions.ts";
 import { type SettingsFile, settingsFiles } from "./scan/settings.ts";
 import { schemaErrors } from "./schema.ts";
@@ -55,6 +56,11 @@ async function editableFile(
     throw new RefusedError("Managed settings are set by your organisation.");
   if (file.scope !== "user" && !(await stat(dir).catch(() => null))?.isDirectory())
     throw new RefusedError(`${dir} is not a directory on this machine.`);
+  // A project or local file can be a link to the user file, as dotfile managers make them; an edit
+  // through it would change every project.
+  const userFile = join(env.claudeDir, "settings.json");
+  if (file.scope !== "user" && (await resolvedPath(file.path)) === (await resolvedPath(userFile)))
+    throw new RefusedError(`${file.path} leads to your user settings; edit it as User.`);
   return file;
 }
 

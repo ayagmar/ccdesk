@@ -598,6 +598,26 @@ test("MCP policy entries never show the secrets they match on, and still match",
   for (const secret of [token, "pass-secret-2", "q-secret-3"]) assert.ok(!shown.includes(secret));
 });
 
+test("an allowlist entry holding a server's token keeps that server allowed", async () => {
+  const f = makeFixture();
+  const token = "tok-allow-secret-4";
+  f.json("home/.claude.json", {
+    mcpServers: {
+      db: { command: "node", args: ["db.js", "--token", token] },
+      other: { command: "other-mcp" },
+    },
+  });
+  f.json("etc/claude-code/managed-settings.json", {
+    allowedMcpServers: [{ serverCommand: ["node", "db.js", "--token", token] }],
+  });
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+  const status = Object.fromEntries(view.inventory.mcpServers.map((s) => [s.name, s.status]));
+  assert.deepEqual(status, { db: "active", other: "blocked" });
+  assert.ok(!JSON.stringify(view).includes(token));
+});
+
 test("a rules folder linked from outside the project waits for the external-imports approval", async () => {
   const f = makeFixture();
   f.write("shared-rules/style.md", "Early returns.\n");

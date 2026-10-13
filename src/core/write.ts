@@ -88,13 +88,27 @@ function realOrNull(path: string): Promise<string | null> {
 }
 
 /**
- * The revision a review of one file is saved against: its content, the path, and the file the path
- * leads to. Saving works the change out again, so without the path a file that moved after the
- * review (a local settings file once its folder becomes a git repository, a link pointed elsewhere)
- * would be written instead of the one reviewed; two missing files have the same content.
+ * The revision a review of one file is saved against: its content, the path, and where the path
+ * leads. Saving works the change out again, so without the path a file that moved after the review
+ * (a local settings file once its folder becomes a git repository, a link pointed elsewhere) would
+ * be written instead of the one reviewed; two missing files have the same content.
  */
 export async function reviewRevision(path: string, raw: string | null): Promise<string> {
-  return revisionOf(`${path}\0${(await realOrNull(path)) ?? ""}\0${revisionOf(raw)}`);
+  return revisionOf(`${path}\0${await leadsTo(path)}\0${revisionOf(raw)}`);
+}
+
+/**
+ * Where a path leads after links. A file that does not exist yet leads where its nearest existing
+ * folder does, so a linked parent folder pointed elsewhere changes it too.
+ */
+async function leadsTo(path: string): Promise<string> {
+  const rest: string[] = [];
+  for (let at = path; ; at = dirname(at)) {
+    const real = await realOrNull(at);
+    if (real) return join(real, ...rest);
+    if (dirname(at) === at) return path;
+    rest.unshift(basename(at));
+  }
 }
 
 /** The file a path leads to after links; a missing file keeps its own path. */

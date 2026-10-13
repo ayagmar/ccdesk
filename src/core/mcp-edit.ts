@@ -316,8 +316,9 @@ async function planClaudeJson(env: ScanEnv, edit: McpEdit, run: RunClaude): Prom
       before,
       after: errors.length > 0 ? (before ?? "") : shown(edited(servers, edit)),
       // Of the servers as stored, so a changed hidden value, which the page never sees,
-      // still makes a reviewed edit stale.
-      revision: revisionOf(JSON.stringify(servers)),
+      // still makes a reviewed edit stale; and of the folder a local server belongs to, which
+      // moves to the repository root once a parent folder becomes a repository.
+      revision: revisionOf(`${cwd ?? ""}\0${JSON.stringify(servers)}`),
       reformats: false,
       errors,
       // Shown with secrets hidden; the command that runs has the values you typed.

@@ -3,9 +3,9 @@ import { join } from "node:path";
 import { allowedScopes, EVERY_FILE, ignoredReason } from "../../shared/scopes.ts";
 import { type EffectiveSetting, type Scope, type SettingsLayer } from "../../shared/types.ts";
 import { redactSecrets } from "../secrets.ts";
-import { type ScanEnv } from "./env.ts";
-import { isFile, listDir, readJsonObject, resolvedPath } from "./files.ts";
 import { isRecord } from "./data.ts";
+import { isUserClaudeFolder, type ScanEnv } from "./env.ts";
+import { isFile, listDir, readJsonObject } from "./files.ts";
 import { mainWorktreeRoot } from "./git.ts";
 import { type Dropped, sandboxFilter } from "./sandbox.ts";
 
@@ -160,12 +160,9 @@ export async function settingsFiles(env: ScanEnv, dir: string): Promise<Settings
   if (localDir !== dir)
     files.push({ scope: "local", path: join(dir, ".claude", "settings.local.json"), legacy: true });
   const projectFile = join(dir, ".claude", "settings.json");
-  // In the home directory, .claude/settings.json is the user file, not a project layer. Compared by
-  // where the folders really are, so a link to the home folder cannot make the user file a project
-  // file, whose edits would then change every project.
-  const sameFolder =
-    (await resolvedPath(join(dir, ".claude"))) === (await resolvedPath(env.claudeDir));
-  if (!sameFolder) files.push({ scope: "project", path: projectFile });
+  // In the home directory, .claude/settings.json is the user file, not a project layer, whose edits
+  // would then change every project.
+  if (!(await isUserClaudeFolder(env, dir))) files.push({ scope: "project", path: projectFile });
   files.push({ scope: "user", path: userFile });
   return files;
 }

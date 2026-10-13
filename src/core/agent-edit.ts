@@ -1,6 +1,6 @@
 import { join, resolve } from "node:path";
 import { type AgentEdit, type Change, type SettingsEditPreview } from "../shared/types.ts";
-import { type ScanEnv } from "./scan/env.ts";
+import { isUserClaudeFolder, type ScanEnv } from "./scan/env.ts";
 import { revisionOf } from "./scan/files.ts";
 import { gitRoot } from "./scan/git.ts";
 import { scanDirectory } from "./scan/index.ts";
@@ -42,10 +42,12 @@ async function targetOf(env: ScanEnv, edit: AgentEdit): Promise<string> {
   const file = edit.create.file.replace(/\.md$/i, "");
   if (!/^[\w][\w.-]*$/.test(file))
     throw new RefusedError("A file name has letters, digits, '.', '-' or '_', and no folders.");
-  const folder =
-    scope === "user"
-      ? join(env.claudeDir, "agents")
-      : join((await gitRoot(dir)) ?? dir, ".claude", "agents");
+  const base = (await gitRoot(dir)) ?? dir;
+  if (scope === "project" && (await isUserClaudeFolder(env, base)))
+    throw new RefusedError(
+      "Here .claude/agents is your own agents folder, which every project reads; create it as User."
+    );
+  const folder = scope === "user" ? join(env.claudeDir, "agents") : join(base, ".claude", "agents");
   return join(folder, `${file}.md`);
 }
 
