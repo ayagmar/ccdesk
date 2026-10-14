@@ -115,7 +115,7 @@ ccdesk never writes `~/.claude.json`. Claude Code rewrites that file during ever
 
 ## Live refresh
 
-ccdesk watches the config files for the open directory. When Claude Code or your editor changes one, the page updates within about a second. `~/.claude.json` is not watched, because Claude Code rewrites it so often; the page rereads it when you switch back to the ccdesk tab. If ccdesk cannot watch a folder, the page names it above the tables. Changes elsewhere still show, ccdesk tries the folder again every few seconds, and the page rereads everything when you switch back to the tab. On Linux the usual cause is the limit on file watches; raise `fs.inotify.max_user_watches` with `sysctl`. A folder on a network drive is never watched.
+ccdesk watches the config files for the open directory. When Claude Code or your editor changes one, the page updates within about a second. `~/.claude.json` is not watched, because Claude Code rewrites it so often; the page rereads it when you switch back to the ccdesk tab. If ccdesk cannot watch a folder, the page names it above the tables. Changes elsewhere still show, ccdesk tries the folder again after 5 seconds, waiting twice as long after each failure up to 5 minutes, and the page rereads everything when you switch back to the tab. On Linux the usual cause is the limit on file watches; raise `fs.inotify.max_user_watches` with `sysctl`. A folder on a network drive is never watched.
 
 ## Other directories
 

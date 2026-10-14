@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { type FSWatcher, mkdirSync, utimesSync, type WatchListener, watch } from "node:fs";
 import { EventEmitter } from "node:events";
-import { after, test } from "node:test";
+import { after, type TestContext, test } from "node:test";
 import { scanDirectory, testPath, Watcher } from "../src/core/index.ts";
 import { type WatchHost } from "../src/core/watch.ts";
 import { makeFixture } from "./helpers/fixture.ts";
@@ -649,4 +649,111 @@ test("a watcher that fails after starting answers a waiting page, and the path t
   assert.deepEqual(answer.unwatched, [f.at("app/.claude/rules")]);
   await pathTest();
   assert.equal(counter.scans, 2);
+});
+
+/**
+ * Watchers that report nothing unless the test emits on them, on a host where `folder` cannot be
+ * watched while `fails.now` is set; `tries` counts the attempts to watch it. A poll moves the
+ * mocked clock on by `ms` first.
+ */
+function flakyFolder(t: TestContext, f: ReturnType<typeof makeFixture>, folder: string) {
+  const fails = { now: true };
+  const state = { tries: 0 };
+  const fakes = new Map<
+    string,
+    { watcher: EventEmitter; listener: WatchListener<string> | undefined }
+  >();
+  const host: WatchHost = {
+    platform: "linux",
+    watch: ((path: string, _options?: unknown, listener?: WatchListener<string>) => {
+      const watcher = Object.assign(new EventEmitter(), { close: () => undefined });
+      if (path === folder) {
+        state.tries++;
+        if (fails.now) throw Object.assign(new Error("ENOSPC"), { code: "ENOSPC" });
+      }
+      fakes.set(path, { watcher, listener });
+      return watcher as unknown as FSWatcher;
+    }) as typeof watch,
+  };
+  const watcher = new Watcher(f.env, scanDirectory, host);
+  watchers.push(watcher);
+  const signal = new AbortController().signal;
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  const pollAfter = async (ms: number) => {
+    t.mock.timers.setTime(Date.now() + ms);
+    return (await watcher.wait(f.at("app"), 0, signal, 100)).unwatched;
+  };
+  return { fails, state, fakes, pollAfter };
+}
+
+test("a folder that keeps failing to be watched is tried less and less often, and from the start again once watched", async (t) => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/api.md", "API\n");
+  const folder = f.at("app/.claude/rules");
+  const { fails, state, fakes, pollAfter } = flakyFolder(t, f, folder);
+
+  assert.deepEqual(await pollAfter(0), [folder]);
+  assert.equal(state.tries, 1);
+  await pollAfter(5000);
+  assert.equal(state.tries, 2, "the first retry comes 5 s after the first failure");
+  await pollAfter(5000);
+  assert.equal(state.tries, 2, "after a second failure, 5 s is too soon");
+  await pollAfter(5000);
+  assert.equal(state.tries, 3, "after a second failure, the retry comes 10 s later");
+
+  fails.now = false;
+  assert.deepEqual(await pollAfter(20_000), []);
+  assert.equal(state.tries, 4);
+
+  // Watched for 5 s, its next failure waits 5 s again, counted from when its watcher started, so
+  // the next poll tries it; the failure after that waits 10 s.
+  assert.deepEqual(await pollAfter(5000), []);
+  fails.now = true;
+  fakes.get(folder)?.watcher.emit("error", new Error("EPERM"));
+  assert.deepEqual(await pollAfter(0), [folder]);
+  assert.equal(state.tries, 5);
+  await pollAfter(5000);
+  assert.equal(state.tries, 5);
+  await pollAfter(5000);
+  assert.equal(state.tries, 6);
+});
+
+test("changes elsewhere while a folder cannot be watched do not lengthen the wait before it is tried again", async (t) => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/api.md", "API\n");
+  const folder = f.at("app/.claude/rules");
+  const { state, fakes, pollAfter } = flakyFolder(t, f, folder);
+  assert.deepEqual(await pollAfter(0), [folder]);
+
+  // Each settled change rewatches the directory, and so tries the folder too.
+  for (let i = 0; i < 3; i++) {
+    fakes.get(f.at("app"))?.listener?.("change", "CLAUDE.md");
+    await pause(500);
+  }
+  // A poll waits for the last rewatch to finish; its clock has not moved, so it tries nothing.
+  await pollAfter(0);
+  const before = state.tries;
+  assert.ok(before > 1, "the changes rewatched the directory");
+  await pollAfter(5000);
+
+  assert.equal(state.tries, before + 1, "tried again 5 s after the last rewatch");
+});
+
+test("a folder whose watcher keeps failing soon after it starts is tried less and less often", async (t) => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/api.md", "API\n");
+  const folder = f.at("app/.claude/rules");
+  const { fails, state, fakes, pollAfter } = flakyFolder(t, f, folder);
+  fails.now = false;
+  assert.deepEqual(await pollAfter(0), []);
+  const failSoon = () => fakes.get(folder)?.watcher.emit("error", new Error("EPERM"));
+
+  failSoon();
+  await pollAfter(5000);
+  assert.equal(state.tries, 2, "the first failure is tried again after 5 s");
+  failSoon();
+  await pollAfter(5000);
+  assert.equal(state.tries, 2, "the second failure waits longer than 5 s");
+  await pollAfter(5000);
+  assert.equal(state.tries, 3);
 });
