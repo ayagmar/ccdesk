@@ -8,7 +8,15 @@ import {
   type TextFile,
 } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
-import { isDir, listDir, readTextFile, revisionOf, shortHash, stringField } from "./files.ts";
+import {
+  isDir,
+  isFile,
+  listDir,
+  readTextFile,
+  revisionOf,
+  shortHash,
+  stringField,
+} from "./files.ts";
 import { isRecord, parseFrontmatter } from "./data.ts";
 
 const INDEX_FILE = "MEMORY.md";
@@ -67,12 +75,12 @@ export async function readMemoryStore(
     dir,
     loaded: true,
     projectPath,
-    index: indexFile ? summarizeIndex(indexFile, files) : null,
+    index: indexFile ? summarizeIndex(indexFile, await missingLinks(dir, indexFile.text)) : null,
     memories,
   };
 }
 
-function summarizeIndex(file: TextFile, files: string[]): MemoryIndex {
+function summarizeIndex(file: TextFile, missing: Set<string>): MemoryIndex {
   // A file's last newline ends its last line; it does not start another one.
   const lines = file.text.replace(/\n$/, "").split("\n");
   let loadedLines = 0;
@@ -87,20 +95,58 @@ function summarizeIndex(file: TextFile, files: string[]): MemoryIndex {
     revision: revisionOf(file.text),
     truncated: loadedLines < lines.length,
     loadedLines,
-    missingFiles: [...new Set(file.text.split("\n").flatMap((l) => deadLinks(l, files)))],
+    missingFiles: [...new Set(file.text.split("\n").flatMap((l) => deadLinks(l, missing)))],
   };
 }
 
-/** Memory files an index line links to that are not in the store. */
-export function deadLinks(line: string, files: string[]): string[] {
-  return [...line.matchAll(/\]\(([^)\s/\\]+\.md)\)/g)]
-    .map((m) => m[1] ?? "")
-    .filter((f) => !files.includes(f));
+/** The memory files an index line links to as `[text](file.md)`, as written. */
+function fileLinks(line: string): string[] {
+  return [...line.matchAll(/\]\(([^)\s/\\]+\.md)\)/g)].map((m) => m[1] ?? "");
+}
+
+/** A link's file name with `%xx` decoded, as in `my%20note.md`; one that would leave the folder stays as written. */
+function linkedName(link: string): string {
+  try {
+    const name = decodeURIComponent(link);
+    return /[/\\]/.test(name) ? link : name;
+  } catch {
+    return link;
+  }
+}
+
+/**
+ * The links in `index` whose file is not in `dir`. Each is looked up on disk, so a link that
+ * differs from the file's name only in case still counts on a file system that ignores case.
+ */
+export async function missingLinks(dir: string, index: string): Promise<Set<string>> {
+  const missing = new Set<string>();
+  for (const link of new Set(fileLinks(index)))
+    if (!(await isFile(join(dir, linkedName(link))))) missing.add(link);
+  return missing;
+}
+
+/** The links of an index line that are in `missing`. */
+export function deadLinks(line: string, missing: Set<string>): string[] {
+  return fileLinks(line).filter((link) => missing.has(link));
+}
+
+/**
+ * Whether every memory an index line points at, by Markdown link or [[name]] link, is one of
+ * `files`: only then can the line go with them without losing a pointer that still works.
+ */
+export function pointsOnlyAt(line: string, files: string[]): boolean {
+  const names = new Set(files.map(linkedName));
+  const targets = [...fileLinks(line).map(linkedName), ...wikiLinks(line).map((n) => `${n}.md`)];
+  return targets.every((target) => names.has(target));
 }
 
 /** Whether MEMORY.md text points at a memory file, as a Markdown link or a [[name]] link. */
 export function indexMentions(index: string, file: string): boolean {
-  return index.includes(`(${file})`) || index.includes(`[[${file.replace(/\.md$/, "")}]]`);
+  return (
+    index.includes(`(${file})`) ||
+    fileLinks(index).some((link) => linkedName(link) === file) ||
+    index.includes(`[[${file.replace(/\.md$/, "")}]]`)
+  );
 }
 
 function wikiLinks(body: string): string[] {

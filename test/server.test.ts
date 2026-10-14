@@ -457,6 +457,43 @@ test("only index lines whose file is gone are removed, and only from the MEMORY.
   assertRefused(stale, 409, /changed since you reviewed this/);
 });
 
+test("removing dead index lines keeps a line that still links to a memory, and a link written percent-encoded", async () => {
+  const dir = memoryDirFor(fixture, "/work/mixed");
+  const indexPath = fixture.write(
+    `${dir}/MEMORY.md`,
+    [
+      "- [Gone](gone.md) — deleted by hand",
+      "- [Gone](gone.md), see also [Here](here.md)",
+      "- [Note](my%20note.md) — spaces in the name",
+      "",
+    ].join("\n")
+  );
+  fixture.write(`${dir}/here.md`, memoryFile("here", "user", "ok", "x"));
+  fixture.write(`${dir}/my note.md`, memoryFile("note", "user", "spaces", "y"));
+
+  const removed = await changeMemory("remove-dead", indexPath);
+
+  assert.equal(removed.status, 200);
+  assert.equal(
+    readFileSync(indexPath, "utf8"),
+    "- [Gone](gone.md), see also [Here](here.md)\n- [Note](my%20note.md) — spaces in the name\n"
+  );
+});
+
+test("deleting a memory keeps an index line that also links to another memory", async () => {
+  const dir = memoryDirFor(fixture, "/work/shared-line");
+  const line = "- [A](a.md), see also [B](b.md)";
+  fixture.write(`${dir}/MEMORY.md`, `- [A](a.md) — first\n${line}\n`);
+  const a = fixture.write(`${dir}/a.md`, memoryFile("a", "user", "first", "x"));
+  fixture.write(`${dir}/b.md`, memoryFile("b", "user", "second", "y"));
+
+  const deleted = await deleteMemory(a);
+
+  assert.equal(deleted.status, 200);
+  assert.equal(existsSync(a), false);
+  assert.equal(readFileSync(`${dir}/MEMORY.md`, "utf8"), `${line}\n`);
+});
+
 test("index changes are refused outside a memory folder's MEMORY.md", async () => {
   const target = fixture.write("home/.claude/CLAUDE.md", "keep me\n");
 
