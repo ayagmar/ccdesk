@@ -7,11 +7,12 @@ import {
 } from "../shared/types.ts";
 import { api, errorText } from "./api.ts";
 import { ContextView } from "./ContextView.tsx";
-import { tilde } from "./format.ts";
+import { plural, tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { type Group, groupRows, isFiltered, PAGE } from "./list.ts";
 import { RouteStrip, SharingStrip } from "./RouteStrip.tsx";
+import { type Following } from "./useConfig.ts";
 import { type Saved } from "./useReviewedChange.tsx";
 import { SECTIONS } from "./sections/index.ts";
 import { type Row, type SectionId } from "../view/sections/types.ts";
@@ -29,8 +30,8 @@ interface Props {
   /** Called once a jump is handled, so a later visit to this page does not repeat it. */
   onJumped: () => void;
   reload: () => void;
-  /** Whether every config file here is watched, so the page updates when one changes. */
-  watching: boolean;
+  /** The folders ccdesk cannot watch here, and whether its server answers. */
+  following: Following;
   onToast: (toast: ToastMessage) => void;
   onOpenDirectory: (path: string) => void;
   onOpenPalette: () => void;
@@ -57,7 +58,7 @@ export function DirectoryPage({
   jump,
   onJumped,
   reload,
-  watching,
+  following,
   onToast,
   onOpenDirectory,
   onOpenPalette,
@@ -159,7 +160,7 @@ export function DirectoryPage({
         </header>
         <SessionSwitch profile={view.profile} onProfile={onProfile} />
         <Problems problems={view.problems} />
-        {!watching && <NotWatching />}
+        <NotFollowing following={following} />
         <UnreadManagedSources view={view} />
         <ManagedRepairs view={view} />
         {seeing ? (
@@ -545,15 +546,26 @@ function ManagedRepairs({ view }: { view: DirectoryView }) {
   );
 }
 
-/** Says the page may miss a change, while ccdesk cannot watch every config file here. */
-function NotWatching() {
+/** Says the page may miss a change, while ccdesk cannot watch a folder here or its server is gone. */
+function NotFollowing({ following }: { following: Following }) {
+  const [first, ...more] = following.unwatched;
+  if (following.reachable && first === undefined) return null;
   return (
     <section className="problems" role="status" aria-label="Live updates">
       <Icon name="warn" />
-      <p>
-        ccdesk is not watching every config file here, so this page may not update when one changes.
-        It reads them again when you come back to this tab.
-      </p>
+      {first === undefined ? (
+        <p>
+          ccdesk is not answering, so this page will not update. Check that it is still running in
+          your terminal.
+        </p>
+      ) : (
+        <p>
+          ccdesk cannot watch <span className="mono">{tilde(first)}</span>
+          {more.length > 0 && ` and ${plural(more.length, "other folder")}`}, so this page may not
+          update when a file there changes. Other changes still show, and ccdesk tries again every
+          few seconds.
+        </p>
+      )}
     </section>
   );
 }

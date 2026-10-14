@@ -21,6 +21,8 @@ import {
 const WAIT_MS = 25_000;
 /** Editors write a file in several steps; one change covers them all. */
 const SETTLE_MS = 300;
+/** While some folders cannot be watched, a poll this long after the last try tries them again. */
+const RETRY_MS = 5000;
 /** Watchers outlive a request by this much, so nothing is missed between two polls. */
 const IDLE_MS = 60_000;
 /** How long after subscribers are told macOS can report the same change again. */
@@ -79,7 +81,7 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
     if (dirname(d) === d) break;
   }
   if (mainRoot !== dir) out.push(...claude(join(mainRoot, ".claude")));
-  return out.filter((t) => !isNetworkPath(t.path));
+  return out;
 }
 
 /**
@@ -183,8 +185,12 @@ interface Subscription {
   touchedAt: number;
   /** When the current watchers started. */
   watchingSince: number;
-  /** Whether a watcher runs for every target that exists, so no change to them goes unseen. */
-  complete: boolean;
+  /**
+   * Folders the watchers should cover but do not: one that could not be watched, such as when the
+   * system ran out of watches, one whose watcher failed, or one on a network drive. Empty when
+   * every change is seen.
+   */
+  unwatched: string[];
   waiters: Set<() => void>;
   /** Callers of `subscribe`, called after every change until they unsubscribe. */
   listeners: Set<() => void>;
@@ -288,14 +294,16 @@ export class Watcher {
    * scan is reused, as the path tester describes an interactive session.
    */
   async view(dir: string): Promise<DirectoryView> {
+    // Read first, so a watcher that fails meanwhile is seen below.
+    const stateFile = await this.stateFile();
     const latest = this.latest.get(dir);
     const subscription = this.subscriptions.get(dir);
     if (
       latest?.view.profile === "interactive" &&
-      subscription?.complete &&
+      subscription?.unwatched.length === 0 &&
       subscription.watchingSince < latest.startedAt &&
       subscription.touchedAt < latest.startedAt &&
-      latest.stateFile === (await this.stateFile())
+      latest.stateFile === stateFile
     )
       return latest.view;
     return this.scan(dir);
@@ -308,21 +316,35 @@ export class Watcher {
 
   /**
    * Answers once something changed after `since` (ms since the epoch), or after `timeoutMs` with
-   * the last change time, whichever comes first. While some files cannot be watched, it answers at
-   * once with `watching` false, since a change to them would never end the wait.
+   * the last change time, whichever comes first. While some folders cannot be watched, it tries
+   * them again now and then, and answers at once with them in `unwatched`, since a change there
+   * would never end the wait.
    */
   async wait(
     dir: string,
     since: number,
     signal: AbortSignal,
     timeoutMs = WAIT_MS
-  ): Promise<{ changed: boolean; at: number; watching: boolean }> {
+  ): Promise<{ changed: boolean; at: number; unwatched: string[] }> {
     const subscription = await this.watching(dir);
+    if (
+      subscription.unwatched.length > 0 &&
+      Date.now() - subscription.watchingSince >= RETRY_MS &&
+      this.subscriptions.get(dir) === subscription
+    ) {
+      this.restart(dir, subscription);
+      await subscription.ready;
+    }
     clearTimeout(subscription.idle);
     // Closed while its watchers were starting: there is nothing left to wait on.
     const closed = this.subscriptions.get(dir) !== subscription;
     try {
-      if (!closed && subscription.complete && subscription.changedAt <= since && !signal.aborted)
+      if (
+        !closed &&
+        subscription.unwatched.length === 0 &&
+        subscription.changedAt <= since &&
+        !signal.aborted
+      )
         await new Promise<void>((resolve) => {
           const done = () => {
             clearTimeout(timer);
@@ -340,7 +362,7 @@ export class Watcher {
     return {
       changed: subscription.changedAt > since,
       at: subscription.changedAt,
-      watching: subscription.complete,
+      unwatched: subscription.unwatched,
     };
   }
 
@@ -393,7 +415,7 @@ export class Watcher {
       changedAt: 0,
       touchedAt: 0,
       watchingSince: Number.POSITIVE_INFINITY,
-      complete: false,
+      unwatched: [],
       waiters: new Set(),
       listeners: new Set(),
       extra: this.scanned.get(dir) ?? [],
@@ -481,8 +503,9 @@ export class Watcher {
    * A rebuild replaces the stream, so a change made during one can still be lost.
    */
   private async rewatch(dir: string, subscription: Subscription): Promise<void> {
-    const extra = await Promise.all(subscription.extra.map(nearestWatchable));
-    const list = await targets(this.env, dir, extra);
+    const list = await Promise.all(
+      (await targets(this.env, dir, subscription.extra)).map(nearestWatchable)
+    );
     const old = subscription.watchers;
     subscription.watchers = [];
     if (this.subscriptions.get(dir) !== subscription) {
@@ -490,8 +513,13 @@ export class Watcher {
       return;
     }
     const started: string[] = [];
-    let complete = true;
+    const unwatched: string[] = [];
     for (const target of list) {
+      // A network drive may not report changes, so the folder is not watched (see isNetworkPath).
+      if (isNetworkPath(target.path)) {
+        unwatched.push(target.path);
+        continue;
+      }
       try {
         const watcher = this.host.watch(
           target.path,
@@ -511,23 +539,24 @@ export class Watcher {
         watcher.on("error", () => {
           watcher.close();
           if (!subscription.watchers.includes(watcher)) return;
-          subscription.complete = false;
+          if (!subscription.unwatched.includes(target.path))
+            subscription.unwatched = [...subscription.unwatched, target.path];
           // A page waiting for a change hears that this folder is no longer watched.
           for (const wake of [...subscription.waiters]) wake();
         });
         subscription.watchers.push(watcher);
         started.push(target.path);
       } catch (error) {
-        // A folder that does not exist yet is caught by watching its parent. Any other failure, such
-        // as running out of watches, leaves the folder unwatched.
+        // A folder removed since nearestWatchable looked is caught by its parent's watcher. Any other
+        // failure, such as running out of watches, leaves the folder unwatched.
         const code = (error as NodeJS.ErrnoException).code;
-        if (code !== "ENOENT" && code !== "ENOTDIR") complete = false;
+        if (code !== "ENOENT" && code !== "ENOTDIR") unwatched.push(target.path);
       }
     }
     for (const w of old) w.close();
     if (this.host.platform === "darwin" && started.length > 0) this.waitUntilLive(dir, started);
     subscription.watchingSince = Date.now();
-    subscription.complete = complete;
+    subscription.unwatched = [...new Set(unwatched)];
   }
 
   /**

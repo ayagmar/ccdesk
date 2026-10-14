@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { type FSWatcher, mkdirSync, utimesSync, type WatchListener, watch } from "node:fs";
+import { EventEmitter } from "node:events";
 import { after, test } from "node:test";
 import { scanDirectory, testPath, Watcher } from "../src/core/index.ts";
 import { type WatchHost } from "../src/core/watch.ts";
@@ -55,6 +56,18 @@ test("adding a rule to the managed folder wakes a page waiting for changes", asy
 
   const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
   f.write("etc/claude-code/.claude/rules/infra/new.md", "two\n");
+
+  assert.equal((await waiting).changed, true);
+});
+
+test("creating the managed folder, missing at first as it usually is, wakes a page waiting for changes", async () => {
+  const f = makeFixture();
+  mkdirSync(f.at("app"), { recursive: true });
+  const watcher = watcherFor(f);
+  await settled(watcher, f.at("app"));
+
+  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  f.json("etc/claude-code/managed-settings.json", { model: "opus" });
 
   assert.equal((await waiting).changed, true);
 });
@@ -516,12 +529,12 @@ test("the path tester scans again after ~/.claude.json changes, which is not wat
   assert.equal(counter.scans, 2);
 });
 
-/** A host on which `folder` cannot be watched, as when the system runs out of watches. */
-function cannotWatch(folder: string): WatchHost {
+/** A host on which `folder` cannot be watched while `fails.now` is set, as when the system runs out of watches. */
+function cannotWatch(folder: string, fails = { now: true }): WatchHost {
   return {
     platform: process.platform,
     watch: ((path: string, options?: { recursive?: boolean }, listener?: WatchListener<string>) => {
-      if (path === folder)
+      if (path === folder && fails.now)
         throw Object.assign(new Error("ENOSPC: System limit for number of file watchers reached"), {
           code: "ENOSPC",
         });
@@ -548,8 +561,59 @@ test("while a folder cannot be watched, a waiting page hears at once that live u
   const watcher = new Watcher(f.env, scanDirectory, cannotWatch(f.at("app/.claude/rules")));
   watchers.push(watcher);
 
-  const answer = await watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const asked = Date.now();
+  const answer = await watcher.wait(f.at("app"), asked, new AbortController().signal, 5000);
 
-  assert.equal(answer.watching, false);
+  assert.ok(Date.now() - asked < 2000, "answered before the wait timed out");
+  assert.deepEqual(answer.unwatched, [f.at("app/.claude/rules")]);
   assert.equal(answer.changed, false);
+});
+
+test("a folder that could not be watched is watched again once it can be", async (t) => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/api.md", "API\n");
+  const fails = { now: true };
+  const watcher = new Watcher(f.env, scanDirectory, cannotWatch(f.at("app/.claude/rules"), fails));
+  watchers.push(watcher);
+  const signal = new AbortController().signal;
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  assert.equal((await watcher.wait(f.at("app"), 0, signal, 100)).unwatched.length, 1);
+
+  // As when the watch limit is raised: the next poll a while later tries the folder again.
+  fails.now = false;
+  t.mock.timers.setTime(Date.now() + 5000);
+
+  assert.deepEqual((await watcher.wait(f.at("app"), 0, signal, 100)).unwatched, []);
+});
+
+test("a watcher that fails after starting answers a waiting page, and the path tester scans again", async () => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/api.md", "---\npaths: src/api/**\n---\nAPI\n");
+  const fakes = new Map<string, EventEmitter>();
+  // Watchers that report nothing, except an error the test raises, as fs.watch does when a folder
+  // goes away on Windows.
+  const host: WatchHost = {
+    platform: "linux",
+    watch: ((path: string) => {
+      const fake = Object.assign(new EventEmitter(), { close: () => undefined });
+      fakes.set(path, fake);
+      return fake as unknown as FSWatcher;
+    }) as typeof watch,
+  };
+  const { watcher, counter, pathTest } = await countingWatcher(f, host);
+  await pathTest();
+  await pathTest();
+  assert.equal(counter.scans, 1);
+
+  const asked = Date.now();
+  const waiting = watcher.wait(f.at("app"), asked, new AbortController().signal, 5000);
+  // Once the page is waiting.
+  await pause(100);
+  fakes.get(f.at("app/.claude/rules"))?.emit("error", new Error("EPERM"));
+  const answer = await waiting;
+
+  assert.ok(Date.now() - asked < 2000, "answered before the wait timed out");
+  assert.deepEqual(answer.unwatched, [f.at("app/.claude/rules")]);
+  await pathTest();
+  assert.equal(counter.scans, 2);
 });

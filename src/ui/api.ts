@@ -133,10 +133,10 @@ export const api = {
     request<Change>("/api/hooks/save", { method: "POST", body: { ...edit, revision } }),
   /**
    * Waits up to 25 seconds for a config file that affects `dir` to change after `since`. While
-   * some cannot be watched, it answers at once with `watching` false.
+   * some folders cannot be watched, it answers at once with them in `unwatched`.
    */
   watch: (dir: string, since: number, signal: AbortSignal) =>
-    request<{ changed: boolean; at: number; watching: boolean }>(
+    request<{ changed: boolean; at: number; unwatched: string[] }>(
       `/api/watch?dir=${encodeURIComponent(dir)}&since=${since}`,
       undefined,
       signal
