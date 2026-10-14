@@ -5,7 +5,7 @@ import { type BackupSummary, type RestorePreview } from "../shared/types.ts";
 import { assertMemoryDir, indexPathIn, revisionOfBoth } from "./mutations.ts";
 import { parseJson } from "./scan/data.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isWithin, revisionOf } from "./scan/files.ts";
+import { isDir, isWithin, revisionOf } from "./scan/files.ts";
 import { hiddenValues, shown, shownText } from "./secrets.ts";
 import {
   type BackupManifest,
@@ -287,6 +287,7 @@ export async function previewRestore(env: ScanEnv, id: string): Promise<RestoreP
   const before = show(current);
   const after = (onlyIndexLines(plan) ? before : show(saved)) ?? "";
   const blocked = blockedReason(plan);
+  const createsFolder = saved === null ? null : await missingFolder(manifest.target);
   return {
     id,
     kind: manifest.kind,
@@ -296,10 +297,19 @@ export async function previewRestore(env: ScanEnv, id: string): Promise<RestoreP
     revision: planRevision(plan),
     ...(saved === null ? { removes: true } : {}),
     ...(blocked ? { blocked } : {}),
+    ...(createsFolder ? { createsFolder } : {}),
     ...(index && index.missing.length > 0
       ? { indexLines: index.missing.map((line) => shownText(line) ?? line) }
       : {}),
   };
+}
+
+/** The outermost folder above `file` that does not exist, which writing `file` creates; null if none. */
+async function missingFolder(file: string): Promise<string | null> {
+  let missing: string | null = null;
+  for (let dir = dirname(file); dir !== dirname(dir) && !(await isDir(dir)); dir = dirname(dir))
+    missing = dir;
+  return missing;
 }
 
 /**
