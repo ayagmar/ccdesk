@@ -92,12 +92,16 @@ export const api = {
     request<DirectoryView>(
       `/api/directory?path=${encodeURIComponent(path)}${profile === "interactive" ? "" : `&profile=${profile}`}`
     ),
-  /** How Claude used tools in the sessions started in `path`, and how many calls each rule covers. */
+  /**
+   * How Claude used tools in the sessions started in `path`, how many calls each rule covers, and
+   * how often it read each memory file the scan in `profile` finds there.
+   */
   usage: (
     path: string,
     rules: Array<{ list: PermissionList; rule: string }>,
+    profile: SessionProfile,
     signal: AbortSignal
-  ) => request<Usage>("/api/usage", { method: "POST", body: { path, rules } }, signal),
+  ) => request<Usage>("/api/usage", { method: "POST", body: { path, rules, profile } }, signal),
   /** What a memory action would change; `path` is the memory, or MEMORY.md for remove-dead. */
   previewMemory: (action: MemoryAction, path: string) =>
     request<MemoryChangePreview>("/api/memory/preview", { method: "POST", body: { action, path } }),

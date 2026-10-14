@@ -1005,12 +1005,16 @@ input::placeholder {
 .tt-memory th:nth-child(3) {
   width: 98px;
 }
-.tt-memory th:nth-child(5) {
-  width: 200px;
+.tt-memory th:nth-child(4) {
+  width: 64px;
+  text-align: right;
 }
-.tt-memory th:nth-child(6) {
+.tt-memory th:nth-child(5) {
   width: 82px;
   text-align: right;
+}
+.tt-memory th:nth-child(6) {
+  width: 240px;
 }
 
 .tt-hooks th:nth-child(1),
@@ -1062,12 +1066,12 @@ input::placeholder {
 }
 
 /* Too narrow for every column, such as beside the inspector, which shows what is left out: the
-   tools' descriptions, an instruction's line count and when a memory changed. The descriptions of
-   instructions and memories get the room. */
+   tools' descriptions, an instruction's line count, and a memory's type (the filter chips name
+   it) and last read. The descriptions of instructions and memories get the room. */
 @container (max-width: 880px) {
   .tt-tools :is(th, td):nth-child(6),
   .tt-instructions :is(th, td):nth-child(6),
-  .tt-memory :is(th, td):nth-child(6) {
+  .tt-memory :is(th, td):is(:nth-child(3), :nth-child(5)) {
     display: none;
   }
 }
@@ -2360,7 +2364,7 @@ button:disabled {
   /* Keep what answers "is it loaded, and who sees it"; drop the detail the inspector repeats. */
   .tt-instructions :is(th, td):is(:nth-child(5), :nth-child(6)),
   .tt-settings :is(th, td):nth-child(4),
-  .tt-memory :is(th, td):is(:nth-child(3), :nth-child(4), :nth-child(6)),
+  .tt-memory :is(th, td):is(:nth-child(3), :nth-child(4), :nth-child(5), :nth-child(7)),
   .tt-permissions :is(th, td):nth-child(4),
   .tt-tools :is(th, td):is(:nth-child(4), :nth-child(6)),
   .tt-hooks :is(th, td):nth-child(4),
@@ -2369,6 +2373,11 @@ button:disabled {
   .tt-shared :is(th, td):nth-child(n + 4),
   .tt-dirs :is(th, td):is(:nth-child(2), :nth-child(3)) {
     display: none;
+  }
+
+  /* A memory's flags wrap rather than hide one behind another: "never read" lives only here. */
+  .tt-memory td.checks {
+    white-space: normal;
   }
 
   /* The directory is the row's name, not a bullet, so it takes the room. */

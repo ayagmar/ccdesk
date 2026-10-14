@@ -145,9 +145,15 @@ function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
       if (!profile) throw new RequestError(400, `profile is one of ${SESSION_PROFILES.join(", ")}`);
       return watcher.scan(absoluteParam(url, "path"), profile);
     }),
-    post("/api/usage", ({ body, res }) => {
-      const { path, rules } = checked(usageBody, body);
-      return core.readUsage(path, rules, { signal: stopOnClose(res) });
+    post("/api/usage", async ({ body, res }) => {
+      const { path, rules, profile = "interactive" } = checked(usageBody, body);
+      if (!isAbsolute(path)) throw new RequestError(400, "path must be an absolute path");
+      // The memory files come from the store the scan finds here, never from the request, so no
+      // other file's reads can be asked about.
+      const view =
+        profile === "interactive" ? await watcher.view(path) : await watcher.scan(path, profile);
+      const memories = view.memory.memories.map((m) => m.path);
+      return core.readUsage(path, rules, { memories, signal: stopOnClose(res) });
     }),
     post("/api/memory/preview", async ({ body }) => {
       const { action, path } = checked(memoryBody, body);

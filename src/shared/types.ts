@@ -475,6 +475,15 @@ export interface Usage {
   approvals: Approval[];
   /** For each rule asked about, how many calls it covers; null when ccdesk cannot match its kind. */
   matches: Record<string, number | null>;
+  /** For each memory file asked about, by its path, how often Claude read it. */
+  memories: Record<string, MemoryReads>;
+}
+
+/** Read calls on one memory file. */
+export interface MemoryReads {
+  reads: number;
+  /** When it was last read; null when it never was. */
+  last: string | null;
 }
 
 export interface ToolUsage {

@@ -8,7 +8,7 @@ import { CountStopped } from "../src/core/index.ts";
 import { usageCounter } from "../src/core/scan/usage.ts";
 import { storeDirName } from "../src/shared/memory.ts";
 import { type PermissionList } from "../src/shared/types.ts";
-import { type Fixture, makeFixture } from "./helpers/fixture.ts";
+import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
 // One counter for the file, as a core keeps one: some tests rely on what earlier counts cached.
 const readUsage = usageCounter();
@@ -47,6 +47,9 @@ function call(
     });
   return lines.map((l) => `${JSON.stringify(l)}\n`).join("");
 }
+
+/** `n` lines from `line`, each a call of its own. */
+const times = (n: number, line: () => string) => Array.from({ length: n }, line).join("");
 
 const bash = (command: string, answer?: "accept" | "reject" | "mode", cwd?: string) =>
   call("Bash", { command }, answer, cwd);
@@ -421,14 +424,20 @@ test("once the cache holds too many calls, a directory counted earlier is read a
 test("counts asked for at the same time are each counted once", async () => {
   const f = makeFixture();
   const dir = f.at("work", "app");
-  const file = f.write(join(storeOf(f, dir), "one.jsonl"), bash("ls").repeat(200));
+  const file = f.write(
+    join(storeOf(f, dir), "one.jsonl"),
+    times(200, () => bash("ls"))
+  );
 
   const both = await Promise.all([readUsage(f.env, dir, []), readUsage(f.env, dir, [])]);
   assert.deepEqual(
     both.map((u) => u.tools[0]?.calls),
     [200, 200]
   );
-  appendFileSync(file, bash("ls").repeat(500));
+  appendFileSync(
+    file,
+    times(500, () => bash("ls"))
+  );
   assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 700);
 });
 
@@ -443,7 +452,7 @@ test("a line longer than one read is counted whole", async () => {
 
 /** A transcript of `n` calls, each line longer than one read, so counting it takes many reads. */
 function longCalls(n: number): string {
-  return call("Bash", { command: "ls", description: "x".repeat(9 * 1024 * 1024) }).repeat(n);
+  return times(n, () => call("Bash", { command: "ls", description: "x".repeat(9 * 1024 * 1024) }));
 }
 
 test("a count that takes too long stops, and the next count continues it exactly", async () => {
@@ -483,7 +492,10 @@ test("a count asked for by a page that already left is not started", async () =>
 test("a count shared by two pages keeps going when one of them leaves", async () => {
   const f = makeFixture();
   const dir = f.at("work", "app");
-  f.write(join(storeOf(f, dir), "one.jsonl"), bash("ls").repeat(3));
+  f.write(
+    join(storeOf(f, dir), "one.jsonl"),
+    times(3, () => bash("ls"))
+  );
 
   const left = new AbortController();
   const first = readUsage(f.env, dir, [], { signal: left.signal });
@@ -520,6 +532,216 @@ test(
     assert.equal((await readUsage(f.env, dir, [])).tools[0]?.calls, 1);
   }
 );
+
+/** An assistant line calling Read on `file` at `at`, as Claude Code records it. */
+function readAt(file: string, at: string, cwd?: string): string {
+  const id = `toolu_${++next}`;
+  return `${JSON.stringify({
+    type: "assistant",
+    timestamp: at,
+    ...(cwd ? { cwd } : {}),
+    message: {
+      role: "assistant",
+      content: [{ type: "tool_use", id, name: "Read", input: { file_path: file } }],
+    },
+  })}\n`;
+}
+
+/** An attachment line Claude Code writes by itself, such as an instructions load or a compaction replay. */
+function attachment(what: Record<string, unknown>, cwd: string): string {
+  return `${JSON.stringify({ type: "attachment", attachment: what, cwd, timestamp: "2026-10-05T00:00:00.000Z" })}\n`;
+}
+
+/** A memory file in the store `dir` uses, written so links to it can resolve. */
+function memoryIn(f: Fixture, dir: string, file: string): string {
+  return f.write(join(memoryDirFor(f, dir), file), memoryFile(file, "project", "d", "body"));
+}
+
+test("each Read of a memory file counts, with the time of the last one", async () => {
+  // Catches reads not being counted, or the first read's time shown as the last.
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  const memory = memoryIn(f, dir, "testing.md");
+  const unread = memoryIn(f, dir, "style.md");
+  f.write(
+    join(storeOf(f, dir), "one.jsonl"),
+    readAt(memory, "2026-10-02T09:00:00.000Z", dir) + readAt(memory, "2026-10-04T09:00:00.000Z")
+  );
+  f.write(join(storeOf(f, dir), "two.jsonl"), readAt(memory, "2026-10-03T09:00:00.000Z", dir));
+
+  const usage = await readUsage(f.env, dir, [], { memories: [memory, unread] });
+
+  assert.deepEqual(usage.memories, {
+    [memory]: { reads: 3, last: "2026-10-04T09:00:00.000Z" },
+    [unread]: { reads: 0, last: null },
+  });
+});
+
+test("a Read of another file with a memory's name does not count", async () => {
+  // Catches matching reads by file name alone.
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  const memory = memoryIn(f, dir, "testing.md");
+  f.write("work/app/docs/testing.md", "x\n");
+  f.write(
+    join(storeOf(f, dir), "one.jsonl"),
+    readAt(f.at("work", "app", "docs", "testing.md"), "2026-10-02T09:00:00.000Z", dir)
+  );
+
+  const usage = await readUsage(f.env, dir, [], { memories: [memory] });
+
+  assert.deepEqual(usage.memories[memory], { reads: 0, last: null });
+});
+
+test("loading MEMORY.md and replaying reads after a compaction are not reads", async () => {
+  // Catches counting the index Claude Code loads every session, or the earlier reads it replays
+  // into the context after a compaction, as Claude using a memory again.
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  const memory = memoryIn(f, dir, "testing.md");
+  const index = f.write(join(memoryDirFor(f, dir), "MEMORY.md"), "- [Testing](testing.md)\n");
+  f.write(
+    join(storeOf(f, dir), "one.jsonl"),
+    attachment(
+      {
+        type: "instructions",
+        files: [{ path: index, type: "AutoMem", content: "- [Testing](testing.md)" }],
+      },
+      dir
+    ) +
+      readAt(memory, "2026-10-02T09:00:00.000Z") +
+      attachment(
+        {
+          type: "file",
+          filename: memory,
+          content: { type: "text", file: { filePath: memory, content: "body" } },
+        },
+        dir
+      ) +
+      attachment({ type: "compact_file_reference", filename: memory }, dir)
+  );
+
+  const usage = await readUsage(f.env, dir, [], { memories: [memory] });
+
+  assert.deepEqual(usage.memories[memory], { reads: 1, last: "2026-10-02T09:00:00.000Z" });
+});
+
+test("a Read in a subfolder or worktree session of the repository counts for its one store", async () => {
+  // Claude Code names auto memory after the repository, so these sessions read the same files;
+  // catches counting only the sessions started at the root.
+  const f = makeFixture();
+  const repo = f.at("work", "app");
+  f.write("work/app/README.md", "x\n");
+  f.git(repo, "init", "-q");
+  f.git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-qm", "x");
+  const memory = memoryIn(f, repo, "testing.md");
+  const sub = join(repo, "packages", "api");
+  f.write(join(sub, "index.ts"), "x\n");
+  f.write(join(storeOf(f, sub), "sub.jsonl"), readAt(memory, "2026-10-02T09:00:00.000Z", sub));
+  const tree = f.at("work", "app-feat");
+  f.git(repo, "worktree", "add", "-q", tree);
+  f.write(join(storeOf(f, tree), "feat.jsonl"), readAt(memory, "2026-10-03T09:00:00.000Z", tree));
+
+  const usage = await readUsage(f.env, sub, [], { memories: [memory] });
+
+  assert.deepEqual(usage.memories[memory], { reads: 2, last: "2026-10-03T09:00:00.000Z" });
+});
+
+test("a memory read through a link to the Claude folder, or written with ~, counts", async () => {
+  // Catches comparing the path Claude wrote with the store's path as text only.
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  const memory = memoryIn(f, dir, "testing.md");
+  f.link(f.at("home", "dotfiles-claude"), f.env.claudeDir);
+  const store = join("projects", storeDirName(dir), "memory", "testing.md");
+  f.write(
+    join(storeOf(f, dir), "one.jsonl"),
+    readAt(join(f.env.home, "dotfiles-claude", store), "2026-10-02T09:00:00.000Z", dir) +
+      readAt(`~/.claude/${store}`, "2026-10-03T09:00:00.000Z")
+  );
+
+  const usage = await readUsage(f.env, dir, [], { memories: [memory] });
+
+  assert.equal(usage.memories[memory]?.reads, 2);
+});
+
+/** A tool result line answering the Read with id `id`, as Claude Code records a refusal or an error. */
+function resultOf(id: string, error: string, decision?: "reject"): string {
+  return `${JSON.stringify({
+    type: "user",
+    timestamp: "2026-10-02T09:00:01.000Z",
+    message: {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: id, content: error, is_error: true }],
+    },
+    ...(decision ? { permissionDecision: { decision, source: "user_reject" } } : {}),
+  })}\n`;
+}
+
+test("a Read of a memory that you refused is not a read", async () => {
+  // Catches counting a call Claude never got to make, which hides "never read".
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  const memory = memoryIn(f, dir, "testing.md");
+  f.write(
+    join(storeOf(f, dir), "one.jsonl"),
+    readAt(memory, "2026-10-02T09:00:00.000Z", dir) +
+      resultOf(`toolu_${next}`, "The user doesn't want to proceed", "reject")
+  );
+
+  const usage = await readUsage(f.env, dir, [], { memories: [memory] });
+
+  assert.deepEqual(usage.memories[memory], { reads: 0, last: null });
+});
+
+test("a Read of a memory that failed is not a read", async () => {
+  // Catches counting a Read of a memory before it was saved or after it was renamed.
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  const memory = memoryIn(f, dir, "testing.md");
+  f.write(
+    join(storeOf(f, dir), "one.jsonl"),
+    readAt(memory, "2026-10-02T09:00:00.000Z", dir) +
+      resultOf(`toolu_${next}`, "File does not exist.")
+  );
+
+  const usage = await readUsage(f.env, dir, [], { memories: [memory] });
+
+  assert.deepEqual(usage.memories[memory], { reads: 0, last: null });
+});
+
+test("a call copied into a resumed or forked session's transcript counts once", async () => {
+  // Claude Code copies the conversation, with its tool_use ids, into the new transcript; catches
+  // counting those calls, and the reads among them, twice.
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  const memory = memoryIn(f, dir, "testing.md");
+  const earlier = readAt(memory, "2026-10-02T09:00:00.000Z", dir);
+  f.write(join(storeOf(f, dir), "one.jsonl"), earlier);
+  f.write(
+    join(storeOf(f, dir), "two.jsonl"),
+    earlier + readAt(memory, "2026-10-03T09:00:00.000Z", dir)
+  );
+
+  const usage = await readUsage(f.env, dir, [], { memories: [memory] });
+
+  assert.equal(usage.tools[0]?.calls, 2);
+  assert.equal(usage.memories[memory]?.reads, 2);
+});
+
+test("a memory that is a link counts a read of the file it links to", async () => {
+  // Catches matching only the link's own path when Claude read the file it leads to.
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  const target = f.write("notes/testing.md", memoryFile("testing", "project", "d", "body"));
+  const memory = join(memoryDirFor(f, dir), "testing.md");
+  f.link(memory, target);
+  f.write(join(storeOf(f, dir), "one.jsonl"), readAt(target, "2026-10-02T09:00:00.000Z", dir));
+
+  const usage = await readUsage(f.env, dir, [], { memories: [memory] });
+
+  assert.equal(usage.memories[memory]?.reads, 1);
+});
 
 test("only counts and rule patterns are returned, never commands or results", async () => {
   const f = makeFixture();

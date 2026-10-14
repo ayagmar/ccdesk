@@ -84,8 +84,15 @@ export type McpEdit = Static<typeof McpEditBody>;
 /** A save's or restore's revision: the one its preview returned. */
 export const RevisionBody = Type.Object({ revision: Type.String() });
 
-/** Count which permission rules the transcripts under `path` used. */
-export const UsageBody = Type.Object({ path: Type.String(), rules: Type.Array(Rule) });
+/**
+ * Count which permission rules the transcripts under `path` used, and how often Claude read each
+ * memory file of the store `path` uses in that session profile (interactive by default).
+ */
+export const UsageBody = Type.Object({
+  path: Type.String(),
+  rules: Type.Array(Rule),
+  profile: Type.Optional(Type.Enum(["interactive", "print"])),
+});
 
 /**
  * Preview a memory change; changing it also sends the revision, and the directory the store is

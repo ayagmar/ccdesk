@@ -123,7 +123,7 @@ export function useConfig(requested: string | null | undefined, profile: Session
     const rules = scanned.permissions.flatMap((p) =>
       p.kind === "rule" && p.inEffect ? [{ list: p.list, rule: p.rule }] : []
     );
-    api.usage(scanned.path, rules, stop.signal).then(
+    api.usage(scanned.path, rules, scanned.profile, stop.signal).then(
       (data) => !stop.signal.aborted && setUsage({ path: scanned.path, data }),
       () => !stop.signal.aborted && setUsage({ path: scanned.path, data: null })
     );

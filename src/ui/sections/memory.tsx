@@ -4,14 +4,17 @@ import {
   type MemoryAction,
   type MemoryChangePreview,
   type MemoryStore,
+  type Usage,
 } from "../../shared/types.ts";
+import { readsOf, unreadOf } from "../../view/sections/memory.ts";
 import { type RowOf } from "../../view/sections/types.ts";
+import { sessionsHere } from "../../view/usage.ts";
 import { api, errorText } from "../api.ts";
 import { Bullet } from "../Bullet.tsx";
 import { DiffView } from "../DiffView.tsx";
-import { ago, tilde } from "../format.ts";
+import { ago, plural, tilde } from "../format.ts";
 import { Icon } from "../Icon.tsx";
-import { Contents, Field, NameButton, PathValue } from "./kit.tsx";
+import { Contents, Count, Field, NameButton, PathValue } from "./kit.tsx";
 import { type Actions, type SectionUi } from "./types.ts";
 
 type R = RowOf<"memory">;
@@ -39,7 +42,12 @@ export const memory: SectionUi<R> = {
         <td>
           <TypeName type={m.type} />
         </td>
-        <td className="desc">{m.description}</td>
+        <td className={`num${row.reads?.reads ? " used" : ""}`}>
+          <Count value={row.reads === null ? null : row.reads?.reads} />
+        </td>
+        <td className="num">
+          <LastRead row={row} />
+        </td>
         <td className="checks">
           {!m.inIndex && (
             <span className="flag bad" title="MEMORY.md does not mention it">
@@ -52,10 +60,9 @@ export const memory: SectionUi<R> = {
             </span>
           )}
           {sharedNames.has(m.name) && <span className="flag">also elsewhere</span>}
+          {row.unread && <span className="flag">{row.unread}</span>}
         </td>
-        <td className="num" title={new Date(m.mtime).toLocaleString()}>
-          {ago(m.mtime)}
-        </td>
+        <td className="desc">{m.description}</td>
       </>
     );
   },
@@ -64,12 +71,69 @@ export const memory: SectionUi<R> = {
   Details: MemoryDetails,
 };
 
+/** When Claude last read the memory: "never" once counted, with the exact time in its tooltip. */
+function LastRead({ row }: { row: R }) {
+  if (!row.reads) return <Count value={row.reads} />;
+  if (!row.reads.last) return <span className="muted">never</span>;
+  return <span title={new Date(row.reads.last).toLocaleString()}>{ago(row.reads.last)}</span>;
+}
+
+/** How often Claude read the memory in the sessions counted, as one sentence. */
+function readHere(usage: Usage | null | undefined, row: R): string {
+  if (usage === undefined || row.reads === undefined) return "counting…";
+  if (usage === null || row.reads === null)
+    return "ccdesk could not finish counting the transcripts";
+  if (usage.sessions === 0) return "no sessions here yet";
+  return `${plural(row.reads.reads, "read")} in ${sessionsHere(usage)}`;
+}
+
+/** What an unread memory still costs, or why Claude has not read it. */
+function unreadHint(row: R): string {
+  if (row.item.inIndex)
+    return "Claude Code still loads its index line every session. If it no longer helps, deleting it frees that line.";
+  if (row.reads?.reads)
+    return "It is not in MEMORY.md, so Claude only comes across it by searching the folder.";
+  return "Not in MEMORY.md and never read, so Claude has not found it.";
+}
+
+/** How many memories look unused, and what the Reads column counts, once the count is in. */
+function ReadsSummary({ actions }: { actions: Actions }) {
+  const { usage } = actions.view;
+  const { memories } = actions.view.memory;
+  if (usage === undefined || memories.length === 0) return null;
+  if (usage === null)
+    return (
+      <span className="flag" title="ccdesk could not finish counting the transcripts">
+        read counts unavailable
+      </span>
+    );
+  const unread = memories.map((m) => unreadOf(usage, readsOf(usage, m.path)));
+  const kinds = [...new Set(unread.filter((u) => u !== null))].sort();
+  return (
+    <>
+      {kinds.length > 0 && (
+        <span className="flag">
+          {kinds.map((kind) => `${unread.filter((u) => u === kind).length} ${kind}`).join(" · ")}
+        </span>
+      )}
+      <span className="tt-note">
+        Reads counts Claude's Read calls on each file in{" "}
+        {usage.sessions === 0
+          ? "this directory's sessions; there are none yet"
+          : sessionsHere(usage)}
+        . Loading MEMORY.md at session start is not a read.
+      </span>
+    </>
+  );
+}
+
 function MemoryHead({ actions }: { actions: Actions }) {
   const store = actions.view.memory;
   const index = store.index;
   const [reviewing, setReviewing] = useState(false);
   return (
     <>
+      <ReadsSummary actions={actions} />
       {store.note && (
         <span className={`flag${store.loaded ? "" : " warn"}`} title={tilde(store.dir)}>
           {!store.loaded && <Icon name="warn" />} {store.note}
@@ -263,6 +327,19 @@ function MemoryDetails({ row, actions }: { row: R; actions: Actions }) {
             </span>
           )}
         </Field>
+        <Field label="Read here">{readHere(actions.view.usage, row)}</Field>
+        {row.reads && (actions.view.usage?.sessions ?? 0) > 0 && (
+          <Field label="Last read">
+            {row.reads.last ? (
+              <>
+                <span title={new Date(row.reads.last).toLocaleString()}>{ago(row.reads.last)}</span>{" "}
+                {row.unread && <span className="flag">{row.unread}</span>}
+              </>
+            ) : (
+              <span className="flag">never read</span>
+            )}
+          </Field>
+        )}
         {m.linkedFrom.length > 0 && (
           <Field label="Linked from">
             <span className="mono">{m.linkedFrom.join(", ")}</span>
@@ -274,6 +351,7 @@ function MemoryDetails({ row, actions }: { row: R; actions: Actions }) {
           </Field>
         )}
       </dl>
+      {row.unread && <p className="muted small">{unreadHint(row)}</p>}
       {adding && (
         <MemoryReview
           action="add"

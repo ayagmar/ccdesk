@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { after, before, beforeEach, test } from "node:test";
 import { createCore, RefusedError, revisionOf } from "../src/core/index.ts";
 import { createCcdeskServer } from "../src/server/server.ts";
+import { type Usage } from "../src/shared/types.ts";
 import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
 const TOKEN = "test-token";
@@ -228,6 +229,68 @@ test("deleting a memory removes its file and index line, and undo puts both back
   assert.equal(restored.status, 200);
   assert.equal(readFileSync(old, "utf8"), memoryFile("old", "project", "stale", "y"));
   assert.match(readFileSync(`${dir}/MEMORY.md`, "utf8"), /\[Old\]\(old\.md\)/);
+});
+
+/** An assistant line calling Read on `file`, as Claude Code records it. */
+function readLine(id: string, file: string, at: string, cwd: string): string {
+  const content = [{ type: "tool_use", id, name: "Read", input: { file_path: file } }];
+  return `${JSON.stringify({ type: "assistant", timestamp: at, cwd, message: { content } })}\n`;
+}
+
+test("the usage count says how often Claude read each memory file of the directory's store", async () => {
+  // Catches the route not counting the store's memory files, so every memory shows as never read.
+  const project = fixture.at("work", "reads");
+  const memory = fixture.write(
+    join(memoryDirFor(fixture, project), "testing.md"),
+    memoryFile("testing", "project", "d", "x")
+  );
+  const at = "2026-10-02T09:00:00.000Z";
+  fixture.write(
+    join(memoryDirFor(fixture, project), "..", "one.jsonl"),
+    readLine("t1", memory, at, project)
+  );
+
+  const res = await call("/api/usage", { method: "POST", body: { path: project, rules: [] } });
+
+  assert.deepEqual((res.json as Usage).memories, { [memory]: { reads: 1, last: at } });
+});
+
+test("the usage count answers for no file outside the directory's memory folder", async () => {
+  // Catches the route counting reads of paths the request names, which would tell anyone with
+  // the token whether and when Claude read any file, such as a key or a .env.
+  const project = fixture.at("work", "secretive");
+  const secret = fixture.write("work/secretive/.env", "TOKEN=fake\n");
+  fixture.write(
+    join(memoryDirFor(fixture, project), "..", "one.jsonl"),
+    readLine("t1", secret, "2026-10-02T09:00:00.000Z", project)
+  );
+
+  const res = await call("/api/usage", {
+    method: "POST",
+    body: { path: project, rules: [], memories: [secret] },
+  });
+
+  assert.equal(res.status, 200);
+  assert.deepEqual((res.json as Usage).memories, {});
+});
+
+test("a large memory folder does not stop tool calls being counted", async () => {
+  // Catches the page sending every memory's path again: a few hundred long paths passed the
+  // request size limit, and the tools' counts failed with it.
+  const project = fixture.at("work", "many");
+  const store = memoryDirFor(fixture, project);
+  for (let i = 0; i < 700; i++)
+    fixture.write(join(store, `${"a-rather-long-memory-name-".repeat(4)}${i}.md`), "x\n");
+  fixture.write(
+    join(store, "..", "one.jsonl"),
+    readLine("t1", join(project, "README.md"), "2026-10-02T09:00:00.000Z", project)
+  );
+
+  const res = await call("/api/usage", { method: "POST", body: { path: project, rules: [] } });
+
+  assert.equal(res.status, 200);
+  assert.equal((res.json as Usage).tools[0]?.calls, 1);
+  assert.equal(Object.keys((res.json as Usage).memories).length, 700);
 });
 
 test("deleting a memory also removes an index line that names it as [[name]]", async () => {
