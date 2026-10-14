@@ -242,13 +242,13 @@ test("a subscriber hears once about an editor's save, and nothing after unsubscr
 });
 
 /**
- * A watcher on `app` on a macOS host whose watchers report only what the test passes to `report`,
- * as fs.watch would, after `app/CLAUDE.md` was edited to "two" and subscribers were told.
+ * A watcher on `app` on a `platform` host whose watchers report only what the test passes to
+ * `reportEdit`, as fs.watch would, after `app/CLAUDE.md` was edited to "two" and subscribers were told.
  */
-async function toldOnMacOS() {
+async function toldOn(platform: NodeJS.Platform) {
   const open = new Set<{ path: string; listener: WatchListener<string> | undefined }>();
   const host: WatchHost = {
-    platform: "darwin",
+    platform,
     watch: ((path: string, _options?: unknown, listener?: WatchListener<string>) => {
       const entry = { path, listener };
       open.add(entry);
@@ -265,9 +265,8 @@ async function toldOnMacOS() {
   watchers.push(watcher);
   const counter = { calls: 0 };
   await watcher.subscribe(f.at("app"), () => counter.calls++);
-  const reportEdit = () => {
-    for (const entry of [...open])
-      if (entry.path === f.at("app")) entry.listener?.("change", "CLAUDE.md");
+  const reportEdit = (name = "CLAUDE.md") => {
+    for (const entry of [...open]) if (entry.path === f.at("app")) entry.listener?.("change", name);
   };
   const waitFor = (changedSince: number, timeoutMs: number) =>
     watcher.wait(f.at("app"), changedSince, new AbortController().signal, timeoutMs);
@@ -282,11 +281,11 @@ async function toldOnMacOS() {
   assert.equal(first.changed, true);
   // The watchers move after a change; macOS can report the change again to the new ones.
   await started(watcher, f.at("app"));
-  return { f, counter, reportEdit, waitFor, told: first.at, mtime };
+  return { f, watcher, counter, reportEdit, waitFor, told: first.at, mtime };
 }
 
 test("on macOS, a change reported again after the watchers move is told once, and the next edit is told", async () => {
-  const { f, counter, reportEdit, waitFor, told } = await toldOnMacOS();
+  const { f, counter, reportEdit, waitFor, told } = await toldOn("darwin");
 
   reportEdit();
   assert.equal((await waitFor(told, 800)).changed, false);
@@ -299,7 +298,7 @@ test("on macOS, a change reported again after the watchers move is told once, an
 });
 
 test("on macOS, an edit right after the watchers move is told even with the same size and modification time", async () => {
-  const { f, counter, reportEdit, waitFor, told, mtime } = await toldOnMacOS();
+  const { f, counter, reportEdit, waitFor, told, mtime } = await toldOn("darwin");
 
   // As cp -p or rsync -a leave it: other text of the same length, with the old modification time.
   f.write("app/CLAUDE.md", "six\n");
@@ -308,6 +307,31 @@ test("on macOS, an edit right after the watchers move is told even with the same
 
   assert.equal((await waitFor(told, 5000)).changed, true);
   assert.equal(counter.calls, 2);
+});
+
+test("on Linux, a change reported again after the watchers move is told again, as every change is", async () => {
+  const { counter, reportEdit, waitFor, told } = await toldOn("linux");
+
+  reportEdit();
+
+  assert.equal((await waitFor(told, 5000)).changed, true);
+  assert.equal(counter.calls, 2);
+});
+
+test("on macOS, a folder reported again right after the watchers move is told, since a file in it may have changed", async () => {
+  const { f, watcher, counter, reportEdit, waitFor, told } = await toldOn("darwin");
+  f.write("app/.claude/settings.json", "{}\n");
+  reportEdit(".claude");
+  const second = await waitFor(told, 5000);
+  assert.equal(second.changed, true);
+  await started(watcher, f.at("app"));
+
+  // An edit inside the folder leaves the folder's own size and times as they were.
+  f.write("app/.claude/settings.json", "[]\n");
+  reportEdit(".claude");
+
+  assert.equal((await waitFor(second.at, 5000)).changed, true);
+  assert.equal(counter.calls, 3);
 });
 
 test("closing the watcher does not tell a subscriber something changed", async () => {

@@ -205,13 +205,16 @@ interface Seen {
 const nothingSeen = (): Seen => ({ counts: false, checking: 0, states: new Map() });
 
 /**
- * A file or folder's inode, size and times, or undefined when it cannot be read. The change time
- * moves on every write, even when a tool sets the modification time back, and a file renamed over
- * it has another inode.
+ * A file's inode, size and times, or undefined when they cannot show that it changed. The change
+ * time moves on every write, even when a tool sets the modification time back, and a file renamed
+ * over it has another inode. That needs times finer than a second: on a volume that keeps whole
+ * seconds, such as HFS+ or FAT, two writes in one second look alike. A folder's own state does not
+ * move when a file in it is edited, so a folder has none either.
  */
 async function fileState(path: string): Promise<string | undefined> {
   const info = await stat(path, { bigint: true }).catch(() => null);
-  return info ? `${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}` : undefined;
+  if (!info?.isFile() || info.ctimeNs % 1_000_000_000n === 0n) return undefined;
+  return `${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}`;
 }
 
 /** The latest scan of a directory, with when it started and ~/.claude.json as it was then. */
