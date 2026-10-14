@@ -53,12 +53,13 @@ export async function mainWorktreeRoot(dir: string): Promise<string | null> {
 }
 
 /**
- * The folder Claude Code names a repository's auto memory after, so that every worktree and
- * subfolder shares one store (docs: memory#storage-location): the main checkout's root, the bare
- * folder itself for a worktree of a bare repository, else the repository root, as in a submodule
- * (observed in v2.1.296). Outside git it is `dir`.
+ * The repository's canonical root as Claude Code finds it (observed in v2.1.296): the main
+ * checkout's root, the bare folder itself for a worktree of a bare repository, else the repository
+ * root, as in a submodule; outside git, `dir`. Auto memory is named after it, so every worktree and
+ * subfolder shares one store (docs: memory#storage-location), and a linked worktree reads through
+ * to its project skills, agents and commands (docs: worktrees#what-worktrees-share-with-the-main-checkout).
  */
-export async function memoryKey(dir: string): Promise<string> {
+export async function canonicalRoot(dir: string): Promise<string> {
   try {
     const { stdout } = await run(
       "git",

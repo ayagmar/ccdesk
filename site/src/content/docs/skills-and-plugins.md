@@ -11,7 +11,7 @@ Skills are folders with a `SKILL.md`. ccdesk reads them from:
 
 - your organisation's managed folder;
 - `~/.claude/skills`, including skills synced into `~/.claude/skills/synced`;
-- `.claude/skills` in the open directory and every folder above it up to the repository root;
+- `.claude/skills` in the open directory and every folder above it up to the repository root. In a linked git worktree whose root has no `.claude/skills`, for example because the folder is gitignored, the main checkout's `.claude/skills` is read instead, and the same goes for `.claude/agents`, `.claude/commands` and `.claude/output-styles`, each on its own. The docs name only the first three; Claude Code 2.1.296 also reads output styles through;
 - enabled plugins.
 
 A plugin's skills and commands are named with the plugin first, such as `my-plugin:review`, so they never clash with yours. When a skill and a command share a name, the skill runs and the command is marked as not used. A skill in a folder below the open directory loads once Claude works on files there, whatever its `paths` say: Claude Code 2.1.296 does not check them for such a skill, and the skills docs do not say either way; when its folder name matches another skill's, the path test names it with its folder, such as `apps/web:deploy`.
@@ -28,6 +28,6 @@ Custom slash commands come from your organisation's managed folder, `~/.claude/c
 
 ## Plugins
 
-Installed plugins come from `~/.claude/plugins/installed_plugins.json`. A plugin installed for a project applies only in that project, where it takes the place of a user install.
+Installed plugins come from `~/.claude/plugins/installed_plugins.json`. A plugin installed for a project applies only in that project and in the worktrees of its repository, where it takes the place of a user install.
 
 A plugin is on or off according to the highest settings file that lists it in `enabledPlugins`; with no entry, its own manifest decides, and plugins are on by default. A plugin that is off is dimmed and contributes nothing. An enabled plugin can add skills, commands, subagents, output styles, hooks and MCP servers, each listed in its own section with the **X** bullet, and the route strip gains a Plugin stop. A manifest that sets `commands`, `agents` or `outputStyles` replaces the plugin's default folder for it, and `commands` may be a map of names to a file or inline text, which replaces the folder too; `skills` adds to the `skills` folder. The plugins reference says `agents` entries must be `.md` files, but Claude Code 2.1.296 also loads a folder named there, and so does ccdesk.

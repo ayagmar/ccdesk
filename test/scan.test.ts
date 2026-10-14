@@ -750,6 +750,46 @@ test("in claude -p, a local approval counts until git tracks the file, and again
   assert.deepEqual((await docs())?.approvals, approval(true));
 });
 
+test("a linked worktree reads the main checkout's skills, agents and commands for each folder it lacks, and its project plugins", async () => {
+  const f = makeFixture();
+  const entry = (name: string, description: string) =>
+    `---\nname: ${name}\ndescription: ${description}\n---\n`;
+  f.write("repo/.gitignore", ".claude/\n");
+  f.write("repo/.claude/skills/release/SKILL.md", entry("release", "main skill"));
+  f.write("repo/.claude/agents/main-agent.md", entry("main-agent", "main agent"));
+  f.write("repo/.claude/commands/ship.md", "---\ndescription: main command\n---\n");
+  f.git("repo", "init", "-q");
+  f.git("repo", "add", ".");
+  f.git("repo", "commit", "-qm", "init");
+  f.git("repo", "worktree", "add", "-q", f.at("wt"));
+  // The worktree has agents of its own, so only those load.
+  f.write("wt/.claude/agents/own.md", entry("own", "worktree agent"));
+  f.json("home/.claude/plugins/installed_plugins.json", {
+    plugins: {
+      "kit@market": [
+        { scope: "project", projectPath: f.at("repo"), installPath: f.at("plugins/kit") },
+      ],
+    },
+  });
+  f.json("plugins/kit/.claude-plugin/plugin.json", { name: "kit" });
+
+  const view = await scanDirectory(f.env, f.at("wt"));
+  const { skills, agents, commands, plugins } = view.inventory;
+
+  assert.deepEqual(
+    [skills, agents, commands].map((list) => list.map((e) => f.rel(e.path))),
+    [
+      ["repo/.claude/skills/release/SKILL.md"],
+      ["wt/.claude/agents/own.md"],
+      ["repo/.claude/commands/ship.md"],
+    ]
+  );
+  assert.deepEqual(
+    plugins.map((p) => p.id),
+    ["kit@market"]
+  );
+});
+
 test("in a linked worktree, the main checkout's tracked local file is held like repository settings", async () => {
   const f = makeFixture();
   f.json("repo/.mcp.json", { mcpServers: { docs: { command: "docs-mcp" } } });
