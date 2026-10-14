@@ -52,6 +52,7 @@ export const extensions: SectionUi<R> = {
           <LinkMark realPath={e.realPath} />
         </td>
         <td className="desc">
+          {e.synced && <span className="flag">claude.ai sync</span>}{" "}
           {notOffered(e) && <span className="flag warn">{notOffered(e)}</span>} {e.description}
         </td>
       </>

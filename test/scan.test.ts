@@ -1389,3 +1389,75 @@ test("skill folders named synced in any case, and skills and commands named anth
   const listing = view.context.find((b) => b.kind === "skills")?.text ?? "";
   assert.doesNotMatch(listing, /synced|Synced|reserved/);
 });
+
+/** A claude.ai account in ~/.claude.json and the folder Claude Code syncs its skills into. */
+function syncedAccount(f: ReturnType<typeof makeFixture>) {
+  const org = "0000000A-0000-4000-8000-000000000001";
+  const account = "0000000B-0000-4000-8000-000000000002";
+  f.json("home/.claude.json", { oauthAccount: { organizationUuid: org, accountUuid: account } });
+  return `home/.claude/skills/synced/${org.toLowerCase()}_${account.toLowerCase()}`;
+}
+
+test("a synced skill never takes a name from your skills or commands; it runs as anthropic-skills:<name> instead", async () => {
+  const f = makeFixture();
+  const bucket = syncedAccount(f);
+  const skill = (name: string, description: string) =>
+    `---\nname: ${name}\ndescription: ${description}\n---\n`;
+  f.write("app/.claude/skills/deploy/SKILL.md", skill("deploy", "project deploy"));
+  f.write("home/.claude/commands/commit.md", "---\ndescription: my commit\n---\n");
+  f.write(`${bucket}/deploy/SKILL.md`, skill("deploy", "synced deploy"));
+  // Names compare ignoring case and compatibility forms (docs: skills#when-a-synced-skill-name-matches-another-command).
+  f.write(`${bucket}/Commit/SKILL.md`, skill("Ｃommit", "synced commit"));
+  f.write(`${bucket}/pdf/SKILL.md`, skill("pdf", "synced pdf"));
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  const project = view.inventory.skills.find((s) => s.scope === "project");
+  assert.equal(project?.shadowedBy, undefined);
+  assert.equal(view.inventory.commands[0]?.shadowedBy, undefined);
+  assert.deepEqual(
+    view.inventory.skills
+      .filter((s) => s.synced)
+      .map((s) => [s.id ?? s.name, s.shadowedBy ?? null]),
+    [
+      ["anthropic-skills:Ｃommit", null],
+      ["anthropic-skills:deploy", null],
+      ["pdf", null],
+    ]
+  );
+  const listing = view.context.find((b) => b.kind === "skills")?.text ?? "";
+  assert.match(listing, /- deploy: project deploy/);
+  assert.match(listing, /- anthropic-skills:deploy: synced deploy/);
+});
+
+test("synced skills load only for the signed-in claude.ai account, and not after syncClaudeAiSkills: false", async () => {
+  const f = makeFixture();
+  const bucket = syncedAccount(f);
+  const skill = "---\nname: pdf\ndescription: synced pdf\n---\n";
+  f.write(`${bucket}/pdf/SKILL.md`, skill);
+  f.write(
+    "home/.claude/skills/synced/0000000c-0000-4000-8000-000000000003_0000000d-0000-4000-8000-000000000004/xlsx/SKILL.md",
+    "---\nname: xlsx\ndescription: other account\n---\n"
+  );
+  f.write("app/README.md", "x");
+
+  const loaded = async () =>
+    (await scanDirectory(f.env, f.at("app"))).inventory.skills.map((s) => [s.name, !s.skipped]);
+
+  assert.deepEqual(await loaded(), [
+    ["pdf", true],
+    ["xlsx", false],
+  ]);
+  f.json("home/.claude/settings.json", { syncClaudeAiSkills: false });
+  assert.deepEqual(await loaded(), [
+    ["pdf", false],
+    ["xlsx", false],
+  ]);
+  // Not signed in with a claude.ai account: no synced skill loads.
+  f.json("home/.claude/settings.json", {});
+  f.json("home/.claude.json", {});
+  assert.deepEqual(await loaded(), [
+    ["pdf", false],
+    ["xlsx", false],
+  ]);
+});
