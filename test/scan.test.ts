@@ -678,6 +678,59 @@ test("a worktree is trusted when you trusted the main checkout", async () => {
   assert.equal(view.trust.root, f.at("repo"));
 });
 
+test("in claude -p, a local approval counts until git tracks the file, and again once you trust the repository", async () => {
+  const f = makeFixture();
+  f.json("app/.mcp.json", { mcpServers: { docs: { command: "docs-mcp" } } });
+  f.git("app", "init", "-q");
+  const local = f.json("app/.claude/settings.local.json", { enabledMcpjsonServers: ["docs"] });
+  const docs = async () =>
+    (await scanDirectory(f.env, f.at("app"), "print")).inventory.mcpServers.find(
+      (s) => s.name === "docs"
+    );
+  const approval = (counts: boolean) => [
+    { key: "enabledMcpjsonServers", source: "local", path: local, counts },
+  ];
+
+  const untracked = await docs();
+  assert.deepEqual(untracked?.approvals, approval(true));
+  assert.equal(untracked?.note, undefined);
+
+  f.git("app", "add", ".claude/settings.local.json");
+  const tracked = await docs();
+  assert.deepEqual(tracked?.approvals, approval(false));
+  assert.equal(tracked?.status, "active");
+  assert.match(tracked?.note ?? "", /claude -p connects/);
+
+  f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
+  assert.deepEqual((await docs())?.approvals, approval(true));
+});
+
+test("in a linked worktree, the main checkout's tracked local file is held like repository settings", async () => {
+  const f = makeFixture();
+  f.json("repo/.mcp.json", { mcpServers: { docs: { command: "docs-mcp" } } });
+  const local = f.json("repo/.claude/settings.local.json", { enabledMcpjsonServers: ["docs"] });
+  f.git("repo", "init", "-q");
+  f.git("repo", "add", ".");
+  f.git("repo", "commit", "-qm", "init");
+  f.git("repo", "worktree", "add", "-q", "-b", "feature", f.at("repo-feature"));
+  // The branch drops the file, so only the main checkout's copy is read.
+  f.git("repo-feature", "rm", "-q", ".claude/settings.local.json");
+  f.git("repo-feature", "commit", "-qm", "drop local settings");
+  const docs = async () =>
+    (await scanDirectory(f.env, f.at("repo-feature"), "print")).inventory.mcpServers.find(
+      (s) => s.name === "docs"
+    );
+
+  const held = await docs();
+  assert.deepEqual(held?.approvals, [
+    { key: "enabledMcpjsonServers", source: "local", path: local, counts: false },
+  ]);
+  assert.match(held?.note ?? "", /claude -p connects/);
+
+  f.json("home/.claude.json", { projects: { [f.at("repo")]: { hasTrustDialogAccepted: true } } });
+  assert.equal((await docs())?.approvals?.[0]?.counts, true);
+});
+
 test("managedMcpServers entries Claude Code would drop are shown as invalid", async () => {
   const f = makeFixture();
   f.json("etc/claude-code/managed-settings.json", {

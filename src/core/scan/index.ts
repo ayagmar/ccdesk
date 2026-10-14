@@ -103,7 +103,7 @@ export async function scanDirectory(
   const trustOptions = {
     trust,
     inConfigHome: (file: string) => localInConfigHome(env, path, file),
-    localFromRepository: await localFromRepository(root, settings),
+    localFromRepository: await localFromRepository(root, mainRoot, settings),
     profile,
   };
   const instructions = await resolveInstructions({
@@ -229,23 +229,26 @@ async function shareProjectFiles(
 
 /**
  * Whether the local settings file counts as the repository's: tracked in git, or in a .claude
- * that is a link (docs: permissions#when-your-local-settings-file-needs-trust).
+ * that is a link (docs: permissions#when-your-local-settings-file-needs-trust). Each file is checked
+ * against the checkout that holds it: in a linked worktree, the main checkout for the file Claude
+ * Code keeps at its root, and the worktree for a legacy file in the start folder.
  */
 async function localFromRepository(
   root: string | null,
+  mainRoot: string | null,
   settings: SettingsLayer[]
 ): Promise<boolean> {
-  const local = settings.filter((l) => l.scope === "local" && l.exists);
-  const visibility = await visibilityOf(
-    root,
-    local.map((l) => l.path)
-  );
   const fromRepository = await Promise.all(
-    local.map(
-      async (l) =>
-        visibility.get(l.path) === "tracked" ||
-        ((await lstat(dirname(l.path)).catch(() => null))?.isSymbolicLink() ?? false)
-    )
+    settings
+      .filter((l) => l.scope === "local" && l.exists)
+      .map(async (l) => {
+        const owner = root && isWithin(root, l.path) ? root : mainRoot;
+        const visibility = await visibilityOf(owner, [l.path]);
+        return (
+          visibility.get(l.path) === "tracked" ||
+          ((await lstat(dirname(l.path)).catch(() => null))?.isSymbolicLink() ?? false)
+        );
+      })
   );
   return fromRepository.some(Boolean);
 }
