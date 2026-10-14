@@ -133,7 +133,7 @@
     },
     {
       "name": "ScheduleWakeup",
-      "description": "Reschedules the next iteration of a self-paced `/loop`. Claude calls this at the end of each iteration to pick when the next one runs, between one minute and one hour out; you don't call it directly. To end the loop instead, Claude calls it with `stop: true`, which cancels the pending wakeup. The pending wakeup appears in `session_crons` in Stop hook input",
+      "description": "Reschedules the next iteration of a self-paced `/loop`. Claude calls this at the end of each iteration to pick when the next one runs, between one minute and one hour out; you don't call it directly. To end the loop instead, Claude calls it with `stop: true`, which cancels the pending wakeup. The `stop` field requires Claude Code v2.1.202 or later. The pending wakeup appears in `session_crons` in Stop hook input",
       "asks": false
     },
     {
@@ -183,12 +183,12 @@
     },
     {
       "name": "TaskOutput",
-      "description": "Removed in v2.1.277. Previously retrieved output from a background task; Claude reads a background task's output file with `Read` instead",
+      "description": "Retrieves output from a background task. Deprecated in favor of `Read` on the task's output file path. When no task matches the ID, the error lists the running background agents by ID and description. Before v2.1.203, the error named only the missing ID",
       "asks": false
     },
     {
       "name": "TaskStop",
-      "description": "Stops a running background task by ID. It also accepts an agent-team teammate or a named background agent by agent ID or name. When no task matches the ID, the error lists the running background agents by ID and description, including agents that another agent spawned",
+      "description": "Stops a running background task by ID. It also accepts an agent-team teammate or a named background agent by agent ID or name. When no task matches the ID, the error lists the running background agents by ID and description, including agents that another agent spawned. Before v2.1.203, the error listed running teammates and named agents but not background agents another agent spawned, so those couldn't be identified or stopped from the main conversation",
       "asks": false
     },
     {
