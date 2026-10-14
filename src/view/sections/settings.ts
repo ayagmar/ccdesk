@@ -43,8 +43,13 @@ export const settings = defineSection<R>({
       const lines = item.from as Line[];
       const setting = documented.get(item.key);
       const byDefault = documentedDefault(setting);
+      // A value that beats a different one in a lower file changes something, even if it is the default.
       const atDefault =
-        item.from.length > 0 && byDefault !== undefined && sameJson(item.value, byDefault.value);
+        item.from.length > 0 &&
+        byDefault !== undefined &&
+        [item.value, ...item.overridden.map((o) => o.value)].every((v) =>
+          sameJson(v, byDefault.value)
+        );
       return {
         id: `set:${item.key}`,
         section: "settings",
