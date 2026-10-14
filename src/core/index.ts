@@ -36,13 +36,14 @@ export {
   parseSettingsEdit,
 } from "./parse-edit.ts";
 export { previewHookEdit, previewPermissionEdit, previewSettingsEdit } from "./settings-edit.ts";
+export { firstError } from "./schema.ts";
 export { RefusedError, StaleError } from "./write.ts";
 
 // History: every change ccdesk saves is a backup that a core can restore by its id.
 export { listBackups, previewRestore } from "./backups.ts";
 
 // Host.
-export { openInEditor } from "./open.ts";
+export { openBrowser, openInEditor } from "./open.ts";
 
 // Claude Code's settings schema, settings catalog and hook events.
 export { REFERENCE } from "./reference.ts";

@@ -3,23 +3,23 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import { type TProperties, type TSchema } from "typebox";
 import { Compile, type Validator } from "typebox/compile";
-import { type Core } from "../core/core.ts";
-import { BackupBody, MemoryBody, OpenBody, RevisionBody, UsageBody } from "../shared/requests.ts";
-import { SESSION_PROFILES } from "../shared/types.ts";
-import { isMemoryAction } from "../core/mutations.ts";
 import {
+  type Core,
+  CountStopped,
+  firstError,
   InvalidEditError,
+  isMemoryAction,
   parseAgentEdit,
   parseHookEdit,
   parseMcpEdit,
   parsePermissionEdit,
   parseSettingsEdit,
-} from "../core/parse-edit.ts";
-import { REFERENCE } from "../core/reference.ts";
-import { CountStopped } from "../core/scan/usage.ts";
-import { firstError } from "../core/schema.ts";
-import { Watcher } from "../core/watch.ts";
-import { RefusedError } from "../core/write.ts";
+  REFERENCE,
+  RefusedError,
+  Watcher,
+} from "../core/index.ts";
+import { BackupBody, MemoryBody, OpenBody, RevisionBody, UsageBody } from "../shared/requests.ts";
+import { SESSION_PROFILES } from "../shared/types.ts";
 
 export interface ServerOptions {
   /** What the routes read and change; tests make one with fakes so nothing is launched. */

@@ -3,11 +3,9 @@ import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type Core, createCore } from "../core/core.ts";
+import { type Core, createCore, openBrowser, scanEnvFromProcess } from "../core/index.ts";
 import { type Command, HELP, parse, UsageError } from "./args.ts";
 import { checkDirectory, explainText, scanJson } from "./commands.ts";
-import { openBrowser } from "../core/open.ts";
-import { scanEnvFromProcess } from "../core/scan/env.ts";
 
 const DEV_TOKEN = "dev";
 
