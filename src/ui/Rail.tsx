@@ -27,6 +27,9 @@ interface Props {
   onToggleTheme: () => void;
   textSize: TextSize;
   onTextSize: (size: TextSize) => void;
+  /** On a wide window the rail is folded to a strip with only the button that opens it again. */
+  hidden: boolean;
+  onToggleHidden: () => void;
 }
 
 function label(path: string, home: string): string {
@@ -43,12 +46,85 @@ function emptyText(failed: boolean, query: string, folded: number): string {
   return query ? "No directory matches." : "No other directories yet.";
 }
 
+const FOLDED_KEY = "ccdesk-rail-dirs";
+
+/** Whether the main directory list was folded in this browser. */
+function readFolded(): string | null {
+  try {
+    return localStorage.getItem(FOLDED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberFolded(value: "folded" | null) {
+  try {
+    if (value) localStorage.setItem(FOLDED_KEY, value);
+    else localStorage.removeItem(FOLDED_KEY);
+  } catch {
+    // The fold just won't persist.
+  }
+}
+
 /** Where you are, named on the phone's rail bar. */
 function whereLabel(current: string | null | undefined, changesOpen: boolean, home: string) {
   if (changesOpen) return "Recent changes";
   if (current === null) return "All directories";
   if (typeof current === "string") return label(current, home);
   return "Directories";
+}
+
+/** The text size, theme and hide buttons in the brand row. */
+function Controls({
+  dark,
+  onToggleTheme,
+  textSize,
+  onTextSize,
+  hidden,
+  onToggleHidden,
+}: Pick<
+  Props,
+  "dark" | "onToggleTheme" | "textSize" | "onTextSize" | "hidden" | "onToggleHidden"
+>) {
+  return (
+    <div className="brand-controls">
+      <fieldset className="segmented small text-size" aria-label="Text size">
+        {TEXT_SIZES.map(({ size, label: name }) => (
+          <button
+            key={size}
+            type="button"
+            className={size}
+            aria-label={name}
+            title={name}
+            aria-pressed={textSize === size}
+            onClick={() => onTextSize(size)}
+          >
+            A
+          </button>
+        ))}
+      </fieldset>
+      <button
+        type="button"
+        className="icon-button theme"
+        onClick={onToggleTheme}
+        aria-label="Dark theme"
+        aria-pressed={dark}
+      >
+        <Icon name="sun" />
+      </button>
+      <button
+        type="button"
+        className="icon-button rail-hide"
+        onClick={onToggleHidden}
+        aria-expanded={!hidden}
+        aria-controls="rail-body"
+        aria-label={hidden ? "Show the directory list" : "Hide the directory list"}
+        title={hidden ? "Show the directory list" : "Hide the directory list"}
+      >
+        <Icon name="panel" />
+      </button>
+    </div>
+  );
 }
 
 export function Rail({
@@ -62,8 +138,12 @@ export function Rail({
   onToggleTheme,
   textSize,
   onTextSize,
+  hidden,
+  onToggleHidden,
 }: Props) {
   const [query, setQuery] = useState("");
+  // The main list stays as you left it in this browser; a search always shows what it matches.
+  const [showRegular, setShowRegular] = useState(() => readFolded() !== "folded");
   // Each folded group follows the open directory until the user folds or unfolds it themselves.
   const [showEphemeral, setShowEphemeral] = useState<boolean>();
   const [showGone, setShowGone] = useState<boolean>();
@@ -77,6 +157,7 @@ export function Rail({
   const regular = listed.filter((p) => p.exists && !p.ephemeral);
   const ephemeral = listed.filter((p) => p.exists && p.ephemeral);
   // A folded group opens when it holds the open directory, so the row you are on is not hidden.
+  const regularOpen = showRegular || query !== "";
   const ephemeralOpen = showEphemeral ?? ephemeral.some((p) => p.path === current);
   const goneOpen = showGone ?? gone.some((p) => p.path === current);
 
@@ -102,7 +183,7 @@ export function Rail({
 
   return (
     <nav
-      className={`rail${open ? " open" : ""}`}
+      className={`rail${open ? " open" : ""}${hidden ? " hidden" : ""}`}
       aria-label="Directories"
       onKeyDown={(e) => {
         if (e.key === "Escape") setOpen(false);
@@ -124,30 +205,14 @@ export function Rail({
           <Icon name={open ? "close" : "folder"} />
           <span className="rail-label">{here}</span>
         </button>
-        <fieldset className="segmented small text-size" aria-label="Text size">
-          {TEXT_SIZES.map(({ size, label: name }) => (
-            <button
-              key={size}
-              type="button"
-              className={size}
-              aria-label={name}
-              title={name}
-              aria-pressed={textSize === size}
-              onClick={() => onTextSize(size)}
-            >
-              A
-            </button>
-          ))}
-        </fieldset>
-        <button
-          type="button"
-          className="icon-button"
-          onClick={onToggleTheme}
-          aria-label="Dark theme"
-          aria-pressed={dark}
-        >
-          <Icon name="sun" />
-        </button>
+        <Controls
+          dark={dark}
+          onToggleTheme={onToggleTheme}
+          textSize={textSize}
+          onTextSize={onTextSize}
+          hidden={hidden}
+          onToggleHidden={onToggleHidden}
+        />
       </div>
       <div className="rail-body" id="rail-body">
         <button
@@ -187,14 +252,26 @@ export function Rail({
             aria-label="Find a directory"
           />
         </label>
-        <h2 className="rail-group">Used with Claude</h2>
-        {regular.length > 0 ? (
-          <ul className="rail-list">{regular.map(item)}</ul>
-        ) : (
-          <p className="rail-empty">
-            {emptyText(overviewFailed, query, ephemeral.length + gone.length)}
-          </p>
-        )}
+        <button
+          type="button"
+          className="rail-group toggle"
+          aria-expanded={regularOpen}
+          onClick={() => {
+            setShowRegular(!regularOpen);
+            rememberFolded(regularOpen ? "folded" : null);
+          }}
+        >
+          <Icon name="chevron" /> Used with Claude{" "}
+          <span className="rail-count">{regular.length}</span>
+        </button>
+        {regularOpen &&
+          (regular.length > 0 ? (
+            <ul className="rail-list">{regular.map(item)}</ul>
+          ) : (
+            <p className="rail-empty">
+              {emptyText(overviewFailed, query, ephemeral.length + gone.length)}
+            </p>
+          ))}
         {ephemeral.length > 0 && (
           <>
             <button
