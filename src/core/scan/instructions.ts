@@ -1,4 +1,4 @@
-import { dirname, extname, isAbsolute, join, matchesGlob, parse, posix, resolve } from "node:path";
+import { dirname, extname, isAbsolute, join, parse, posix, resolve } from "node:path";
 import { Lexer, type Token } from "marked";
 import picomatch from "picomatch";
 import {
@@ -433,15 +433,6 @@ function skip(file: Instruction, reason: string) {
   if (file.status === "skipped") return;
   file.status = "skipped";
   file.reason = reason;
-}
-
-/** An invalid pattern matches nothing. */
-export function safeMatch(path: string, glob: string): boolean {
-  try {
-    return matchesGlob(path, glob);
-  } catch {
-    return false;
-  }
 }
 
 /** Claude Code's docs suggest keeping each CLAUDE.md under this many lines. */

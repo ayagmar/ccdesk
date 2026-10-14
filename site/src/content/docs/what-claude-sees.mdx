@@ -44,4 +44,6 @@ Under the list, type a path (relative to the open directory, or absolute) and pr
 - skills whose `paths` match it;
 - the `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md` and rule files of the folders between the open directory and the file.
 
+`paths` are matched as Claude Code matches them, which differs from the docs' table; see [on match](../instructions/#status). A skill's `paths` are read from the open directory, wherever the skill is.
+
 The file does not have to exist. Paths outside the open directory get no results, because nothing from this directory's config applies there.

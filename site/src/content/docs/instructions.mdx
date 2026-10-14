@@ -26,7 +26,7 @@ Rule folders are searched in subfolders too. Instruction files in folders below 
 Each file has one of three statuses:
 
 - **loaded**: in context from the start of every session here.
-- **on match**: a rule with a `paths` field in its frontmatter. It loads only when Claude reads or edits a file that matches. A rule whose `paths` only match everything, such as `**`, loads every session instead, as Claude Code treats it like one without the field.
+- **on match**: a rule with a `paths` field in its frontmatter. It loads only when Claude reads or edits a file that matches. A rule whose `paths` only match everything, such as `**`, loads every session instead, as Claude Code treats it like one without the field. ccdesk matches `paths` the way Claude Code 2.1.296 does, with `.gitignore` rules, and in places that differs from the [docs' table](https://code.claude.com/docs/en/memory#path-specific-rules): a pattern without a slash matches at any depth, so `*.md` matches `docs/guide.md` and not only Markdown files in the project root; `**` matches folders whose names start with a dot; case does not count; and `src/**` matches a `src` folder at any depth. A project rule's patterns are read from the folder holding its `.claude`, and those of your own and managed rules from the directory the session starts in.
 - **skipped**: present, but Claude Code does not load it. The **Why** column says which rule applies.
 
 A file is skipped when:

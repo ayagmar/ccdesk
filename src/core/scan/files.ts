@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { type BigIntStats } from "node:fs";
 import { type FileHandle, lstat, open, readdir, readlink, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import ignore from "ignore";
 import { type Problem, type TextFile } from "../../shared/types.ts";
 import { jsonSyntaxError, shownJsonFile, shownText } from "../secrets.ts";
 import { isRecord, parseJson } from "./data.ts";
@@ -259,15 +260,80 @@ function toStringList(value: unknown): string[] {
 }
 
 /**
- * A rule's or skill's `paths` globs, or none when it applies everywhere: without the field, or
- * when each glob, once a trailing `/**` is cut, is empty or `**` (observed in v2.1.296; the docs
- * do not say). The globs are kept as written, since the cut ones match differently (docs:
- * memory#path-specific-rules).
+ * A rule's or skill's `paths` globs as written, or none when it applies everywhere: without the
+ * field, or when each of its patterns is empty or `**` (observed in v2.1.296; the docs do not say).
  */
 export function pathsField(value: unknown): string[] {
   const paths = toStringList(value);
-  const cut = paths.map((p) => (p.endsWith("/**") ? p.slice(0, -3) : p)).filter(Boolean);
-  return cut.every((p) => p === "**") ? [] : paths;
+  return pathPatterns(paths)
+    .flat()
+    .every((p) => p === "**")
+    ? []
+    : paths;
+}
+
+/**
+ * The glob in `globs` that matches `path`, relative to the folder the globs are read from, or
+ * none. Claude Code 2.1.296 matches with gitignore rules (the ignore package): a pattern without
+ * a slash matches at any depth, `*` and `**` match dot folders, and case does not count. The docs
+ * read differently, such as `*.md` for Markdown files in the project root only; ccdesk follows
+ * Claude Code (docs: memory#path-specific-rules).
+ */
+export function matchingGlob(globs: string[], path: string): string | undefined {
+  // Claude Code matches nothing outside the folder, nor a path that starts with two dots.
+  if (path === "" || path.startsWith("..")) return undefined;
+  const patterns = pathPatterns(globs);
+  if (!ignore().add(patterns.flat()).ignores(path)) return undefined;
+  return globs.find((_, i) =>
+    ignore()
+      .add(patterns[i] ?? [])
+      .ignores(path)
+  );
+}
+
+/**
+ * The patterns Claude Code matches for each glob: braces expanded, then a trailing `/**` cut, so
+ * `src/**` is the folder `src` at any depth (observed in v2.1.296).
+ */
+function pathPatterns(globs: string[]): string[][] {
+  const budget = { patterns: MAX_BRACE_PATTERNS, bytes: MAX_BRACE_BYTES };
+  return globs.map((glob) =>
+    expandBraces(glob, budget)
+      .map((p) => (p.endsWith("/**") ? p.slice(0, -3) : p))
+      .filter(Boolean)
+  );
+}
+
+/** A `paths` list shares this budget of expanded patterns (docs: memory#path-specific-rules). */
+const MAX_BRACE_PATTERNS = 1000;
+const MAX_BRACE_BYTES = 4 * 1024 * 1024;
+
+/**
+ * A glob with each `{a,b}` group expanded, first group first, as Claude Code does. A glob whose
+ * expansion would exceed what is left of the budget is kept as written, so its braces match
+ * nothing (docs: memory#path-specific-rules).
+ */
+function expandBraces(glob: string, budget: { patterns: number; bytes: number }): string[] {
+  if (!glob.includes("{")) return [glob];
+  const done: string[] = [];
+  const pending = [glob];
+  for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+    const group = /^([^{]*)\{([^}]+)\}(.*)$/.exec(next);
+    if (!group) {
+      done.push(next);
+      continue;
+    }
+    const [, before = "", options = "", after = ""] = group;
+    const choices = options.split(",").map((c) => c.trim());
+    budget.bytes -= next.length;
+    const count = done.length + pending.length + choices.length;
+    if (budget.bytes < 0 || count > budget.patterns || count * glob.length > budget.bytes)
+      return [glob];
+    for (let i = choices.length - 1; i >= 0; i--) pending.push(before + choices[i] + after);
+  }
+  budget.patterns -= done.length;
+  budget.bytes -= done.length * glob.length;
+  return done;
 }
 
 export function stringField(data: Record<string, unknown>, key: string): string {
