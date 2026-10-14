@@ -334,13 +334,26 @@ export class Watcher {
     for (const wake of [...subscription.waiters]) wake();
   }
 
-  /** (Re)creates the watchers, so a folder created since, such as a new .claude, is watched. */
+  /**
+   * (Re)creates the watchers, so a folder created since, such as a new .claude, is watched. The old
+   * watchers close only once the new ones have started, so a change made while they move is seen.
+   *
+   * On macOS, libuv runs every folder watch in the process through one FSEvents stream, which its
+   * own thread rebuilds whenever a watch starts or closes. Starting a watch returns before that
+   * rebuild, so a change made right after it is lost; closing one waits until the rebuilt stream,
+   * with every watch started before it, is running. Closing a spare watch last makes the new
+   * watchers live before this resolves.
+   */
   private async rewatch(dir: string, subscription: Subscription): Promise<void> {
     const extra = await Promise.all(subscription.extra.map(nearestWatchable));
     const list = await targets(this.env, dir, extra);
-    for (const w of subscription.watchers) w.close();
+    const old = subscription.watchers;
     subscription.watchers = [];
-    if (this.subscriptions.get(dir) !== subscription) return;
+    if (this.subscriptions.get(dir) !== subscription) {
+      for (const w of old) w.close();
+      return;
+    }
+    let live: string | undefined;
     for (const target of list) {
       try {
         const watcher = watch(target.path, { recursive: target.recursive }, (_event, name) => {
@@ -357,8 +370,17 @@ export class Watcher {
         });
         watcher.on("error", () => watcher.close());
         subscription.watchers.push(watcher);
+        live ??= target.path;
       } catch {
         // A folder that does not exist yet is caught by watching its parent.
+      }
+    }
+    for (const w of old) w.close();
+    if (live !== undefined && process.platform === "darwin") {
+      try {
+        watch(live).close();
+      } catch {
+        // The folder went away since; its watcher reports that change.
       }
     }
     subscription.watchingSince = Date.now();
