@@ -10,6 +10,8 @@ Ideas, not commitments: each one is something the code is already close to suppo
 
 **`ccdesk changes` and `ccdesk undo <id>`** (M). Lists Recent changes and restores one, through a core's `listBackups`, `previewRestore` and `restoreBackup`. Restoring needs a review step in the terminal: print the diff, ask, then pass the reviewed revision, as the page does.
 
+**`ccdesk forget <dir>`** (S). Forgets a directory whose folder is gone, as the page's Forget button does, through a core's `previewForget` and `forgetDirectory`: print the store, its sessions, memories and size, ask, then pass the reviewed revision. With `--all-gone`, the same for every listed directory whose folder is gone, such as the stores test runs leave behind.
+
 **`ccdesk rules --suggest [dir]`** (M). Lists the allow rules that would cover calls you approved by hand, with how many calls each covers. The counting is a core's `readUsage`; the suggestions are built by `suggestedRules` in `src/view/usage.ts`.
 
 ## In a terminal UI

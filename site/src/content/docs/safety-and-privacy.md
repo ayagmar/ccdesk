@@ -33,7 +33,7 @@ ccdesk makes no network requests of its own. It does not connect to MCP servers,
 - `~/.claude.json` is never written, even through a settings file that links to it. Claude Code rewrites it during every session. User and local MCP server changes go through Claude Code's `claude mcp` commands, which write it.
 - `~/.claude/remote-settings.json`, where Claude Code caches your organisation's server-managed settings, macOS configuration profiles and the Windows registry policy keys are not read. ccdesk only checks whether they are there, and the page names the ones it finds and how Claude Code ranks them.
 - A `MEMORY.md` that links outside its memory folder is left alone.
-- Sessions and transcripts are never deleted or changed.
+- Sessions and transcripts are never deleted or changed. Forgetting a directory whose folder is gone moves its whole store, sessions included, into `~/.claude/backups/ccdesk/`, from where Recent changes can move it back.
 
 ## Every write is reviewed and reversible
 
