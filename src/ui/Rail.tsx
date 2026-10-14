@@ -31,6 +31,14 @@ function label(path: string, home: string): string {
   return path === home ? "~ (home)" : tilde(path);
 }
 
+/** Where you are, named on the phone's rail bar. */
+function whereLabel(current: string | null | undefined, changesOpen: boolean, home: string) {
+  if (changesOpen) return "Recent changes";
+  if (current === null) return "All directories";
+  if (typeof current === "string") return label(current, home);
+  return "Directories";
+}
+
 export function Rail({
   overview,
   current,
@@ -44,6 +52,8 @@ export function Rail({
 }: Props) {
   const [query, setQuery] = useState("");
   const [showEphemeral, setShowEphemeral] = useState(false);
+  // On a phone the rail is one bar; this opens the rest of it over the page.
+  const [open, setOpen] = useState(false);
   const projects = overview?.projects ?? [];
   const match = (p: ProjectSummary) => !query || p.path.toLowerCase().includes(query.toLowerCase());
   const launch = projects.find((p) => p.path === overview?.launchDir);
@@ -56,7 +66,10 @@ export function Rail({
         type="button"
         className={`rail-item${current === p.path ? " current" : ""}${p.exists ? "" : " gone"}`}
         aria-current={current === p.path ? "page" : undefined}
-        onClick={() => onOpen(p.path)}
+        onClick={() => {
+          setOpen(false);
+          onOpen(p.path);
+        }}
         title={p.exists ? tilde(p.path) : `${tilde(p.path)} (folder no longer exists)`}
       >
         <span className="rail-label">{label(p.path, overview?.home ?? "")}</span>
@@ -65,13 +78,32 @@ export function Rail({
     </li>
   );
 
+  const here = whereLabel(current, changesOpen, overview?.home ?? "");
+
   return (
-    <nav className="rail" aria-label="Directories">
+    <nav
+      className={`rail${open ? " open" : ""}`}
+      aria-label="Directories"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setOpen(false);
+      }}
+    >
       <div className="brand">
         <a className="brand-link" href={DOCS} target="_blank" rel="noreferrer" title="ccdesk docs">
           <img src="/logo.png" width="26" height="26" alt="" />
           <span>ccdesk</span>
         </a>
+        <button
+          type="button"
+          className="rail-toggle"
+          aria-expanded={open}
+          aria-controls="rail-body"
+          title={open ? "Close the directory list" : "Open the directory list"}
+          onClick={() => setOpen(!open)}
+        >
+          <Icon name={open ? "close" : "folder"} />
+          <span className="rail-label">{here}</span>
+        </button>
         <fieldset className="segmented small text-size" aria-label="Text size">
           {TEXT_SIZES.map(({ size, label: name }) => (
             <button
@@ -97,74 +129,82 @@ export function Rail({
           <Icon name="sun" />
         </button>
       </div>
-      <button
-        type="button"
-        className={`rail-item overview-link${current === null ? " current" : ""}`}
-        aria-current={current === null ? "page" : undefined}
-        onClick={() => onOpen(null)}
-      >
-        <Icon name="folder" /> <span className="rail-label">All directories</span>
-      </button>
-      <button
-        type="button"
-        className={`rail-item overview-link${changesOpen ? " current" : ""}`}
-        aria-current={changesOpen ? "page" : undefined}
-        onClick={onChanges}
-      >
-        <Icon name="undo" /> <span className="rail-label">Recent changes</span>
-      </button>
-      {launch && (
-        <>
-          <h2 className="rail-group">Opened from</h2>
-          <ul className="rail-list">{item(launch)}</ul>
-        </>
-      )}
-      <label className="rail-filter">
-        <Icon name="search" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Find a directory"
-          aria-label="Find a directory"
-        />
-      </label>
-      <h2 className="rail-group">Used with Claude</h2>
-      {regular.length > 0 ? (
-        <ul className="rail-list">{regular.map(item)}</ul>
-      ) : (
-        <p className="rail-empty">
-          {query ? "No directory matches." : "No other directories yet."}
-        </p>
-      )}
-      {ephemeral.length > 0 && (
-        <>
-          <button
-            type="button"
-            className="rail-group toggle"
-            aria-expanded={showEphemeral}
-            onClick={() => setShowEphemeral(!showEphemeral)}
-          >
-            Temporary and test dirs <span className="rail-count">{ephemeral.length}</span>
-          </button>
-          {showEphemeral && <ul className="rail-list">{ephemeral.map(item)}</ul>}
-        </>
-      )}
-      {typeof current === "string" && (
-        <ul className="rail-keys" aria-label="Keyboard shortcuts">
-          <li>
-            <kbd>j</kbd> <kbd>k</kbd> rows
-          </li>
-          <li>
-            <kbd>1</kbd>–<kbd>{SECTIONS.length}</kbd> sections
-          </li>
-          <li>
-            <kbd>/</kbd> filter
-          </li>
-          <li>
-            <kbd>Ctrl</kbd> <kbd>K</kbd> jump anywhere
-          </li>
-        </ul>
-      )}
+      <div className="rail-body" id="rail-body">
+        <button
+          type="button"
+          className={`rail-item overview-link${current === null ? " current" : ""}`}
+          aria-current={current === null ? "page" : undefined}
+          onClick={() => {
+            setOpen(false);
+            onOpen(null);
+          }}
+        >
+          <Icon name="folder" /> <span className="rail-label">All directories</span>
+        </button>
+        <button
+          type="button"
+          className={`rail-item overview-link${changesOpen ? " current" : ""}`}
+          aria-current={changesOpen ? "page" : undefined}
+          onClick={() => {
+            setOpen(false);
+            onChanges();
+          }}
+        >
+          <Icon name="undo" /> <span className="rail-label">Recent changes</span>
+        </button>
+        {launch && (
+          <>
+            <h2 className="rail-group">Opened from</h2>
+            <ul className="rail-list">{item(launch)}</ul>
+          </>
+        )}
+        <label className="rail-filter">
+          <Icon name="search" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Find a directory"
+            aria-label="Find a directory"
+          />
+        </label>
+        <h2 className="rail-group">Used with Claude</h2>
+        {regular.length > 0 ? (
+          <ul className="rail-list">{regular.map(item)}</ul>
+        ) : (
+          <p className="rail-empty">
+            {query ? "No directory matches." : "No other directories yet."}
+          </p>
+        )}
+        {ephemeral.length > 0 && (
+          <>
+            <button
+              type="button"
+              className="rail-group toggle"
+              aria-expanded={showEphemeral}
+              onClick={() => setShowEphemeral(!showEphemeral)}
+            >
+              Temporary and test dirs <span className="rail-count">{ephemeral.length}</span>
+            </button>
+            {showEphemeral && <ul className="rail-list">{ephemeral.map(item)}</ul>}
+          </>
+        )}
+        {typeof current === "string" && (
+          <ul className="rail-keys" aria-label="Keyboard shortcuts">
+            <li>
+              <kbd>j</kbd> <kbd>k</kbd> rows
+            </li>
+            <li>
+              <kbd>1</kbd>–<kbd>{SECTIONS.length}</kbd> sections
+            </li>
+            <li>
+              <kbd>/</kbd> filter
+            </li>
+            <li>
+              <kbd>Ctrl</kbd> <kbd>K</kbd> jump anywhere
+            </li>
+          </ul>
+        )}
+      </div>
     </nav>
   );
 }

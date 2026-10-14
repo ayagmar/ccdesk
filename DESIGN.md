@@ -303,7 +303,7 @@ Timetable rows are exactly one row unit (32px) tall, with 8px cell padding, sing
 Responsive behaviour is three window steps, plus column drops keyed to the main column's own width (a container query), since the inspector takes room at any window size. Below 880px of main column, Built-in tools drops its Description column, which the inspector shows; below 680px the route strip turns vertical.
 - **1181–1400px:** the rail narrows to 220px and the inspector to 360px; the Instructions "Lines" column is dropped because the inspector already shows it.
 - **≤1180px:** the inspector leaves the grid and slides over from the right edge as a drawer when a row is selected; with nothing selected it is hidden.
-- **≤760px:** the rail stacks above the content (capped at 34% of the viewport), gutters shrink to 16px, the palette button is hidden in favour of the keyboard shortcut, each table keeps only the columns that answer "is it loaded, and who sees it", and column heads stop sticking because the header height varies.
+- **≤760px:** the rail becomes one bar above the content: the brand, a button naming where you are, and the theme switch. The button opens the whole rail as a sheet over the page, and choosing a directory or page closes it, so the main column owns the scroll. Gutters shrink to 16px, the palette button is hidden in favour of the keyboard shortcut, each table keeps only the columns that answer "is it loaded, and who sees it" (All directories keeps the directory and when it was last used), and column heads stop sticking because the header height varies.
 
 ### Named Rules
 **The One Row Rule.** Every list row is 32px. A new list joins this grid; it does not invent a taller card row.
