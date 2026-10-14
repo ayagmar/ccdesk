@@ -9,12 +9,20 @@ import { isRecord } from "./data.ts";
 import { canonicalRoot } from "./git.ts";
 import { readMemoryStore } from "./memory.ts";
 
-interface KnownProject extends ProjectSummary {
+export interface KnownProject extends ProjectSummary {
   /** The project's auto memory, read once for both the counts and the search catalog. */
   store: MemoryStore | null;
+  /** The folder under `<Claude folder>/projects` that holds its sessions and memory; null for none. */
+  storeDir: string | null;
+  /** Whether `~/.claude.json` has an entry for it under `projects`. */
+  inClaudeJson: boolean;
 }
 
-/** Directories Claude Code has been used in: its project stores, `~/.claude.json`, and the launch directory. */
+/**
+ * Directories Claude Code has been used in: its project stores, `~/.claude.json`, and the launch
+ * directory. A directory known only from `~/.claude.json` whose folder is gone is left out: it has
+ * no sessions or memory to show.
+ */
 export async function listProjects(
   env: ScanEnv,
   claudeJson: Record<string, unknown> | null,
@@ -32,6 +40,8 @@ export async function listProjects(
     byPath.set(path, {
       path,
       store,
+      storeDir,
+      inClaudeJson: knownPaths.includes(path),
       exists: await isDir(path),
       sessions: sessions.length,
       lastActive: sessions[0] ? new Date(sessions[0].mtime).toISOString() : null,
@@ -64,12 +74,17 @@ export async function listProjects(
   );
   for (const claim of claims)
     if (claim && !byPath.has(claim.path)) await add(claim.path, claim.storeDir, claim.sessions);
-  for (const path of [...knownPaths, resolve(launchDir)]) {
+  const launch = resolve(launchDir);
+  for (const path of [...knownPaths, launch]) {
     if (byPath.has(path)) continue;
+    const exists = await isDir(path);
+    if (!exists && path !== launch) continue;
     byPath.set(path, {
       path,
       store: null,
-      exists: await isDir(path),
+      storeDir: null,
+      inClaudeJson: knownPaths.includes(path),
+      exists,
       sessions: 0,
       lastActive: null,
       memories: 0,
