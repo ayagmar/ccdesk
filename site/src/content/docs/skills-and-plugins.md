@@ -16,6 +16,8 @@ Skills are folders with a `SKILL.md`. ccdesk reads them from:
 
 A plugin's skills and commands are named with the plugin first, such as `my-plugin:review`, so they never clash with yours. When a skill and a command share a name, the skill runs and the command is marked as not used. A skill in a folder below the open directory loads once Claude works on files there, whatever its `paths` say: Claude Code 2.1.296 does not check them for such a skill, and the skills docs do not say either way; when its folder name matches another skill's, the path test names it with its folder, such as `apps/web:deploy`.
 
+Outside plugins, Claude Code skips a skill folder named `synced` in any case, and a skill folder, frontmatter `name`, command file or command subfolder named `anthropic-skills` or starting with `anthropic-skills:`. ccdesk marks them as skipped, in the open directory's subfolders too. A plugin may use these names.
+
 A skill with `disable-model-invocation` is marked as one that runs only when you call it. The `skillOverrides` setting can turn a skill off, keep it out of the listing Claude sees, or show only its name; ccdesk applies it to user, project and managed skills and to commands. [What Claude sees](../what-claude-sees/) shows the skill listing as Claude gets it.
 
 When managed settings set `strictPluginOnlyCustomization` to `true`, or to a list naming `skills`, Claude Code loads skills and commands only from plugins and the managed folder: your skills and commands, synced ones included, and the project's are marked as skipped and left out of the listing.

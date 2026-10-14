@@ -1236,3 +1236,35 @@ test("managed strictPluginOnlyCustomization withholds your and the project's ski
   assert.ok(hooksOnly.inventory.skills.every((s) => s.skipped === undefined));
   assert.equal(hooksOnly.inventory.hooks[0]?.active, false);
 });
+
+test("skill folders named synced in any case, and skills and commands named anthropic-skills, are skipped outside plugins", async () => {
+  const f = makeFixture();
+  const skill = (name: string, description: string) =>
+    `---\nname: ${name}\ndescription: ${description}\n---\n`;
+  f.write("app/.claude/skills/synced/SKILL.md", skill("synced", "project synced"));
+  f.write("home/.claude/skills/Synced/SKILL.md", skill("mine", "personal Synced"));
+  f.write("app/.claude/skills/anthropic-skills/SKILL.md", skill("helper", "reserved folder"));
+  f.write("app/.claude/skills/pdf/SKILL.md", skill("anthropic-skills:pdf", "reserved name"));
+  f.write("app/.claude/skills/deploy/SKILL.md", skill("deploy", "kept"));
+  f.write("app/.claude/commands/anthropic-skills.md", "---\ndescription: reserved command\n---\n");
+  f.write("app/.claude/commands/anthropic-skills/x.md", "---\ndescription: reserved folder\n---\n");
+  f.write("app/.claude/commands/ship.md", "---\ndescription: ship it\n---\n");
+  // A plugin may use the name (docs: skills#names-reserved-for-synced-skills).
+  f.json("home/.claude/plugins/installed_plugins.json", {
+    plugins: { "anthropic-skills@market": [{ scope: "user", installPath: f.at("plugins/as") }] },
+  });
+  f.write("plugins/as/skills/anthropic-skills/SKILL.md", skill("anthropic-skills", "plugin skill"));
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  const loaded = (entries: typeof view.inventory.skills) =>
+    entries.filter((e) => !e.skipped).map((e) => e.id ?? e.name);
+  assert.deepEqual(loaded(view.inventory.skills).sort(), [
+    "anthropic-skills:anthropic-skills",
+    "deploy",
+  ]);
+  assert.equal(view.inventory.skills.filter((s) => s.skipped).length, 4);
+  assert.deepEqual(loaded(view.inventory.commands), ["ship"]);
+  const listing = view.context.find((b) => b.kind === "skills")?.text ?? "";
+  assert.doesNotMatch(listing, /synced|Synced|reserved/);
+});

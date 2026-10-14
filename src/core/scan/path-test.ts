@@ -23,7 +23,7 @@ import {
   rulePaths,
   ruleTarget,
 } from "./instructions.ts";
-import { applySkillOverrides, readSkill } from "./inventory.ts";
+import { applySkillOverrides, readSkill, reservedSkillNote } from "./inventory.ts";
 import { pluginOnlySurfaces } from "./plugins.ts";
 
 /** Globs are written with forward slashes on every platform. */
@@ -165,7 +165,7 @@ async function nestedSkills(test: FolderTest, folder: string): Promise<PathMatch
   if (skillsLocked) return matches;
   for (const name of await listDir(join(folder, ".claude", "skills"))) {
     const skill = await readSkill(env, join(folder, ".claude", "skills", name), "project");
-    if (!skill) continue;
+    if (!skill || reservedSkillNote(skill)) continue;
     applySkillOverrides([skill], overrides);
     if (skill.listed === false) continue;
     // A nested skill whose folder name another skill has is called by its folder as well, as

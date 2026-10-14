@@ -169,6 +169,27 @@ export async function readSkill(
   return entry;
 }
 
+/** Whether a name is in the `anthropic-skills` namespace, which Claude Code keeps for synced skills. */
+function isReservedName(name: string): boolean {
+  return name === "anthropic-skills" || name.startsWith("anthropic-skills:");
+}
+
+const RESERVED_NOTE =
+  "Claude Code keeps the name anthropic-skills for skills synced from claude.ai and skips this one";
+
+/**
+ * Why Claude Code skips a skill outside a plugin for its name, or null: a folder named `synced` in
+ * any case, or a folder or frontmatter name in the `anthropic-skills` namespace
+ * (docs: skills#where-skills-live, skills#names-reserved-for-synced-skills).
+ */
+export function reservedSkillNote(skill: Entry): string | null {
+  const folder = basename(skill.folder ?? "");
+  if (folder.toLowerCase() === "synced")
+    return "Claude Code keeps the folder name synced for skills synced from claude.ai and skips this one";
+  if (isReservedName(folder) || isReservedName(skill.name)) return RESERVED_NOTE;
+  return null;
+}
+
 /** `<name>/SKILL.md` folders, or one folder holding SKILL.md itself. */
 async function readSkills(
   env: ScanEnv,
@@ -182,9 +203,12 @@ async function readSkills(
   }
   const out: Entry[] = [];
   for (const name of await listDir(dir)) {
-    if (name.startsWith(".") || (scope === "user" && name === "synced")) continue;
+    if (name.startsWith(".")) continue;
     const skill = await readSkill(env, join(dir, name), scope, options);
-    if (skill) out.push(skill);
+    if (!skill) continue;
+    const reserved = scope === "plugin" ? null : reservedSkillNote(skill);
+    if (reserved) skill.skipped = reserved;
+    out.push(skill);
   }
   return out;
 }
@@ -421,6 +445,50 @@ export function applySkillOverrides(entries: Entry[], overrides: unknown) {
   }
 }
 
+/**
+ * Skills from the managed folder, yours, synced ones and the project's, and the one that runs for
+ * each name. The same name in two of managed, yours and the project runs the first, in that order
+ * (docs: skills#resolve-skills-that-share-a-name).
+ */
+async function readLocalSkills(
+  env: ScanEnv,
+  projectDir: string,
+  gitRoot: string | null,
+  locked: boolean,
+  problems: Problem[]
+): Promise<{ skills: Entry[]; winners: Map<string, Entry> }> {
+  // Project skills come from the start directory and every parent up to the repository root.
+  const skillDirs: [string, Source][] = [
+    [join(env.managedDir, ".claude", "skills"), "managed"],
+    [join(env.claudeDir, "skills"), "user"],
+    ...(await listDir(join(env.claudeDir, "skills", "synced")))
+      .filter((bucket) => !bucket.startsWith("."))
+      .map((bucket): [string, Source] => [join(env.claudeDir, "skills", "synced", bucket), "user"]),
+    ...(await projectFolders(env, projectDir, gitRoot, "skills")).map((dir): [string, Source] => [
+      dir,
+      "project",
+    ]),
+  ];
+  const skills: Entry[] = [];
+  const seenFolders = new Set<string>();
+  const winners = new Map<string, Entry>();
+  for (const [dir, scope] of skillDirs) {
+    for (const skill of await readSkills(env, dir, scope, { problems })) {
+      // A folder that several locations link to loads once.
+      const real = skill.realPath ?? skill.folder ?? skill.path;
+      if (seenFolders.has(real)) continue;
+      seenFolders.add(real);
+      if (!skill.skipped && locked && scope !== "managed") skill.skipped = pluginOnlyNote("skills");
+      skills.push(skill);
+      if (skill.skipped) continue;
+      const winner = winners.get(skill.name);
+      if (winner && winner.scope !== skill.scope) skill.shadowedBy = winner.path;
+      else if (!winner) winners.set(skill.name, skill);
+    }
+  }
+  return { skills, winners };
+}
+
 export async function readInventory(input: InventoryInput): Promise<Inventory> {
   const { env, projectDir, gitRoot, layers, problems } = input;
   const locked = pluginOnlySurfaces(input.managed);
@@ -437,47 +505,21 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
       ? await readFileEntries(env, join(projectClaude, sub), "project", { separator, problems })
       : []),
   ];
-
-  // Project skills come from the start directory and every parent up to the repository root.
-  const skillDirs: [string, Source][] = [
-    [join(env.managedDir, ".claude", "skills"), "managed"],
-    [join(env.claudeDir, "skills"), "user"],
-    ...(await listDir(join(env.claudeDir, "skills", "synced")))
-      .filter((bucket) => !bucket.startsWith("."))
-      .map((bucket): [string, Source] => [join(env.claudeDir, "skills", "synced", bucket), "user"]),
-    ...(await projectFolders(env, projectDir, gitRoot, "skills")).map((dir): [string, Source] => [
-      dir,
-      "project",
-    ]),
-  ];
-  const skills: Entry[] = [];
-  const seenFolders = new Set<string>();
-  // The same name in two of managed, yours and the project runs the first, in that order
-  // (docs: skills#resolve-skills-that-share-a-name).
-  const winners = new Map<string, Entry>();
-  for (const [dir, scope] of skillDirs) {
-    for (const skill of await readSkills(env, dir, scope, { problems })) {
-      // A folder that several locations link to loads once.
-      const real = skill.realPath ?? skill.folder ?? skill.path;
-      if (seenFolders.has(real)) continue;
-      seenFolders.add(real);
-      if (locked.has("skills") && scope !== "managed") {
-        skill.skipped = pluginOnlyNote("skills");
-        skills.push(skill);
-        continue;
-      }
-      const winner = winners.get(skill.name);
-      if (winner && winner.scope !== skill.scope) skill.shadowedBy = winner.path;
-      else if (!winner) winners.set(skill.name, skill);
-      skills.push(skill);
-    }
-  }
+  const { skills, winners } = await readLocalSkills(
+    env,
+    projectDir,
+    gitRoot,
+    locked.has("skills"),
+    problems
+  );
 
   // A command file is a skill too: one with disable-model-invocation is not listed to Claude.
   const commands = await files("commands", ":");
   // A skill of the same name runs instead of it (docs: skills#resolve-skills-that-share-a-name).
   for (const command of commands) {
-    if (locked.has("skills")) command.skipped = pluginOnlyNote("skills");
+    // A command file or subfolder named in the anthropic-skills namespace does not load.
+    if (isReservedName(command.name)) command.skipped = RESERVED_NOTE;
+    else if (locked.has("skills")) command.skipped = pluginOnlyNote("skills");
     if (isTrue(parseFrontmatter(command.text).data["disable-model-invocation"]))
       command.listed = false;
     const skill = winners.get(command.name);
