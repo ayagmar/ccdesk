@@ -1976,6 +1976,8 @@ button:disabled {
 
 .sharing dd {
   flex: 1 1 0;
+  /* Room for a short path on one line; with less beside the label, the files go under it. */
+  min-width: min(100%, 28ch);
   display: flex;
   flex-wrap: wrap;
   gap: 2px 14px;
