@@ -71,3 +71,16 @@ export function firstSentence(text: string): [first: string, rest: string] {
 export function plural(n: number, word: string, many = `${word}s`): string {
   return `${n} ${n === 1 ? word : many}`;
 }
+
+/** A path typed in full: absolute, or under the home folder with ~. */
+export function typedPath(query: string, home: string | undefined): string | null {
+  const q = query.trim();
+  if (home && (q === "~" || q.startsWith("~/"))) return withoutTrailingSlash(home + q.slice(1));
+  return q.startsWith("/") || /^[A-Za-z]:[\\/]/.test(q) ? withoutTrailingSlash(q) : null;
+}
+
+/** ".../acme-api/" as ".../acme-api", so it matches the directory it names; a root keeps its slash. */
+function withoutTrailingSlash(path: string): string {
+  const trimmed = path.replace(/[\\/]+$/, "");
+  return trimmed === "" || /^[A-Za-z]:$/.test(trimmed) ? path : trimmed;
+}
