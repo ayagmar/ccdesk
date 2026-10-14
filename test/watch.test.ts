@@ -59,6 +59,19 @@ test("adding a rule to the managed folder wakes a page waiting for changes", asy
   assert.equal((await waiting).changed, true);
 });
 
+test("editing a skill in the managed folder wakes a page waiting for changes", async () => {
+  const f = makeFixture();
+  mkdirSync(f.at("app"), { recursive: true });
+  f.write("etc/claude-code/.claude/skills/deploy/SKILL.md", "---\ndescription: one\n---\n");
+  const watcher = watcherFor(f);
+  await settled(watcher, f.at("app"));
+
+  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  f.write("etc/claude-code/.claude/skills/deploy/SKILL.md", "---\ndescription: two\n---\n");
+
+  assert.equal((await waiting).changed, true);
+});
+
 test("creating a file CLAUDE.md imports but that was missing wakes a page waiting for changes", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "@docs/new.md\n");
