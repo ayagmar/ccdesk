@@ -207,7 +207,7 @@ async function count(
   const folders = repository ? checkouts : [dir];
   const projects = join(env.claudeDir, "projects");
   const storeNames = await listDir(projects);
-  const tally: Tally = { taken: new Set(), calls: [], ids: new Set(), sessions: 0 };
+  const tally: Tally = { taken: new Set(), calls: [], ids: new Map(), sessions: 0 };
   const named = env.projectDirName;
   for (const folder of folders) {
     const own = storeDirName(folder);
@@ -343,8 +343,8 @@ async function sameFile(a: string, b: string): Promise<boolean> {
 interface Tally {
   taken: Set<string>;
   calls: Call[];
-  /** The ids of the calls taken, so a call copied into another transcript counts once. */
-  ids: Set<string>;
+  /** Where each call taken sits in `calls`, by id, so a call copied into another transcript counts once. */
+  ids: Map<string, number>;
   sessions: number;
 }
 
@@ -370,12 +370,33 @@ async function countStore(
     if (start ? !startsHere(start) : !ownStore) continue;
     tally.taken.add(file);
     for (const call of (await transcript(transcripts, env, file, signal))?.calls ?? []) {
-      if (tally.ids.has(call.id)) continue;
-      tally.ids.add(call.id);
-      tally.calls.push(call);
+      take(tally, call);
     }
     if (file === session) tally.sessions++;
   }
+}
+
+/**
+ * Adds a call to the tally once per id. A copy in another transcript may lack the result lines
+ * the other has, so the call keeps what either knows: your answer, and whether it failed. Calls
+ * are shared through the cache, so the merge is a new object.
+ */
+function take(tally: Tally, call: Call): void {
+  const kept = tally.ids.get(call.id);
+  if (kept === undefined) {
+    tally.ids.set(call.id, tally.calls.push(call) - 1);
+    return;
+  }
+  const known = tally.calls[kept];
+  if (!known) return;
+  const byYou = known.byYou ?? call.byYou;
+  const failed = known.failed || call.failed;
+  if (byYou !== known.byYou || failed !== known.failed)
+    tally.calls[kept] = {
+      ...known,
+      ...(byYou === undefined ? {} : { byYou }),
+      ...(failed ? { failed } : {}),
+    };
 }
 
 /** Drops the least recently counted transcripts over the limit, keeping those just counted. */
