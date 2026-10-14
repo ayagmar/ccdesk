@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { type AgentEdit, type Change, type SettingsEditPreview } from "../shared/types.ts";
 import { isUserClaudeFolder, type ScanEnv } from "./scan/env.ts";
@@ -42,6 +43,9 @@ async function targetOf(env: ScanEnv, edit: AgentEdit): Promise<string> {
   const file = edit.create.file.replace(/\.md$/i, "");
   if (!/^[\w][\w.-]*$/.test(file))
     throw new RefusedError("A file name has letters, digits, '.', '-' or '_', and no folders.");
+  // Writing a project agent into a folder that is gone would create the folder again.
+  if (scope === "project" && !(await stat(dir).catch(() => null))?.isDirectory())
+    throw new RefusedError(`${dir} is not a directory on this machine.`);
   const base = (await gitRoot(dir)) ?? dir;
   if (scope === "project" && (await isUserClaudeFolder(env, base)))
     throw new RefusedError(
