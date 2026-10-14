@@ -2641,8 +2641,9 @@ fieldset.field {
   white-space: nowrap;
 }
 
-.catalog-files .bullet + .bullet {
-  margin-left: 2px;
+.catalog-letters {
+  font-family: var(--mono);
+  font-size: var(--text-sm);
 }
 
 .docs-text > :first-child {

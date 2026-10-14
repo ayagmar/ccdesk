@@ -1,7 +1,7 @@
 import { EDITABLE_SCOPES, HIGHEST_FIRST } from "../../shared/scopes.ts";
 import { plain, valueHere } from "../../view/sections/catalog.ts";
 import { type RowOf } from "../../view/sections/types.ts";
-import { type Line, lineName } from "../../view/lines.ts";
+import { LINES, type Line, lineName } from "../../view/lines.ts";
 import { Bullet } from "../Bullet.tsx";
 import { preview, tildeAll } from "../format.ts";
 import { Icon } from "../Icon.tsx";
@@ -83,9 +83,16 @@ export const catalog: SectionUi<R> = {
           {s.scopes.length === 0 ? (
             <span className="muted small">~/.claude.json</span>
           ) : (
-            HIGHEST_FIRST.filter((scope) => s.scopes.includes(scope)).map((scope) => (
-              <Bullet key={scope} line={scope} hollow />
-            ))
+            // Plain letters, not bullets: a bullet means a value came from that scope, and a
+            // hollow one that it is there but not in force; these are only where it may be read.
+            <span className="catalog-letters muted" title={`Read from ${filesText(s.scopes)}`}>
+              <span aria-hidden="true">
+                {HIGHEST_FIRST.filter((scope) => s.scopes.includes(scope))
+                  .map((scope) => LINES.find((l) => l.line === scope)?.letter)
+                  .join(" ")}
+              </span>
+              <span className="visually-hidden">{filesText(s.scopes)}</span>
+            </span>
           )}
         </td>
         <td className="mono value">
