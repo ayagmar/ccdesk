@@ -9,7 +9,7 @@ import { type ScanEnv } from "./scan/env.ts";
 import { isCredentials } from "./scan/files.ts";
 import { scanDirectory, scanOverview } from "./scan/index.ts";
 import { testPath } from "./scan/path-test.ts";
-import { usageCounter } from "./scan/usage.ts";
+import { type RuleInEffect, usageCounter } from "./scan/usage.ts";
 import {
   previewHookEdit,
   previewPermissionEdit,
@@ -25,6 +25,7 @@ import {
   type McpEdit,
   type MemoryAction,
   type PermissionEdit,
+  type SessionProfile,
   type SettingsEdit,
 } from "../shared/types.ts";
 
@@ -47,6 +48,7 @@ export function createCore(env: ScanEnv, options: CoreOptions = {}) {
   const run = options.runClaude ?? claudeRunner(env);
   const open = options.openFile ?? ((path: string) => openInEditor(path, env));
   const queue = changeQueue();
+  const countUsage = usageCounter();
   const bound =
     <A extends unknown[], R>(read: (env: ScanEnv, ...args: A) => R) =>
     (...args: A) =>
@@ -66,7 +68,23 @@ export function createCore(env: ScanEnv, options: CoreOptions = {}) {
     scanDirectory: bound(scanDirectory),
     compareSettings: bound(compareSettings),
     testPath: bound(testPath),
-    readUsage: bound(usageCounter()),
+    /**
+     * Counts the tool calls in the sessions started in `dir`, and the Read calls on each memory file
+     * of the store a session under `profile` uses there. The memory files come from a scan of `dir`,
+     * never from the caller, so no other file's reads can be asked about. Each count scans `dir` once.
+     */
+    readUsage: async (
+      dir: string,
+      rules: RuleInEffect[],
+      {
+        profile = "interactive",
+        ...counting
+      }: { profile?: SessionProfile; signal?: AbortSignal; maxCachedCalls?: number } = {}
+    ) => {
+      const view = await scanDirectory(env, dir, profile);
+      const memories = view.memory.memories.map((m) => m.path);
+      return countUsage(env, dir, rules, { ...counting, memories });
+    },
 
     previewSettingsEdit: bound(previewSettingsEdit),
     saveSettingsEdit: (edit: SettingsEdit, revision: string) =>
