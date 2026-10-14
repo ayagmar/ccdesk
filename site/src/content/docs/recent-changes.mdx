@@ -32,7 +32,7 @@ A change that created its file has no earlier version, so its review shows the f
 
 ## Forgotten directories
 
-Forgetting a directory whose folder is gone is listed as **Directory forgotten**, with the directory and its store folder under `~/.claude/projects`. The store is kept whole in the change's backup folder. **Review restore** says how many sessions and memory files it holds, and **Move the store back** puts it back where it was, so the directory is listed again. The restore is refused while a store of that name exists, which happens when Claude Code was used in that directory again since; move that folder aside first. Once the store is back, the change stays listed and its review says so.
+Forgetting a directory whose folder is gone is listed as **Directory forgotten**, with the directory and its store folder under `~/.claude/projects`. The store is kept whole in the change's backup folder. **Review restore** says how many sessions and memory files it holds, and **Move the store back** puts it back where it was, so the directory is listed again. The restore is refused while a folder of that name exists in `~/.claude/projects`, such as one Claude Code made when the directory was used again, or one a memory restore made; move that folder aside first. Once the store is back, the change stays listed and its review says so.
 
 ## When a restore is refused
 
