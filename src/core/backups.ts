@@ -80,6 +80,7 @@ export async function listBackups(
       createdAt: manifest.createdAt,
       created: manifest.before === revisionOf(null),
       ...(manifest.after === "pending" || manifest.after === "partial" ? { incomplete: true } : {}),
+      ...(manifest.projectPath ? { projectPath: manifest.projectPath } : {}),
     });
   }
   return { changes, more: false };
@@ -318,22 +319,30 @@ export function restoreBackup(
     if (blocked) throw new RefusedError(blocked);
     if (planRevision(plan) !== expectedRevision)
       throw new RefusedError("The file changed since you reviewed this restore; review it again.");
-    const { target } = manifest;
+    const { target, projectPath } = manifest;
     if (saved === null) {
-      await recordChange(env, { kind: manifest.kind, target, before: current }, async () => {
-        if (!(await removeExactly(target, revisionOf(current))))
-          throw new StaleError(
-            `${target} changed while ccdesk was removing it; nothing was removed. Review it again.`
-          );
-        return { revision: revisionOf(null) };
-      });
+      await recordChange(
+        env,
+        { kind: manifest.kind, target, before: current, projectPath },
+        async () => {
+          if (!(await removeExactly(target, revisionOf(current))))
+            throw new StaleError(
+              `${target} changed while ccdesk was removing it; nothing was removed. Review it again.`
+            );
+          return { revision: revisionOf(null) };
+        }
+      );
       return { target };
     }
     if (manifest.kind !== "memory-delete") {
-      await recordChange(env, { kind: manifest.kind, target, before: current }, async () => {
-        await writeAtomic(env, target, saved, revisionOf(current));
-        return { revision: revisionOf(saved) };
-      });
+      await recordChange(
+        env,
+        { kind: manifest.kind, target, before: current, projectPath },
+        async () => {
+          await writeAtomic(env, target, saved, revisionOf(current));
+          return { revision: revisionOf(saved) };
+        }
+      );
       return { target };
     }
     // A memory and its MEMORY.md lines come back together: when the index cannot be written, the
@@ -341,10 +350,14 @@ export function restoreBackup(
     // they were.
     const created =
       current === null
-        ? await recordChange(env, { kind: "memory-restore", target, before: null }, async () => {
-            await writeAtomic(env, target, saved, revisionOf(null));
-            return { revision: revisionOf(saved) };
-          })
+        ? await recordChange(
+            env,
+            { kind: "memory-restore", target, before: null, projectPath },
+            async () => {
+              await writeAtomic(env, target, saved, revisionOf(null));
+              return { revision: revisionOf(saved) };
+            }
+          )
         : null;
     try {
       if (index && index.missing.length > 0) {
@@ -353,7 +366,7 @@ export function restoreBackup(
         const next = `${[...lines, ...index.missing].join("\n")}\n`;
         await recordChange(
           env,
-          { kind: "memory-index", target: index.path, before: index.text },
+          { kind: "memory-index", target: index.path, before: index.text, projectPath },
           async () => {
             await writeAtomic(env, index.path, next, revisionOf(index.text));
             return { revision: revisionOf(next) };

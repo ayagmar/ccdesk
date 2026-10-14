@@ -87,8 +87,15 @@ export const RevisionBody = Type.Object({ revision: Type.String() });
 /** Count which permission rules the transcripts under `path` used. */
 export const UsageBody = Type.Object({ path: Type.String(), rules: Type.Array(Rule) });
 
-/** Preview a memory change; changing it also sends the revision. */
-export const MemoryBody = Type.Object({ action: Type.String(), path: Type.String() });
+/**
+ * Preview a memory change; changing it also sends the revision, and the directory the store is
+ * saved for so Recent changes can name it.
+ */
+export const MemoryBody = Type.Object({
+  action: Type.String(),
+  path: Type.String(),
+  projectPath: Type.Optional(Type.String()),
+});
 
 export const OpenBody = Type.Object({ path: Type.String() });
 

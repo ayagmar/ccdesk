@@ -826,7 +826,8 @@ input::placeholder {
 
 .tt .bullet,
 .palette .bullet,
-.layers .bullet {
+.layers .bullet,
+.change-store .bullet {
   width: 20px;
   height: 20px;
   font-size: 10.5px;
@@ -2971,6 +2972,24 @@ pre.diff span {
 
 .change-file .muted {
   font-size: 12.5px;
+}
+
+/*
+ * A memory's store is named after its directory, so the directory is shown and the folder only in
+ * the opened change. Inline, so a long directory wraps under the words rather than squeezing them.
+ */
+.change-store {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.change-folder {
+  margin: 6px 0 0;
+}
+
+.change-store .bullet {
+  vertical-align: middle;
+  margin-right: 2px;
 }
 
 .change-row .num {

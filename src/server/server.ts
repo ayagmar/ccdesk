@@ -155,9 +155,9 @@ function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
       return core.previewMemoryChange(action, path);
     }),
     post("/api/memory/change", async ({ body }) => {
-      const { action, path } = checked(memoryBody, body);
+      const { action, path, projectPath } = checked(memoryBody, body);
       if (!isMemoryAction(action)) throw new RequestError(400, "unknown memory action");
-      return core.changeMemory(action, path, revision(body));
+      return core.changeMemory(action, path, revision(body), projectPath);
     }),
     post("/api/open", async ({ body }) => {
       const { path } = checked(openBody, body);

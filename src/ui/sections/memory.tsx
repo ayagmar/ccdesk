@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { storeDirName } from "../../shared/memory.ts";
-import { type MemoryAction, type MemoryChangePreview } from "../../shared/types.ts";
+import {
+  type MemoryAction,
+  type MemoryChangePreview,
+  type MemoryStore,
+} from "../../shared/types.ts";
 import { type RowOf } from "../../view/sections/types.ts";
 import { api, errorText } from "../api.ts";
 import { Bullet } from "../Bullet.tsx";
@@ -159,7 +163,12 @@ function MemoryReview({
               setBusy(true);
               // Closed either way: a failure is reported in the toast, and reopening reviews afresh.
               void actions
-                .onChange(() => api.changeMemory(action, path, preview.revision), message, select)
+                .onChange(
+                  () =>
+                    api.changeMemory(action, path, preview.revision, savedFor(actions.view.memory)),
+                  message,
+                  select
+                )
                 .finally(onClose);
             }}
           >
@@ -202,10 +211,22 @@ function MemoryFiles({
   ));
 }
 
+/**
+ * The directory a store is saved for: none for one named by autoMemoryDirectory or
+ * CLAUDE_CODE_PROJECT_DIR_NAME, which every directory may share.
+ */
+function savedFor(store: MemoryStore): string | undefined {
+  if (store.custom || !store.projectPath) return undefined;
+  const name = store.dir.split(/[/\\]/).at(-2);
+  return storeDirName(store.projectPath) === name ? store.projectPath : undefined;
+}
+
 function MemoryDetails({ row, actions }: { row: R; actions: Actions }) {
   const m = row.item;
+  const store = actions.view.memory;
   // A store set by autoMemoryDirectory: ccdesk shows it but only changes stores under ~/.claude.
-  const readOnly = actions.view.memory.custom === true;
+  const readOnly = store.custom === true;
+  const saved = savedFor(store);
   const [confirming, setConfirming] = useState(false);
   const [adding, setAdding] = useState(false);
   const elsewhere = actions.overview?.sharedMemories.find((s) => s.name === m.name)?.stores ?? [];
@@ -219,6 +240,11 @@ function MemoryDetails({ row, actions }: { row: R; actions: Actions }) {
         <Field label="Type">
           <TypeName type={m.type} />
         </Field>
+        {saved && (
+          <Field label="Saved for">
+            <span className="mono wrap">{tilde(saved)}</span>
+          </Field>
+        )}
         <Field label="File">
           <PathValue path={m.path} />
         </Field>

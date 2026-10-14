@@ -26,7 +26,7 @@ After a save or a delete, a toast at the bottom of the page offers **Undo** for 
 
 Press **Review restore** on a change to see the diff from the file as it is now to the version in the backup, then **Restore this version**. Before replacing the file, ccdesk backs up its current text, so a restore is itself a change you can undo.
 
-Restoring a deleted memory also puts its line back in `MEMORY.md`.
+Restoring a deleted memory also puts its line back in `MEMORY.md`. A memory change names the directory the memory is saved for, and opening it shows the memory folder under `~/.claude/projects`. Changes ccdesk could not tie to one directory show the folder instead: older ones, and those to a memory folder that `autoMemoryDirectory` or `CLAUDE_CODE_PROJECT_DIR_NAME` sets, which every directory may share.
 
 A change that created its file has no earlier version, so its review shows the file going away and the button reads **Remove this file**. ccdesk removes it only while it is exactly what ccdesk wrote, and backs it up first, so the removal shows up here as a change you can restore.
 
