@@ -23,6 +23,7 @@ ccdesk makes no network requests of its own. It does not connect to MCP servers,
 - In an MCP server's `args`, the value after a flag such as `--token`, `--api-key`, `--access-token` or `--client-secret`, a header's value after `--header` or `-H` (as `mcp-remote` takes `Authorization: Bearer …`), and a value that starts like a common key (`sk-`, `ghp_`, `xoxb-`), are shown as `•••`. The [MCP servers](../mcp-servers/) page has the full list.
 - `allowedMcpServers` and `deniedMcpServers` entries match a server by repeating its command or URL, so a `serverCommand`'s arguments and a `serverUrl`'s user, password and query are hidden the same way. ccdesk still matches them against the real values.
 - A settings file reached through an `@import` or a link is shown with the same values hidden.
+- The [comparison page](../settings/#comparing-two-directories) compares the real values, so it says whether two hidden values are the same, never what they are.
 - An error about a JSON file that does not parse gives only the line and column, never the text around it.
 - ccdesk never changes hidden values. An edit that would touch them is refused, and so is a restore that would bring back different ones. Removing an MCP server with hidden values is allowed.
 
