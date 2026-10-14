@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type Overview } from "../shared/types.ts";
 import { Bullet } from "./Bullet.tsx";
-import { tilde } from "./format.ts";
+import { tilde, typedPath } from "./format.ts";
 import { Icon } from "./Icon.tsx";
 import { pageContext, sectionOf } from "./sections/index.ts";
 import { type Row } from "../view/sections/types.ts";
@@ -33,13 +33,6 @@ interface Props {
   onSelectRow: (id: string) => void;
   onOpenMemory: (projectPath: string, path: string) => void;
   onCompare: (from: string, to: string) => void;
-}
-
-/** A path typed in full: absolute, or under the home folder with ~. */
-function typedPath(query: string, home: string | undefined): string | null {
-  const q = query.trim();
-  if (home && (q === "~" || q.startsWith("~/"))) return home + q.slice(1);
-  return q.startsWith("/") || /^[A-Za-z]:[\\/]/.test(q) ? q : null;
 }
 
 /**

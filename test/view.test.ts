@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { REFERENCE, scanDirectory } from "../src/core/index.ts";
 import { buildRows, formatter, routeStops, SECTIONS, type ViewContext } from "../src/view/index.ts";
+import { typedPath } from "../src/view/format.ts";
 import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
 /** A project with something in every section of the directory page. */
@@ -82,4 +83,18 @@ test("the route strip flags a scope whose settings file cannot be read instead o
   // A scope with nothing in it stays an idle stop.
   const managed = stops.find((s) => s.line === "managed");
   assert.deepEqual([managed?.unreadable, managed?.active], [0, false]);
+});
+
+test("a folder typed with a trailing separator names the same folder, and a root stays a root", () => {
+  const cases: [string, string | null][] = [
+    ["~/", "/home/me"],
+    ["~/code/acme-api/", "/home/me/code/acme-api"],
+    ["/a/b//", "/a/b"],
+    ["/", "/"],
+    ["C:\\", "C:\\"],
+    ["C:/x/", "C:/x"],
+    ["C:\\code\\acme\\", "C:\\code\\acme"],
+    ["acme-api/", null],
+  ];
+  for (const [typed, path] of cases) assert.equal(typedPath(typed, "/home/me"), path, typed);
 });
