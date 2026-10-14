@@ -169,6 +169,8 @@ export const BACKUP_KINDS = [
   "memory-restore",
   // A user or local MCP server change made through `claude mcp`, which ccdesk cannot undo.
   "mcp-claude",
+  // A directory whose folder is gone, its store moved into the backup folder.
+  "directory-forget",
 ] as const;
 
 export type BackupKind = (typeof BACKUP_KINDS)[number];
@@ -184,7 +186,10 @@ export interface BackupSummary {
   created: boolean;
   /** The change was interrupted or failed halfway; the backup still holds the earlier text. */
   incomplete?: boolean;
-  /** For a memory change: the directory its store is saved for, when ccdesk recorded it. */
+  /**
+   * For a memory change: the directory its store is saved for, when ccdesk recorded it. For a
+   * forgotten directory: that directory.
+   */
   projectPath?: string;
 }
 
@@ -213,6 +218,28 @@ export interface MemoryChangePreview {
   revision: string;
 }
 
+/**
+ * What forgetting a directory whose folder is gone would take away, reviewed before anything moves.
+ * Its store moves into the change's backup folder, so Recent changes can move it back.
+ */
+export interface ForgetPreview {
+  /** The directory. */
+  path: string;
+  /** Its store folder under `<Claude folder>/projects`: sessions and auto memory. */
+  store: string;
+  sessions: number;
+  memories: number;
+  /** The size of everything in the store. */
+  bytes: number;
+  /**
+   * `~/.claude.json` has an entry for the directory (its trust answer, local MCP servers). ccdesk
+   * does not change that file, so the entry stays; with no store left the directory is not listed.
+   */
+  claudeJsonEntry: boolean;
+  /** Fingerprint of the store as reviewed; forgetting requires it unchanged. */
+  revision: string;
+}
+
 /** What restoring a backup would change, shown as a diff before anything is written. */
 export interface RestorePreview {
   id: string;
@@ -235,6 +262,11 @@ export interface RestorePreview {
   createsFolder?: string;
   /** For a deleted memory: the lines put back into MEMORY.md. */
   indexLines?: string[];
+  /**
+   * For a forgotten directory: the store folder the restore moves back. `after` then says what it
+   * holds, and `before` is null.
+   */
+  movesBack?: string;
   /**
    * For a change made through `claude mcp`, which ccdesk cannot undo: the commands that put it
    * back, values hidden. `before` and `after` are then the servers before and after the change.

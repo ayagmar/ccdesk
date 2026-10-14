@@ -15,7 +15,8 @@ import { join } from "node:path";
 import { after, before, beforeEach, test } from "node:test";
 import { createCore, RefusedError, revisionOf, Watcher } from "../src/core/index.ts";
 import { createCcdeskServer } from "../src/server/server.ts";
-import { type Usage } from "../src/shared/types.ts";
+import { storeDirName } from "../src/shared/memory.ts";
+import { type ForgetPreview, type Overview, type Usage } from "../src/shared/types.ts";
 import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
 const TOKEN = "test-token";
@@ -2506,4 +2507,35 @@ test("only agents shown here can be changed, and a new one cannot leave its agen
   });
   assertRefused(escaping, 409, /A file name has letters, digits/);
   assert.equal(readFileSync(other, "utf8"), "keep me\n");
+});
+
+test("a directory whose folder is gone is forgotten through the API, but never the launch directory", async () => {
+  const dir = "/work/forgotten-worktree";
+  fixture.write(`${memoryDirFor(fixture, dir)}/note.md`, memoryFile("note", "user", "d", "x"));
+  fixture.write(
+    join(fixture.env.claudeDir, "projects", storeDirName(dir), "one.jsonl"),
+    `${JSON.stringify({ type: "user", cwd: dir })}\n`
+  );
+  const listed = async () =>
+    ((await call("/api/overview")).json as Overview).projects.map((p) => p.path);
+  const launch = await call("/api/forget/preview", {
+    method: "POST",
+    body: { path: fixture.at("home") },
+  });
+
+  const preview = (await call("/api/forget/preview", { method: "POST", body: { path: dir } }))
+    .json as ForgetPreview;
+  const listedBefore = await listed();
+  const forgot = await call("/api/forget/change", {
+    method: "POST",
+    body: { path: dir, revision: preview.revision },
+  });
+  const listedAfter = await listed();
+
+  assertRefused(launch, 409, /started in this directory/);
+  assert.equal(forgot.status, 200);
+  assert.deepEqual([listedBefore.includes(dir), listedAfter.includes(dir)], [true, false]);
+  const { res } = await restoreReviewed((forgot.json as Change).id);
+  assert.equal(res.status, 200);
+  assert.ok((await listed()).includes(dir));
 });

@@ -1,6 +1,7 @@
 import { stat } from "node:fs/promises";
 import { previewAgentEdit, saveAgentEdit } from "./agent-edit.ts";
 import { listBackups, previewRestore, restoreBackup } from "./backups.ts";
+import { forgetDirectory, previewForget } from "./forget.ts";
 import { claudeRunner, previewMcpEdit, type RunClaude, saveMcpEdit } from "./mcp-edit.ts";
 import { changeMemory, previewMemoryChange } from "./mutations.ts";
 import { openInEditor } from "./open.ts";
@@ -101,6 +102,11 @@ export function createCore(env: ScanEnv, options: CoreOptions = {}) {
     previewMemoryChange: bound(previewMemoryChange),
     changeMemory: (action: MemoryAction, path: string, revision: string, projectPath?: string) =>
       changeMemory(env, action, path, revision, queue, projectPath),
+
+    previewForget: bound(previewForget),
+    /** Forgets a directory whose folder is gone; `launchDir` is never forgotten. */
+    forgetDirectory: (dir: string, launchDir: string, revision: string) =>
+      forgetDirectory(env, dir, launchDir, revision, queue),
 
     listBackups: bound(listBackups),
     previewRestore: bound(previewRestore),

@@ -1,7 +1,8 @@
-import { lstat, readdir, readFile, realpath } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, realpath, rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { Compile } from "typebox/compile";
 import { type BackupSummary, type RestorePreview } from "../shared/types.ts";
+import { storeContents } from "./forget.ts";
 import { assertMemoryDir, indexPathIn, revisionOfBoth } from "./mutations.ts";
 import { parseJson } from "./scan/data.ts";
 import { type ScanEnv } from "./scan/env.ts";
@@ -13,6 +14,7 @@ import {
   backupRoot,
   forgetChange,
   MANIFEST,
+  MOVED_STORE,
   RefusedError,
   readIfExists,
   recordChange,
@@ -167,12 +169,51 @@ async function claudeMcpPreview(
   };
 }
 
+/**
+ * A forgotten directory's store: where it goes back to, why it cannot, and what it holds. It goes
+ * back only under the projects folder, and never over a store Claude Code made there since.
+ */
+async function planStoreRestore(env: ScanEnv, manifest: BackupManifest, dir: string) {
+  const target = manifest.target;
+  if (dirname(target) !== join(env.claudeDir, "projects"))
+    throw new RefusedError(
+      "This backup does not point at a store in Claude Code's projects folder."
+    );
+  const moved = join(dir, MOVED_STORE);
+  const kept = (await lstat(moved).catch(() => null)) !== null;
+  const taken = (await lstat(target).catch(() => null)) !== null;
+  const listing = kept ? (await storeContents(moved)).listing : "";
+  let blocked: string | undefined;
+  if (!kept)
+    blocked = taken
+      ? "This store was moved back already."
+      : "The forgotten store is missing from the backup folder.";
+  else if (taken)
+    blocked =
+      "A store of that name exists again, since Claude Code was used in this directory after it was forgotten. Move that folder aside first to restore this one.";
+  return { target, moved, listing, blocked, revision: revisionOf(`${taken}\0${listing}`) };
+}
+
+/** What a forgotten store holds, in words: its sessions and memory files. */
+function storeSummary(listing: string): string {
+  const files = listing.split("\n").map((line) => line.split("\t")[0]?.split(/[/\\]/) ?? []);
+  const sessions = files.filter((f) => f.length === 1 && f[0]?.endsWith(".jsonl")).length;
+  const memories = files.filter(
+    (f) => f.length === 2 && f[0] === "memory" && f[1]?.endsWith(".md") && f[1] !== "MEMORY.md"
+  ).length;
+  const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+  return `${count(sessions, "session")} and ${count(memories, "memory file")}\n`;
+}
+
 async function planRestore(env: ScanEnv, id: string): Promise<Plan> {
   const { manifest, dir } = await backupAt(env, id);
   let target = manifest.target;
   switch (manifest.kind) {
     case "mcp-claude":
       throw new RefusedError(MADE_BY_CLAUDE);
+    // Moved back by restoreStore; a store is a folder, not a file this plan can write.
+    case "directory-forget":
+      throw new RefusedError("This backup holds a store folder, not a file.");
     case "settings":
       if (!isSettingsFile(env, target))
         throw new RefusedError("This backup does not point at a settings file.");
@@ -281,6 +322,19 @@ function blockedReason(plan: Plan): string | undefined {
 export async function previewRestore(env: ScanEnv, id: string): Promise<RestorePreview> {
   const { manifest: recorded, dir } = await backupAt(env, id);
   if (recorded.kind === "mcp-claude") return claudeMcpPreview(id, recorded, dir);
+  if (recorded.kind === "directory-forget") {
+    const store = await planStoreRestore(env, recorded, dir);
+    return {
+      id,
+      kind: recorded.kind,
+      target: store.target,
+      before: null,
+      after: storeSummary(store.listing),
+      revision: store.revision,
+      movesBack: store.target,
+      ...(store.blocked ? { blocked: store.blocked } : {}),
+    };
+  }
   const plan = await planRestore(env, id);
   const { manifest, current, saved, index } = plan;
   const show = manifest.kind === "settings" || manifest.kind === "mcp" ? shownSettings : shownText;
@@ -312,9 +366,28 @@ async function missingFolder(file: string): Promise<string | null> {
   return missing;
 }
 
+/** Moves a forgotten directory's store back, while the backup and the place it goes are as reviewed. */
+async function restoreStore(
+  env: ScanEnv,
+  manifest: BackupManifest,
+  dir: string,
+  expectedRevision: string
+): Promise<{ target: string }> {
+  const store = await planStoreRestore(env, manifest, dir);
+  if (store.blocked) throw new RefusedError(store.blocked);
+  if (store.revision !== expectedRevision)
+    throw new RefusedError("The store changed since you reviewed this restore; review it again.");
+  await mkdir(dirname(store.target), { recursive: true });
+  // A store Claude Code made in the meantime is never replaced: rename fails on a folder with files
+  // in it, and an empty one holds nothing.
+  await rename(store.moved, store.target);
+  return { target: store.target };
+}
+
 /**
  * Puts a backed-up file back, or removes a file ccdesk created, if the file is still as it was
- * when the restore was reviewed. A removed file is backed up first, so it can be put back too.
+ * when the restore was reviewed. A removed file is backed up first, so it can be put back too. A
+ * forgotten directory's store moves back to where it was.
  */
 export function restoreBackup(
   env: ScanEnv,
@@ -323,6 +396,9 @@ export function restoreBackup(
   queue: Serially
 ): Promise<{ target: string }> {
   return queue(async () => {
+    const { manifest: recorded, dir } = await backupAt(env, id);
+    if (recorded.kind === "directory-forget")
+      return restoreStore(env, recorded, dir, expectedRevision);
     const plan = await planRestore(env, id);
     const { manifest, current, saved, index } = plan;
     const blocked = blockedReason(plan);

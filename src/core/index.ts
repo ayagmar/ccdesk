@@ -26,6 +26,7 @@ export { Watcher } from "./watch.ts";
 // changed while ccdesk was writing it.
 export { previewAgentEdit } from "./agent-edit.ts";
 export { claudeProgram, claudeRunner, previewMcpEdit, type RunClaude } from "./mcp-edit.ts";
+export { previewForget } from "./forget.ts";
 export { isMemoryAction, previewMemoryChange } from "./mutations.ts";
 export {
   InvalidEditError,

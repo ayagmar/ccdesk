@@ -19,7 +19,14 @@ import {
   Watcher,
 } from "../core/index.ts";
 import { eventText } from "../shared/events.ts";
-import { BackupBody, MemoryBody, OpenBody, RevisionBody, UsageBody } from "../shared/requests.ts";
+import {
+  BackupBody,
+  ForgetBody,
+  MemoryBody,
+  OpenBody,
+  RevisionBody,
+  UsageBody,
+} from "../shared/requests.ts";
 import { SESSION_PROFILES } from "../shared/types.ts";
 
 export interface ServerOptions {
@@ -123,6 +130,7 @@ const revisionBody = Compile(RevisionBody);
 const usageBody = Compile(UsageBody);
 const memoryBody = Compile(MemoryBody);
 const openBody = Compile(OpenBody);
+const forgetBody = Compile(ForgetBody);
 const backupBody = Compile(BackupBody);
 
 /** A POST body `validator` accepts; anything else is a 400 naming what is wrong. */
@@ -198,6 +206,16 @@ function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
       const { action, path, projectPath } = checked(memoryBody, body);
       if (!isMemoryAction(action)) throw new RequestError(400, "unknown memory action");
       return core.changeMemory(action, path, revision(body), projectPath);
+    }),
+    post("/api/forget/preview", async ({ body }) => {
+      const { path } = checked(forgetBody, body);
+      if (!isAbsolute(path)) throw new RequestError(400, "path must be an absolute path");
+      return core.previewForget(path, launchDir);
+    }),
+    post("/api/forget/change", async ({ body }) => {
+      const { path } = checked(forgetBody, body);
+      if (!isAbsolute(path)) throw new RequestError(400, "path must be an absolute path");
+      return core.forgetDirectory(path, launchDir, revision(body));
     }),
     post("/api/open", async ({ body }) => {
       const { path } = checked(openBody, body);
