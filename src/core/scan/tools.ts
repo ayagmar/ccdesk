@@ -7,7 +7,7 @@ import {
   type ToolRule,
 } from "../../shared/types.ts";
 import { wildcard } from "./files.ts";
-import { CHECK_ORDER } from "./permissions.ts";
+import { CHECK_ORDER, isSkippedAllowGlob } from "./permissions.ts";
 
 /**
  * The other tools a rule for some uses covers: Bash rules apply to Monitor, Claude Code checks file
@@ -52,7 +52,7 @@ export function parseRule(rule: string): { tool: string; specifier: string | nul
  */
 export function namesTool(list: PermissionList, tool: string, name: string): boolean {
   if (!tool.includes("*")) return tool === name;
-  if (list === "allow" && !/^mcp__[^*]+__/.test(tool)) return false;
+  if (list === "allow" && isSkippedAllowGlob(tool)) return false;
   return wildcard(tool).test(name);
 }
 

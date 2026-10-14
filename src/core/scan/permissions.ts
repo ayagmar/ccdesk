@@ -49,6 +49,14 @@ export function isSkippedMcpRule(rule: string): boolean {
   return /^mcp__[^(]*\(/.test(rule);
 }
 
+/**
+ * Whether an allow rule's tool name is a glob anywhere but after a literal `mcp__<server>__`. Claude
+ * Code skips such a rule with a warning (docs: permissions#tool-name-wildcards).
+ */
+export function isSkippedAllowGlob(tool: string): boolean {
+  return tool.includes("*") && !/^mcp__[^*]+__/.test(tool);
+}
+
 /** Claude Code checks every file's rules together: deny, then ask, then allow (docs: permissions). */
 export const CHECK_ORDER: PermissionList[] = ["deny", "ask", "allow"];
 
@@ -90,6 +98,12 @@ export function permissionsOf(layers: SettingsLayer[], options: Options): Permis
             ...base,
             inEffect: false,
             note: "Claude Code skips an MCP rule with parentheses in a settings file; pass it with --disallowedTools",
+          };
+        if (list === "allow" && isSkippedAllowGlob(/^[^(]*/.exec(rule)?.[0].trim() ?? ""))
+          return {
+            ...base,
+            inEffect: false,
+            note: "Claude Code skips an allow rule whose tool name is a glob, unless the glob comes after mcp__<server>__",
           };
         if (managedOnly && scope !== "managed")
           return {

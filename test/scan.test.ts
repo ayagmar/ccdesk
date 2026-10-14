@@ -1217,6 +1217,34 @@ test("an MCP rule with parentheses in a settings file is listed as skipped", asy
   assert.deepEqual(rules, { "mcp__db__query(table:users)": false, mcp__db__drop: true });
 });
 
+test("an allow rule that globs the tool name outside mcp__<server>__ is listed as skipped", async () => {
+  const f = makeFixture();
+  f.write("app/README.md", "x");
+  f.json("home/.claude/settings.json", {
+    permissions: {
+      allow: ["mcp__*", "Web*", "mcp__git*__get_issue", "mcp__github__*", "Bash(npm *)"],
+      deny: ["mcp__*"],
+    },
+  });
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  // docs: permissions#tool-name-wildcards
+  const rules = Object.fromEntries(
+    view.permissions.flatMap((p) =>
+      p.kind === "rule" ? [[`${p.list} ${p.rule}`, p.inEffect]] : []
+    )
+  );
+  assert.deepEqual(rules, {
+    "allow mcp__*": false,
+    "allow Web*": false,
+    "allow mcp__git*__get_issue": false,
+    "allow mcp__github__*": true,
+    "allow Bash(npm *)": true,
+    "deny mcp__*": true,
+  });
+});
+
 test("in the folder whose .claude is CLAUDE_CONFIG_DIR, local MCP approvals apply without the trust step", async () => {
   const f = makeFixture();
   const env = {
