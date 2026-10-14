@@ -7,7 +7,15 @@ import { type ScanEnv } from "./scan/env.ts";
 import { isDir, isFile, isNetworkPath } from "./scan/files.ts";
 import { canonicalRoot, mainWorktreeRoot } from "./scan/git.ts";
 import { scanDirectory } from "./scan/index.ts";
-import { loadPlugin, manifestCommandMap, manifestPaths, pluginsRoot } from "./scan/plugins.ts";
+import {
+  isSkillsDirPlugin,
+  knownMarketplacesFile,
+  loadPlugin,
+  manifestCommandMap,
+  manifestPaths,
+  marketplaceFiles,
+  pluginsRoot,
+} from "./scan/plugins.ts";
 
 /** How long one request waits for a change before answering "nothing changed". */
 const WAIT_MS = 25_000;
@@ -70,8 +78,8 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
 
 /**
  * Files a scan read that the fixed list does not cover: a custom memory folder, imports, installed
- * plugins. A missing import is watched too, so creating it shows up, even when its folder is missing
- * as well.
+ * plugins and their marketplace records. A missing import or marketplace file is watched too, so
+ * creating it shows up, even when its folder is missing as well.
  */
 async function dependencies(env: ScanEnv, view: DirectoryView): Promise<Target[]> {
   const files = view.instructions.flatMap((i) => [
@@ -85,10 +93,18 @@ async function dependencies(env: ScanEnv, view: DirectoryView): Promise<Target[]
     byFolder.set(dirname(file), names);
   }
   const plugins = await Promise.all(view.inventory.plugins.map((p) => pluginTargets(env, view, p)));
+  // An installed plugin's marketplace entry can decide whether it is on.
+  const installed = view.inventory.plugins.filter((p) => !isSkillsDirPlugin(p)).map((p) => p.id);
+  const marketplaces = [knownMarketplacesFile(env), ...(await marketplaceFiles(env, installed))];
   return [
     ...[...byFolder].map(([path, names]) => ({ path, recursive: false, names: [...names] })),
     ...(view.memory ? [{ path: view.memory.dir, recursive: false }] : []),
     ...plugins.flat(),
+    ...marketplaces.map((file) => ({
+      path: dirname(file),
+      recursive: false,
+      names: [basename(file)],
+    })),
   ];
 }
 

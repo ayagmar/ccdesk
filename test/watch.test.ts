@@ -136,6 +136,38 @@ function pluginFixture(manifest: Record<string, unknown>) {
   return { f, plugin, watcher: watcherFor(f) };
 }
 
+test("a change to a plugin's marketplace entry, or the marketplace record appearing, wakes a page and updates its view", async () => {
+  const { f, watcher } = pluginFixture({});
+  const entry = (defaultEnabled: boolean) => ({
+    name: "market",
+    plugins: [{ name: "alpha", source: "./alpha", defaultEnabled }],
+  });
+  f.json("market/.claude-plugin/marketplace.json", entry(false));
+  const enabled = async () =>
+    (await watcher.view(f.at("app"))).inventory.plugins.find((p) => p.id === "alpha@market")
+      ?.enabled;
+  await watcher.scan(f.at("app"));
+  await started(watcher, f.at("app"));
+  assert.equal(await enabled(), true);
+
+  // known_marketplaces.json does not exist yet: creating it counts.
+  const created = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  f.json("home/.claude/plugins/known_marketplaces.json", {
+    market: {
+      source: { source: "directory", path: f.at("market") },
+      installLocation: f.at("market"),
+    },
+  });
+  assert.equal((await created).changed, true);
+  assert.equal(await enabled(), false);
+
+  await started(watcher, f.at("app"));
+  const edited = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  f.json("market/.claude-plugin/marketplace.json", entry(true));
+  assert.equal((await edited).changed, true);
+  assert.equal(await enabled(), true);
+});
+
 test("editing a file inside an installed plugin wakes a page waiting for changes", async () => {
   const { f, plugin, watcher } = pluginFixture({});
   f.write(`${plugin}/agents/review.md`, "---\nname: review\ndescription: one\n---\n");

@@ -204,33 +204,58 @@ function decide(plugin: Plugin, layers: SettingsLayer[], defaultEnabled: unknown
   }
 }
 
+/** known_marketplaces.json: the marketplaces Claude Code has fetched, by name. */
+export function knownMarketplacesFile(env: ScanEnv): string {
+  return join(pluginsRoot(env), "known_marketplaces.json");
+}
+
+/** The marketplace a plugin id names after its last `@`, or null for an id without one. */
+function marketOf(id: string): { name: string; market: string } | null {
+  const at = id.lastIndexOf("@");
+  const market = id.slice(at + 1);
+  return at > 0 && market ? { name: id.slice(0, at), market } : null;
+}
+
 /**
- * The defaultEnabled that an installed plugin's marketplace entry sets, from the marketplace.json
- * at the marketplace's installLocation in known_marketplaces.json; undefined when it sets none.
+ * The marketplace.json of a marketplace in known_marketplaces.json: under its installLocation, or
+ * the file itself for a marketplace added from a file (docs: plugins/loading#find-plugins-on-disk).
+ */
+function marketplaceFile(known: Record<string, unknown> | null, market: string): string | null {
+  const record = known?.[market];
+  if (!isRecord(record)) return null;
+  const location = stringField(record, "installLocation");
+  if (!location) return null;
+  const fromFile = isRecord(record.source) && record.source.source === "file";
+  return fromFile ? location : join(location, ".claude-plugin", "marketplace.json");
+}
+
+/** The marketplace.json files the marketplace entries of `ids` come from, for the watcher. */
+export async function marketplaceFiles(env: ScanEnv, ids: string[]): Promise<string[]> {
+  const known = await readJsonOrReport(env, knownMarketplacesFile(env), []);
+  const markets = new Set(ids.flatMap((id) => marketOf(id)?.market ?? []));
+  return [...markets].flatMap((market) => marketplaceFile(known, market) ?? []);
+}
+
+/**
+ * The defaultEnabled that an installed plugin's marketplace entry sets, from its marketplace.json
+ * (see marketplaceFile); undefined when it sets none.
  */
 function marketplaceDefaults(
   env: ScanEnv,
   problems: Problem[]
 ): (id: string) => Promise<boolean | undefined> {
   const markets = new Map<string, Promise<Record<string, unknown>[]>>();
-  const known = readJsonOrReport(env, join(pluginsRoot(env), "known_marketplaces.json"), problems);
+  const known = readJsonOrReport(env, knownMarketplacesFile(env), problems);
   const entries = async (market: string) => {
-    const record = (await known)?.[market];
-    if (!isRecord(record)) return [];
-    const location = stringField(record, "installLocation");
-    if (!location) return [];
-    // A marketplace added from a file is recorded at that file (docs: plugins/loading#find-plugins-on-disk).
-    const fromFile = isRecord(record.source) && record.source.source === "file";
-    const file = fromFile ? location : join(location, ".claude-plugin", "marketplace.json");
-    const json = await readJsonOrReport(env, file, problems);
+    const file = marketplaceFile(await known, market);
+    const json = file ? await readJsonOrReport(env, file, problems) : null;
     return Array.isArray(json?.plugins) ? json.plugins.filter((p) => isRecord(p)) : [];
   };
   return async (id) => {
-    const at = id.lastIndexOf("@");
-    const market = id.slice(at + 1);
-    if (at <= 0 || !market) return;
-    if (!markets.has(market)) markets.set(market, entries(market));
-    const entry = (await markets.get(market))?.find((p) => p.name === id.slice(0, at));
+    const named = marketOf(id);
+    if (!named) return;
+    if (!markets.has(named.market)) markets.set(named.market, entries(named.market));
+    const entry = (await markets.get(named.market))?.find((p) => p.name === named.name);
     return typeof entry?.defaultEnabled === "boolean" ? entry.defaultEnabled : undefined;
   };
 }
