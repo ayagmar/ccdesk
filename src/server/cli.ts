@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Core, createCore } from "../core/core.ts";
 import { type Command, HELP, parse, UsageError } from "./args.ts";
-import { explainText, scanJson } from "./commands.ts";
+import { checkDirectory, explainText, scanJson } from "./commands.ts";
 import { openBrowser } from "../core/open.ts";
 import { scanEnvFromProcess } from "../core/scan/env.ts";
 
@@ -43,6 +43,13 @@ async function main() {
   if (!isFolder(dir)) {
     console.error(`ccdesk: ${command.dir} is not a folder`);
     process.exitCode = 2;
+    return;
+  }
+  if (command.command === "check") {
+    const { output, exitCode } = await checkDirectory(core, dir, command);
+    if (exitCode === 2) console.error(output);
+    else console.log(output);
+    process.exitCode = exitCode;
     return;
   }
   console.log(

@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { Agent, request } from "node:http";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { createCore, type DirectoryView } from "../src/core/index.ts";
 import { DEV_PORT, HELP, parse, UsageError } from "../src/server/args.ts";
-import { explainText, scanJson } from "../src/server/commands.ts";
+import { checkDirectory, explainText, scanJson } from "../src/server/commands.ts";
 import { startServer } from "../src/server/start.ts";
-import { makeFixture } from "./helpers/fixture.ts";
+import { type Fixture, makeFixture } from "./helpers/fixture.ts";
 
 // What the `ccdesk` command promises: its flags and their errors, what its subcommands print, and a
 // server another front end can start and stop. The bin itself only prints what these return.
@@ -179,6 +181,237 @@ test("explain says when nothing more loads, and when the file is outside the sta
     await explainText(core, f.at("home/app"), f.at("home/other/src/api/a.ts")),
     `${join("~", "other", "src", "api", "a.ts")} is outside ${join("~", "app")}, so nothing there applies to it.`
   );
+});
+
+test("check takes one folder and its own flags", () => {
+  // Catches --strict or --all dropped on the way, which would make CI pass what it was told to fail,
+  // and a flag of another command accepted and ignored.
+  assert.deepEqual(parse(["check"]), {
+    command: "check",
+    dir: undefined,
+    configDir: undefined,
+    json: false,
+    strict: false,
+    all: false,
+  });
+  assert.deepEqual(parse(["check", "app", "--json", "--strict", "--all"]), {
+    command: "check",
+    dir: "app",
+    configDir: undefined,
+    json: true,
+    strict: true,
+    all: true,
+  });
+  for (const argv of [
+    ["check", "a", "b"],
+    ["check", "--dir", "a"],
+    ["--strict"],
+    ["scan", "--all"],
+  ])
+    assert.throws(() => parse(argv), UsageError, argv.join(" "));
+});
+
+/** A git repository at home/app, as a CI checkout is. */
+function repository(): Fixture {
+  const f = makeFixture();
+  f.write("home/app/README.md", "An app.\n");
+  f.git("home/app", "init", "--quiet");
+  return f;
+}
+
+const check = (f: Fixture, dir: string, flags: { strict?: boolean; all?: boolean } = {}) =>
+  checkDirectory(createCore(f.env), dir, { json: false, strict: false, all: false, ...flags });
+
+test("check passes a clean repository on a machine with no Claude folder, as a CI runner has", async () => {
+  // Catches a missing ~/.claude or ~/.claude.json reported as a problem, which would fail every CI run.
+  const f = repository();
+  f.json("home/app/.claude/settings.json", { permissions: { allow: ["Bash(npm test)"] } });
+  f.json("home/app/.mcp.json", { mcpServers: { docs: { command: "docs-server" } } });
+  const env = { ...f.env, home: f.at("runner"), claudeDir: f.at("runner/.claude") };
+  env.claudeJson = join(env.home, ".claude.json");
+
+  const result = await checkDirectory(createCore(env), f.at("home/app"), {
+    json: false,
+    strict: false,
+    all: false,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.output, `No problems in a session started in ${f.at("home/app")}.`);
+});
+
+test("check fails on a broken .claude/settings.json and .mcp.json and names each file", async () => {
+  // Catches the check passing a file Claude Code cannot parse, and a CI log that does not say which
+  // file to fix.
+  const f = repository();
+  f.write("home/app/.claude/settings.json", '{ "model": "opus", }');
+  f.write("home/app/.mcp.json", '{ "mcpServers": ');
+
+  const result = await check(f, f.at("home/app"));
+
+  assert.equal(result.exitCode, 1);
+  const lines = result.output.split("\n");
+  assert.equal(lines[0], "Claude Code cannot read these files and may skip them:");
+  assert.ok(
+    lines.some((l) => l.startsWith(`  ${join(".claude", "settings.json")}: `)),
+    result.output
+  );
+  assert.ok(
+    lines.some((l) => l.startsWith("  .mcp.json: ")),
+    result.output
+  );
+  assert.equal(lines.at(-1), `2 problems in a session started in ${join("~", "app")}.`);
+});
+
+test("check counts only the repository's files unless --all, and lists what stops Claude Code first", async () => {
+  // Catches a broken file in the runner's home failing the repository's check, and a file that keeps
+  // Claude Code from starting listed below ones it merely skips.
+  const f = repository();
+  f.write("home/.claude/settings.json", "{");
+  f.write("home/.claude.json", "not json");
+  f.json("etc/claude-code/managed-settings.json", ["not", "an", "object"]);
+
+  const repoOnly = await check(f, f.at("home/app"));
+  assert.equal(repoOnly.exitCode, 0);
+  assert.ok(
+    repoOnly.output
+      .split("\n")
+      .includes("Not counted: problems in 3 files outside the repository; --all counts them."),
+    repoOnly.output
+  );
+
+  f.write("home/app/.mcp.json", "{");
+  const all = await check(f, f.at("home/app"), { all: true });
+  assert.equal(all.exitCode, 1);
+  const lines = all.output.split("\n");
+  const headings = lines.filter((l) => l.endsWith(":") && !l.startsWith(" "));
+  assert.deepEqual(headings, [
+    "Claude Code will not start until these are fixed:",
+    "Claude Code cannot read these files and may skip them:",
+  ]);
+  assert.match(lines[1] ?? "", /managed-settings\.json: /);
+  assert.equal(lines.at(-1), `4 problems in a session started in ${join("~", "app")}.`);
+});
+
+test("check never counts the Claude folder or ~/.claude.json without --all, even inside the repository", async () => {
+  // Catches a dotfiles repository at ~, or a container whose HOME is the checkout, failing on the
+  // runner's own Claude files because they happen to sit under the git root.
+  const f = makeFixture();
+  f.write("home/README.md", "Dotfiles.\n");
+  f.git("home", "init", "--quiet");
+  f.write("home/.claude/settings.json", "{");
+  f.write("home/.claude.json", "not json");
+
+  assert.equal((await check(f, f.at("home"))).exitCode, 0);
+  f.write("home/.mcp.json", "{");
+  assert.equal((await check(f, f.at("home"))).exitCode, 1);
+});
+
+test("check in a linked worktree counts the main checkout's files it reads through to", async () => {
+  // Catches a broken agent in the main checkout, which a session in the worktree loads, reported as
+  // outside the repository and passed.
+  const f = repository();
+  f.git("home/app", "add", ".");
+  f.git("home/app", "commit", "-qm", "init");
+  f.git("home/app", "worktree", "add", "-q", f.at("home/app-feature"));
+  const loop = f.at("home/app/.claude/agents/review.md");
+  f.link(loop, loop);
+
+  const result = await check(f, f.at("home/app-feature"));
+
+  assert.equal(result.exitCode, 1, result.output);
+  assert.ok(result.output.includes("review.md: cannot be read (ELOOP)"), result.output);
+});
+
+test("check words a JSON file it cannot open as it words any other, without Node's message", async () => {
+  // Catches "Error: ELOOP: too many symbolic links encountered, open '/abs/path'" in a CI log, where
+  // a CLAUDE.md in the same state reads "cannot be read (ELOOP)".
+  const f = repository();
+  const loop = f.at("home/app/.mcp.json");
+  f.link(loop, loop);
+
+  const { output } = await check(f, f.at("home/app"));
+
+  assert.ok(output.split("\n").includes("  .mcp.json: cannot be read (ELOOP)"), output);
+});
+
+test("check exits 2, not 1, when it cannot run", async () => {
+  // Catches a scan that throws read as "problems found", which sends a CI user looking for a broken
+  // file that is not there.
+  const f = makeFixture();
+
+  const result = await check(f, f.at("home/gone"));
+
+  assert.equal(result.exitCode, 2);
+  assert.match(result.output, /^ccdesk: ENOENT/);
+});
+
+test("check reports skipped entries without failing, unless --strict", async () => {
+  // Catches the default failing CI over an entry Claude Code only skips, and --strict not failing it.
+  const f = repository();
+  f.json("home/app/.claude/settings.json", { permissions: { defaultMode: "careful" } });
+
+  const lenient = await check(f, f.at("home/app"));
+  assert.equal(lenient.exitCode, 0);
+  const lines = lenient.output.split("\n");
+  assert.equal(
+    lines[0],
+    "Claude Code may skip entries in these files (not counted; --strict counts them):"
+  );
+  assert.equal(lines.at(-1), `No counted problems in a session started in ${join("~", "app")}.`);
+  assert.equal((await check(f, f.at("home/app"), { strict: true })).exitCode, 1);
+});
+
+test("check counts the repository's files when it is reached through a symlink", async () => {
+  // Catches git's real root not matching the linked path, which would put every repository file
+  // outside the repository and pass a broken one.
+  const f = repository();
+  f.write("home/app/.mcp.json", "{");
+  f.link("home/linked", f.at("home/app"));
+
+  assert.equal((await check(f, f.at("home/linked"))).exitCode, 1);
+});
+
+test("check --json prints each problem with its path and whether it counts", async () => {
+  // Catches JSON a CI step cannot parse, such as text mixed in, or one that hides why it failed.
+  const f = repository();
+  f.write("home/app/.mcp.json", "{");
+  f.write("home/.claude/settings.json", "{");
+
+  const { output, exitCode } = await checkDirectory(createCore(f.env), f.at("home/app"), {
+    json: true,
+    strict: false,
+    all: false,
+  });
+  const report = JSON.parse(output) as {
+    root: string;
+    failed: boolean;
+    problems: Array<{ path: string; file: string; counted: boolean }>;
+  };
+
+  assert.equal(exitCode, 1);
+  assert.equal(report.failed, true);
+  assert.equal(report.root, f.at("home/app"));
+  assert.deepEqual(report.problems.map((p) => [p.path, p.file, p.counted]).sort(), [
+    [f.at("home/.claude/settings.json"), join("~", ".claude", "settings.json"), false],
+    [f.at("home/app/.mcp.json"), ".mcp.json", true],
+  ]);
+});
+
+test("check on a folder that does not exist is a usage error, not a pass", () => {
+  // Catches a mistyped folder in a CI step scanning nothing and exiting 0.
+  const cli = fileURLToPath(new URL("../src/server/cli.ts", import.meta.url));
+  const run = spawnSync(
+    process.execPath,
+    [`--import=${import.meta.resolve("tsx")}`, cli, "check", "no-such-folder"],
+    {
+      cwd: makeFixture().root,
+      encoding: "utf8",
+    }
+  );
+
+  assert.equal(run.status, 2);
+  assert.equal(run.stderr.trim(), "ccdesk: no-such-folder is not a folder");
 });
 
 /** GET `path` on the server at `url` with the token from its fragment; resolves the status. */
