@@ -579,7 +579,7 @@ function problemOutcome(p: DirectoryView["problems"][number]): string {
   return "Claude Code may skip this file.";
 }
 
-/** The files ccdesk could not read or parse here. */
+/** The files ccdesk could not read or parse here: each path on its own line, the message under it. */
 function Problems({ problems }: { problems: DirectoryView["problems"] }) {
   if (problems.length === 0) return null;
   return (
@@ -588,7 +588,8 @@ function Problems({ problems }: { problems: DirectoryView["problems"] }) {
       <ul className="plain">
         {problems.map((p) => (
           <li key={p.path}>
-            <span className="mono">{tilde(p.path)}</span>: {p.error}. {problemOutcome(p)}
+            <span className="mono problem-path">{tilde(p.path)}:</span>
+            {p.error}. {problemOutcome(p)}
           </li>
         ))}
       </ul>

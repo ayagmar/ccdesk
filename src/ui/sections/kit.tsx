@@ -9,22 +9,25 @@ export function NameButton({
   children,
   onClick,
   current,
+  path,
 }: {
   children: ReactNode;
   onClick: () => void;
   current?: boolean;
+  /** A path, whose end names the file, so a long one loses its start instead. */
+  path?: boolean;
 }) {
   return (
     <button
       type="button"
-      className="row-name"
+      className={path ? "row-name ends-first" : "row-name"}
       aria-current={current ? "true" : undefined}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
     >
-      {children}
+      {path ? <span>{children}</span> : children}
     </button>
   );
 }

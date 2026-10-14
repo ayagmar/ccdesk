@@ -21,7 +21,7 @@ export const hooks: SectionUi<R> = {
         </td>
         <td className="mono">{h.matcher ?? <span className="muted">any</span>}</td>
         <td className="mono value">
-          {tildeAll(h.command)}
+          {tildeAll(h.command)}{" "}
           {!h.active && (
             <span className="flag warn" title={h.note}>
               off
