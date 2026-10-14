@@ -402,7 +402,11 @@ input::placeholder {
 
 /* ---------- directory header ---------- */
 
-/* Two fixed rows (title and tools, then the section index) so column heads can stick under it. */
+/*
+ * Fixed rows, so column heads can stick under it: the title with the tools beside it, then the
+ * section index. A narrower column gives the tools a row of their own (see below), so the path keeps
+ * its room.
+ */
 .dir-head {
   position: sticky;
   top: 0;
@@ -418,6 +422,18 @@ input::placeholder {
   padding: 16px 0 8px;
 }
 
+@container (max-width: 960px) {
+  .dir-head,
+  .tt-section {
+    --head: 130px;
+  }
+
+  .dir-head {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 32px 30px 28px;
+  }
+}
+
 .dir-title {
   display: flex;
   align-items: center;
@@ -425,6 +441,7 @@ input::placeholder {
   min-width: 0;
 }
 
+/* The end of a path names the directory, so a long one loses its start. */
 .dir-title h1 {
   margin: 0;
   font-size: 19px;
@@ -433,10 +450,26 @@ input::placeholder {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
+  direction: rtl;
+  text-align: left;
+  flex: 0 1 auto;
+  min-width: min(16ch, 100%);
 }
 
-.dir-title .flag,
+.dir-title h1 > span {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Flags give way only once the path is down to its minimum; the tiny shrink factor keeps them whole until then. */
+.dir-title .flag {
+  display: block;
+  flex: 0 0.001 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* The session the page describes: a rare choice, so it sits under the header, not in it. */
 .session-line {
   display: flex;
@@ -536,8 +569,8 @@ input::placeholder {
   width: 240px;
 }
 
-/* The directory name comes first, so the tools beside it shrink. */
-@container (max-width: 960px) {
+/* On their own row, the tools shrink when even that is too narrow for them. */
+@container (max-width: 600px) {
   .filter {
     width: 140px;
   }
@@ -1947,9 +1980,15 @@ button:disabled {
     padding-top: 18px;
   }
 
-  /* The header grows here, so the flags wrap under a name they would crush. */
+  /* The header grows here, so the path wraps whole and the flags wrap under it. */
   .dir-title {
     flex-wrap: wrap;
+  }
+
+  .dir-title h1 {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    direction: ltr;
   }
 
   .tt-section {

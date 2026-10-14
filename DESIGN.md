@@ -281,7 +281,7 @@ Both are bundled through `@fontsource-variable`, so the app never depends on a n
 
 ### Hierarchy
 - **Display** (700, 22px, -0.015em): page titles on full pages such as All directories.
-- **Headline** (mono 700, 19px, -0.01em): the current directory path at the top of the workspace. The path is the title, so it is set in mono.
+- **Headline** (mono 700, 19px, -0.01em): the current directory path at the top of the workspace. The path is the title, so it is set in mono. Its end names the directory, so a path too long for its row loses its start ("…/services/billing-worker"), with the whole path in its tooltip; the flags beside it give way only once the path is down to 16 characters. On phones it wraps instead.
 - **Title** (700, 15px; 16px in the inspector head; 13px for inspector sub-heads): timetable section names (Instructions, Settings, Permissions, Memory, Hooks, MCP servers, Agents, skills & plugins, All settings) and the selected item's name.
 - **Body** (400, 14px, 1.45): interface text, timetable cells, the "why" column.
 - **Prose** (400, 13.5px, 1.6, max 68ch): rendered markdown of instruction and memory files in the inspector; headings inside it stay at 14px so a file's own h1 never outshouts the interface.
@@ -296,9 +296,9 @@ Both are bundled through `@fontsource-variable`, so the app never depends on a n
 
 ## Layout
 
-The shell is a three-column grid: the directory rail (248px), the main column, and the inspector (440px, growing to 30% of the window up to 600px). The main column scrolls on its own with a 28px gutter and carries, top to bottom, a sticky 92px directory header (path, the Config / What Claude sees switch, row filter, palette button, then the section index with its 1–9 keys, which drops the key hints and then the counts when the column is narrow so it stays on one line), the route strip (stops with nothing to contribute take half the width), and the timetable sections spaced 26px apart.
+The shell is a three-column grid: the directory rail (248px), the main column, and the inspector (440px, growing to 30% of the window up to 600px). The main column scrolls on its own with a 28px gutter and carries, top to bottom, a sticky directory header (the path with the Config / What Claude sees switch, row filter and palette button beside it, then the section index with its 1–9 keys, which drops the key hints and then the counts when the column is narrow so it stays on one line), the route strip (stops with nothing to contribute take half the width), and the timetable sections spaced 26px apart.
 
-Timetable rows are exactly one row unit (32px) tall, with 8px cell padding, single-line cells that truncate with an ellipsis, and fixed column widths per table so the bullet, name and file columns land in the same place from section to section. Column heads (26px) stick directly under the sticky directory header, so a section's columns stay labelled while you scroll it. The palette's results use the same 32px row.
+Timetable rows are exactly one row unit (32px) tall, with 8px cell padding, single-line cells that truncate with an ellipsis, and fixed column widths per table so the bullet, name and file columns land in the same place from section to section. Column heads (26px) stick directly under the sticky directory header, so a section's columns stay labelled while you scroll it. The header is 92px tall; in a main column narrower than 960px the tools move to a row of their own under the path and it grows to 130px, so the path keeps the column's width. The palette's results use the same 32px row.
 
 Responsive behaviour is three steps:
 - **1181–1400px:** the rail narrows to 220px and the inspector to 360px; the Instructions "Lines" column is dropped because the inspector already shows it.

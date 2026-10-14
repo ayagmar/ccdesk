@@ -278,11 +278,13 @@ function DirectoryTitle({ view }: { view: DirectoryView }) {
   return (
     <div className="dir-title">
       <h1 className="mono" title={tilde(view.path)}>
-        {tilde(view.path)}
+        <span>{tilde(view.path)}</span>
       </h1>
       {!view.exists && <span className="flag bad">folder no longer exists</span>}
       {view.gitRoot && view.gitRoot !== view.path && (
-        <span className="flag">inside {tilde(view.gitRoot)}</span>
+        <span className="flag" title={`inside ${tilde(view.gitRoot)}`}>
+          inside {tilde(view.gitRoot)}
+        </span>
       )}
       <TrustFlag view={view} />
     </div>
