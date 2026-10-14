@@ -23,6 +23,8 @@ const WAIT_MS = 25_000;
 const SETTLE_MS = 300;
 /** Watchers outlive a request by this much, so nothing is missed between two polls. */
 const IDLE_MS = 60_000;
+/** How long after subscribers are told macOS can report the same change again. */
+const REPEAT_MS = 1000;
 
 interface Target {
   path: string;
@@ -181,18 +183,35 @@ interface Subscription {
   /** Callers of `subscribe`, called after every change until they unsubscribe. */
   listeners: Set<() => void>;
   extra: Target[];
-  /** Paths watchers named since subscribers were last told. */
-  pending: Set<string>;
-  /** Each path's state when subscribers were last told about it, from `fileState`. */
+  /** What the watchers saw since subscribers were last told. */
+  seen: Seen;
+  /** On macOS, the state of each path read before subscribers were last told, until `repeatsUntil`. */
   told: Map<string, string>;
+  repeatsUntil: number;
   idle?: NodeJS.Timeout;
   settle?: NodeJS.Timeout;
 }
 
-/** A file or folder's size and modification time, or undefined when it cannot be read. */
+/** The events of one settle, so one made only of repeats can be left untold. */
+interface Seen {
+  /** Whether an event was not a repeat, or was found to report a change. */
+  counts: boolean;
+  /** Possible repeats whose path is still being read. */
+  checking: number;
+  /** On macOS, each named path's state, once read. */
+  states: Map<string, string>;
+}
+
+const nothingSeen = (): Seen => ({ counts: false, checking: 0, states: new Map() });
+
+/**
+ * A file or folder's inode, size and times, or undefined when it cannot be read. The change time
+ * moves on every write, even when a tool sets the modification time back, and a file renamed over
+ * it has another inode.
+ */
 async function fileState(path: string): Promise<string | undefined> {
-  const info = await stat(path).catch(() => null);
-  return info ? `${info.size}:${info.mtimeMs}` : undefined;
+  const info = await stat(path, { bigint: true }).catch(() => null);
+  return info ? `${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}` : undefined;
 }
 
 /** The latest scan of a directory, with when it started and ~/.claude.json as it was then. */
@@ -355,8 +374,9 @@ export class Watcher {
       waiters: new Set(),
       listeners: new Set(),
       extra: this.scanned.get(dir) ?? [],
-      pending: new Set(),
+      seen: nothingSeen(),
       told: new Map(),
+      repeatsUntil: 0,
     };
     this.subscriptions.set(dir, subscription);
     this.restart(dir, subscription);
@@ -377,36 +397,40 @@ export class Watcher {
   }
 
   /**
-   * Settles a change a watcher reported at `path`, or at an unnamed path, unless `path` is as it was
-   * when subscribers were last told about it. On macOS, the stream that replaces the old one when
-   * watchers move can report a change again, after subscribers heard about it.
+   * Settles a change a watcher reported at `path`, or at an unnamed path. On macOS, a watcher can
+   * report a change again soon after subscribers were told about it, after the watchers moved; a
+   * change seen there and then is checked against the path's state from before they were told.
+   * Every other event, on every other platform, counts without a check.
    */
-  private async noticed(dir: string, subscription: Subscription, path?: string): Promise<void> {
-    if (path !== undefined) {
-      const state = await fileState(path);
-      if (this.subscriptions.get(dir) !== subscription) return;
-      // A path that cannot be read always counts, since a deleted file has no state to compare.
-      if (state !== undefined && state === subscription.told.get(path)) return;
-      subscription.pending.add(path);
-    }
+  private noticed(dir: string, subscription: Subscription, path?: string): void {
+    const seen = subscription.seen;
+    if (this.host.platform === "darwin" && path !== undefined) {
+      const told = Date.now() < subscription.repeatsUntil ? subscription.told.get(path) : undefined;
+      if (told === undefined) seen.counts = true;
+      else seen.checking++;
+      void fileState(path).then((state) => {
+        if (state !== undefined) seen.states.set(path, state);
+        if (told === undefined) return;
+        seen.checking--;
+        if (state !== told) seen.counts = true;
+      });
+    } else seen.counts = true;
     clearTimeout(subscription.settle);
-    subscription.settle = setTimeout(() => void this.tell(dir, subscription), SETTLE_MS);
+    subscription.settle = setTimeout(() => this.tell(dir, subscription), SETTLE_MS);
   }
 
   /**
-   * Notes the state of each path changed since the last time, then tells waiters and subscribers.
-   * The states are read first, so whatever a subscriber reads after being told is at least as new.
+   * Tells waiters and subscribers about a settled change, unless every event in it was a repeat of
+   * one they were told about. A path still being read counts, so a slow read never hides a change.
+   * The states read by now were read before this, so a subscriber reads them or newer ones.
    */
-  private async tell(dir: string, subscription: Subscription): Promise<void> {
-    const paths = [...subscription.pending];
-    subscription.pending.clear();
-    const states = await Promise.all(paths.map(fileState));
-    if (this.subscriptions.get(dir) !== subscription) return;
-    paths.forEach((path, i) => {
-      const state = states[i];
-      if (state === undefined) subscription.told.delete(path);
-      else subscription.told.set(path, state);
-    });
+  private tell(dir: string, subscription: Subscription): void {
+    const seen = subscription.seen;
+    subscription.seen = nothingSeen();
+    if (!seen.counts && seen.checking === 0) return;
+    // A copy: a read that finishes after this may see a later state, which the subscriber may not.
+    subscription.told = new Map(seen.states);
+    subscription.repeatsUntil = Date.now() + REPEAT_MS;
     subscription.changedAt = Date.now();
     // First, so a subscriber that throws cannot leave the old watchers in place.
     this.restart(dir, subscription);
@@ -452,11 +476,7 @@ export class Watcher {
             const changed = name === null ? "" : String(name);
             if (target.names && !target.names.includes(basename(changed))) return;
             subscription.touchedAt = Date.now();
-            void this.noticed(
-              dir,
-              subscription,
-              name === null ? undefined : join(target.path, changed)
-            );
+            this.noticed(dir, subscription, name === null ? undefined : join(target.path, changed));
           }
         );
         watcher.on("error", () => watcher.close());

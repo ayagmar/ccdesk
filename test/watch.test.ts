@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { type FSWatcher, mkdirSync, type WatchListener, watch } from "node:fs";
+import { type FSWatcher, mkdirSync, utimesSync, type WatchListener, watch } from "node:fs";
 import { after, test } from "node:test";
 import { scanDirectory, testPath, Watcher } from "../src/core/index.ts";
 import { type WatchHost } from "../src/core/watch.ts";
@@ -241,12 +241,15 @@ test("a subscriber hears once about an editor's save, and nothing after unsubscr
   assert.equal(calls, 1);
 });
 
-/** A host whose watchers report only what the test passes to `report`, as fs.watch would. */
-function reportingHost() {
-  const open = new Set<{ path: string; listener: WatchListener<string> }>();
+/**
+ * A watcher on `app` on a macOS host whose watchers report only what the test passes to `report`,
+ * as fs.watch would, after `app/CLAUDE.md` was edited to "two" and subscribers were told.
+ */
+async function toldOnMacOS() {
+  const open = new Set<{ path: string; listener: WatchListener<string> | undefined }>();
   const host: WatchHost = {
-    platform: "linux",
-    watch: ((path: string, _options: unknown, listener: WatchListener<string>) => {
+    platform: "darwin",
+    watch: ((path: string, _options?: unknown, listener?: WatchListener<string>) => {
       const entry = { path, listener };
       open.add(entry);
       const watcher = {
@@ -256,38 +259,55 @@ function reportingHost() {
       return watcher as unknown as FSWatcher;
     }) as typeof watch,
   };
-  const report = (path: string, name: string) => {
-    for (const entry of [...open]) if (entry.path === path) entry.listener("change", name);
-  };
-  return { host, report };
-}
-
-test("a change reported again after the watchers move is told once, and the next edit is told", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "one\n");
-  const { host, report } = reportingHost();
   const watcher = new Watcher(f.env, scanDirectory, host);
   watchers.push(watcher);
-  const signal = new AbortController().signal;
-  let calls = 0;
-  await watcher.subscribe(f.at("app"), () => calls++);
+  const counter = { calls: 0 };
+  await watcher.subscribe(f.at("app"), () => counter.calls++);
+  const reportEdit = () => {
+    for (const entry of [...open])
+      if (entry.path === f.at("app")) entry.listener?.("change", "CLAUDE.md");
+  };
+  const waitFor = (changedSince: number, timeoutMs: number) =>
+    watcher.wait(f.at("app"), changedSince, new AbortController().signal, timeoutMs);
 
   const since = Date.now();
   f.write("app/CLAUDE.md", "two\n");
-  report(f.at("app"), "CLAUDE.md");
-  const first = await watcher.wait(f.at("app"), since, signal, 5000);
+  // A whole second, so a test can set the same modification time back exactly.
+  const mtime = new Date("2026-01-01T00:00:00Z");
+  utimesSync(f.at("app/CLAUDE.md"), mtime, mtime);
+  reportEdit();
+  const first = await waitFor(since, 5000);
   assert.equal(first.changed, true);
-
-  // macOS can report a change again to the watchers that replace the old ones after it.
+  // The watchers move after a change; macOS can report the change again to the new ones.
   await started(watcher, f.at("app"));
-  report(f.at("app"), "CLAUDE.md");
-  assert.equal((await watcher.wait(f.at("app"), first.at, signal, 800)).changed, false);
-  assert.equal(calls, 1);
+  return { f, counter, reportEdit, waitFor, told: first.at, mtime };
+}
+
+test("on macOS, a change reported again after the watchers move is told once, and the next edit is told", async () => {
+  const { f, counter, reportEdit, waitFor, told } = await toldOnMacOS();
+
+  reportEdit();
+  assert.equal((await waitFor(told, 800)).changed, false);
+  assert.equal(counter.calls, 1);
 
   f.write("app/CLAUDE.md", "three\n");
-  report(f.at("app"), "CLAUDE.md");
-  assert.equal((await watcher.wait(f.at("app"), first.at, signal, 5000)).changed, true);
-  assert.equal(calls, 2);
+  reportEdit();
+  assert.equal((await waitFor(told, 5000)).changed, true);
+  assert.equal(counter.calls, 2);
+});
+
+test("on macOS, an edit right after the watchers move is told even with the same size and modification time", async () => {
+  const { f, counter, reportEdit, waitFor, told, mtime } = await toldOnMacOS();
+
+  // As cp -p or rsync -a leave it: other text of the same length, with the old modification time.
+  f.write("app/CLAUDE.md", "six\n");
+  utimesSync(f.at("app/CLAUDE.md"), mtime, mtime);
+  reportEdit();
+
+  assert.equal((await waitFor(told, 5000)).changed, true);
+  assert.equal(counter.calls, 2);
 });
 
 test("closing the watcher does not tell a subscriber something changed", async () => {
