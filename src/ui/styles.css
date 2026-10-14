@@ -2,39 +2,39 @@
    Scope lines are flat Okabe–Ito colours, always paired with a letter. */
 
 :root {
-  --paper: #fbfbf7;
-  --panel: #ffffff;
-  --sunk: #f1f0ea;
-  --ink: #141414;
-  --ink-2: #4a4a45;
-  --muted: #6b6a63;
-  --rule: #dcdad1;
+  --paper: light-dark(#fbfbf7, #131312);
+  --panel: light-dark(#ffffff, #1a1a18);
+  --sunk: light-dark(#f1f0ea, #222220);
+  --ink: light-dark(#141414, #ece8de);
+  --ink-2: light-dark(#4a4a45, #c7c2b6);
+  --muted: light-dark(#6b6a63, #938f84);
+  --rule: light-dark(#dcdad1, #2c2b28);
   /* Field, filter and segmented borders: 3:1 on paper, so an empty field still shows its edge. */
-  --rule-control: #8f8c81;
-  --rule-strong: #141414;
-  --sel: #fff3c4;
-  --sel-ink: #141414;
-  --hover: #f4f3ec;
-  --focus: #0072b2;
-  --ok: #1d6b47;
-  --warn: #8a5a00;
-  --warn-bg: #fff1d6;
-  --bad: #a3361c;
-  --bad-bg: #fde7e0;
-  --on-bad: #ffffff;
+  --rule-control: light-dark(#8f8c81, #6e6c64);
+  --rule-strong: light-dark(#141414, #ece8de);
+  --sel: light-dark(#fff3c4, #33302a);
+  --sel-ink: light-dark(#141414, #fff6e0);
+  --hover: light-dark(#f4f3ec, #1d1d1b);
+  --focus: light-dark(#0072b2, #f2c14e);
+  --ok: light-dark(#1d6b47, #6fcf97);
+  --warn: light-dark(#8a5a00, #f2c14e);
+  --warn-bg: light-dark(#fff1d6, #2b2512);
+  --bad: light-dark(#a3361c, #ff8a73);
+  --bad-bg: light-dark(#fde7e0, #371b15);
+  --on-bad: light-dark(#ffffff, #131312);
 
-  --line-managed: #b84f00;
-  --line-user: #0072b2;
-  --line-project: #007a5a;
-  --line-local: #e69f00;
-  --line-memory: #cc79a7;
-  --line-plugin: #5f5f5a;
-  --on-managed: #ffffff;
-  --on-user: #ffffff;
-  --on-project: #ffffff;
+  --line-managed: light-dark(#b84f00, #ff7a3d);
+  --line-user: light-dark(#0072b2, #4aa8e8);
+  --line-project: light-dark(#007a5a, #2fbf8f);
+  --line-local: light-dark(#e69f00, #f2b233);
+  --line-memory: light-dark(#cc79a7, #e391bd);
+  --line-plugin: light-dark(#5f5f5a, #8d95a5);
+  --on-managed: light-dark(#ffffff, #131312);
+  --on-user: light-dark(#ffffff, #131312);
+  --on-project: light-dark(#ffffff, #131312);
   --on-local: #141414;
   --on-memory: #141414;
-  --on-plugin: #ffffff;
+  --on-plugin: light-dark(#ffffff, #131312);
 
   --sans:
     "Hanken Grotesk Variable", "Helvetica Neue", Helvetica, "Nimbus Sans", "Liberation Sans", Arial,
@@ -56,74 +56,16 @@
   --text-lg: 15px;
   --text-xl: 19px;
   --text-2xl: 22px;
+  /* Each colour holds its paper and board value; color-scheme picks one, the system's unless the
+     theme switch set data-theme. */
+  color-scheme: light dark;
+}
+
+:root[data-theme="light"] {
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: #131312;
-    --panel: #1a1a18;
-    --sunk: #222220;
-    --ink: #ece8de;
-    --ink-2: #c7c2b6;
-    --muted: #938f84;
-    --rule: #2c2b28;
-    --rule-control: #6e6c64;
-    --rule-strong: #ece8de;
-    --sel: #33302a;
-    --sel-ink: #fff6e0;
-    --hover: #1d1d1b;
-    --focus: #f2c14e;
-    --ok: #6fcf97;
-    --warn: #f2c14e;
-    --warn-bg: #2b2512;
-    --bad: #ff8a73;
-    --bad-bg: #371b15;
-    --on-bad: #131312;
-    --line-managed: #ff7a3d;
-    --line-user: #4aa8e8;
-    --line-project: #2fbf8f;
-    --line-local: #f2b233;
-    --line-memory: #e391bd;
-    --line-plugin: #8d95a5;
-    --on-managed: #131312;
-    --on-user: #131312;
-    --on-project: #131312;
-    --on-plugin: #131312;
-    color-scheme: dark;
-  }
-}
-
 :root[data-theme="dark"] {
-  --paper: #131312;
-  --panel: #1a1a18;
-  --sunk: #222220;
-  --ink: #ece8de;
-  --ink-2: #c7c2b6;
-  --muted: #938f84;
-  --rule: #2c2b28;
-  --rule-control: #6e6c64;
-  --rule-strong: #ece8de;
-  --sel: #33302a;
-  --sel-ink: #fff6e0;
-  --hover: #1d1d1b;
-  --focus: #f2c14e;
-  --ok: #6fcf97;
-  --warn: #f2c14e;
-  --warn-bg: #2b2512;
-  --bad: #ff8a73;
-  --bad-bg: #371b15;
-  --on-bad: #131312;
-  --line-managed: #ff7a3d;
-  --line-user: #4aa8e8;
-  --line-project: #2fbf8f;
-  --line-local: #f2b233;
-  --line-memory: #e391bd;
-  --line-plugin: #8d95a5;
-  --on-managed: #131312;
-  --on-user: #131312;
-  --on-project: #131312;
-  --on-plugin: #131312;
   color-scheme: dark;
 }
 
