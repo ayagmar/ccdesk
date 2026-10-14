@@ -32,6 +32,7 @@ import { tilde } from "./format.ts";
 import { documentedValues } from "./settingsCatalog.ts";
 import { propertyFor, schemaSource, settingKeys } from "./settingsSchema.ts";
 import { type ReviewedChange, type Saved, useReviewedChange } from "./useReviewedChange.tsx";
+import { Icon } from "./Icon.tsx";
 
 interface Props {
   view: DirectoryView;
@@ -264,14 +265,19 @@ function ValueForm({
         >
           Review change
         </button>
-        {canRemove && (
-          <button type="button" disabled={busy} onClick={() => onReview(true)}>
-            Remove from this file
-          </button>
-        )}
         {fieldKind(property) !== "json" && (
           <button type="button" disabled={busy} onClick={onSwitch}>
             {kind === "json" ? "Edit in form" : "Edit as JSON"}
+          </button>
+        )}
+        {canRemove && (
+          <button
+            type="button"
+            className="quiet-danger"
+            disabled={busy}
+            onClick={() => onReview(true)}
+          >
+            <Icon name="trash" /> Remove from this file…
           </button>
         )}
       </div>

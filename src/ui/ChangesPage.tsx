@@ -120,8 +120,14 @@ function ChangeItem({
   onDone: (text: string) => void;
 }) {
   let toggle = "Review restore";
-  if (open) toggle = "Close";
-  else if (b.kind === "mcp-claude") toggle = "Show change";
+  let icon: "undo" | "close" | "eye" = "undo";
+  if (open) {
+    toggle = "Close";
+    icon = "close";
+  } else if (b.kind === "mcp-claude") {
+    toggle = "Show change";
+    icon = "eye";
+  }
   return (
     <li className="change">
       <div className="change-row">
@@ -144,7 +150,7 @@ function ChangeItem({
           {new Date(b.createdAt).toLocaleTimeString(undefined, { timeStyle: "short" })}
         </span>
         <button type="button" className="head-action" aria-expanded={open} onClick={onToggle}>
-          <Icon name="undo" /> {toggle}
+          <Icon name={icon} /> {toggle}
         </button>
       </div>
       {open && b.kind === "memory-restore" && (

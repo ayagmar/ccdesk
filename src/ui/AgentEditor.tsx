@@ -3,6 +3,7 @@ import { type AgentEdit, type DirectoryView, type Entry } from "../shared/types.
 import { api } from "./api.ts";
 import { ScopeButtons } from "./editorKit.tsx";
 import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
+import { Icon } from "./Icon.tsx";
 
 type AgentScope = "project" | "user";
 
@@ -112,7 +113,7 @@ export function AgentEditor({ view, agent, onSaved }: Props) {
                 )
               }
             >
-              Delete
+              <Icon name="trash" /> Delete…
             </button>
           )}
         </div>
