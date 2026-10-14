@@ -490,6 +490,46 @@ async function readLocalSkills(
   return { skills, winners };
 }
 
+/**
+ * Command files from the managed folder, yours, then every project folder from the start directory
+ * up to the repository root, closest first; the first of a name runs, and a skill of that name runs
+ * instead of any (docs: skills#resolve-skills-that-share-a-name; the order within the project is
+ * observed in v2.1.296). A command file is a skill too: one with disable-model-invocation is not
+ * listed to Claude.
+ */
+async function readCommands(
+  env: ScanEnv,
+  projectDir: string,
+  gitRoot: string | null,
+  locked: boolean,
+  skills: Map<string, Entry>,
+  problems: Problem[]
+): Promise<Entry[]> {
+  const sources: [string, Source][] = [
+    [join(env.managedDir, ".claude", "commands"), "managed"],
+    [join(env.claudeDir, "commands"), "user"],
+    ...(await projectFolders(env, projectDir, gitRoot, "commands"))
+      .reverse()
+      .map((dir): [string, Source] => [dir, "project"]),
+  ];
+  const commands: Entry[] = [];
+  const winners = new Map<string, Entry>();
+  for (const [dir, scope] of sources)
+    for (const command of await readFileEntries(env, dir, scope, { separator: ":", problems })) {
+      commands.push(command);
+      if (isTrue(parseFrontmatter(command.text).data["disable-model-invocation"]))
+        command.listed = false;
+      // A command file or subfolder named in the anthropic-skills namespace does not load.
+      if (isReservedName(command.name)) command.skipped = RESERVED_NOTE;
+      else if (locked) command.skipped = pluginOnlyNote("skills");
+      if (command.skipped) continue;
+      const winner = skills.get(command.name) ?? winners.get(command.name);
+      if (winner) command.shadowedBy = winner.path;
+      else winners.set(command.name, command);
+    }
+  return commands;
+}
+
 export async function readInventory(input: InventoryInput): Promise<Inventory> {
   const { env, projectDir, gitRoot, layers, problems } = input;
   const locked = pluginOnlySurfaces(input.managed);
@@ -498,14 +538,6 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
   const fromPlugins = await Promise.all(
     active.map((plugin) => pluginEntries(env, plugin, problems))
   );
-  const projectClaude = join(projectDir, ".claude");
-  const hasProjectDir = !(await isUserClaudeFolder(env, projectDir));
-  const files = async (sub: string, separator = "/") => [
-    ...(await readFileEntries(env, join(env.claudeDir, sub), "user", { separator, problems })),
-    ...(hasProjectDir
-      ? await readFileEntries(env, join(projectClaude, sub), "project", { separator, problems })
-      : []),
-  ];
   const { skills, winners } = await readLocalSkills(
     env,
     projectDir,
@@ -514,18 +546,14 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
     problems
   );
 
-  // A command file is a skill too: one with disable-model-invocation is not listed to Claude.
-  const commands = await files("commands", ":");
-  // A skill of the same name runs instead of it (docs: skills#resolve-skills-that-share-a-name).
-  for (const command of commands) {
-    // A command file or subfolder named in the anthropic-skills namespace does not load.
-    if (isReservedName(command.name)) command.skipped = RESERVED_NOTE;
-    else if (locked.has("skills")) command.skipped = pluginOnlyNote("skills");
-    if (isTrue(parseFrontmatter(command.text).data["disable-model-invocation"]))
-      command.listed = false;
-    const skill = winners.get(command.name);
-    if (skill) command.shadowedBy = skill.path;
-  }
+  const commands = await readCommands(
+    env,
+    projectDir,
+    gitRoot,
+    locked.has("skills"),
+    winners,
+    problems
+  );
   const overrides = input.effective.find((s) => s.key === "skillOverrides")?.value;
   applySkillOverrides([...skills, ...commands], overrides);
 
