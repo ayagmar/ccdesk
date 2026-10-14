@@ -1046,6 +1046,42 @@ test("your skill wins over a project skill of the same name, and a command is na
   );
 });
 
+test("commands come from the managed folder, yours and every project folder up to the repository root, and the first of a name runs", async () => {
+  const f = makeFixture();
+  const command = (description: string) => `---\ndescription: ${description}\n---\n`;
+  f.write("etc/claude-code/.claude/commands/audit.md", command("managed audit"));
+  f.write("home/.claude/commands/audit.md", command("my audit"));
+  f.write("home/.claude/commands/deploy.md", command("my deploy"));
+  f.write("repo/.claude/commands/deploy.md", command("root deploy"));
+  f.write("repo/.claude/commands/lint.md", command("root lint"));
+  f.write("repo/pkg/.claude/commands/lint.md", command("pkg lint"));
+  f.write("outside/.claude/commands/stray.md", command("not here"));
+  f.git("repo", "init", "-q");
+
+  const view = await scanDirectory(f.env, f.at("repo/pkg"));
+
+  // docs: skills#resolve-skills-that-share-a-name, managed over yours over the project; within the
+  // project the folder closest to the start directory comes first (observed in v2.1.296).
+  assert.deepEqual(
+    view.inventory.commands.map((c) => [
+      c.name,
+      f.rel(c.path),
+      c.shadowedBy ? f.rel(c.shadowedBy) : null,
+    ]),
+    [
+      ["audit", "etc/claude-code/.claude/commands/audit.md", null],
+      ["audit", "home/.claude/commands/audit.md", "etc/claude-code/.claude/commands/audit.md"],
+      ["deploy", "home/.claude/commands/deploy.md", null],
+      ["lint", "repo/pkg/.claude/commands/lint.md", null],
+      ["deploy", "repo/.claude/commands/deploy.md", "home/.claude/commands/deploy.md"],
+      ["lint", "repo/.claude/commands/lint.md", "repo/pkg/.claude/commands/lint.md"],
+    ]
+  );
+  const listing = view.context.find((b) => b.kind === "skills")?.text ?? "";
+  assert.match(listing, /managed audit/);
+  assert.doesNotMatch(listing, /my audit|root deploy|root lint|not here/);
+});
+
 test("under a trusted parent, a local file in a .claude that is a link waits for its own trust", {
   skip: process.platform === "win32",
 }, async () => {

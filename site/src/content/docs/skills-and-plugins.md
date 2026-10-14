@@ -24,7 +24,7 @@ When managed settings set `strictPluginOnlyCustomization` to `true`, or to a lis
 
 ## Commands and output styles
 
-Custom slash commands come from `~/.claude/commands` and the open directory's `.claude/commands`; output styles from `~/.claude/output-styles` and the open directory's `.claude/output-styles`. Plugins can add both. Commands in subfolders are named with `:`, such as `frontend:test`.
+Custom slash commands come from your organisation's managed folder, `~/.claude/commands`, and `.claude/commands` in the open directory and every folder above it up to the repository root. When two share a name, the managed one runs, then yours, then the project folder closest to the open directory, and the others are marked as not used. Output styles come from `~/.claude/output-styles` and the open directory's `.claude/output-styles`. Plugins can add both. Commands in subfolders are named with `:`, such as `frontend:test`.
 
 ## Plugins
 
