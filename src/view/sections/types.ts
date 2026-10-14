@@ -22,7 +22,15 @@ export type EntryKind = "agent" | "skill" | "command" | "output style";
 /** One table row; `id` stays the same across reloads so a selection survives them. */
 export type Row =
   | { id: string; section: "instructions"; line: Line; item: Instruction; order: number }
-  | { id: string; section: "settings"; line: Line; item: EffectiveSetting; lines: Line[] }
+  | {
+      id: string;
+      section: "settings";
+      line: Line;
+      item: EffectiveSetting;
+      lines: Line[];
+      /** The documented default, as the docs word it, when the value Claude Code uses equals it. */
+      atDefault?: string;
+    }
   | { id: string; section: "permissions"; line: Line; item: Permission }
   /** Calls you approved by hand that an allow rule not yet in any file would cover. */
   | { id: string; section: "permissions"; line: null; item: Approval; suggested: true }

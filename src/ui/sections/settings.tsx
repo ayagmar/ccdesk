@@ -1,6 +1,7 @@
 import { EDITABLE_SCOPES, HIGHEST_FIRST } from "../../shared/scopes.ts";
 import { type EffectiveSetting, type Scope } from "../../shared/types.ts";
 import { lineName } from "../../view/lines.ts";
+import { plain } from "../../view/sections/catalog.ts";
 import { type RowOf } from "../../view/sections/types.ts";
 import { Bullet } from "../Bullet.tsx";
 import { preview, tildeAll } from "../format.ts";
@@ -63,6 +64,14 @@ export const settings: SectionUi<R> = {
             <span className="muted">{ignoredLabel(leading(s.ignored))}</span>
           ) : (
             tildeAll(preview(s.value))
+          )}
+          {row.atDefault && (
+            <>
+              {" "}
+              <span className="flag" title={`Claude Code's default: ${plain(row.atDefault)}`}>
+                default
+              </span>
+            </>
           )}
         </td>
         <td className="beat">
@@ -144,6 +153,9 @@ export const settings: SectionUi<R> = {
           onSaved={actions.onSaved}
         />
         <dl className="fields">
+          {row.atDefault && (
+            <Field label="Default">Same as Claude Code's default: {plain(row.atDefault)}</Field>
+          )}
           {s.from.map((scope) => {
             const layer = layerOf(scope);
             return layer ? (

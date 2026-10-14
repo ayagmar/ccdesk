@@ -124,3 +124,25 @@ test("the settings filter counts each key under the file that decides its value"
   // The project's model beats the user's, and merged permissions count under the higher file.
   assert.deepEqual(counts, { User: 1, Project: 2, Local: 1 });
 });
+
+test("a setting is marked as Claude Code's default only when its value is the one default the docs give", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/settings.json", {
+    verbose: false,
+    cleanupPeriodDays: 30,
+    disableClaudeAiConnectors: false,
+    autoCompactEnabled: false,
+    model: "opus",
+    defaultShell: "bash",
+  });
+  const view = await scanDirectory(f.env, f.at("home"));
+  const context: ViewContext = { format: formatter(f.env.home), reference: REFERENCE };
+
+  const atDefault = buildRows(view, context)
+    .flatMap((r) => (r.section === "settings" && r.atDefault !== undefined ? [r.item.key] : []))
+    .sort();
+
+  // autoCompactEnabled defaults to true; model's default is told in words; defaultShell's depends
+  // on the platform.
+  assert.deepEqual(atDefault, ["cleanupPeriodDays", "disableClaudeAiConnectors", "verbose"]);
+});
