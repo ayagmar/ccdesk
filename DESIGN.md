@@ -406,7 +406,7 @@ Editing happens inside the inspector. A segmented control picks the target layer
 - **Segmented control:** joined options with control line dividers and border and a 6px outer radius; the pressed option fills with ink. Used for memory-type filters (with the type shapes), Read/Raw, and layer choice (with bullets).
 
 ### Navigation
-- **Rail:** panel white with a hairline right edge. The brand mark is Murmeli's badge at 26px beside "ccdesk" in 700. "All directories" and "Recent changes" sit under it as icon links. Groups ("Opened from", "Used with Claude") are 13px muted labels. Items are 30px, 14px, with a mono count on the right; hover in hover paper; the current directory is inverted (ink fill, paper text); a directory that no longer exists is struck through.
+- **Rail:** panel white with a hairline right edge. The brand mark is Murmeli's badge at 26px beside "ccdesk" in 700. "All directories" and "Recent changes" sit under it as icon links. Groups ("Opened from", "Used with Claude") are 13px muted labels. Items are 30px, 14px, with a mono count on the right; hover in hover paper; the current directory or page is inverted (ink fill, paper text), so where you are never looks like a selected row in selection cream; a directory that no longer exists is struck through.
 - **Command palette:** opened with Ctrl/⌘K over a paper scrim, 640px wide with a 46px input and 32px result rows, each led by a bullet; the active option is selection cream. It rises 6px into place over 180ms.
 - **Keyboard:** j/k move between rows and move focus with them, / focuses the row filter, Ctrl/⌘K opens the palette.
 

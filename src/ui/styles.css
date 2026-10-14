@@ -360,15 +360,20 @@ html[data-text-size="larger"] #root {
   background: var(--hover);
 }
 
+/* Where you are is inverted, so it never reads as a selected row's cream. */
 .rail-item.current {
-  background: var(--sel);
-  color: var(--sel-ink);
+  background: var(--ink);
+  color: var(--paper);
   font-weight: 600;
 }
 
 .rail-item.gone .rail-label {
   text-decoration: line-through;
   text-decoration-color: var(--muted);
+}
+
+.rail-item.current.gone .rail-label {
+  text-decoration-color: currentColor;
 }
 
 .rail-label {
