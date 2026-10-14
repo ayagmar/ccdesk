@@ -497,10 +497,15 @@ export class Watcher {
           target.path,
           { recursive: target.recursive },
           (_event, name) => {
-            const changed = name === null ? "" : String(name);
-            if (target.names && !target.names.includes(basename(changed))) return;
+            // An event that names nothing may be about any entry, so it counts.
+            if (target.names && name !== null && !target.names.includes(basename(String(name))))
+              return;
             subscription.touchedAt = Date.now();
-            this.noticed(dir, subscription, name === null ? undefined : join(target.path, changed));
+            this.noticed(
+              dir,
+              subscription,
+              name === null ? undefined : join(target.path, String(name))
+            );
           }
         );
         watcher.on("error", () => {
