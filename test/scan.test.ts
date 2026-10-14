@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { mkdirSync, renameSync } from "node:fs";
 import { basename } from "node:path";
 import { test } from "node:test";
 import { scanDirectory, scanOverview } from "../src/core/index.ts";
@@ -1667,4 +1668,28 @@ test("synced skills load only for the signed-in claude.ai account, and not after
     ["pdf", false],
     ["xlsx", false],
   ]);
+});
+
+test("a directory known only from ~/.claude.json is listed while its folder exists, not after", async () => {
+  const f = makeFixture();
+  const kept = f.at("kept");
+  const gone = f.at("gone");
+  mkdirSync(kept, { recursive: true });
+  f.json("home/.claude.json", { projects: { [kept]: {}, [gone]: {} } });
+
+  const before = (await scanOverview(f.env, f.at("home"))).projects.map((p) => p.path);
+  renameSync(kept, f.at("moved"));
+  const after = (await scanOverview(f.env, f.at("home"))).projects.map((p) => p.path);
+
+  assert.deepEqual(
+    [before.includes(kept), before.includes(gone), after.includes(kept)],
+    [true, false, false]
+  );
+});
+
+test("the launch directory is listed even when its folder is gone", async () => {
+  const f = makeFixture();
+  const launch = f.at("gone");
+
+  assert.ok((await scanOverview(f.env, launch)).projects.some((p) => p.path === launch));
 });

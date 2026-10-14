@@ -68,7 +68,9 @@ export async function scanOverview(env: ScanEnv, launchDir: string): Promise<Ove
     claudeDir: env.claudeDir,
     launchDir: resolve(launchDir),
     platform: env.platform,
-    projects: projects.map(({ store: _store, ...summary }) => summary),
+    projects: projects.map(
+      ({ store: _store, storeDir: _storeDir, inClaudeJson: _inClaudeJson, ...summary }) => summary
+    ),
     sharedMemories: [...hashesByName.entries()]
       .filter(([, stores]) => stores.length > 1)
       .map(([name, stores]) => ({ name, stores }))
