@@ -134,8 +134,12 @@ test("a setting is marked as Claude Code's default only when its value is the on
     autoCompactEnabled: false,
     model: "opus",
     defaultShell: "bash",
+    respectGitignore: false,
+    spinnerTipsEnabled: true,
   });
-  const view = await scanDirectory(f.env, f.at("home"));
+  // The project pins respectGitignore to its default over the user's false, so removing it changes something.
+  f.json("app/.claude/settings.json", { respectGitignore: true, spinnerTipsEnabled: true });
+  const view = await scanDirectory(f.env, f.at("app"));
   const context: ViewContext = { format: formatter(f.env.home), reference: REFERENCE };
 
   const atDefault = buildRows(view, context)
@@ -144,5 +148,10 @@ test("a setting is marked as Claude Code's default only when its value is the on
 
   // autoCompactEnabled defaults to true; model's default is told in words; defaultShell's depends
   // on the platform.
-  assert.deepEqual(atDefault, ["cleanupPeriodDays", "disableClaudeAiConnectors", "verbose"]);
+  assert.deepEqual(atDefault, [
+    "cleanupPeriodDays",
+    "disableClaudeAiConnectors",
+    "spinnerTipsEnabled",
+    "verbose",
+  ]);
 });
