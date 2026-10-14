@@ -18,6 +18,8 @@ interface Props {
   overview: Overview | null;
   /** The open directory; null for all directories, undefined when another page is open. */
   current: string | null | undefined;
+  /** The list of directories did not load, so an empty list says nothing. */
+  overviewFailed: boolean;
   changesOpen: boolean;
   dark: boolean;
   onOpen: (path: string | null) => void;
@@ -31,6 +33,12 @@ function label(path: string, home: string): string {
   return path === home ? "~ (home)" : tilde(path);
 }
 
+/** What an empty directory list says: that it failed to load, that nothing matches, or that it is empty. */
+function emptyText(failed: boolean, query: string): string {
+  if (failed) return "ccdesk could not list your directories.";
+  return query ? "No directory matches." : "No other directories yet.";
+}
+
 /** Where you are, named on the phone's rail bar. */
 function whereLabel(current: string | null | undefined, changesOpen: boolean, home: string) {
   if (changesOpen) return "Recent changes";
@@ -42,6 +50,7 @@ function whereLabel(current: string | null | undefined, changesOpen: boolean, ho
 export function Rail({
   overview,
   current,
+  overviewFailed,
   changesOpen,
   dark,
   onOpen,
@@ -171,9 +180,7 @@ export function Rail({
         {regular.length > 0 ? (
           <ul className="rail-list">{regular.map(item)}</ul>
         ) : (
-          <p className="rail-empty">
-            {query ? "No directory matches." : "No other directories yet."}
-          </p>
+          <p className="rail-empty">{emptyText(overviewFailed, query)}</p>
         )}
         {ephemeral.length > 0 && (
           <>

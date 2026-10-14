@@ -44,16 +44,7 @@ export function useConfig(requested: string | null | undefined, profile: Session
   useEffect(refreshOverview, [refreshOverview]);
 
   // The settings catalog and editors read it, so no directory is shown before it arrives.
-  const [reference, setLoadedReference] = useState<Load<Reference>>({ state: "loading" });
-  useEffect(() => {
-    api.reference().then(
-      (data) => {
-        setReference(data);
-        setLoadedReference({ state: "ready", data });
-      },
-      (error: unknown) => setLoadedReference({ state: "error", message: errorText(error) })
-    );
-  }, []);
+  const [reference, retryReference] = useReference();
 
   // Only the latest request may land, so a slow answer for a folder you left cannot replace the new one.
   const generation = useRef(0);
@@ -88,6 +79,13 @@ export function useConfig(requested: string | null | undefined, profile: Session
     reloadDirectory();
     refreshOverview();
   }, [reloadDirectory, refreshOverview]);
+  // After a failed load: ask again for whatever failed, showing the loading line meanwhile.
+  const retry = useCallback(() => {
+    if (reference.state === "error") retryReference();
+    if (overview.state === "error") setOverview({ state: "loading" });
+    refreshOverview();
+    if (dirRef.current !== null) load(dirRef.current, profileRef.current, false);
+  }, [reference.state, overview.state, retryReference, refreshOverview, load]);
 
   useEffect(() => {
     if (dir === null) return;
@@ -158,9 +156,28 @@ export function useConfig(requested: string | null | undefined, profile: Session
   );
   return {
     overview,
-    view: reference.state === "error" ? reference : view,
+    reference,
+    view,
     data: withUsage,
     dir,
     reload,
+    retry,
   };
+}
+
+/** The settings schema, catalog and hook events from /api/reference, and a way to ask again. */
+function useReference(): [Load<Reference>, () => void] {
+  const [reference, setLoaded] = useState<Load<Reference>>({ state: "loading" });
+  const load = useCallback(() => {
+    setLoaded({ state: "loading" });
+    api.reference().then(
+      (data) => {
+        setReference(data);
+        setLoaded({ state: "ready", data });
+      },
+      (error: unknown) => setLoaded({ state: "error", message: errorText(error) })
+    );
+  }, []);
+  useEffect(load, [load]);
+  return [reference, load];
 }

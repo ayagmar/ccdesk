@@ -1728,14 +1728,26 @@ button:disabled {
   }
 }
 
+/* A page that could not be shown: the problems notice, alone on the page. */
 .problem {
   padding: 48px 28px;
-  max-width: 64ch;
+  max-width: 72ch;
 }
 
 .problem h1 {
-  font-size: 18px;
-  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.problem p {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.problem .head-action {
+  margin: 12px 0 2px;
+  color: var(--ink);
 }
 
 /* ---------- permissions, index fixes ---------- */
