@@ -395,6 +395,29 @@ test("an installed plugin, a plugin-only lock or a marketplace allowlist keeps a
   assert.deepEqual((await loaded())[1], ["extra@skills-dir", true]);
 });
 
+test("env values in a plugin command's inline content are hidden, as in a command file", async () => {
+  const f = makeFixture();
+  const content = (secret: string) => JSON.stringify({ env: { API_KEY: secret } });
+  f.json("home/.claude/skills/kit/.claude-plugin/plugin.json", {
+    name: "kit",
+    commands: {
+      inline: { content: content("fake-inline-secret"), description: "Inline" },
+      file: { source: "./file.md", description: "From a file" },
+    },
+  });
+  f.write("home/.claude/skills/kit/file.md", content("fake-file-secret"));
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  const commands = view.inventory.commands.filter((c) => c.plugin === "kit@skills-dir");
+  assert.deepEqual(commands.map((c) => c.id).sort(), ["kit:file", "kit:inline"]);
+  for (const command of commands) assert.match(command.text, /API_KEY/);
+  const shown = JSON.stringify(view);
+  for (const secret of ["fake-inline-secret", "fake-file-secret"])
+    assert.ok(!shown.includes(secret));
+});
+
 test("a manifest's commands map replaces the default commands folder, as a path does", async () => {
   const f = makeFixture();
   f.json("home/.claude/plugins/installed_plugins.json", {
