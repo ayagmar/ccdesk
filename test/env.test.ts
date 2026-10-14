@@ -29,14 +29,18 @@ test("a relative CLAUDE_CONFIG_DIR names the same folder for ccdesk and the clau
 
 test("a registry value is there when reg.exe exits 0, however much it prints, and not when it fails", async () => {
   // A stand-in for reg.exe: it checks the query it was given, prints more than 1 MiB as a large
-  // policy would, and exits 0, or 1 for a value that is not there.
+  // policy would, and exits 0, or 1 for a value that is not there. It is a whole Node process, which
+  // can take longer to start on a busy Windows runner than reg.exe is given, so it gets a minute.
   const fakeReg = (code: number) =>
     registryQuery(
       process.execPath,
-      "-e",
-      `const [query, key, v, name] = process.argv.slice(1);
+      [
+        "-e",
+        `const [query, key, v, name] = process.argv.slice(1);
        if (query !== "query" || key !== ${JSON.stringify(HKLM_POLICY)} || v !== "/v" || name !== "Settings") process.exit(2);
-       process.stdout.write("x".repeat(1_200_000), () => process.exit(${code}));`
+       process.stdout.write("x".repeat(1_200_000), () => process.exit(${code}));`,
+      ],
+      60_000
     );
 
   assert.equal(await fakeReg(0)(HKLM_POLICY), true);

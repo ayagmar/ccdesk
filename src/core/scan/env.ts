@@ -114,17 +114,19 @@ function regExe(processEnv: NodeJS.ProcessEnv): string {
 /**
  * Asks `<program> query <key> /v Settings`, which exits 0 when the value is there; `leading`
  * arguments go before the query. Only the exit status is read: what it prints, the value included,
- * goes nowhere, so a large value still counts. A failure or a query over 5 s counts as no value.
+ * goes nowhere, so a large value still counts. A failure or a query over `timeout` ms counts as no
+ * value.
  */
 export function registryQuery(
   program: string,
-  ...leading: string[]
+  leading: string[] = [],
+  timeout = 5000
 ): (key: string) => Promise<boolean> {
   return (key) =>
     new Promise((done) => {
       const child = spawn(program, [...leading, "query", key, "/v", "Settings"], {
         stdio: "ignore",
-        timeout: 5000,
+        timeout,
         windowsHide: true,
       });
       child.on("error", () => done(false));
