@@ -41,9 +41,15 @@ export function parseRule(rule: string): { tool: string; specifier: string | nul
   return { tool: rule.slice(0, open).trim(), specifier: specifier === "*" ? null : specifier };
 }
 
-/** Deny and ask rules may glob the tool name; allow rules name it exactly (docs: permissions#tool-name-wildcards). */
+/**
+ * Deny and ask rules may glob the tool name. An allow rule may glob it only after a literal
+ * `mcp__<server>__`, so it names one server; any other allow glob approves nothing
+ * (docs: permissions#tool-name-wildcards).
+ */
 export function namesTool(list: PermissionList, tool: string, name: string): boolean {
-  return list === "allow" || !tool.includes("*") ? tool === name : wildcard(tool).test(name);
+  if (!tool.includes("*")) return tool === name;
+  if (list === "allow" && !/^mcp__[^*]+__/.test(tool)) return false;
+  return wildcard(tool).test(name);
 }
 
 /** A hook matcher, evaluated as the docs describe (docs: hooks#matcher-patterns). */
