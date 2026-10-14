@@ -46,7 +46,7 @@ export const tools = defineSection<R>({
   empty: () => "ccdesk has no list of built-in tools.",
   dimmed: (row) => row.item.verdict === "denied",
   text: (row) => `tool ${row.item.name} ${outcome(row.item)} ${row.item.description}`,
-  label: (row) => `tool ${row.item.name}`,
+  label: (row) => ({ kind: "tool", name: row.item.name }),
   heading: (row) => row.item.name,
   facet: {
     label: "Filter tools by outcome",

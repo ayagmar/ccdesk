@@ -954,11 +954,13 @@ input::placeholder {
 }
 
 /* As the directory path in the header: the end stays, the start gives way. */
-.row-name.ends-first {
+.row-name.ends-first,
+.palette-name.ends-first {
   direction: rtl;
 }
 
-.row-name.ends-first > span {
+.row-name.ends-first > span,
+.palette-name.ends-first > span {
   direction: ltr;
   unicode-bidi: isolate;
 }
@@ -1729,6 +1731,58 @@ button:disabled {
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
+}
+
+/* Name, then a note, then the kind at the right; the note gives way first, then the name. */
+.palette-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-why,
+.palette-note {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Short and fixed, so it is shown whole or not at all. */
+.palette-why {
+  flex: none;
+}
+
+.palette-note {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-what {
+  flex: none;
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.palette-results [role="option"].active .palette-why,
+.palette-results [role="option"].active .palette-note,
+.palette-results [role="option"].active .palette-what {
+  color: inherit;
+}
+
+/* A phone has room for the name, where it lives and the kind, not for why it matched. */
+@media (max-width: 520px) {
+  .palette-why {
+    display: none;
+  }
+}
+
+/* Holds a bullet's place for a row that comes from no one scope. */
+.palette .bullet-none {
+  flex: none;
+  width: 20px;
 }
 
 .palette-results [role="option"].active {

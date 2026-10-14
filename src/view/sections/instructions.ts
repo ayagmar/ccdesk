@@ -27,7 +27,11 @@ export const instructions = defineSection<R>({
   empty: () => "No CLAUDE.md, AGENTS.md or rules apply here.",
   dimmed: (row) => row.item.status === "skipped",
   text: (row) => `${row.item.path} ${row.item.reason}`,
-  label: (row, { format }) => format.tilde(row.item.path),
+  label: (row, { format }) => ({
+    kind: "instruction",
+    name: format.tilde(row.item.path),
+    path: true,
+  }),
   // The file and its folder, or the whole ~ path when that is as short: ~/.claude/CLAUDE.md is
   // your user file, while .claude/CLAUDE.md would read as the project's.
   heading: (row, { format }) => {

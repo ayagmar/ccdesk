@@ -6,10 +6,22 @@ import { Icon } from "./Icon.tsx";
 import { pageContext, sectionOf } from "./sections/index.ts";
 import { type Row } from "../view/sections/types.ts";
 
+/** A result row: its name, what kind of thing it is, and where it lives when that is elsewhere. */
+interface Shown {
+  key: string;
+  name: string;
+  /** The name is a path, so a long one loses its start. */
+  isPath: boolean;
+  what: string;
+  /** Found only in text the row does not show, such as a description. */
+  inText?: boolean;
+  note?: string;
+}
+
 type Result =
-  | { kind: "dir"; key: string; label: string; path: string }
-  | { kind: "row"; key: string; label: string; row: Row }
-  | { kind: "memory"; key: string; label: string; projectPath: string; path: string };
+  | (Shown & { kind: "dir"; path: string })
+  | (Shown & { kind: "row"; row: Row })
+  | (Shown & { kind: "memory"; projectPath: string; path: string });
 
 interface Props {
   overview: Overview | null;
@@ -43,27 +55,48 @@ function paletteResults(
   const q = query.trim().toLowerCase();
   const dirs: Result[] = (overview?.projects ?? [])
     .filter(
-      (p) => !p.ephemeral && p.path !== compareFrom && (!q || p.path.toLowerCase().includes(q))
+      (p) =>
+        !p.ephemeral &&
+        p.path !== compareFrom &&
+        (!q || p.path.toLowerCase().includes(q) || tilde(p.path).toLowerCase().includes(q))
     )
-    .map((p) => ({ kind: "dir", key: `dir:${p.path}`, label: tilde(p.path), path: p.path }));
+    .map((p) => ({
+      kind: "dir",
+      key: `dir:${p.path}`,
+      name: tilde(p.path),
+      isPath: true,
+      what: "directory",
+      path: p.path,
+    }));
   if (compareFrom !== undefined) {
     const typed = typedPath(query, overview?.home);
     const known = dirs.some((d) => d.kind === "dir" && d.path === typed);
     return [
-      ...(typed && !known
-        ? [{ kind: "dir" as const, key: `typed:${typed}`, label: tilde(typed), path: typed }]
+      ...(typed && !known && typed !== compareFrom
+        ? [
+            {
+              kind: "dir" as const,
+              key: `typed:${typed}`,
+              name: tilde(typed),
+              isPath: true,
+              what: "directory",
+              path: typed,
+            },
+          ]
         : []),
       ...dirs,
     ].slice(0, 40);
   }
-  const items: Result[] = rows
-    .filter((r) => q && sectionOf(r.section).text(r).toLowerCase().includes(q))
-    .map((r) => ({
-      kind: "row",
-      key: r.id,
-      label: sectionOf(r.section).label(r, pageContext()),
-      row: r,
-    }));
+  const items: Result[] = !q
+    ? []
+    : rows.flatMap((r) => {
+        const section = sectionOf(r.section);
+        const { kind, name, path: isPath = false } = section.label(r, pageContext());
+        // What the row shows is searched too, so a path is found as written with ~.
+        const shown = `${kind} ${name}`.toLowerCase().includes(q);
+        if (!shown && !section.text(r).toLowerCase().includes(q)) return [];
+        return [{ kind: "row", key: r.id, name, isPath, what: kind, inText: !shown, row: r }];
+      });
   const here = new Set(rows.map((r) => r.id));
   const memories: Result[] = (overview?.memoryCatalog ?? [])
     .filter(
@@ -75,7 +108,10 @@ function paletteResults(
     .map((m) => ({
       kind: "memory",
       key: `cat:${m.path}`,
-      label: `memory ${m.name} · ${tilde(m.projectPath)}`,
+      name: m.name,
+      isPath: false,
+      what: "memory",
+      note: tilde(m.projectPath),
       projectPath: m.projectPath,
       path: m.path,
     }));
@@ -88,11 +124,16 @@ function emptyText(query: string, compareFrom: string | undefined): string {
   return "No other directories yet. Type a full path.";
 }
 
-/** A row's bullet, or an icon for a directory or a row without one. */
+/**
+ * A row's bullet, a folder for a directory, and an empty mark for a row from no one scope. A memory's
+ * bullet is not read out, since its kind says memory.
+ */
 function ResultIcon({ result }: { result: Result }) {
-  if (result.kind === "memory") return <Bullet line="memory" />;
+  if (result.kind === "memory") return <Bullet line="memory" ariaHidden />;
   if (result.kind === "dir") return <Icon name="folder" />;
-  return result.row.line ? <Bullet line={result.row.line} /> : <Icon name="command" />;
+  const { line } = result.row;
+  if (!line) return <span className="bullet-none" />;
+  return <Bullet line={line} ariaHidden={line === "memory"} />;
 }
 
 /** Jump to any directory, any row in the current one, or a memory saved for any directory. */
@@ -189,7 +230,16 @@ export function Palette({
               onClick={() => choose(r)}
             >
               <ResultIcon result={r} />
-              <span className={r.kind === "dir" ? "mono" : ""}>{r.label}</span>
+              {r.isPath ? (
+                <span className="palette-name mono ends-first">
+                  <span>{r.name}</span>
+                </span>
+              ) : (
+                <span className="palette-name mono">{r.name}</span>
+              )}
+              {r.inText && <span className="palette-why">matches in text</span>}
+              {r.note && <span className="palette-note">{r.note}</span>}
+              <span className="palette-what">{r.what}</span>
             </div>
           ))}
         </div>

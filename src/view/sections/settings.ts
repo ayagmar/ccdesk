@@ -33,6 +33,6 @@ export const settings = defineSection<R>({
       : "no-overrides",
   dimmed: (row) => row.item.from.length === 0,
   text: (row) => `${row.item.key} ${JSON.stringify(row.item.value)}`,
-  label: (row) => `setting ${row.item.key}`,
+  label: (row) => ({ kind: "setting", name: row.item.key }),
   heading: (row) => row.item.key,
 });

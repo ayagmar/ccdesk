@@ -31,7 +31,7 @@ export const memory = defineSection<R>({
       ? "MEMORY.md is here, but no memory files."
       : "Claude hasn't saved any memory for this directory yet.",
   text: (row) => `${row.item.name} ${row.item.description} ${row.item.type} ${row.item.body}`,
-  label: (row) => `memory ${row.item.name}`,
+  label: (row) => ({ kind: "memory", name: row.item.name }),
   heading: (row) => row.item.name,
   facet: { label: "Filter memory by type", of: (row) => row.item.type, order: () => MEMORY_TYPES },
 });
