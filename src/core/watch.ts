@@ -181,8 +181,18 @@ interface Subscription {
   /** Callers of `subscribe`, called after every change until they unsubscribe. */
   listeners: Set<() => void>;
   extra: Target[];
+  /** Paths watchers named since subscribers were last told. */
+  pending: Set<string>;
+  /** Each path's state when subscribers were last told about it, from `fileState`. */
+  told: Map<string, string>;
   idle?: NodeJS.Timeout;
   settle?: NodeJS.Timeout;
+}
+
+/** A file or folder's size and modification time, or undefined when it cannot be read. */
+async function fileState(path: string): Promise<string | undefined> {
+  const info = await stat(path).catch(() => null);
+  return info ? `${info.size}:${info.mtimeMs}` : undefined;
 }
 
 /** The latest scan of a directory, with when it started and ~/.claude.json as it was then. */
@@ -257,8 +267,7 @@ export class Watcher {
 
   /** ~/.claude.json's size and time; Claude Code rewrites it too often to watch. */
   private async stateFile(): Promise<string> {
-    const info = await stat(this.env.claudeJson).catch(() => null);
-    return info ? `${info.size}:${info.mtimeMs}` : "missing";
+    return (await fileState(this.env.claudeJson)) ?? "missing";
   }
 
   /**
@@ -346,6 +355,8 @@ export class Watcher {
       waiters: new Set(),
       listeners: new Set(),
       extra: this.scanned.get(dir) ?? [],
+      pending: new Set(),
+      told: new Map(),
     };
     this.subscriptions.set(dir, subscription);
     this.restart(dir, subscription);
@@ -363,6 +374,43 @@ export class Watcher {
     this.latest.delete(dir);
     // Pages still waiting are answered now, so no timer outlives the watcher.
     for (const wake of [...subscription.waiters]) wake();
+  }
+
+  /**
+   * Settles a change a watcher reported at `path`, or at an unnamed path, unless `path` is as it was
+   * when subscribers were last told about it. On macOS, the stream that replaces the old one when
+   * watchers move can report a change again, after subscribers heard about it.
+   */
+  private async noticed(dir: string, subscription: Subscription, path?: string): Promise<void> {
+    if (path !== undefined) {
+      const state = await fileState(path);
+      if (this.subscriptions.get(dir) !== subscription) return;
+      // A path that cannot be read always counts, since a deleted file has no state to compare.
+      if (state !== undefined && state === subscription.told.get(path)) return;
+      subscription.pending.add(path);
+    }
+    clearTimeout(subscription.settle);
+    subscription.settle = setTimeout(() => void this.tell(dir, subscription), SETTLE_MS);
+  }
+
+  /**
+   * Notes the state of each path changed since the last time, then tells waiters and subscribers.
+   * The states are read first, so whatever a subscriber reads after being told is at least as new.
+   */
+  private async tell(dir: string, subscription: Subscription): Promise<void> {
+    const paths = [...subscription.pending];
+    subscription.pending.clear();
+    const states = await Promise.all(paths.map(fileState));
+    if (this.subscriptions.get(dir) !== subscription) return;
+    paths.forEach((path, i) => {
+      const state = states[i];
+      if (state === undefined) subscription.told.delete(path);
+      else subscription.told.set(path, state);
+    });
+    subscription.changedAt = Date.now();
+    // First, so a subscriber that throws cannot leave the old watchers in place.
+    this.restart(dir, subscription);
+    for (const wake of [...subscription.waiters, ...subscription.listeners]) wake();
   }
 
   /** Rewatches `dir`. A failure rejects `ready` for whoever awaits it, and is handled when no one does. */
@@ -404,13 +452,11 @@ export class Watcher {
             const changed = name === null ? "" : String(name);
             if (target.names && !target.names.includes(basename(changed))) return;
             subscription.touchedAt = Date.now();
-            clearTimeout(subscription.settle);
-            subscription.settle = setTimeout(() => {
-              subscription.changedAt = Date.now();
-              // First, so a subscriber that throws cannot leave the old watchers in place.
-              this.restart(dir, subscription);
-              for (const wake of [...subscription.waiters, ...subscription.listeners]) wake();
-            }, SETTLE_MS);
+            void this.noticed(
+              dir,
+              subscription,
+              name === null ? undefined : join(target.path, changed)
+            );
           }
         );
         watcher.on("error", () => watcher.close());
