@@ -175,6 +175,30 @@ async function nearestWatchable(target: Target): Promise<Target> {
   return target;
 }
 
+/**
+ * One target per folder. Several missing files and folders can stand in for the same folder that
+ * exists, and each watch costs a handle on Windows and a path in the macOS stream. A folder watched
+ * for every entry, or recursively, covers the narrower watches beside it.
+ */
+function oncePerFolder(list: Target[]): Target[] {
+  const byPath = new Map<string, Target>();
+  for (const target of list) {
+    const known = byPath.get(target.path);
+    if (!known) {
+      byPath.set(target.path, target);
+      continue;
+    }
+    const names =
+      known.names && target.names ? [...new Set([...known.names, ...target.names])] : undefined;
+    byPath.set(target.path, {
+      path: target.path,
+      recursive: known.recursive || target.recursive,
+      ...(names && { names }),
+    });
+  }
+  return [...byPath.values()];
+}
+
 interface Subscription {
   watchers: FSWatcher[];
   /** The latest (re)start of the watchers; they cover every current target once it settles. */
@@ -328,7 +352,8 @@ export class Watcher {
   ): Promise<{ changed: boolean; at: number; unwatched: string[] }> {
     const subscription = await this.watching(dir);
     if (
-      subscription.unwatched.length > 0 &&
+      // A network drive is never watched, so only other folders are worth another try.
+      subscription.unwatched.some((path) => !isNetworkPath(path)) &&
       Date.now() - subscription.watchingSince >= RETRY_MS &&
       this.subscriptions.get(dir) === subscription
     ) {
@@ -503,8 +528,8 @@ export class Watcher {
    * A rebuild replaces the stream, so a change made during one can still be lost.
    */
   private async rewatch(dir: string, subscription: Subscription): Promise<void> {
-    const list = await Promise.all(
-      (await targets(this.env, dir, subscription.extra)).map(nearestWatchable)
+    const list = oncePerFolder(
+      await Promise.all((await targets(this.env, dir, subscription.extra)).map(nearestWatchable))
     );
     const old = subscription.watchers;
     subscription.watchers = [];

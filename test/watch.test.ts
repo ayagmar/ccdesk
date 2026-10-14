@@ -383,6 +383,30 @@ test("a change a watcher reports without naming the file wakes a page waiting fo
   assert.equal((await waiting).changed, true);
 });
 
+test("each folder is watched once, however many of the files ccdesk reads are in it", async () => {
+  const f = makeFixture();
+  f.write("work/team/app/README.md", "x");
+  const watched: string[] = [];
+  const host: WatchHost = {
+    platform: "linux",
+    watch: ((path: string) => {
+      watched.push(path);
+      const fake = Object.assign(new EventEmitter(), { close: () => undefined });
+      return fake as unknown as FSWatcher;
+    }) as typeof watch,
+  };
+  const watcher = new Watcher(f.env, scanDirectory, host);
+  watchers.push(watcher);
+
+  // No folder on the way up has a .claude, so each one stands in for several missing targets.
+  await started(watcher, f.at("work/team/app"));
+
+  assert.deepEqual(
+    watched.filter((path, i) => watched.indexOf(path) !== i),
+    []
+  );
+});
+
 test("closing the watcher does not tell a subscriber something changed", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "one\n");
