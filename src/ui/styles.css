@@ -2767,8 +2767,6 @@ pre.diff span {
 }
 
 .sort-mark {
-  font-family: var(--mono);
-  font-size: var(--text-xs);
   opacity: 0;
   transition: opacity 120ms;
 }

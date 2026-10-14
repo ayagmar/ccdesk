@@ -16,6 +16,9 @@ const PATHS = {
   code: "M5.5 4.5 2 8l3.5 3.5m5-7L14 8l-3.5 3.5",
   open: "M9 2.5h4.5V7m0-4.5L7 9m4.5.5v4h-9v-9h4",
   block: "M8 14.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13ZM3.4 12.6l9.2-9.2",
+  sort: "M5 6.5 8 3.5l3 3m-6 3 3 3 3-3",
+  "sort-up": "M8 13V3.5M4.5 7 8 3.5 11.5 7",
+  "sort-down": "M8 3v9.5M4.5 9 8 12.5 11.5 9",
 } as const;
 
 type IconName = keyof typeof PATHS;
