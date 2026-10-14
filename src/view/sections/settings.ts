@@ -1,6 +1,6 @@
 import { HIGHEST_FIRST } from "../../shared/scopes.ts";
 import { type Scope } from "../../shared/types.ts";
-import { type Line } from "../lines.ts";
+import { LINES, type Line, lineName } from "../lines.ts";
 import { defineSection, type RowOf } from "./types.ts";
 
 type R = RowOf<"settings">;
@@ -35,4 +35,10 @@ export const settings = defineSection<R>({
   text: (row) => `${row.item.key} ${JSON.stringify(row.item.value)}`,
   label: (row) => ({ kind: "setting", name: row.item.key }),
   heading: (row) => row.item.key,
+  facet: {
+    label: "Filter settings by the file that decides them",
+    // A merged value is decided by its highest file, the one the row's line shows.
+    of: (row) => (row.item.from.length === 0 ? "Ignored" : lineName(row.line)),
+    order: () => [...LINES.map((l) => l.name), "Ignored"],
+  },
 });
