@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type KeyboardEvent, useState } from "react";
 import { type Overview, type ProjectSummary } from "../shared/types.ts";
 import { tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
@@ -64,6 +64,16 @@ function rememberFolded(value: "folded" | null) {
   } catch {
     // The fold just won't persist.
   }
+}
+
+/** Closing the phone overlay is the whole of that Escape; the page's own Escape stays out of it. */
+function closeOnEscape(open: boolean, close: () => void) {
+  return (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key === "Escape" && open) {
+      close();
+      e.stopPropagation();
+    }
+  };
 }
 
 /** Where you are, named on the phone's rail bar. */
@@ -185,13 +195,7 @@ export function Rail({
     <nav
       className={`rail${open ? " open" : ""}${hidden ? " hidden" : ""}`}
       aria-label="Directories"
-      onKeyDown={(e) => {
-        // Closing the phone overlay is the whole of that Escape; the page's own Escape stays out of it.
-        if (e.key === "Escape" && open) {
-          setOpen(false);
-          e.stopPropagation();
-        }
-      }}
+      onKeyDown={closeOnEscape(open, () => setOpen(false))}
     >
       <div className="brand">
         <a className="brand-link" href={DOCS} target="_blank" rel="noreferrer" title="ccdesk docs">

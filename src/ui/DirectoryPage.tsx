@@ -91,17 +91,10 @@ export function DirectoryPage({
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [adding, setAdding] = useState<Adding | null>(null);
-  /** Show what Claude reads at session start instead of the tables. */
-  const [seeing, setSeeing] = useState(false);
   const [list, setList] = useState<ListState>(readListState);
   const [shown, setShown] = useState<Partial<Record<SectionId, number>>>({});
   const filterInput = useRef<HTMLInputElement>(null);
-  const configButton = useRef<HTMLButtonElement>(null);
-  /** Back to the tables, with focus on the switch so the keyboard does not start over at the top. */
-  const leaveSeeing = useCallback(() => {
-    setSeeing(false);
-    requestAnimationFrame(() => configButton.current?.focus());
-  }, []);
+  const { seeing, setSeeing, configButton, leaveSeeing } = useSeeing();
 
   useEffect(
     () => replaceListState({ kind: "directory", dir: view.path, profile: view.profile }, list),
@@ -331,6 +324,20 @@ function DirectoryTitle({ view }: { view: DirectoryView }) {
       <TrustFlag view={view} />
     </div>
   );
+}
+
+/**
+ * Whether the page shows what Claude reads at session start instead of the tables, and the way
+ * back, which puts focus on the view switch so the keyboard does not start over at the top.
+ */
+function useSeeing() {
+  const [seeing, setSeeing] = useState(false);
+  const configButton = useRef<HTMLButtonElement>(null);
+  const leaveSeeing = useCallback(() => {
+    setSeeing(false);
+    requestAnimationFrame(() => configButton.current?.focus());
+  }, []);
+  return { seeing, setSeeing, configButton, leaveSeeing };
 }
 
 /** Config or what Claude sees, the row filter, and the palette button. */
