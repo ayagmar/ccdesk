@@ -284,8 +284,11 @@ interface Subscription {
   /** The `projects` entries of ~/.claude.json the scan reads, and `claudeJsonPrint` of them. */
   projectKeys: string[];
   claudeJson?: string;
-  /** The latest read of ~/.claude.json after a watcher saw it change; reads run one at a time. */
+  /** Waits for a change to ~/.claude.json to settle before reading it (see `claudeJsonChanged`). */
+  claudeJsonSettle?: NodeJS.Timeout | undefined;
+  /** The latest read of ~/.claude.json, and whether one is waiting to start; one runs at a time. */
   claudeJsonRead: Promise<void>;
+  claudeJsonQueued: boolean;
   /** What the watchers saw since subscribers were last told. */
   seen: Seen;
   /** On macOS, the state of each path read before subscribers were last told, until `repeatsUntil`. */
@@ -431,7 +434,9 @@ export class Watcher {
       latest?.view.profile === "interactive" &&
       subscription?.unwatched.length === 0 &&
       subscription.watchingSince < latest.startedAt &&
-      subscription.touchedAt < latest.startedAt
+      subscription.touchedAt < latest.startedAt &&
+      // One that has not settled yet may too.
+      subscription.claudeJsonSettle === undefined
     )
       return latest.view;
     return this.scan(dir);
@@ -497,6 +502,7 @@ export class Watcher {
       extra: this.scanned.get(dir) ?? [],
       projectKeys: [],
       claudeJsonRead: Promise.resolve(),
+      claudeJsonQueued: false,
       seen: nothingSeen(),
       told: new Map(),
       repeatsUntil: 0,
@@ -513,6 +519,7 @@ export class Watcher {
     clearTimeout(subscription.idle);
     clearTimeout(subscription.settle);
     clearTimeout(subscription.retry);
+    clearTimeout(subscription.claudeJsonSettle);
     for (const w of subscription.watchers) w.close();
     this.subscriptions.delete(dir);
     this.latest.delete(dir);
@@ -542,17 +549,27 @@ export class Watcher {
   }
 
   /**
-   * Reads ~/.claude.json after a watcher saw it change, and settles a change only when what the
-   * scan reads in it changed.
+   * Reads ~/.claude.json once a watcher's reports of it have settled, and settles a change only
+   * when what the scan reads in it changed. A file written in place can be read half written, so it
+   * is read only after a pause in its events, and never twice for one write: a read already waiting
+   * to start reads the latest file.
    */
   private claudeJsonChanged(dir: string, subscription: Subscription): void {
-    subscription.claudeJsonRead = subscription.claudeJsonRead.then(async () => {
-      const print = await claudeJsonPrint(this.env, subscription.projectKeys);
-      if (print === subscription.claudeJson || this.subscriptions.get(dir) !== subscription) return;
-      subscription.claudeJson = print;
-      subscription.touchedAt = Date.now();
-      this.noticed(dir, subscription);
-    });
+    clearTimeout(subscription.claudeJsonSettle);
+    subscription.claudeJsonSettle = setTimeout(() => {
+      subscription.claudeJsonSettle = undefined;
+      if (subscription.claudeJsonQueued) return;
+      subscription.claudeJsonQueued = true;
+      subscription.claudeJsonRead = subscription.claudeJsonRead.then(async () => {
+        subscription.claudeJsonQueued = false;
+        const print = await claudeJsonPrint(this.env, subscription.projectKeys);
+        if (print === subscription.claudeJson || this.subscriptions.get(dir) !== subscription)
+          return;
+        subscription.claudeJson = print;
+        subscription.touchedAt = Date.now();
+        this.noticed(dir, subscription);
+      });
+    }, SETTLE_MS);
   }
 
   /**
