@@ -1,5 +1,7 @@
 # Changelog
 
+## [0.4.1](https://github.com/ayagmar/ccdesk/compare/v0.4.0...v0.4.1) (2026-10-14)
+
 ## [0.4.0](https://github.com/ayagmar/ccdesk/compare/v0.3.0...v0.4.0) (2026-10-14)
 
 ### Features
