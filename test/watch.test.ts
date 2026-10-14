@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, type WatchListener, watch } from "node:fs";
+import { type FSWatcher, mkdirSync, type WatchListener, watch } from "node:fs";
 import { after, test } from "node:test";
 import { scanDirectory, testPath, Watcher } from "../src/core/index.ts";
 import { type WatchHost } from "../src/core/watch.ts";
@@ -239,6 +239,55 @@ test("a subscriber hears once about an editor's save, and nothing after unsubscr
   // Answers once the change has settled, when subscribers are told.
   await watcher.wait(f.at("app"), since, new AbortController().signal, 5000);
   assert.equal(calls, 1);
+});
+
+/** A host whose watchers report only what the test passes to `report`, as fs.watch would. */
+function reportingHost() {
+  const open = new Set<{ path: string; listener: WatchListener<string> }>();
+  const host: WatchHost = {
+    platform: "linux",
+    watch: ((path: string, _options: unknown, listener: WatchListener<string>) => {
+      const entry = { path, listener };
+      open.add(entry);
+      const watcher = {
+        close: () => open.delete(entry),
+        on: () => watcher,
+      };
+      return watcher as unknown as FSWatcher;
+    }) as typeof watch,
+  };
+  const report = (path: string, name: string) => {
+    for (const entry of [...open]) if (entry.path === path) entry.listener("change", name);
+  };
+  return { host, report };
+}
+
+test("a change reported again after the watchers move is told once, and the next edit is told", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "one\n");
+  const { host, report } = reportingHost();
+  const watcher = new Watcher(f.env, scanDirectory, host);
+  watchers.push(watcher);
+  const signal = new AbortController().signal;
+  let calls = 0;
+  await watcher.subscribe(f.at("app"), () => calls++);
+
+  const since = Date.now();
+  f.write("app/CLAUDE.md", "two\n");
+  report(f.at("app"), "CLAUDE.md");
+  const first = await watcher.wait(f.at("app"), since, signal, 5000);
+  assert.equal(first.changed, true);
+
+  // macOS can report a change again to the watchers that replace the old ones after it.
+  await started(watcher, f.at("app"));
+  report(f.at("app"), "CLAUDE.md");
+  assert.equal((await watcher.wait(f.at("app"), first.at, signal, 800)).changed, false);
+  assert.equal(calls, 1);
+
+  f.write("app/CLAUDE.md", "three\n");
+  report(f.at("app"), "CLAUDE.md");
+  assert.equal((await watcher.wait(f.at("app"), first.at, signal, 5000)).changed, true);
+  assert.equal(calls, 2);
 });
 
 test("closing the watcher does not tell a subscriber something changed", async () => {
