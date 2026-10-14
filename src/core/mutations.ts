@@ -1,5 +1,6 @@
 import { access, constants, readdir, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { storeDirName } from "../shared/memory.ts";
 import { type Change, type MemoryAction, type MemoryChangePreview } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isWithin, revisionOf, stringField } from "./scan/files.ts";
@@ -62,6 +63,17 @@ async function assertMemoryFile(env: ScanEnv, path: string): Promise<string> {
   return real;
 }
 
+/**
+ * The directory `store` is saved for, kept with the change so Recent changes can name it: a store's
+ * folder name cannot be read back into a path. One that does not name this store is not kept, as
+ * for a store CLAUDE_CODE_PROJECT_DIR_NAME names; the change itself still goes ahead.
+ */
+function savedFor(store: string, projectPath: string | undefined): string | undefined {
+  if (projectPath === undefined || storeDirName(projectPath) !== basename(dirname(store)))
+    return undefined;
+  return projectPath;
+}
+
 /** One fingerprint for two files, so a change can require both as they were reviewed. */
 export function revisionOfBoth(first: string | null, second: string | null): string {
   return `${revisionOf(first)}+${revisionOf(second)}`;
@@ -83,8 +95,9 @@ function indexLines(index: string | null): string[] {
  * Deletes a memory with the MEMORY.md lines that point at it. A line that also points at another
  * memory stays as it is, so the delete never drops a pointer that still works.
  */
-async function planDelete(env: ScanEnv, path: string): Promise<Plan> {
+async function planDelete(env: ScanEnv, path: string, projectPath?: string): Promise<Plan> {
   const real = await assertMemoryFile(env, path);
+  const project = savedFor(dirname(real), projectPath);
   const text = await readIfExists(env, real);
   const indexPath = await indexPathIn(dirname(real));
   const index = await readIfExists(env, indexPath);
@@ -106,7 +119,14 @@ async function planDelete(env: ScanEnv, path: string): Promise<Plan> {
       (await readIfExists(env, real)) !== null;
     return recordChange(
       env,
-      { kind: "memory-delete", target: real, before: text, removedIndexLines, unchanged },
+      {
+        kind: "memory-delete",
+        target: real,
+        before: text,
+        removedIndexLines,
+        unchanged,
+        projectPath: project,
+      },
       async () => {
         // The index goes first: if it changed meanwhile, nothing has been removed yet.
         if (next !== index) await writeAtomic(env, indexPath, next ?? "", revisionOf(index));
@@ -151,17 +171,23 @@ async function planIndex(
   store: string,
   edit: (lines: string[]) => string[],
   /** Other text the new index was worked out from, bound into the revision. */
-  source: string | null
+  source: string | null,
+  projectPath: string | undefined
 ): Promise<Plan> {
   const path = await indexPathIn(store);
+  const project = savedFor(store, projectPath);
   const before = await readIfExists(env, path);
   const after = `${edit(indexLines(before)).join("\n")}\n`;
   if (after === before) throw new RefusedError("MEMORY.md already says that.");
   const save = () =>
-    recordChange(env, { kind: "memory-index", target: path, before }, async () => {
-      await writeAtomic(env, path, after, revisionOf(before));
-      return { target: path, revision: revisionOf(after) };
-    });
+    recordChange(
+      env,
+      { kind: "memory-index", target: path, before, projectPath: project },
+      async () => {
+        await writeAtomic(env, path, after, revisionOf(before));
+        return { target: path, revision: revisionOf(after) };
+      }
+    );
   return {
     preview: { files: [{ path, before, after }], revision: revisionOfBoth(before, source) },
     save,
@@ -174,21 +200,25 @@ function oneLine(text: string): string {
 }
 
 /** Adds a memory that MEMORY.md does not mention, in the `- [name](file) — description` form. */
-async function planAdd(env: ScanEnv, memoryPath: string): Promise<Plan> {
+async function planAdd(env: ScanEnv, memoryPath: string, projectPath?: string): Promise<Plan> {
   const real = await assertMemoryFile(env, memoryPath);
   const text = await readIfExists(env, real);
   const { data } = parseFrontmatter(text ?? "");
   const name = oneLine(stringField(data, "name")) || basename(real, ".md");
   const description = oneLine(stringField(data, "description"));
   const line = `- [${name}](${basename(real)})${description ? ` — ${description}` : ""}`;
-  return planIndex(env, dirname(real), (lines) => [...lines, line], text);
+  return planIndex(env, dirname(real), (lines) => [...lines, line], text, projectPath);
 }
 
 /**
  * Removes every MEMORY.md line that points only at memory files that no longer exist. A line that
  * also points at a memory that is there stays, to be fixed by hand.
  */
-async function planRemoveDead(env: ScanEnv, indexPath: string): Promise<Plan> {
+async function planRemoveDead(
+  env: ScanEnv,
+  indexPath: string,
+  projectPath?: string
+): Promise<Plan> {
   if (basename(indexPath) !== "MEMORY.md")
     throw new RefusedError("Only a memory folder's MEMORY.md can be changed.");
   const store = await assertMemoryDir(env, dirname(indexPath));
@@ -205,11 +235,15 @@ async function planRemoveDead(env: ScanEnv, indexPath: string): Promise<Plan> {
         const dead = deadLinks(line, missing);
         return dead.length === 0 || !pointsOnlyAt(line, dead);
       }),
-    files.join("\n")
+    files.join("\n"),
+    projectPath
   );
 }
 
-const PLANS: Record<MemoryAction, (env: ScanEnv, path: string) => Promise<Plan>> = {
+const PLANS: Record<
+  MemoryAction,
+  (env: ScanEnv, path: string, projectPath?: string) => Promise<Plan>
+> = {
   delete: planDelete,
   add: planAdd,
   "remove-dead": planRemoveDead,
@@ -239,14 +273,21 @@ export async function previewMemoryChange(
 
 /**
  * Makes a reviewed memory action. `path` is the memory file, or MEMORY.md for remove-dead; the
- * action runs only while everything its review was worked out from is unchanged.
+ * action runs only while everything its review was worked out from is unchanged. `projectPath`, the
+ * directory the store is saved for, is kept with the change.
  */
 export function changeMemory(
   env: ScanEnv,
   action: MemoryAction,
   path: string,
   expectedRevision: string,
-  queue: Serially
+  queue: Serially,
+  projectPath?: string
 ): Promise<Change> {
-  return saveReviewed(queue, () => PLANS[action](env, path), expectedRevision, REVIEW_AGAIN);
+  return saveReviewed(
+    queue,
+    () => PLANS[action](env, path, projectPath),
+    expectedRevision,
+    REVIEW_AGAIN
+  );
 }

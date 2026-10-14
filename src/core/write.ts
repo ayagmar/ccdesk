@@ -256,6 +256,8 @@ export const BackupManifestSchema = Type.Object({
   removedIndexLines: Type.Optional(Type.Array(Type.String())),
   /** For a change made through `claude mcp`: the commands that put it back, values hidden. */
   undoCommands: Type.Optional(Type.Array(Type.String())),
+  /** For a memory change: the directory its store is saved for. */
+  projectPath: Type.Optional(Type.String()),
 });
 export type BackupManifest = Static<typeof BackupManifestSchema>;
 
@@ -324,6 +326,8 @@ export async function recordChange<T extends { revision: string }>(
     target: string;
     before: string | null;
     removedIndexLines?: string[];
+    /** For a memory change: the directory its store is saved for. */
+    projectPath?: string | undefined;
     /** Whether disk is still as before the change; by default, whether the target is. */
     unchanged?: () => Promise<boolean>;
   },
@@ -337,6 +341,7 @@ export async function recordChange<T extends { revision: string }>(
     before: revisionOf(record.before),
     after: "pending",
     ...(record.removedIndexLines ? { removedIndexLines: record.removedIndexLines } : {}),
+    ...(record.projectPath ? { projectPath: record.projectPath } : {}),
   };
   // Replaced by rename, so an interrupted rewrite leaves the earlier manifest rather than half of one.
   const writeManifest = async () => {

@@ -184,6 +184,8 @@ export interface BackupSummary {
   created: boolean;
   /** The change was interrupted or failed halfway; the backup still holds the earlier text. */
   incomplete?: boolean;
+  /** For a memory change: the directory its store is saved for, when ccdesk recorded it. */
+  projectPath?: string;
 }
 
 /** A change ccdesk made; Recent changes lists it under `id` and can undo it. */

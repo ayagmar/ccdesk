@@ -101,9 +101,15 @@ export const api = {
   /** What a memory action would change; `path` is the memory, or MEMORY.md for remove-dead. */
   previewMemory: (action: MemoryAction, path: string) =>
     request<MemoryChangePreview>("/api/memory/preview", { method: "POST", body: { action, path } }),
-  /** Makes the reviewed memory action, only while what it was worked out from is unchanged. */
-  changeMemory: (action: MemoryAction, path: string, revision: string) =>
-    request<Change>("/api/memory/change", { method: "POST", body: { action, path, revision } }),
+  /**
+   * Makes the reviewed memory action, only while what it was worked out from is unchanged.
+   * `projectPath` is the directory the store is saved for, which Recent changes then names.
+   */
+  changeMemory: (action: MemoryAction, path: string, revision: string, projectPath?: string) =>
+    request<Change>("/api/memory/change", {
+      method: "POST",
+      body: { action, path, revision, ...(projectPath && { projectPath }) },
+    }),
   open: (path: string) =>
     request<{ editor: string }>("/api/open", { method: "POST", body: { path } }),
   previewSettings: (edit: SettingsEdit) =>

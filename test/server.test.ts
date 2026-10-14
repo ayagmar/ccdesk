@@ -36,6 +36,7 @@ interface Backup {
   kind: string;
   target: string;
   created: boolean;
+  projectPath?: string;
 }
 interface RestorePreview {
   before: string | null;
@@ -148,12 +149,18 @@ function previewMemory(action: string, path: string) {
   return call("/api/memory/preview", { method: "POST", body: { action, path } });
 }
 
-/** Reviews a memory action, then makes it with the reviewed revision, as the page does. */
-async function changeMemory(action: string, path: string) {
+/**
+ * Reviews a memory action, then makes it with the reviewed revision, as the page does, naming the
+ * directory the store is saved for when given.
+ */
+async function changeMemory(action: string, path: string, projectPath?: string) {
   const preview = await previewMemory(action, path);
   if (preview.status !== 200) return preview;
   const { revision } = preview.json as { revision: string };
-  return call("/api/memory/change", { method: "POST", body: { action, path, revision } });
+  return call("/api/memory/change", {
+    method: "POST",
+    body: { action, path, revision, ...(projectPath && { projectPath }) },
+  });
 }
 
 function deleteMemory(path: string) {
@@ -820,6 +827,38 @@ test("a memory put back from recent changes is listed as a change of its own", a
   const preview = (await call("/api/backups/preview", { method: "POST", body: { id: restore.id } }))
     .json as RestorePreview;
   assert.match(preview.blocked ?? "", /delete the memory again/);
+});
+
+test("Recent changes names the directory a memory is saved for, for its delete and for putting it back", async () => {
+  // Catches the directory not being kept with the change: a store's folder name cannot be read back
+  // into a path, so Recent changes would show ~/.claude/projects/<name>/memory instead.
+  const project = fixture.at("work/named");
+  const store = memoryDirFor(fixture, project);
+  const path = fixture.write(join(store, "note.md"), memoryFile("note", "project", "d", "b"));
+  fixture.write(join(store, "MEMORY.md"), "- [note](note.md) — d\n");
+
+  const deleted = (await changeMemory("delete", path, project)).json as Change;
+  assert.equal((await undo(deleted)).status, 200);
+
+  const changes = (await backups()).filter((b) => b.target.startsWith(store));
+  assert.deepEqual(changes.map((b) => [b.kind, b.projectPath]).sort(), [
+    ["memory-delete", project],
+    ["memory-index", project],
+    ["memory-restore", project],
+  ]);
+});
+
+test("a memory change naming a directory its memory is not saved for goes ahead without naming it", async () => {
+  // Catches a wrong directory blocking the change, as with a store CLAUDE_CODE_PROJECT_DIR_NAME
+  // names, or being shown in Recent changes as where the memory was saved.
+  const { old } = seedMemory();
+
+  const res = await changeMemory("delete", old, fixture.at("work/other"));
+
+  assert.equal(res.status, 200);
+  assert.equal(existsSync(old), false);
+  const change = (await backups()).find((b) => b.id === (res.json as Change).id);
+  assert.equal(change?.projectPath, undefined);
 });
 
 test("a delete that stopped halfway after Claude rewrote the memory can still put its MEMORY.md line back", async () => {

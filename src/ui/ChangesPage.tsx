@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { type BackupKind, type BackupSummary, type RestorePreview } from "../shared/types.ts";
 import { api, errorText } from "./api.ts";
+import { Bullet } from "./Bullet.tsx";
 import { DiffView } from "./DiffView.tsx";
 import { tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
@@ -128,6 +129,7 @@ function ChangeItem({
     toggle = "Show change";
     icon = "eye";
   }
+  const folder = tilde(b.target.replace(/[/\\][^/\\]*$/, ""));
   return (
     <li className="change">
       <div className="change-row">
@@ -144,7 +146,14 @@ function ChangeItem({
         </span>
         <span className="change-file">
           <span className="mono">{b.target.split(/[/\\]/).pop()}</span>
-          <span className="mono wrap muted">{tilde(b.target.replace(/[/\\][^/\\]*$/, ""))}</span>
+          {b.projectPath ? (
+            <span className="change-store">
+              <Bullet line="memory" ariaHidden /> auto memory of{" "}
+              <span className="mono wrap">{tilde(b.projectPath)}</span>
+            </span>
+          ) : (
+            <span className="mono wrap muted">{folder}</span>
+          )}
         </span>
         <span className="muted num" title={new Date(b.createdAt).toLocaleString()}>
           {new Date(b.createdAt).toLocaleTimeString(undefined, { timeStyle: "short" })}
@@ -153,6 +162,11 @@ function ChangeItem({
           <Icon name={icon} /> {toggle}
         </button>
       </div>
+      {open && b.projectPath && (
+        <p className="muted small change-folder">
+          Memory folder: <span className="mono wrap">{folder}</span>
+        </p>
+      )}
       {open && b.kind === "memory-restore" && (
         <p className="muted small review">
           This put a deleted memory back. To undo it, delete the memory again.

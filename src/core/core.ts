@@ -81,8 +81,8 @@ export function createCore(env: ScanEnv, options: CoreOptions = {}) {
     previewMcpEdit: (edit: McpEdit) => previewMcpEdit(env, edit, run),
     saveMcpEdit: (edit: McpEdit, revision: string) => saveMcpEdit(env, edit, revision, run, queue),
     previewMemoryChange: bound(previewMemoryChange),
-    changeMemory: (action: MemoryAction, path: string, revision: string) =>
-      changeMemory(env, action, path, revision, queue),
+    changeMemory: (action: MemoryAction, path: string, revision: string, projectPath?: string) =>
+      changeMemory(env, action, path, revision, queue, projectPath),
 
     listBackups: bound(listBackups),
     previewRestore: bound(previewRestore),
