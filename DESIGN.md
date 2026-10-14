@@ -229,7 +229,7 @@ The interface is built for people with a lot of config who scan rather than read
 - One 32px row grid shared by timetables and palette results.
 - Grotesk for the interface, tabular monospace for keys, paths, values and counts.
 - Flat surfaces; heavy ink rules divide sections, hairlines divide rows.
-- Two themes from one token set: timetable paper (light) and departure board (dark).
+- Two themes from one token set: timetable paper (light) and departure board (dark). Each colour token holds both values in one `light-dark()`, and the theme (the system's, or the one picked in the rail) only sets `color-scheme`, so the two themes cannot drift apart.
 
 **Mascot.** Murmeli (Swiss German for marmot) is the station master of the line: an upright Alpine marmot in clay fur and a cream belly, wearing a near-black conductor cap and a whistle, because marmots stand watch and whistle when something is wrong, which is what ccdesk does for your config. The logo is his head in a near-black badge with a clay ring (`assets/brand/logo.png`; the app serves a 128px copy as its icon). The README banners (`assets/brand/banner-light.webp`, `banner-dark.webp`) put him at a station desk beside a line of five stops in the scope colours. The generated originals are in `assets/brand/source/`. He stays out of the working interface beyond the rail badge.
 
