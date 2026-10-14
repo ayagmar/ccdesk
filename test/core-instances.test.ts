@@ -80,6 +80,23 @@ test("one core's usage counts do not evict another core's cache", async () => {
   assert.equal((await first.readUsage(app, [])).tools[0]?.tool, "Bash");
 });
 
+test("a core's usage count answers for no file its caller names, only its store's memories", async () => {
+  // Catches readUsage letting the caller's options decide which files to count, so any front end
+  // built on the package could learn whether and when Claude read any file, such as a .env.
+  const f = makeFixture();
+  const app = f.at("app");
+  const secret = f.write("app/.env", "TOKEN=fake\n");
+  const content = [{ type: "tool_use", id: "toolu_1", name: "Read", input: { file_path: secret } }];
+  f.write(
+    join(f.env.claudeDir, "projects", storeDirName(app), "one.jsonl"),
+    `${JSON.stringify({ type: "assistant", timestamp: "2026-10-01T00:00:00.000Z", cwd: app, message: { content } })}\n`
+  );
+
+  const usage = await createCore(f.env).readUsage(app, [], { memories: [secret] } as never);
+
+  assert.deepEqual(usage.memories, {});
+});
+
 test("a core never opens the credentials file, whatever opener it is given", async () => {
   // Catches the credentials check living only in the web server's route, so a CLI or library
   // front end calling core.openFile would open the file ccdesk promises never to read.
