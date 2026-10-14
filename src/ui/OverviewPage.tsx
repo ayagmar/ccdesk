@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { type Overview, type ProjectSummary } from "../shared/types.ts";
 import { Bullet } from "./Bullet.tsx";
+import { ForgetReview } from "./ForgetReview.tsx";
 import { ago, tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
 import { compare, PAGE } from "./list.ts";
@@ -26,10 +27,14 @@ function emptyText(total: number, listed: number): string {
 export function OverviewPage({
   overview,
   onOpen,
+  onForgotten,
 }: {
   overview: Overview;
   onOpen: (path: string) => void;
+  /** Called with the toast's text once a directory whose folder is gone is forgotten. */
+  onForgotten: (text: string) => void;
 }) {
+  const [forgetting, setForgetting] = useState<string | null>(null);
   const projects = useMemo(() => overview.projects.filter((p) => !p.ephemeral), [overview]);
   const memories = projects.reduce((n, p) => n + p.memories, 0);
   const gone = projects.filter((p) => !p.exists).length;
@@ -98,24 +103,50 @@ export function OverviewPage({
           <SortHeaders columns={COLUMNS} sort={sort} onSort={setSort} />
           <tbody>
             {matching.slice(0, shown).map((p) => (
-              <tr key={p.path} onClick={() => onOpen(p.path)} className={p.exists ? "" : "dim"}>
-                <td className="mono">
-                  <button
-                    type="button"
-                    className="row-name"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpen(p.path);
-                    }}
-                  >
-                    {tilde(p.path)}
-                  </button>
-                  {!p.exists && <span className="flag">folder gone</span>}
-                </td>
-                <td className="num">{p.sessions || "—"}</td>
-                <td className="num">{p.memories || "—"}</td>
-                <td className="num">{ago(p.lastActive)}</td>
-              </tr>
+              <Fragment key={p.path}>
+                <tr onClick={() => onOpen(p.path)} className={p.exists ? "" : "dim"}>
+                  <td className="mono">
+                    <button
+                      type="button"
+                      className="row-name"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpen(p.path);
+                      }}
+                    >
+                      {tilde(p.path)}
+                    </button>
+                    {!p.exists && <span className="flag">folder gone</span>}
+                    {!p.exists && p.path !== overview.launchDir && (
+                      <button
+                        type="button"
+                        className="link forget-row"
+                        aria-expanded={forgetting === p.path}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setForgetting(forgetting === p.path ? null : p.path);
+                        }}
+                      >
+                        Forget…
+                      </button>
+                    )}
+                  </td>
+                  <td className="num">{p.sessions || "—"}</td>
+                  <td className="num">{p.memories || "—"}</td>
+                  <td className="num">{ago(p.lastActive)}</td>
+                </tr>
+                {forgetting === p.path && (
+                  <tr className="forget-review">
+                    <td colSpan={COLUMNS.length}>
+                      <ForgetReview
+                        path={p.path}
+                        onForgotten={onForgotten}
+                        onClose={() => setForgetting(null)}
+                      />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>

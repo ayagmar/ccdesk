@@ -84,6 +84,16 @@ export function App() {
   }, []);
 
   const clearToast = useCallback(() => setToast(null), []);
+  const { refreshOverview } = config;
+  // A forgotten directory is no longer listed, so its page gives way to All directories.
+  const forgotten = useCallback(
+    (text: string) => {
+      setToast({ text });
+      open({ kind: "all" });
+      refreshOverview();
+    },
+    [open, refreshOverview]
+  );
   const pickCompared = useCallback((from: string) => setPalette({ compareFrom: from }), []);
 
   return (
@@ -113,6 +123,7 @@ export function App() {
             jump={jump}
             onJumped={() => setJump(null)}
             onToast={setToast}
+            onForgotten={forgotten}
             onOpenDirectory={openDirectory}
             onOpenPalette={() => setPalette({})}
             onProfile={changeProfile}
@@ -190,6 +201,7 @@ function PageContent({
   jump,
   onJumped,
   onToast,
+  onForgotten,
   onOpenDirectory,
   onOpenPalette,
   onProfile,
@@ -205,6 +217,7 @@ function PageContent({
   jump: { id: string } | null;
   onJumped: () => void;
   onToast: (toast: ToastMessage) => void;
+  onForgotten: (text: string) => void;
   onOpenDirectory: (path: string | null) => void;
   onOpenPalette: () => void;
   onProfile: (profile: SessionProfile) => void;
@@ -240,7 +253,12 @@ function PageContent({
     );
   if (page.kind === "all")
     return overview ? (
-      <OverviewPage key={visit} overview={overview} onOpen={onOpenDirectory} />
+      <OverviewPage
+        key={visit}
+        overview={overview}
+        onOpen={onOpenDirectory}
+        onForgotten={onForgotten}
+      />
     ) : (
       <Loading />
     );
@@ -277,6 +295,7 @@ function PageContent({
       reload={reload}
       following={following}
       onToast={onToast}
+      onForgotten={onForgotten}
       onOpenDirectory={onOpenDirectory}
       onOpenPalette={onOpenPalette}
       onProfile={onProfile}
