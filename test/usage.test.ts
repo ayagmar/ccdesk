@@ -244,6 +244,29 @@ test("a rule is counted as covering a call the way Claude Code matches it", asyn
   });
 });
 
+test("an MCP allow rule may glob the tool name after its server; an unanchored one covers nothing", async () => {
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  f.write(
+    join(storeOf(f, dir), "one.jsonl"),
+    call("mcp__github__get_issue", {}) + call("mcp__github__list_issues", {})
+  );
+
+  const { matches } = await readUsage(
+    f.env,
+    dir,
+    rules("allow", "mcp__github__get_*", "mcp__github__*", "mcp__*", "mcp__git*__get_issue")
+  );
+
+  // docs: permissions#tool-name-wildcards
+  assert.deepEqual(matches, {
+    "mcp__github__get_*": 1,
+    "mcp__github__*": 2,
+    "mcp__*": 0,
+    "mcp__git*__get_issue": 0,
+  });
+});
+
 test("in a repository, sessions started in its subfolders count and a sibling's do not", async () => {
   const f = makeFixture();
   const repo = f.at("work", "app");
