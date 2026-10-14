@@ -276,7 +276,9 @@ test("check counts only the repository's files unless --all, and lists what stop
   assert.ok(
     repoOnly.output
       .split("\n")
-      .includes("Not counted: problems in 3 files outside the repository; --all counts them."),
+      .includes(
+        "Not counted: problems in 3 files of the Claude folder, ~/.claude.json, managed settings or outside the repository; --all counts them."
+      ),
     repoOnly.output
   );
 
@@ -302,7 +304,16 @@ test("check never counts the Claude folder or ~/.claude.json without --all, even
   f.write("home/.claude/settings.json", "{");
   f.write("home/.claude.json", "not json");
 
-  assert.equal((await check(f, f.at("home"))).exitCode, 0);
+  const first = await check(f, f.at("home"));
+  assert.equal(first.exitCode, 0);
+  assert.ok(
+    first.output
+      .split("\n")
+      .includes(
+        "Not counted: problems in 2 files of the Claude folder, ~/.claude.json, managed settings or outside the repository; --all counts them."
+      ),
+    first.output
+  );
   f.write("home/.mcp.json", "{");
   assert.equal((await check(f, f.at("home"))).exitCode, 1);
 });

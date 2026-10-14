@@ -146,7 +146,7 @@ export async function checkDirectory(
   ).length;
   if (outside > 0)
     lines.push(
-      `Not counted: problems in ${plural(outside, "file")} outside the repository; --all counts them.`
+      `Not counted: problems in ${plural(outside, "file")} of the Claude folder, ~/.claude.json, managed settings or outside the repository; --all counts them.`
     );
   const session = `a session started in ${tilde(view.path)}`;
   const counted = problems.filter((p) => p.counted).length;
