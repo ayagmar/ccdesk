@@ -21,8 +21,12 @@ import {
 const WAIT_MS = 25_000;
 /** Editors write a file in several steps; one change covers them all. */
 const SETTLE_MS = 300;
-/** While some folders cannot be watched, a poll this long after the last try tries them again. */
+/**
+ * While some folders cannot be watched, a poll this long after the last try tries them again. The
+ * wait doubles with each failure of the same folder, up to RETRY_MAX_MS.
+ */
 const RETRY_MS = 5000;
+const RETRY_MAX_MS = 300_000;
 /** Watchers outlive a request by this much, so nothing is missed between two polls. */
 const IDLE_MS = 60_000;
 /** How long after subscribers are told macOS can report the same change again. */
@@ -213,6 +217,8 @@ interface Subscription {
    * every change is seen.
    */
   unwatched: string[];
+  /** Each folder's failed tries in a row (see `Retries`), network drives aside. */
+  retries: Retries;
   waiters: Set<() => void>;
   /** Callers of `subscribe`, called after every change until they unsubscribe. */
   listeners: Set<() => void>;
@@ -264,6 +270,52 @@ interface Scanned {
   view: DirectoryView;
   startedAt: number;
   stateFile: string;
+}
+
+/**
+ * How many tries in a row failed to watch each folder, and since when a folder that has failed is
+ * watched again. A count is cleared only once its folder has been watched for RETRY_MS, so a folder
+ * whose watcher starts and soon fails keeps backing off.
+ */
+type Retries = Map<string, { failures: number; watchedSince?: number }>;
+
+const lasted = (retry: { watchedSince?: number } | undefined, now: number) =>
+  retry?.watchedSince !== undefined && now - retry.watchedSince >= RETRY_MS;
+
+/**
+ * The retries after a rewatch. A folder that failed counts one more failure only when the rewatch
+ * was a timed retry: a rewatch for an ordinary change is no try, so changes elsewhere do not
+ * lengthen the wait.
+ */
+function afterRewatch(
+  before: Retries,
+  unwatched: string[],
+  started: string[],
+  timed: boolean,
+  now: number
+): Retries {
+  const after: Retries = new Map();
+  for (const path of unwatched.filter((p) => !isNetworkPath(p))) {
+    const retry = lasted(before.get(path), now) ? undefined : before.get(path);
+    after.set(path, { failures: retry ? retry.failures + (timed ? 1 : 0) : 1 });
+  }
+  for (const path of started) {
+    const retry = before.get(path);
+    if (retry && !lasted(retry, now))
+      after.set(path, { failures: retry.failures, watchedSince: retry.watchedSince ?? now });
+  }
+  return after;
+}
+
+/**
+ * How long after the watchers started the folders they could not watch are tried again: the
+ * shortest wait among them, doubling with each failure of a folder in a row.
+ */
+function retryDelay(subscription: Subscription): number {
+  const tries = subscription.unwatched
+    .filter((path) => !isNetworkPath(path))
+    .map((path) => subscription.retries.get(path)?.failures ?? 1);
+  return Math.min(RETRY_MAX_MS, RETRY_MS * 2 ** (Math.min(...tries) - 1));
 }
 
 /** The file watching the watchers run on: Node's, on the platform ccdesk runs on. */
@@ -352,10 +404,10 @@ export class Watcher {
     if (
       // A network drive is never watched, so only other folders are worth another try.
       subscription.unwatched.some((path) => !isNetworkPath(path)) &&
-      Date.now() - subscription.watchingSince >= RETRY_MS &&
+      Date.now() - subscription.watchingSince >= retryDelay(subscription) &&
       this.subscriptions.get(dir) === subscription
     ) {
-      this.restart(dir, subscription);
+      this.restart(dir, subscription, true);
       await subscription.ready;
     }
     clearTimeout(subscription.idle);
@@ -439,6 +491,7 @@ export class Watcher {
       touchedAt: 0,
       watchingSince: Number.POSITIVE_INFINITY,
       unwatched: [],
+      retries: new Map(),
       waiters: new Set(),
       listeners: new Set(),
       extra: this.scanned.get(dir) ?? [],
@@ -505,9 +558,12 @@ export class Watcher {
     for (const wake of [...subscription.waiters, ...subscription.listeners]) wake();
   }
 
-  /** Rewatches `dir`. A failure rejects `ready` for whoever awaits it, and is handled when no one does. */
-  private restart(dir: string, subscription: Subscription): void {
-    subscription.ready = this.rewatch(dir, subscription);
+  /**
+   * Rewatches `dir`; `timed` for a retry of folders that could not be watched. A failure rejects
+   * `ready` for whoever awaits it, and is handled when no one does.
+   */
+  private restart(dir: string, subscription: Subscription, timed = false): void {
+    subscription.ready = this.rewatch(dir, subscription, timed);
     subscription.ready.catch(() => {
       // Reported to the callers that await `ready`; a change that triggered it has no caller.
     });
@@ -525,7 +581,7 @@ export class Watcher {
    * new watchers live before this resolves, and without one this fails rather than resolve early.
    * A rebuild replaces the stream, so a change made during one can still be lost.
    */
-  private async rewatch(dir: string, subscription: Subscription): Promise<void> {
+  private async rewatch(dir: string, subscription: Subscription, timed: boolean): Promise<void> {
     const list = oncePerFolder(
       await Promise.all((await targets(this.env, dir, subscription.extra)).map(nearestWatchable))
     );
@@ -564,6 +620,11 @@ export class Watcher {
           if (!subscription.watchers.includes(watcher)) return;
           if (!subscription.unwatched.includes(target.path))
             subscription.unwatched = [...subscription.unwatched, target.path];
+          // A watcher that failed soon after it started counts as one more failed try.
+          const retry = subscription.retries.get(target.path);
+          subscription.retries.set(target.path, {
+            failures: retry && !lasted(retry, Date.now()) ? retry.failures + 1 : 1,
+          });
           // A page waiting for a change hears that this folder is no longer watched.
           for (const wake of [...subscription.waiters]) wake();
         });
@@ -580,6 +641,13 @@ export class Watcher {
     if (this.host.platform === "darwin" && started.length > 0) this.waitUntilLive(dir, started);
     subscription.watchingSince = Date.now();
     subscription.unwatched = [...new Set(unwatched)];
+    subscription.retries = afterRewatch(
+      subscription.retries,
+      subscription.unwatched,
+      started,
+      timed,
+      subscription.watchingSince
+    );
   }
 
   /**

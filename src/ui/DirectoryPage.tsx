@@ -568,8 +568,8 @@ function NotFollowing({ following }: { following: Following }) {
         <p>
           ccdesk cannot watch <span className="mono">{tilde(first)}</span>
           {more.length > 0 && ` and ${plural(more.length, "other folder")}`}, so this page may not
-          update when a file there changes. Other changes still show, and ccdesk tries again every
-          few seconds.
+          update when a file there changes. Other changes still show, and ccdesk tries again after a
+          few seconds, then less often while it keeps failing.
         </p>
       )}
     </section>
