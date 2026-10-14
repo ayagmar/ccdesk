@@ -90,8 +90,8 @@ export interface ViewSection<R extends Row> {
    * a path, so a long one keeps its end.
    */
   label: (row: R, context: ViewContext) => { kind: string; name: string; path?: boolean };
-  /** The inspector's heading for a row. */
-  heading: (row: R, context: ViewContext) => string;
+  /** The inspector's heading for a row: the name the row shows, so the two read as one thing. */
+  heading: (row: R, context: ViewContext, view: DirectoryView) => string;
   facet?: Facet<R>;
   /** An extra class for the table, from the rows on it. */
   tableClass?: (rows: R[]) => string;

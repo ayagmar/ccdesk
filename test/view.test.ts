@@ -38,7 +38,7 @@ test("every section of the page builds its rows from a scanned directory, withou
       assert.ok(section.text(row), `${row.id} has filter text`);
       const label = section.label(row, context);
       assert.ok(label.kind && label.name, `${row.id} has a label`);
-      assert.ok(section.heading(row, context), `${row.id} has a heading`);
+      assert.ok(section.heading(row, context, view), `${row.id} has a heading`);
     }
   }
   // The page selects a row by its id, so two rows sharing one would select each other.

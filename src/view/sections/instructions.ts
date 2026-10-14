@@ -32,13 +32,9 @@ export const instructions = defineSection<R>({
     name: format.tilde(row.item.path),
     path: true,
   }),
-  // The file and its folder, or the whole ~ path when that is as short: ~/.claude/CLAUDE.md is
-  // your user file, while .claude/CLAUDE.md would read as the project's.
-  heading: (row, { format }) => {
-    const short = format.tilde(row.item.path);
-    const parts = short.split(/[/\\]/);
-    return parts.length <= 3 ? short : parts.slice(-2).join("/");
-  },
+  // The path exactly as the row shows it: inside the directory relative to it, outside it with ~.
+  // In your home folder that makes your user file .claude/CLAUDE.md, as its row says too.
+  heading: (row, { format }, view) => format.relativeTo(row.item.path, view.path),
   facet: {
     label: "Filter instructions by status",
     of: (row) => STATUS[row.item.status],

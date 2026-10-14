@@ -3,7 +3,7 @@ import { type BackupKind, type BackupSummary, type RestorePreview } from "../sha
 import { api, errorText } from "./api.ts";
 import { Bullet } from "./Bullet.tsx";
 import { DiffView } from "./DiffView.tsx";
-import { tilde } from "./format.ts";
+import { ago, tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
 
 const WHAT: Record<BackupKind, string> = {
@@ -155,8 +155,8 @@ function ChangeItem({
             <span className="mono wrap muted">{folder}</span>
           )}
         </span>
-        <span className="muted num" title={new Date(b.createdAt).toLocaleString()}>
-          {new Date(b.createdAt).toLocaleTimeString(undefined, { timeStyle: "short" })}
+        <span className="mono muted num" title={new Date(b.createdAt).toLocaleString()}>
+          {ago(b.createdAt)}
         </span>
         <button type="button" className="head-action" aria-expanded={open} onClick={onToggle}>
           <Icon name={icon} /> {toggle}

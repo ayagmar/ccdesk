@@ -89,7 +89,7 @@ export function Inspector({ row, adding, actions, onClose }: Props) {
         <header className="insp-head">
           {row.line ? <Bullet line={row.line} /> : <Icon name="command" />}
           <h2 ref={heading} tabIndex={-1}>
-            {section.heading(row, pageContext())}
+            {section.heading(row, pageContext(), actions.view)}
           </h2>
           <button
             type="button"
