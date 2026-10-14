@@ -286,6 +286,22 @@ html[data-text-size="larger"] #root {
   color: var(--ink);
 }
 
+/* The chevron points right while the group is folded and down once it is open. */
+.rail-group.toggle .icon {
+  width: 12px;
+  height: 12px;
+  margin-right: 2px;
+  transition: transform 120ms;
+}
+
+.rail-group.toggle[aria-expanded="true"] .icon {
+  transform: rotate(90deg);
+}
+
+.rail-group.toggle .rail-count {
+  margin-left: auto;
+}
+
 .rail-list {
   list-style: none;
   margin: 0;

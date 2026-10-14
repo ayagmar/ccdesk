@@ -61,13 +61,17 @@ export function Rail({
 }: Props) {
   const [query, setQuery] = useState("");
   const [showEphemeral, setShowEphemeral] = useState(false);
+  const [showGone, setShowGone] = useState(false);
   // On a phone the rail is one bar; this opens the rest of it over the page.
   const [open, setOpen] = useState(false);
   const projects = overview?.projects ?? [];
   const match = (p: ProjectSummary) => !query || p.path.toLowerCase().includes(query.toLowerCase());
   const launch = projects.find((p) => p.path === overview?.launchDir);
-  const regular = projects.filter((p) => !p.ephemeral && p !== launch && match(p));
-  const ephemeral = projects.filter((p) => p.ephemeral && p !== launch && match(p));
+  const listed = projects.filter((p) => p !== launch && match(p));
+  // A deleted folder stays in its list while it is open, so the row you are on never vanishes.
+  const gone = listed.filter((p) => !p.exists && p.path !== current);
+  const regular = listed.filter((p) => !p.ephemeral && !gone.includes(p));
+  const ephemeral = listed.filter((p) => p.ephemeral && !gone.includes(p));
 
   const item = (p: ProjectSummary) => (
     <li key={p.path}>
@@ -190,9 +194,24 @@ export function Rail({
               aria-expanded={showEphemeral}
               onClick={() => setShowEphemeral(!showEphemeral)}
             >
-              Temporary and test dirs <span className="rail-count">{ephemeral.length}</span>
+              <Icon name="chevron" /> Temporary and test dirs{" "}
+              <span className="rail-count">{ephemeral.length}</span>
             </button>
             {showEphemeral && <ul className="rail-list">{ephemeral.map(item)}</ul>}
+          </>
+        )}
+        {gone.length > 0 && (
+          <>
+            <button
+              type="button"
+              className="rail-group toggle"
+              aria-expanded={showGone}
+              onClick={() => setShowGone(!showGone)}
+            >
+              <Icon name="chevron" /> Deleted folders{" "}
+              <span className="rail-count">{gone.length}</span>
+            </button>
+            {showGone && <ul className="rail-list">{gone.map(item)}</ul>}
           </>
         )}
         {typeof current === "string" && (
