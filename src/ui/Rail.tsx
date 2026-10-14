@@ -186,7 +186,11 @@ export function Rail({
       className={`rail${open ? " open" : ""}${hidden ? " hidden" : ""}`}
       aria-label="Directories"
       onKeyDown={(e) => {
-        if (e.key === "Escape") setOpen(false);
+        // Closing the phone overlay is the whole of that Escape; the page's own Escape stays out of it.
+        if (e.key === "Escape" && open) {
+          setOpen(false);
+          e.stopPropagation();
+        }
       }}
     >
       <div className="brand">
