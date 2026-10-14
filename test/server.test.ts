@@ -2510,7 +2510,8 @@ test("only agents shown here can be changed, and a new one cannot leave its agen
 });
 
 test("a directory whose folder is gone is forgotten through the API, but never the launch directory", async () => {
-  const dir = "/work/forgotten-worktree";
+  // A real absolute path on every platform: the core resolves it, which on Windows adds a drive.
+  const dir = fixture.at("work/forgotten-worktree");
   fixture.write(`${memoryDirFor(fixture, dir)}/note.md`, memoryFile("note", "user", "d", "x"));
   fixture.write(
     join(fixture.env.claudeDir, "projects", storeDirName(dir), "one.jsonl"),
