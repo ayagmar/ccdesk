@@ -3,6 +3,7 @@
 // TypeBox stays out of its bundle.
 import { type Static, Type } from "typebox";
 import { EVERY_FILE, PERMISSION_LISTS } from "./scopes.ts";
+import { SESSION_PROFILES } from "./types.ts";
 
 /** Set one top-level key in one settings file; `value` undefined removes the key. */
 export const SettingsEditBody = Type.Object({
@@ -91,7 +92,7 @@ export const RevisionBody = Type.Object({ revision: Type.String() });
 export const UsageBody = Type.Object({
   path: Type.String(),
   rules: Type.Array(Rule),
-  profile: Type.Optional(Type.Enum(["interactive", "print"])),
+  profile: Type.Optional(Type.Enum(SESSION_PROFILES)),
 });
 
 /**
