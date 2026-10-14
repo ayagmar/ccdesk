@@ -233,19 +233,27 @@ kbd {
   margin-left: auto;
 }
 
-/* The three sizes show as the letter A at three sizes. */
-.brand .text-size button {
+/* The three sizes show as the letter A at three clearly different sizes standing on one line, so
+   the control reads as a size ramp rather than a logo. */
+.brand .segmented.text-size button {
   width: 24px;
-  padding: 0;
+  height: 24px;
+  padding: 0 0 4px;
   justify-content: center;
+  align-items: flex-end;
+  line-height: 1;
 }
 
 .brand .text-size button.smaller {
   font-size: var(--text-2xs);
 }
 
-.brand .text-size button.larger {
+.brand .text-size button.default {
   font-size: var(--text-lg);
+}
+
+.brand .text-size button.larger {
+  font-size: var(--text-xl);
 }
 
 /* The text size control scales the whole page, layout included, so fixed heights never clip. */
