@@ -367,7 +367,7 @@ function explainAgentsFiles(
 
 /**
  * Skips what Claude Code leaves out: any file over 4 MiB, managed ones included (docs:
- * memory#how-auto-memory-works), and of all but managed files, all of them in managed-only mode,
+ * memory#how-it-works), and of all but managed files, all of them in managed-only mode,
  * ones matched by claudeMdExcludes, and project rules linked from outside the project that do not
  * qualify.
  */
