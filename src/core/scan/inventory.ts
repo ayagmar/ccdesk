@@ -38,6 +38,7 @@ import {
   pluginOnlyNote,
   pluginOnlySurfaces,
   readPlugins,
+  unwrapped,
 } from "./plugins.ts";
 
 type Source = Scope | "plugin";
@@ -551,14 +552,7 @@ async function readHooks(input: InventoryInput, plugins: LoadedPlugin[]): Promis
   for (const layer of layers) {
     if (layer.data) out.push(...hooksFrom(layer.data.hooks, layer.scope, layer.path));
   }
-  for (const loaded of plugins) {
-    const { plugin } = loaded;
-    const path = join(plugin.installPath, "hooks", "hooks.json");
-    const file = await readJsonOrReport(env, path, problems);
-    if (file) out.push(...hooksFrom(file.hooks, "plugin", path, plugin));
-    for (const part of await manifestConfigs(env, loaded, "hooks", problems))
-      out.push(...hooksFrom(part.value, "plugin", part.path, plugin));
-  }
+  for (const loaded of plugins) out.push(...(await pluginHooks(env, loaded, problems)));
 
   // docs: hooks#disable-or-remove-hooks, settings-reference#allowmanagedhooksonly
   const managed = layers.find((l) => l.scope === "managed")?.data;
@@ -597,6 +591,25 @@ async function readHooks(input: InventoryInput, plugins: LoadedPlugin[]): Promis
       hook.note = "Waits until you accept Claude Code's trust dialog for this folder";
     }
   }
+  return out;
+}
+
+/** A plugin's hooks: hooks/hooks.json, then the files and inline objects its manifest names. */
+async function pluginHooks(
+  env: ScanEnv,
+  loaded: LoadedPlugin,
+  problems: Problem[]
+): Promise<Hook[]> {
+  const { plugin } = loaded;
+  const out: Hook[] = [];
+  const path = join(plugin.installPath, "hooks", "hooks.json");
+  const file = await readJsonOrReport(env, path, problems);
+  const problem = file && unwrapped(file, "hooks");
+  if (problem) problems.push({ path, error: problem });
+  else if (file) out.push(...hooksFrom(file.hooks, "plugin", path, plugin));
+  // A hooks file wraps its events in "hooks"; an inline object is the events themselves.
+  for (const part of await manifestConfigs(env, loaded, "hooks", problems, true))
+    out.push(...hooksFrom(part.value, "plugin", part.path, plugin));
   return out;
 }
 

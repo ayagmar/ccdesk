@@ -22,6 +22,8 @@ A hook is marked off when:
 - managed settings set `strictPluginOnlyCustomization` to `true`, or to a list naming `hooks`, which turns off the hooks in your, the project's and local settings files and keeps managed and plugin hooks;
 - you have not accepted Claude Code's trust dialog for the folder or a parent folder. An interactive session holds back hooks from every settings file until then, your own `~/.claude/settings.json` included. A `claude -p` or SDK run does not ask and runs them; pick **claude -p / SDK** under the page header to see the hooks that way.
 
+A plugin's `hooks/hooks.json`, and each hooks file its manifest names, holds its events under a top-level `hooks` object. A file that holds the events without it loads none of them; ccdesk lists it under problems instead of its hooks. Hooks written inline in the manifest need no wrapper.
+
 [Built-in tools](../permissions/#built-in-tools) lists, for each tool, the `PreToolUse` hooks whose matcher covers it.
 
 ## Adding, changing and removing a hook
