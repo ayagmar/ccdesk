@@ -18,17 +18,15 @@ import {
   pluginsRoot,
 } from "./scan/plugins.ts";
 
-/** How long one request waits for a change before answering "nothing changed". */
-const WAIT_MS = 25_000;
 /** Editors write a file in several steps; one change covers them all. */
 const SETTLE_MS = 300;
 /**
- * While some folders cannot be watched, a poll this long after the last try tries them again. The
+ * While some folders cannot be watched, they are tried again this long after the last try. The
  * wait doubles with each failure of the same folder, up to RETRY_MAX_MS.
  */
 const RETRY_MS = 5000;
 const RETRY_MAX_MS = 300_000;
-/** Watchers outlive a request by this much, so nothing is missed between two polls. */
+/** Watchers outlive their last subscriber by this much, so a page that comes back finds them. */
 const IDLE_MS = 60_000;
 /** How long after subscribers are told macOS can report the same change again. */
 const REPEAT_MS = 1000;
@@ -253,12 +251,16 @@ function oncePerFolder(list: Target[]): Target[] {
   return [...byKind.values()];
 }
 
+/** A caller of `Watcher.subscribe`. */
+interface Listener {
+  changed: () => void;
+  unwatched?: (folders: string[]) => void;
+}
+
 interface Subscription {
   watchers: FSWatcher[];
   /** The latest (re)start of the watchers; they cover every current target once it settles. */
   ready: Promise<void>;
-  /** When a watched file last changed, in ms since the epoch. */
-  changedAt: number;
   /**
    * When a watcher last saw any change, before it settled; 0 for none. For ~/.claude.json, when a
    * change to what the scan reads was found.
@@ -274,9 +276,10 @@ interface Subscription {
   unwatched: string[];
   /** Each folder's failed tries in a row (see `Retries`), network drives aside. */
   retries: Retries;
-  waiters: Set<() => void>;
-  /** Callers of `subscribe`, called after every change until they unsubscribe. */
-  listeners: Set<() => void>;
+  /** The next try of the folders in `unwatched`. */
+  retry?: NodeJS.Timeout;
+  /** Callers of `subscribe`, told about every change until they unsubscribe. */
+  listeners: Set<Listener>;
   extra: Target[];
   /** The `projects` entries of ~/.claude.json the scan reads, and `claudeJsonPrint` of them. */
   projectKeys: string[];
@@ -435,64 +438,17 @@ export class Watcher {
   }
 
   /**
-   * Answers once something changed after `since` (ms since the epoch), or after `timeoutMs` with
-   * the last change time, whichever comes first. While some folders cannot be watched, it tries
-   * them again now and then, and answers at once with them in `unwatched`, since a change there
-   * would never end the wait.
-   */
-  async wait(
-    dir: string,
-    since: number,
-    signal: AbortSignal,
-    timeoutMs = WAIT_MS
-  ): Promise<{ changed: boolean; at: number; unwatched: string[] }> {
-    const subscription = await this.watching(dir);
-    if (
-      // A network drive is never watched, so only other folders are worth another try.
-      subscription.unwatched.some((path) => !isNetworkPath(path)) &&
-      Date.now() - subscription.watchingSince >= retryDelay(subscription) &&
-      this.subscriptions.get(dir) === subscription
-    ) {
-      this.restart(dir, subscription, true);
-      await subscription.ready;
-    }
-    clearTimeout(subscription.idle);
-    // Closed while its watchers were starting: there is nothing left to wait on.
-    const closed = this.subscriptions.get(dir) !== subscription;
-    try {
-      if (
-        !closed &&
-        subscription.unwatched.length === 0 &&
-        subscription.changedAt <= since &&
-        !signal.aborted
-      )
-        await new Promise<void>((resolve) => {
-          const done = () => {
-            clearTimeout(timer);
-            signal.removeEventListener("abort", done);
-            subscription.waiters.delete(done);
-            resolve();
-          };
-          const timer = setTimeout(done, timeoutMs);
-          signal.addEventListener("abort", done);
-          subscription.waiters.add(done);
-        });
-    } finally {
-      this.release(dir, subscription);
-    }
-    return {
-      changed: subscription.changedAt > since,
-      at: subscription.changedAt,
-      unwatched: subscription.unwatched,
-    };
-  }
-
-  /**
    * Calls `onChange` once after each change to what ccdesk shows for `dir`, until the returned
    * function is called. Resolves once the watchers have started, so a change made after it
-   * resolves is seen. `close` stops the calls without making one.
+   * resolves is seen. `onUnwatched` is called at once with the folders that cannot be watched, and
+   * again whenever they change: a change there is not seen, and while there are any, they are tried
+   * again after a while. `close` stops the calls without making one.
    */
-  async subscribe(dir: string, onChange: () => void): Promise<() => void> {
+  async subscribe(
+    dir: string,
+    onChange: () => void,
+    onUnwatched?: (folders: string[]) => void
+  ): Promise<() => void> {
     const subscription = await this.watching(dir);
     // Closed while its watchers were starting: nothing will change.
     if (this.subscriptions.get(dir) !== subscription)
@@ -500,22 +456,22 @@ export class Watcher {
         // Nothing was subscribed, so there is nothing to stop.
       };
     clearTimeout(subscription.idle);
-    // A function of its own, so the same onChange subscribed twice is unsubscribed twice.
-    const listener = () => onChange();
+    // An object of its own, so the same onChange subscribed twice is unsubscribed twice.
+    const listener: Listener = {
+      changed: onChange,
+      ...(onUnwatched && { unwatched: onUnwatched }),
+    };
     subscription.listeners.add(listener);
+    onUnwatched?.(subscription.unwatched);
     return () => {
       if (subscription.listeners.delete(listener)) this.release(dir, subscription);
     };
   }
 
-  /** Drops the watchers of `dir` after a while once no one waits or listens for changes. */
+  /** Drops the watchers of `dir` after a while once no one listens for changes. */
   private release(dir: string, subscription: Subscription): void {
     // A dropped subscription has nothing left to clean up later.
-    if (
-      subscription.waiters.size === 0 &&
-      subscription.listeners.size === 0 &&
-      this.subscriptions.get(dir) === subscription
-    )
+    if (subscription.listeners.size === 0 && this.subscriptions.get(dir) === subscription)
       subscription.idle = setTimeout(() => this.drop(dir), IDLE_MS);
   }
 
@@ -533,12 +489,10 @@ export class Watcher {
     const subscription: Subscription = {
       watchers: [],
       ready: Promise.resolve(),
-      changedAt: 0,
       touchedAt: 0,
       watchingSince: Number.POSITIVE_INFINITY,
       unwatched: [],
       retries: new Map(),
-      waiters: new Set(),
       listeners: new Set(),
       extra: this.scanned.get(dir) ?? [],
       projectKeys: [],
@@ -558,11 +512,10 @@ export class Watcher {
     if (!subscription) return;
     clearTimeout(subscription.idle);
     clearTimeout(subscription.settle);
+    clearTimeout(subscription.retry);
     for (const w of subscription.watchers) w.close();
     this.subscriptions.delete(dir);
     this.latest.delete(dir);
-    // Pages still waiting are answered now, so no timer outlives the watcher.
-    for (const wake of [...subscription.waiters]) wake();
   }
 
   /**
@@ -589,8 +542,8 @@ export class Watcher {
   }
 
   /**
-   * Reads ~/.claude.json after a watcher saw it change, and settles a change only when what the scan
-   * reads in it changed.
+   * Reads ~/.claude.json after a watcher saw it change, and settles a change only when what the
+   * scan reads in it changed.
    */
   private claudeJsonChanged(dir: string, subscription: Subscription): void {
     subscription.claudeJsonRead = subscription.claudeJsonRead.then(async () => {
@@ -603,8 +556,8 @@ export class Watcher {
   }
 
   /**
-   * Tells waiters and subscribers about a settled change, unless every event in it was a repeat of
-   * one they were told about. A path still being read counts, so a slow read never hides a change.
+   * Tells subscribers about a settled change, unless every event in it was a repeat of one they
+   * were told about. A path still being read counts, so a slow read never hides a change.
    * The states read by now were read before this, so a subscriber reads them or newer ones.
    */
   private tell(dir: string, subscription: Subscription): void {
@@ -614,10 +567,31 @@ export class Watcher {
     // A copy: a read that finishes after this may see a later state, which the subscriber may not.
     subscription.told = new Map(seen.states);
     subscription.repeatsUntil = Date.now() + REPEAT_MS;
-    subscription.changedAt = Date.now();
     // First, so a subscriber that throws cannot leave the old watchers in place.
     this.restart(dir, subscription);
-    for (const wake of [...subscription.waiters, ...subscription.listeners]) wake();
+    for (const listener of [...subscription.listeners]) listener.changed();
+  }
+
+  /**
+   * Sets the folders the watchers do not cover, tells subscribers when they changed, and plans the
+   * next try of them: `retryDelay` after the watchers started, at once when that has passed.
+   */
+  private setUnwatched(dir: string, subscription: Subscription, unwatched: string[]): void {
+    const changed = JSON.stringify(unwatched) !== JSON.stringify(subscription.unwatched);
+    subscription.unwatched = unwatched;
+    clearTimeout(subscription.retry);
+    // A network drive is never watched, so only other folders are worth another try.
+    if (unwatched.some((path) => !isNetworkPath(path))) {
+      const wait = subscription.watchingSince + retryDelay(subscription) - Date.now();
+      subscription.retry = setTimeout(
+        () => {
+          if (this.subscriptions.get(dir) === subscription) this.restart(dir, subscription, true);
+        },
+        Math.max(0, wait)
+      );
+    }
+    if (changed)
+      for (const listener of [...subscription.listeners]) listener.unwatched?.(unwatched);
   }
 
   /**
@@ -681,15 +655,13 @@ export class Watcher {
         watcher.on("error", () => {
           watcher.close();
           if (!subscription.watchers.includes(watcher)) return;
-          if (!subscription.unwatched.includes(target.path))
-            subscription.unwatched = [...subscription.unwatched, target.path];
           // A watcher that failed soon after it started counts as one more failed try.
           const retry = subscription.retries.get(target.path);
           subscription.retries.set(target.path, {
             failures: retry && !lasted(retry, Date.now()) ? retry.failures + 1 : 1,
           });
-          // A page waiting for a change hears that this folder is no longer watched.
-          for (const wake of [...subscription.waiters]) wake();
+          if (!subscription.unwatched.includes(target.path))
+            this.setUnwatched(dir, subscription, [...subscription.unwatched, target.path]);
         });
         subscription.watchers.push(watcher);
         started.push(target.path);
@@ -703,14 +675,15 @@ export class Watcher {
     for (const w of old) w.close();
     if (this.host.platform === "darwin" && started.length > 0) this.waitUntilLive(dir, started);
     subscription.watchingSince = Date.now();
-    subscription.unwatched = [...new Set(unwatched)];
+    const missed = [...new Set(unwatched)];
     subscription.retries = afterRewatch(
       subscription.retries,
-      subscription.unwatched,
+      missed,
       started,
       timed,
       subscription.watchingSince
     );
+    this.setUnwatched(dir, subscription, missed);
   }
 
   /**

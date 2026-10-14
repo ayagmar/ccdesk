@@ -120,10 +120,10 @@ test("editing a project's CLAUDE.md wakes a page waiting for changes", async () 
   const watcher = watcherFor(f);
   await started(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
   f.write("app/CLAUDE.md", "two\n");
 
-  assert.equal((await waiting).changed, true);
+  assert.equal(await changed, true);
 });
 
 test("adding a rule to the managed folder wakes a page waiting for changes", async () => {
@@ -133,10 +133,10 @@ test("adding a rule to the managed folder wakes a page waiting for changes", asy
   const watcher = watcherFor(f);
   await settled(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
   f.write("etc/claude-code/.claude/rules/infra/new.md", "two\n");
 
-  assert.equal((await waiting).changed, true);
+  assert.equal(await changed, true);
 });
 
 test("creating the managed folder, missing at first as it usually is, wakes a page waiting for changes", async () => {
@@ -145,10 +145,10 @@ test("creating the managed folder, missing at first as it usually is, wakes a pa
   const watcher = watcherFor(f);
   await settled(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
   f.json("etc/claude-code/managed-settings.json", { model: "opus" });
 
-  assert.equal((await waiting).changed, true);
+  assert.equal(await changed, true);
 });
 
 test("editing a skill in the managed folder wakes a page waiting for changes", async () => {
@@ -158,10 +158,10 @@ test("editing a skill in the managed folder wakes a page waiting for changes", a
   const watcher = watcherFor(f);
   await settled(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
   f.write("etc/claude-code/.claude/skills/deploy/SKILL.md", "---\ndescription: two\n---\n");
 
-  assert.equal((await waiting).changed, true);
+  assert.equal(await changed, true);
 });
 
 test("creating a file CLAUDE.md imports but that was missing wakes a page waiting for changes", async () => {
@@ -172,10 +172,10 @@ test("creating a file CLAUDE.md imports but that was missing wakes a page waitin
   await watcher.scan(f.at("app"));
   await started(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
   f.write("app/docs/new.md", "Now here.\n");
 
-  assert.equal((await waiting).changed, true);
+  assert.equal(await changed, true);
 });
 
 test("creating the missing folder of an import, then the file, wakes a page each time", async () => {
@@ -184,19 +184,15 @@ test("creating the missing folder of an import, then the file, wakes a page each
   f.write("app/docs/README.md", "Not imported.\n");
   const watcher = watcherFor(f);
   await watcher.scan(f.at("app"));
-  await started(watcher, f.at("app"));
-  const signal = new AbortController().signal;
 
-  const folder = watcher.wait(f.at("app"), Date.now(), signal, 5000);
+  const folder = await nextChange(watcher, f.at("app"), 5000);
   mkdirSync(f.at("app/docs/new-folder"));
-  const first = await folder;
-  assert.equal(first.changed, true);
+  assert.equal(await folder.changed, true);
 
   // No scan in between: the watchers move into the new folder on their own.
-  await started(watcher, f.at("app"));
-  const file = watcher.wait(f.at("app"), first.at, signal, 5000);
+  const file = await nextChange(watcher, f.at("app"), 5000);
   f.write("app/docs/new-folder/new.md", "Now here.\n");
-  assert.equal((await file).changed, true);
+  assert.equal(await file.changed, true);
 });
 
 test("on macOS, subscribing fails while the watchers cannot be shown to be live, and works once they can", async () => {
@@ -224,9 +220,9 @@ test("on macOS, subscribing fails while the watchers cannot be shown to be live,
   // The failed start is not kept: the next subscriber starts the watchers again.
   spareFails = false;
   await started(watcher, f.at("app"));
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
   f.write("app/CLAUDE.md", "two\n");
-  assert.equal((await waiting).changed, true);
+  assert.equal(await changed, true);
 });
 
 /** A watcher on `app`, with the plugin `alpha` installed at `plugin` and its manifest. */
@@ -256,20 +252,19 @@ test("a change to a plugin's marketplace entry, or the marketplace record appear
   assert.equal(await enabled(), true);
 
   // known_marketplaces.json does not exist yet: creating it counts.
-  const created = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const created = await nextChange(watcher, f.at("app"), 5000);
   f.json("home/.claude/plugins/known_marketplaces.json", {
     market: {
       source: { source: "directory", path: f.at("market") },
       installLocation: f.at("market"),
     },
   });
-  assert.equal((await created).changed, true);
+  assert.equal(await created.changed, true);
   assert.equal(await enabled(), false);
 
-  await started(watcher, f.at("app"));
-  const edited = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const edited = await nextChange(watcher, f.at("app"), 5000);
   f.json("market/.claude-plugin/marketplace.json", entry(true));
-  assert.equal((await edited).changed, true);
+  assert.equal(await edited.changed, true);
   assert.equal(await enabled(), true);
 });
 
@@ -279,10 +274,10 @@ test("editing a file inside an installed plugin wakes a page waiting for changes
   await watcher.scan(f.at("app"));
   await started(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
   f.write(`${plugin}/agents/review.md`, "---\nname: review\ndescription: two\n---\n");
 
-  assert.equal((await waiting).changed, true);
+  assert.equal(await changed, true);
 });
 
 test("editing an agent in a folder the plugin's manifest names wakes a page waiting for changes", async () => {
@@ -291,10 +286,10 @@ test("editing an agent in a folder the plugin's manifest names wakes a page wait
   await watcher.scan(f.at("app"));
   await started(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
   f.write(`${plugin}/custom/review.md`, "---\nname: review\ndescription: two\n---\n");
 
-  assert.equal((await waiting).changed, true);
+  assert.equal(await changed, true);
 });
 
 test("files a plugin's MCP server writes in its own folder do not count as a config change", async () => {
@@ -305,11 +300,11 @@ test("files a plugin's MCP server writes in its own folder do not count as a con
   await watcher.scan(f.at("app"));
   await settled(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 800);
+  const { changed } = await nextChange(watcher, f.at("app"), 800);
   f.write(`${plugin}/node_modules/dep/index.js`, "b");
   f.write(`${plugin}/data/state.json`, "b");
 
-  assert.equal((await waiting).changed, false);
+  assert.equal(await changed, false);
 });
 
 test("a subscriber hears once about an editor's save, and nothing after unsubscribing", async () => {
@@ -339,16 +334,17 @@ test("a subscriber hears once about an editor's save, and nothing after unsubscr
   assert.equal(calls, 1);
 
   unsubscribe();
-  const since = Date.now();
+  // Another subscriber hears about the next change once it has settled, when all are told.
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
   f.write("app/CLAUDE.md", "four\n");
-  // Answers once the change has settled, when subscribers are told.
-  await watcher.wait(f.at("app"), since, new AbortController().signal, 5000);
+  assert.equal(await changed, true);
   assert.equal(calls, 1);
 });
 
 /**
  * A watcher on `app` on a `platform` host whose watchers report only what the test passes to
- * `reportEdit`, as fs.watch would, after `app/CLAUDE.md` was edited to "two" and subscribers were told.
+ * `reported`, as fs.watch would, after `app/CLAUDE.md` was edited to "two" and subscribers were
+ * told. `reported` resolves to whether subscribers were told about the report within `timeoutMs`.
  */
 async function toldOn(platform: NodeJS.Platform) {
   const open = new Set<{ path: string; listener: WatchListener<string> | undefined }>();
@@ -370,72 +366,60 @@ async function toldOn(platform: NodeJS.Platform) {
   watchers.push(watcher);
   const counter = { calls: 0 };
   await watcher.subscribe(f.at("app"), () => counter.calls++);
-  const reportEdit = (name = "CLAUDE.md") => {
+  const reported = async (timeoutMs: number, name = "CLAUDE.md") => {
+    const { changed } = await nextChange(watcher, f.at("app"), timeoutMs);
     for (const entry of [...open]) if (entry.path === f.at("app")) entry.listener?.("change", name);
+    return changed;
   };
-  const waitFor = (changedSince: number, timeoutMs: number) =>
-    watcher.wait(f.at("app"), changedSince, new AbortController().signal, timeoutMs);
 
-  const since = Date.now();
   f.write("app/CLAUDE.md", "two\n");
   // A whole second, so a test can set the same modification time back exactly.
   const mtime = new Date("2026-01-01T00:00:00Z");
   utimesSync(f.at("app/CLAUDE.md"), mtime, mtime);
-  reportEdit();
-  const first = await waitFor(since, 5000);
-  assert.equal(first.changed, true);
+  assert.equal(await reported(5000), true);
   // The watchers move after a change; macOS can report the change again to the new ones.
   await started(watcher, f.at("app"));
-  return { f, watcher, counter, reportEdit, waitFor, told: first.at, mtime };
+  return { f, counter, reported, mtime };
 }
 
 test("on macOS, a change reported again after the watchers move is told once, and the next edit is told", async () => {
-  const { f, counter, reportEdit, waitFor, told } = await toldOn("darwin");
+  const { f, counter, reported } = await toldOn("darwin");
 
-  reportEdit();
-  assert.equal((await waitFor(told, 800)).changed, false);
+  assert.equal(await reported(800), false);
   assert.equal(counter.calls, 1);
 
   f.write("app/CLAUDE.md", "three\n");
-  reportEdit();
-  assert.equal((await waitFor(told, 5000)).changed, true);
+  assert.equal(await reported(5000), true);
   assert.equal(counter.calls, 2);
 });
 
 test("on macOS, an edit right after the watchers move is told even with the same size and modification time", async () => {
-  const { f, counter, reportEdit, waitFor, told, mtime } = await toldOn("darwin");
+  const { f, counter, reported, mtime } = await toldOn("darwin");
 
   // As cp -p or rsync -a leave it: other text of the same length, with the old modification time.
   f.write("app/CLAUDE.md", "six\n");
   utimesSync(f.at("app/CLAUDE.md"), mtime, mtime);
-  reportEdit();
 
-  assert.equal((await waitFor(told, 5000)).changed, true);
+  assert.equal(await reported(5000), true);
   assert.equal(counter.calls, 2);
 });
 
 test("on Linux, a change reported again after the watchers move is told again, as every change is", async () => {
-  const { counter, reportEdit, waitFor, told } = await toldOn("linux");
+  const { counter, reported } = await toldOn("linux");
 
-  reportEdit();
-
-  assert.equal((await waitFor(told, 5000)).changed, true);
+  assert.equal(await reported(5000), true);
   assert.equal(counter.calls, 2);
 });
 
 test("on macOS, a folder reported again right after the watchers move is told, since a file in it may have changed", async () => {
-  const { f, watcher, counter, reportEdit, waitFor, told } = await toldOn("darwin");
+  const { f, counter, reported } = await toldOn("darwin");
   f.write("app/.claude/settings.json", "{}\n");
-  reportEdit(".claude");
-  const second = await waitFor(told, 5000);
-  assert.equal(second.changed, true);
-  await started(watcher, f.at("app"));
+  assert.equal(await reported(5000, ".claude"), true);
 
   // An edit inside the folder leaves the folder's own size and times as they were.
   f.write("app/.claude/settings.json", "[]\n");
-  reportEdit(".claude");
 
-  assert.equal((await waitFor(second.at, 5000)).changed, true);
+  assert.equal(await reported(5000, ".claude"), true);
   assert.equal(counter.calls, 3);
 });
 
@@ -456,10 +440,10 @@ test("a change a watcher reports without naming the file wakes a page waiting fo
   watchers.push(watcher);
   await started(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
   listeners.get(f.at("app"))?.("change", null);
 
-  assert.equal((await waiting).changed, true);
+  assert.equal(await changed, true);
 });
 
 test("each folder is watched once for each kind of watch, however many files ccdesk reads in it", async () => {
@@ -508,55 +492,6 @@ test("closing the watcher does not tell a subscriber something changed", async (
   assert.equal(calls, 0);
 });
 
-test("closing the watcher answers a page still waiting, instead of keeping it until the timeout", async () => {
-  const f = makeFixture();
-  f.write("app/CLAUDE.md", "one\n");
-  const watcher = watcherFor(f);
-  await started(watcher, f.at("app"));
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
-  // The wait is waiting once the calls it queued have run.
-  await new Promise((resolve) => setImmediate(resolve));
-
-  watcher.close();
-  const answered = await Promise.race([
-    waiting.then(() => true),
-    new Promise((resolve) => setTimeout(() => resolve(false), 1000)),
-  ]);
-
-  assert.equal(answered, true);
-});
-
-test("closing the watcher while a wait is still starting answers it too", async () => {
-  const f = makeFixture();
-  f.write("app/CLAUDE.md", "one\n");
-  const watcher = watcherFor(f);
-
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
-  watcher.close();
-  const answered = await Promise.race([
-    waiting.then(() => true),
-    new Promise((resolve) => setTimeout(() => resolve(false), 1000)),
-  ]);
-
-  assert.equal(answered, true);
-});
-
-test("a change between two polls is reported to the next poll", async () => {
-  const f = makeFixture();
-  f.write("app/CLAUDE.md", "one\n");
-  const watcher = watcherFor(f);
-  const since = Date.now();
-
-  await watcher.wait(f.at("app"), since, new AbortController().signal, 50);
-  f.write("app/CLAUDE.md", "two\n");
-
-  // Watchers started by this poll would miss the change, and wait until the timeout.
-  assert.equal(
-    (await watcher.wait(f.at("app"), since, new AbortController().signal, 5000)).changed,
-    true
-  );
-});
-
 test("work in Claude Code's worktrees or unrelated files does not count as a config change", async () => {
   const f = makeFixture();
   f.write("app/.claude/worktrees/feature/CLAUDE.md", "a");
@@ -564,11 +499,11 @@ test("work in Claude Code's worktrees or unrelated files does not count as a con
   const watcher = watcherFor(f);
   await settled(watcher, f.at("app"));
 
-  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 800);
+  const { changed } = await nextChange(watcher, f.at("app"), 800);
   f.write("app/.claude/worktrees/feature/CLAUDE.md", "b");
   f.write("app/notes.txt", "b");
 
-  assert.equal((await waiting).changed, false);
+  assert.equal(await changed, false);
 });
 
 /**
@@ -606,9 +541,9 @@ test("the path tester reuses a scan until a file it read changes", async () => {
   await pathTest();
   assert.equal(counter.scans, 1);
 
-  const since = Date.now();
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
   f.write("app/.claude/rules/web.md", "---\npaths: src/**\n---\nWeb\n");
-  await watcher.wait(f.at("app"), since, new AbortController().signal, 5000);
+  assert.equal(await changed, true);
   const result = await pathTest();
 
   assert.equal(counter.scans, 2);
@@ -677,38 +612,44 @@ test("the path tester does not reuse a scan while a folder it read cannot be wat
   assert.ok(result.matches.some((m) => m.path.endsWith("web.md")));
 });
 
-test("while a folder cannot be watched, a waiting page hears at once that live updates are off", async () => {
+/** Subscribes to `dir`, keeping every list of folders it cannot watch the subscriber is told. */
+async function unwatchedOf(watcher: Watcher, dir: string): Promise<string[][]> {
+  const told: string[][] = [];
+  await watcher.subscribe(
+    dir,
+    () => undefined,
+    (folders) => told.push(folders)
+  );
+  return told;
+}
+
+test("while a folder cannot be watched, a subscriber hears at once that live updates are off", async () => {
   const f = makeFixture();
   f.write("app/.claude/rules/api.md", "API\n");
   const watcher = new Watcher(f.env, scanDirectory, cannotWatch(f.at("app/.claude/rules")));
   watchers.push(watcher);
 
-  const asked = Date.now();
-  const answer = await watcher.wait(f.at("app"), asked, new AbortController().signal, 5000);
-
-  assert.ok(Date.now() - asked < 2000, "answered before the wait timed out");
-  assert.deepEqual(answer.unwatched, [f.at("app/.claude/rules")]);
-  assert.equal(answer.changed, false);
+  assert.deepEqual(await unwatchedOf(watcher, f.at("app")), [[f.at("app/.claude/rules")]]);
 });
 
-test("a folder that could not be watched is watched again once it can be", async (t) => {
+test("a folder that could not be watched is watched again once it can be, and the subscriber is told", async (t) => {
   const f = makeFixture();
   f.write("app/.claude/rules/api.md", "API\n");
   const fails = { now: true };
   const watcher = new Watcher(f.env, scanDirectory, cannotWatch(f.at("app/.claude/rules"), fails));
   watchers.push(watcher);
-  const signal = new AbortController().signal;
-  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
-  assert.equal((await watcher.wait(f.at("app"), 0, signal, 100)).unwatched.length, 1);
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: Date.now() });
+  const told = await unwatchedOf(watcher, f.at("app"));
 
-  // As when the watch limit is raised: the next poll a while later tries the folder again.
+  // As when the watch limit is raised: the folder is tried again a while later.
   fails.now = false;
-  t.mock.timers.setTime(Date.now() + 5000);
+  t.mock.timers.tick(5000);
+  await started(watcher, f.at("app"));
 
-  assert.deepEqual((await watcher.wait(f.at("app"), 0, signal, 100)).unwatched, []);
+  assert.deepEqual(told, [[f.at("app/.claude/rules")], []]);
 });
 
-test("a watcher that fails after starting answers a waiting page, and the path tester scans again", async () => {
+test("a watcher that fails after starting tells a subscriber, and the path tester scans again", async () => {
   const f = makeFixture();
   f.write("app/.claude/rules/api.md", "---\npaths: src/api/**\n---\nAPI\n");
   const fakes = new Map<string, EventEmitter>();
@@ -727,23 +668,18 @@ test("a watcher that fails after starting answers a waiting page, and the path t
   await pathTest();
   assert.equal(counter.scans, 1);
 
-  const asked = Date.now();
-  const waiting = watcher.wait(f.at("app"), asked, new AbortController().signal, 5000);
-  // Once the page is waiting.
-  await pause(100);
+  const told = await unwatchedOf(watcher, f.at("app"));
   fakes.get(f.at("app/.claude/rules"))?.emit("error", new Error("EPERM"));
-  const answer = await waiting;
 
-  assert.ok(Date.now() - asked < 2000, "answered before the wait timed out");
-  assert.deepEqual(answer.unwatched, [f.at("app/.claude/rules")]);
+  assert.deepEqual(told, [[], [f.at("app/.claude/rules")]]);
   await pathTest();
   assert.equal(counter.scans, 2);
 });
 
 /**
  * Watchers that report nothing unless the test emits on them, on a host where `folder` cannot be
- * watched while `fails.now` is set; `tries` counts the attempts to watch it. A poll moves the
- * mocked clock on by `ms` first.
+ * watched while `fails.now` is set; `tries` counts the attempts to watch it. `tryAfter(ms)` moves
+ * the mocked clock on by `ms`, waits for a retry that comes due, and gives the folders not watched.
  */
 function flakyFolder(t: TestContext, f: ReturnType<typeof makeFixture>, folder: string) {
   const fails = { now: true };
@@ -766,44 +702,53 @@ function flakyFolder(t: TestContext, f: ReturnType<typeof makeFixture>, folder: 
   };
   const watcher = new Watcher(f.env, scanDirectory, host);
   watchers.push(watcher);
-  const signal = new AbortController().signal;
-  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
-  const pollAfter = async (ms: number) => {
-    t.mock.timers.setTime(Date.now() + ms);
-    return (await watcher.wait(f.at("app"), 0, signal, 100)).unwatched;
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: Date.now() });
+  const told = unwatchedOf(watcher, f.at("app"));
+  const tryAfter = async (ms: number) => {
+    const list = await told;
+    t.mock.timers.tick(ms);
+    await started(watcher, f.at("app"));
+    return list.at(-1);
   };
-  return { fails, state, fakes, pollAfter };
+  /** Reports a change in `app` and lets it settle, which rewatches the directory. */
+  const changeSettled = async () => {
+    await told;
+    fakes.get(f.at("app"))?.listener?.("change", "CLAUDE.md");
+    t.mock.timers.tick(300);
+    await started(watcher, f.at("app"));
+  };
+  return { fails, state, fakes, tryAfter, changeSettled };
 }
 
 test("a folder that keeps failing to be watched is tried less and less often, and from the start again once watched", async (t) => {
   const f = makeFixture();
   f.write("app/.claude/rules/api.md", "API\n");
   const folder = f.at("app/.claude/rules");
-  const { fails, state, fakes, pollAfter } = flakyFolder(t, f, folder);
+  const { fails, state, fakes, tryAfter } = flakyFolder(t, f, folder);
 
-  assert.deepEqual(await pollAfter(0), [folder]);
+  assert.deepEqual(await tryAfter(0), [folder]);
   assert.equal(state.tries, 1);
-  await pollAfter(5000);
+  await tryAfter(5000);
   assert.equal(state.tries, 2, "the first retry comes 5 s after the first failure");
-  await pollAfter(5000);
+  await tryAfter(5000);
   assert.equal(state.tries, 2, "after a second failure, 5 s is too soon");
-  await pollAfter(5000);
+  await tryAfter(5000);
   assert.equal(state.tries, 3, "after a second failure, the retry comes 10 s later");
 
   fails.now = false;
-  assert.deepEqual(await pollAfter(20_000), []);
+  assert.deepEqual(await tryAfter(20_000), []);
   assert.equal(state.tries, 4);
 
   // Watched for 5 s, its next failure waits 5 s again, counted from when its watcher started, so
-  // the next poll tries it; the failure after that waits 10 s.
-  assert.deepEqual(await pollAfter(5000), []);
+  // it is tried at once; the failure after that waits 10 s.
+  assert.deepEqual(await tryAfter(5000), []);
   fails.now = true;
   fakes.get(folder)?.watcher.emit("error", new Error("EPERM"));
-  assert.deepEqual(await pollAfter(0), [folder]);
+  assert.deepEqual(await tryAfter(0), [folder]);
   assert.equal(state.tries, 5);
-  await pollAfter(5000);
+  await tryAfter(5000);
   assert.equal(state.tries, 5);
-  await pollAfter(5000);
+  await tryAfter(5000);
   assert.equal(state.tries, 6);
 });
 
@@ -811,19 +756,14 @@ test("changes elsewhere while a folder cannot be watched do not lengthen the wai
   const f = makeFixture();
   f.write("app/.claude/rules/api.md", "API\n");
   const folder = f.at("app/.claude/rules");
-  const { state, fakes, pollAfter } = flakyFolder(t, f, folder);
-  assert.deepEqual(await pollAfter(0), [folder]);
+  const { state, tryAfter, changeSettled } = flakyFolder(t, f, folder);
+  assert.deepEqual(await tryAfter(0), [folder]);
 
   // Each settled change rewatches the directory, and so tries the folder too.
-  for (let i = 0; i < 3; i++) {
-    fakes.get(f.at("app"))?.listener?.("change", "CLAUDE.md");
-    await pause(500);
-  }
-  // A poll waits for the last rewatch to finish; its clock has not moved, so it tries nothing.
-  await pollAfter(0);
+  for (let i = 0; i < 3; i++) await changeSettled();
   const before = state.tries;
   assert.ok(before > 1, "the changes rewatched the directory");
-  await pollAfter(5000);
+  await tryAfter(5000);
 
   assert.equal(state.tries, before + 1, "tried again 5 s after the last rewatch");
 });
@@ -832,17 +772,17 @@ test("a folder whose watcher keeps failing soon after it starts is tried less an
   const f = makeFixture();
   f.write("app/.claude/rules/api.md", "API\n");
   const folder = f.at("app/.claude/rules");
-  const { fails, state, fakes, pollAfter } = flakyFolder(t, f, folder);
+  const { fails, state, fakes, tryAfter } = flakyFolder(t, f, folder);
   fails.now = false;
-  assert.deepEqual(await pollAfter(0), []);
+  assert.deepEqual(await tryAfter(0), []);
   const failSoon = () => fakes.get(folder)?.watcher.emit("error", new Error("EPERM"));
 
   failSoon();
-  await pollAfter(5000);
+  await tryAfter(5000);
   assert.equal(state.tries, 2, "the first failure is tried again after 5 s");
   failSoon();
-  await pollAfter(5000);
+  await tryAfter(5000);
   assert.equal(state.tries, 2, "the second failure waits longer than 5 s");
-  await pollAfter(5000);
+  await tryAfter(5000);
   assert.equal(state.tries, 3);
 });

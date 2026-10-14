@@ -12,10 +12,6 @@ Ideas, not commitments: each one is something the code is already close to suppo
 
 **`ccdesk rules --suggest [dir]`** (M). Lists the allow rules that would cover calls you approved by hand, with how many calls each covers. The counting is a core's `readUsage`; the suggestions are built by `suggestedRules` in `src/view/usage.ts`.
 
-## On the page
-
-**Push changes instead of long polling** (M). The page now holds a request open on `/api/watch` and asks again after each answer. With `Watcher.subscribe`, the server could push a message over server-sent events when a watched file changes. A TUI would subscribe the same way.
-
 ## In a terminal UI
 
 **`ccdesk tui`** (L). The directory page in a terminal, built on the core and on `src/view` (split plan step 4) for the rows, labels and sort order, with the same review-then-save steps as the page. It depends on every step of the split plan except the CLI.
