@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { createCore, listBackups, RefusedError, scanOverview } from "../src/core/index.ts";
@@ -164,4 +164,70 @@ test("a store that gained a session after the review is not forgotten", async ()
 
   await assert.rejects(core.forgetDirectory(dir, launch, revision), RefusedError);
   assert.ok(existsSync(join(store, "c.jsonl")));
+});
+
+test("a store another directory that still exists shares is never forgotten", async () => {
+  // my.app and my-app give the same store name; my.app is gone, my-app is in use.
+  const f = makeFixture();
+  const gone = f.at("work/my.app");
+  const live = f.at("work/my-app");
+  mkdirSync(live, { recursive: true });
+  const store = join(f.env.claudeDir, "projects", storeDirName(live));
+  f.write(join(store, "old.jsonl"), `${JSON.stringify({ type: "user", cwd: gone })}\n`);
+  f.write(join(store, "new.jsonl"), `${JSON.stringify({ type: "user", cwd: live })}\n`);
+  f.write(`${memoryDirFor(f, live)}/note.md`, memoryFile("note", "user", "d", "body"));
+  f.json("home/.claude.json", { projects: { [gone]: {}, [live]: {} } });
+  const core = createCore(f.env);
+
+  await assert.rejects(
+    core.previewForget(gone, f.at("home")),
+    /my-app exists and uses the same store/
+  );
+  assert.ok(existsSync(join(store, "new.jsonl")));
+});
+
+test("a shared store is kept when the directory still using it is known only from its sessions", async () => {
+  const f = makeFixture();
+  const gone = f.at("work/my.app");
+  const live = f.at("work/my-app");
+  mkdirSync(live, { recursive: true });
+  const store = join(f.env.claudeDir, "projects", storeDirName(live));
+  f.write(join(store, "new.jsonl"), `${JSON.stringify({ type: "user", cwd: live })}\n`);
+  f.json("home/.claude.json", { projects: { [gone]: {} } });
+
+  await assert.rejects(
+    createCore(f.env).previewForget(gone, f.at("home")),
+    /my-app exists and uses the same store/
+  );
+});
+
+test("a folder ccdesk cannot reach is not taken as gone", {
+  // Root reaches any folder, and Windows ignores the mode bits that hide one.
+  skip: process.getuid?.() === 0 || process.platform === "win32",
+}, async (t) => {
+  const f = makeFixture();
+  const { dir, store, launch } = goneDirectory(f);
+  mkdirSync(dir, { recursive: true });
+  const parent = f.at("work");
+  chmodSync(parent, 0o000);
+  t.after(() => chmodSync(parent, 0o755));
+
+  await assert.rejects(
+    createCore(f.env).previewForget(dir, launch),
+    /cannot tell whether .* exists \(EACCES\)/
+  );
+  assert.ok(existsSync(store));
+});
+
+test("the review warns when a session was written in the last few minutes", async () => {
+  const f = makeFixture();
+  const { dir, store, launch } = goneDirectory(f);
+  const core = createCore(f.env);
+
+  const fresh = await core.previewForget(dir, launch);
+  const hourAgo = new Date(Date.now() - 3_600_000);
+  for (const file of ["a.jsonl", "b.jsonl"]) utimesSync(join(store, file), hourAgo, hourAgo);
+  const quiet = await core.previewForget(dir, launch);
+
+  assert.deepEqual([fresh.recentlyActive, quiet.recentlyActive], [true, false]);
 });

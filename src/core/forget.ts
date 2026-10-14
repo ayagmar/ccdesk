@@ -1,9 +1,10 @@
-import { lstat, readdir, rename } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { lstat, readdir, rename, stat } from "node:fs/promises";
+import { basename, join, relative, resolve } from "node:path";
+import { storeDirName } from "../shared/memory.ts";
 import { type Change, type ForgetPreview } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isDir, readJsonObject, revisionOf } from "./scan/files.ts";
-import { listProjects } from "./scan/projects.ts";
+import { claudeJsonPaths, listProjects, storeCwds } from "./scan/projects.ts";
 import {
   MOVED_STORE,
   type Planned,
@@ -37,6 +38,24 @@ export async function storeContents(dir: string): Promise<{ listing: string; byt
   return { listing: `${lines.sort().join("\n")}\n`, bytes };
 }
 
+/** A session written this recently may still be running. */
+const RECENT_MS = 5 * 60_000;
+
+/**
+ * Whether there is a folder at `path`. Only a stat that finds nothing there (ENOENT, or ENOTDIR for
+ * a file in its way) counts as gone; a folder ccdesk cannot reach, such as one behind a parent
+ * without search permission or on a stale network mount, is refused rather than taken as gone.
+ */
+async function folderExists(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory();
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return false;
+    throw new RefusedError(`ccdesk cannot tell whether ${path} exists (${code ?? String(error)}).`);
+  }
+}
+
 /**
  * Forgetting a directory whose folder is gone, worked out from disk as it is now. Only its store
  * moves; `~/.claude.json`, which ccdesk never writes, keeps its entry, and the scan leaves out a
@@ -52,15 +71,32 @@ async function planForget(
     throw new RefusedError(
       "ccdesk was started in this directory, so it stays listed; start ccdesk somewhere else to forget it."
     );
-  if (await isDir(path))
+  if (await folderExists(path))
     throw new RefusedError(`${path} exists; ccdesk forgets only a directory whose folder is gone.`);
-  const claudeJson = await readJsonObject(env, env.claudeJson);
-  const projects = await listProjects(env, claudeJson.ok ? claudeJson.data : null, launchDir);
+  const read = await readJsonObject(env, env.claudeJson);
+  const claudeJson = read.ok ? read.data : null;
+  const projects = await listProjects(env, claudeJson, launchDir);
   const project = projects.find((p) => p.path === path);
   const store = project?.storeDir;
   if (!project || !store)
     throw new RefusedError("Claude Code keeps no sessions or memory for this directory.");
+  // Store names replace every character but letters and digits with a dash, so my.app and my-app
+  // share one: a store another directory that still exists uses is never moved away.
+  const name = basename(store);
+  const sharing = [
+    ...new Set([
+      resolve(launchDir),
+      ...claudeJsonPaths(env, claudeJson),
+      ...(await storeCwds(env, store)),
+    ]),
+  ].filter((p) => p !== path && storeDirName(p) === name);
+  for (const other of sharing)
+    if (await folderExists(other))
+      throw new RefusedError(
+        `${other} exists and uses the same store, ${store}; forgetting ${path} would take its sessions and memory too.`
+      );
   const { listing, bytes } = await storeContents(store);
+  const newest = project.lastActive === null ? null : Date.parse(project.lastActive);
   return {
     preview: {
       path,
@@ -69,6 +105,7 @@ async function planForget(
       memories: project.memories,
       bytes,
       claudeJsonEntry: project.inClaudeJson,
+      recentlyActive: newest !== null && Date.now() - newest < RECENT_MS,
       revision: revisionOf(`${path}\0${store}\0${listing}`),
     },
     save: () =>

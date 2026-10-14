@@ -30,10 +30,7 @@ export async function listProjects(
 ): Promise<KnownProject[]> {
   const byPath = new Map<string, KnownProject>();
   const storesRoot = join(env.claudeDir, "projects");
-  // Claude Code keys Windows folders with forward slashes; listed here as Windows writes them.
-  const knownPaths = (isRecord(claudeJson?.projects) ? Object.keys(claudeJson.projects) : []).map(
-    (key) => (env.platform === "win32" ? key.replaceAll("/", "\\") : key)
-  );
+  const knownPaths = claudeJsonPaths(env, claudeJson);
 
   const add = async (path: string, storeDir: string, sessions: Transcript[]) => {
     const store = await readMemoryStore(env, join(storeDir, "memory"), path);
@@ -92,6 +89,17 @@ export async function listProjects(
     });
   }
   return [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** The directories `~/.claude.json` keeps under `projects`, as Windows writes them there. */
+export function claudeJsonPaths(
+  env: ScanEnv,
+  claudeJson: Record<string, unknown> | null
+): string[] {
+  // Claude Code keys Windows folders with forward slashes.
+  return (isRecord(claudeJson?.projects) ? Object.keys(claudeJson.projects) : []).map((key) =>
+    env.platform === "win32" ? key.replaceAll("/", "\\") : key
+  );
 }
 
 /**
@@ -170,24 +178,38 @@ async function sessionCwd(
   sessions: Transcript[]
 ): Promise<string | null> {
   for (const { file } of sessions.slice(0, 3)) {
-    const handle = await openUnlessCredentials(env, join(storeDir, file)).catch(() => null);
-    if (!handle) continue;
-    const input = handle.createReadStream({ encoding: "utf8" });
-    const lines = createInterface({ input });
-    let read = 0;
-    try {
-      for await (const line of lines) {
-        if (++read > 50) break;
-        if (!line.includes('"cwd"')) continue;
-        const parsed: unknown = JSON.parse(line);
-        if (isRecord(parsed) && typeof parsed.cwd === "string") return parsed.cwd;
-      }
-    } catch {
-      // A truncated or malformed transcript line: try the next file.
-    } finally {
-      lines.close();
-      input.destroy();
+    const cwd = await transcriptCwd(env, join(storeDir, file));
+    if (cwd !== null) return cwd;
+  }
+  return null;
+}
+
+/** Every directory the sessions in a store were started in. */
+export async function storeCwds(env: ScanEnv, storeDir: string): Promise<string[]> {
+  const files = (await listDir(storeDir)).filter((f) => f.endsWith(".jsonl"));
+  const cwds = await Promise.all(files.map((f) => transcriptCwd(env, join(storeDir, f))));
+  return [...new Set(cwds.filter((c): c is string => c !== null))];
+}
+
+/** The `cwd` in a transcript's first 50 lines, or null. */
+async function transcriptCwd(env: ScanEnv, path: string): Promise<string | null> {
+  const handle = await openUnlessCredentials(env, path).catch(() => null);
+  if (!handle) return null;
+  const input = handle.createReadStream({ encoding: "utf8" });
+  const lines = createInterface({ input });
+  let read = 0;
+  try {
+    for await (const line of lines) {
+      if (++read > 50) break;
+      if (!line.includes('"cwd"')) continue;
+      const parsed: unknown = JSON.parse(line);
+      if (isRecord(parsed) && typeof parsed.cwd === "string") return parsed.cwd;
     }
+  } catch {
+    // A truncated or malformed transcript line: no cwd from this file.
+  } finally {
+    lines.close();
+    input.destroy();
   }
   return null;
 }
