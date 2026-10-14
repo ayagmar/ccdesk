@@ -729,6 +729,40 @@ test("a call copied into a resumed or forked session's transcript counts once", 
   assert.equal(usage.memories[memory]?.reads, 2);
 });
 
+test("a copy of a call without your answer does not hide the answer the other copy has", async () => {
+  // Which transcript is read first depends on session ids; catches the copy read first winning,
+  // which dropped the approval and the rule it suggests.
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  const answered = bash("gh pr view 1", "accept", dir);
+  f.write(join(storeOf(f, dir), "b.jsonl"), answered);
+  f.write(join(storeOf(f, dir), "a.jsonl"), answered.split("\n")[0] + "\n");
+
+  const usage = await readUsage(f.env, dir, []);
+
+  assert.deepEqual(
+    usage.approvals.map((a) => [a.rule, a.approved]),
+    [["Bash(gh pr view *)", 1]]
+  );
+});
+
+test("a copy of a failed memory Read without its result does not count as a read", async () => {
+  // Catches the copy read first, which lacks the error, counting a Read Claude never saw.
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  const memory = memoryIn(f, dir, "testing.md");
+  const attempt = readAt(memory, "2026-10-02T09:00:00.000Z", dir);
+  f.write(
+    join(storeOf(f, dir), "b.jsonl"),
+    attempt + resultOf(`toolu_${next}`, "File does not exist.")
+  );
+  f.write(join(storeOf(f, dir), "a.jsonl"), attempt);
+
+  const usage = await readUsage(f.env, dir, [], { memories: [memory] });
+
+  assert.deepEqual(usage.memories[memory], { reads: 0, last: null });
+});
+
 test("a memory that is a link counts a read of the file it links to", async () => {
   // Catches matching only the link's own path when Claude read the file it leads to.
   const f = makeFixture();
