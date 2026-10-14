@@ -18,6 +18,7 @@ import {
   RefusedError,
   Watcher,
 } from "../core/index.ts";
+import { eventText } from "../shared/events.ts";
 import { BackupBody, MemoryBody, OpenBody, RevisionBody, UsageBody } from "../shared/requests.ts";
 import { SESSION_PROFILES } from "../shared/types.ts";
 
@@ -146,8 +147,7 @@ async function streamChanges(watcher: Watcher, dir: string, res: ServerResponse)
   // Sent at once, so the page knows the stream is open while the watchers start.
   res.writeHead(200, { ...SECURITY_HEADERS, "Content-Type": "text/event-stream; charset=utf-8" });
   res.flushHeaders();
-  const event = (name: string, data: unknown) =>
-    res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
+  const event = (name: string, data: unknown) => res.write(eventText(name, data));
   const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), HEARTBEAT_MS);
   const closed = stopOnClose(res);
   let unsubscribe = () => {

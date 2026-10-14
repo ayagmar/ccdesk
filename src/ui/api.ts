@@ -1,4 +1,5 @@
 import { type SettingsComparison } from "../shared/compare.ts";
+import { eventReader } from "../shared/events.ts";
 import {
   type BackupSummary,
   type Change,
@@ -95,26 +96,15 @@ export type WatchEvent = { type: "change" } | { type: "unwatched"; folders: stri
 async function* events(path: string, signal: AbortSignal): AsyncGenerator<WatchEvent> {
   const response = await fetch(path, { signal, headers: { "x-ccdesk-token": sessionToken } });
   if (!response.ok || !response.body) throw await failure(response);
-  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-  let buffer = "";
+  const reader = response.body.getReader();
+  const read = eventReader();
   for (;;) {
     const { value, done } = await reader.read();
     if (done) return;
-    buffer += value;
-    // An event ends with a blank line. A line that starts with a colon, such as the heartbeat, is a
-    // comment, and the server sends no other fields than these two.
-    const blocks = buffer.split("\n\n");
-    buffer = blocks.pop() ?? "";
-    for (const block of blocks) {
-      const field = (name: string) =>
-        block
-          .split("\n")
-          .find((line) => line.startsWith(`${name}: `))
-          ?.slice(name.length + 2);
-      const event = field("event");
+    for (const { event, data } of read(value)) {
       if (event === "change") yield { type: "change" };
       else if (event === "unwatched")
-        yield { type: "unwatched", folders: JSON.parse(field("data") ?? "[]") as string[] };
+        yield { type: "unwatched", folders: JSON.parse(data) as string[] };
     }
   }
 }
