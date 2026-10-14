@@ -372,6 +372,8 @@ A page reached from the rail. Each change is a row on a hairline: bold kind ("Se
 ### Problems Strip
 Above the route strip when ccdesk could not parse a settings file or `.mcp.json`: an amber-tinted box with a warn icon and one line per file (mono path, the parser's message). When the folder is not yet trusted in Claude Code, a "not trusted yet" warn flag sits beside the directory title.
 
+A page ccdesk could not show at all uses the same box alone on the page: a bold sentence naming what failed ("ccdesk could not read ~/code/acme-api."), the reason as the server or browser gave it, and a "Try again" head action that asks again for what failed. An error while drawing a page gets a hint instead, since asking again would draw it the same way. While the directory list is unavailable the rail says so rather than showing its empty text, and marks no item as current.
+
 ### Sharing Strip
 Under the route strip, when the directory is in git: up to three label-and-files groups on one wrapping line, labels in the visibility inks (committed green, untracked amber, ignored muted), file names in mono.
 
