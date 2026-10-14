@@ -347,6 +347,29 @@ test("on macOS, a folder reported again right after the watchers move is told, s
   assert.equal(counter.calls, 3);
 });
 
+test("a change a watcher reports without naming the file wakes a page waiting for changes", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "one\n");
+  const listeners = new Map<string, WatchListener<string>>();
+  // fs.watch passes no file name where the system does not give one.
+  const host: WatchHost = {
+    platform: process.platform,
+    watch: ((path: string, _options?: unknown, listener?: WatchListener<string>) => {
+      if (listener) listeners.set(path, listener);
+      const watcher = { close: () => undefined, on: () => watcher };
+      return watcher as unknown as FSWatcher;
+    }) as typeof watch,
+  };
+  const watcher = new Watcher(f.env, scanDirectory, host);
+  watchers.push(watcher);
+  await started(watcher, f.at("app"));
+
+  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  listeners.get(f.at("app"))?.("change", null);
+
+  assert.equal((await waiting).changed, true);
+});
+
 test("closing the watcher does not tell a subscriber something changed", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "one\n");
