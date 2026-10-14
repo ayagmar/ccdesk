@@ -880,6 +880,24 @@ test("restoring a file of a deleted folder says the restore creates the folder a
   assert.equal(shown.createsFolder, dir);
 });
 
+test("reviewing the removal of a created file in a deleted folder never says it creates the folder", async () => {
+  // Catches the deleted-folder warning on a review of a removal, which creates nothing. Such a
+  // review is always blocked, since the file went with its folder, so the warning would only
+  // confuse why.
+  const dir = fixture.at("work/created-deleted");
+  fixture.write("work/created-deleted/README.md", "A project.\n");
+  await saveSetting({ dir, scope: "project", key: "model", value: "opus" });
+  const backup = (await backups()).find((b) => b.target === join(dir, ".claude", "settings.json"));
+  rmSync(dir, { recursive: true });
+
+  const shown = (await call("/api/backups/preview", { method: "POST", body: { id: backup?.id } }))
+    .json as RestorePreview;
+
+  assert.equal(shown.removes, true);
+  assert.ok(shown.blocked);
+  assert.equal(shown.createsFolder, undefined);
+});
+
 test("a restore is refused when the file changed after it was reviewed", async () => {
   const dir = fixture.at("work/restore-stale");
   const file = fixture.json("work/restore-stale/.claude/settings.json", { model: "sonnet" });
