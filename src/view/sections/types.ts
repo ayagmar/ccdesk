@@ -85,8 +85,11 @@ export interface ViewSection<R extends Row> {
   dimmed?: (row: R) => boolean;
   /** Text the filter box and the palette search. */
   text: (row: R) => string;
-  /** One line naming the row in the palette. */
-  label: (row: R, context: ViewContext) => string;
+  /**
+   * What the palette calls the row: its kind, such as "tool", and its name; `path` when the name is
+   * a path, so a long one keeps its end.
+   */
+  label: (row: R, context: ViewContext) => { kind: string; name: string; path?: boolean };
   /** The inspector's heading for a row. */
   heading: (row: R, context: ViewContext) => string;
   facet?: Facet<R>;

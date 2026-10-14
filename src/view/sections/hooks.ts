@@ -29,7 +29,7 @@ export const hooks = defineSection<R>({
   empty: () => "No hooks run here.",
   dimmed: (row) => !row.item.active,
   text: (row) => `${row.item.event} ${row.item.matcher ?? ""} ${row.item.command}`,
-  label: (row) => `${row.item.event} hook: ${row.item.command}`,
+  label: (row) => ({ kind: `${row.item.event} hook`, name: row.item.command }),
   heading: (row) => `${row.item.event} hook`,
   facet: { label: "Filter hooks by event", of: (row) => row.item.event },
 });

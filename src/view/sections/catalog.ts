@@ -51,7 +51,7 @@ export const catalog = defineSection<R>({
   ],
   empty: () => "ccdesk has no list of Claude Code's settings.",
   text: (row) => `${row.item.key} ${plain(row.item.summary)} ${row.item.category}`,
-  label: (row) => `setting ${row.item.key} (all settings)`,
+  label: (row) => ({ kind: "all settings", name: row.item.key }),
   heading: (row) => row.item.key,
   facet: {
     label: "Filter settings by area",

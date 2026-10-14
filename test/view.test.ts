@@ -36,7 +36,8 @@ test("every section of the page builds its rows from a scanned directory, withou
     assert.ok(own.length > 0, `${section.id} has rows`);
     for (const row of own) {
       assert.ok(section.text(row), `${row.id} has filter text`);
-      assert.ok(section.label(row, context), `${row.id} has a label`);
+      const label = section.label(row, context);
+      assert.ok(label.kind && label.name, `${row.id} has a label`);
       assert.ok(section.heading(row, context), `${row.id} has a heading`);
     }
   }
@@ -57,7 +58,7 @@ test("paths in labels are shown from the home folder the caller gives", async ()
     const context: ViewContext = { format: formatter(home), reference: REFERENCE };
     return buildRows(view, context)
       .filter((r) => r.section === "instructions")
-      .map((r) => instructions?.label(r, context));
+      .map((r) => instructions?.label(r, context).name);
   };
 
   // The path keeps the platform's separators after the ~.

@@ -80,7 +80,15 @@ export const permissions = defineSection<R>({
     !isSuggested(row) &&
     (!row.item.inEffect || (row.item.kind === "rule" && row.item.decidedBy !== undefined)),
   text: (row) => `permission ${words(row)}`,
-  label: words,
+  label: (row) => {
+    if (isSuggested(row)) return { kind: "suggested rule", name: row.item.rule };
+    const { item } = row;
+    if (item.kind === "rule") return { kind: `${item.list} rule`, name: item.rule };
+    return {
+      kind: item.kind === "defaultMode" ? "default mode" : "extra folder",
+      name: item.value,
+    };
+  },
   heading: (row) => {
     if ("rule" in row.item) return row.item.rule;
     return row.item.kind === "defaultMode" ? "Default permission mode" : "Extra folder";

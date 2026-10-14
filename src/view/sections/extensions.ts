@@ -56,7 +56,9 @@ export const extensions = defineSection<R>({
       ? `plugin ${row.item.id}`
       : `${row.kind} ${row.item.id ?? row.item.name} ${row.item.synced ? "claude.ai sync " : ""}${row.item.description}`,
   label: (row) =>
-    row.kind === "plugin" ? `plugin ${row.item.id}` : `${row.kind} ${row.item.id ?? row.item.name}`,
+    row.kind === "plugin"
+      ? { kind: "plugin", name: row.item.id }
+      : { kind: row.kind, name: row.item.id ?? row.item.name },
   heading: (row) => (row.kind === "plugin" ? row.item.id : (row.item.id ?? row.item.name)),
   facet: { label: "Filter by kind", of: (row) => row.kind, order: () => KINDS },
 });

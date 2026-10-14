@@ -33,7 +33,7 @@ export const mcp = defineSection<R>({
   empty: () => "No MCP servers are configured for this directory.",
   dimmed: (row) => row.item.status !== "active",
   text: (row) => `${row.item.name} ${row.item.target}`,
-  label: (row) => `MCP ${row.item.name}`,
+  label: (row) => ({ kind: "MCP server", name: row.item.name }),
   heading: (row) => row.item.name,
   facet: {
     label: "Filter MCP servers by status",
