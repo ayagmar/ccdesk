@@ -156,11 +156,11 @@ async function nestedRules(test: FolderTest, folder: string): Promise<PathMatch[
 
 /**
  * A folder's skills Claude may pick itself: not off, user-invocable-only or
- * disable-model-invocation; one with paths only for a matching file, its globs read from its
- * folder like a rule's.
+ * disable-model-invocation. Their paths do not count: Claude Code adds every skill it finds on
+ * demand (observed in v2.1.296; the docs do not say).
  */
 async function nestedSkills(test: FolderTest, folder: string): Promise<PathMatch[]> {
-  const { env, cwd, target, overrides, startSkills, skillsLocked } = test;
+  const { env, cwd, overrides, startSkills, skillsLocked } = test;
   const matches: PathMatch[] = [];
   if (skillsLocked) return matches;
   for (const name of await listDir(join(folder, ".claude", "skills"))) {
@@ -168,8 +168,6 @@ async function nestedSkills(test: FolderTest, folder: string): Promise<PathMatch
     if (!skill) continue;
     applySkillOverrides([skill], overrides);
     if (skill.listed === false) continue;
-    const glob = skill.paths && matchingGlob(skill.paths, slashed(relative(folder, target)));
-    if (skill.paths && !glob) continue;
     // A nested skill whose folder name another skill has is called by its folder as well, as
     // apps/web:deploy (docs: skills#how-a-skill-gets-its-command-name).
     matches.push({
@@ -177,7 +175,6 @@ async function nestedSkills(test: FolderTest, folder: string): Promise<PathMatch
       path: skill.path,
       scope: "project",
       name: startSkills.has(name) ? `${slashed(relative(cwd, folder))}:${name}` : skill.name,
-      ...(glob ? { glob } : {}),
     });
   }
   return matches;

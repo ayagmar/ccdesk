@@ -224,7 +224,7 @@ test("with only managed instruction files at launch, path rules and subfolder fi
   );
 });
 
-test("a subfolder's skills load on demand only when Claude may invoke them itself", async () => {
+test("a subfolder's skills load on demand, whatever their paths, only when Claude may invoke them itself", async () => {
   const f = makeFixture();
   f.json("app/.claude/settings.json", { skillOverrides: { deploy: "off" } });
   f.write("app/src/.claude/skills/deploy/SKILL.md", "---\nname: deploy\ndescription: d\n---\n");
@@ -244,8 +244,8 @@ test("a subfolder's skills load on demand only when Claude may invoke them itsel
       .map((m) => m.name)
       .sort();
 
-  assert.deepEqual(await skills("src/a.ts"), ["lint"]);
-  assert.deepEqual(await skills("src/a.css"), ["css", "lint"]);
+  // Claude Code 2.1.296 ignores paths for a skill found on demand: it loads with its folder.
+  assert.deepEqual(await skills("src/a.ts"), ["css", "lint"]);
 });
 
 test("a subfolder's AGENTS.md and linked rules load on demand exactly as they load when Claude starts there", async () => {
