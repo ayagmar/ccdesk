@@ -98,3 +98,29 @@ test("a folder typed with a trailing separator names the same folder, and a root
   ];
   for (const [typed, path] of cases) assert.equal(typedPath(typed, "/home/me"), path, typed);
 });
+
+test("the settings filter counts each key under the file that decides its value", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/settings.json", {
+    model: "sonnet",
+    theme: "light",
+    permissions: { allow: ["Read"] },
+  });
+  f.json("app/.claude/settings.json", {
+    model: "opus",
+    permissions: { allow: ["Bash(npm test)"] },
+  });
+  f.json("app/.claude/settings.local.json", { verbose: true });
+  const view = await scanDirectory(f.env, f.at("app"));
+  const context: ViewContext = { format: formatter(f.env.home), reference: REFERENCE };
+  const settings = SECTIONS.find((s) => s.id === "settings");
+
+  const counts: Record<string, number> = {};
+  for (const row of buildRows(view, context).filter((r) => r.section === "settings")) {
+    const scope = settings?.facet?.of(row) ?? "";
+    counts[scope] = (counts[scope] ?? 0) + 1;
+  }
+
+  // The project's model beats the user's, and merged permissions count under the higher file.
+  assert.deepEqual(counts, { User: 1, Project: 2, Local: 1 });
+});
