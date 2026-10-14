@@ -361,6 +361,25 @@ test("a skill folder with a plugin manifest loads as <name>@skills-dir, a projec
   );
 });
 
+test("turning a skills-dir plugin off in settings also skips the SKILL.md in its folder", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/skills/tools/.claude-plugin/plugin.json", { name: "tools" });
+  f.write("home/.claude/skills/tools/SKILL.md", "---\ndescription: tool belt\n---\n");
+  f.write("app/README.md", "x");
+  const scan = async (enabled: boolean) => {
+    f.json("home/.claude/settings.json", { enabledPlugins: { "tools@skills-dir": enabled } });
+    const view = await scanDirectory(f.env, f.at("app"));
+    return {
+      plugin: view.inventory.plugins.find((p) => p.id === "tools@skills-dir")?.enabled,
+      skill: view.inventory.skills.find((s) => s.name === "tools")?.skipped !== undefined,
+      listed: /tool belt/.test(view.context.find((b) => b.kind === "skills")?.text ?? ""),
+    };
+  };
+
+  assert.deepEqual(await scan(false), { plugin: false, skill: true, listed: false });
+  assert.deepEqual(await scan(true), { plugin: true, skill: false, listed: true });
+});
+
 test("an installed plugin, a plugin-only lock or a marketplace allowlist keeps a skills-dir plugin from loading", async () => {
   const f = makeFixture();
   f.json("home/.claude/plugins/installed_plugins.json", {
