@@ -158,6 +158,18 @@ const CROPS: Crop[] = [
   { name: "suggested", target: rowIn("3", "Permissions", "suggested") },
   { name: "mcp-waiting", target: rowIn("7", "MCP servers", "sentry") },
   {
+    name: "memory-reads",
+    width: 1000,
+    target: async (page) => {
+      await page.keyboard.press("5");
+      await pause(page);
+      const memory = page
+        .locator("section")
+        .filter({ has: page.getByRole("heading", { name: "Memory", exact: true }) });
+      return { element: memory, until: memory.getByRole("row").last() };
+    },
+  },
+  {
     name: "shared-memory",
     query: "?all",
     width: 1000,
