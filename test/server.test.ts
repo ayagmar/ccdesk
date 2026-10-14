@@ -958,6 +958,10 @@ test("hidden values that differ compare as different, without either value in th
   fixture.json("work/compare-hidden-a/.claude/settings.json", { env: { API_TOKEN: "fake-one" } });
   fixture.json("work/compare-hidden-b/.claude/settings.json", { env: { API_TOKEN: "fake-two" } });
   fixture.json("work/compare-hidden-c/.claude/settings.json", { env: { API_TOKEN: "fake-one" } });
+  const d = fixture.at("work/compare-hidden-d");
+  fixture.json("work/compare-hidden-d/.claude/settings.json", {
+    env: { API_TOKEN: "fake-one", REGION: "eu" },
+  });
   const compare = async (x: string, y: string) => {
     const res = await call(`/api/compare?a=${encodeURIComponent(x)}&b=${encodeURIComponent(y)}`);
     assert.doesNotMatch(JSON.stringify(res.json), /fake-one|fake-two/);
@@ -973,6 +977,10 @@ test("hidden values that differ compare as different, without either value in th
   const alike = await compare(a, c);
   assert.equal(alike?.same, true);
   assert.equal(alike?.hiddenDiffers, undefined);
+  // Values that differ as shown too need no note.
+  const shown = await compare(a, d);
+  assert.equal(shown?.same, false);
+  assert.equal(shown?.hiddenDiffers, undefined);
 });
 
 test("settings that differ only in the order of their keys compare the same", async () => {
