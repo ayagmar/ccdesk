@@ -96,6 +96,12 @@ export function DirectoryPage({
   const [list, setList] = useState<ListState>(readListState);
   const [shown, setShown] = useState<Partial<Record<SectionId, number>>>({});
   const filterInput = useRef<HTMLInputElement>(null);
+  const configButton = useRef<HTMLButtonElement>(null);
+  /** Back to the tables, with focus on the switch so the keyboard does not start over at the top. */
+  const leaveSeeing = useCallback(() => {
+    setSeeing(false);
+    requestAnimationFrame(() => configButton.current?.focus());
+  }, []);
 
   useEffect(
     () => replaceListState({ kind: "directory", dir: view.path, profile: view.profile }, list),
@@ -160,6 +166,7 @@ export function DirectoryPage({
     select,
     seeing,
     setSeeing,
+    leaveSeeing,
     onClose: closeInspector,
     filterInput,
   });
@@ -187,6 +194,7 @@ export function DirectoryPage({
           <Toolbar
             seeing={seeing}
             onSeeing={setSeeing}
+            configButton={configButton}
             query={list.query}
             onQuery={(query) => changeList({ ...list, query })}
             filterInput={filterInput}
@@ -201,7 +209,7 @@ export function DirectoryPage({
         <UnreadManagedSources view={view} />
         <ManagedRepairs view={view} />
         {seeing ? (
-          <ContextView view={view} onBack={() => setSeeing(false)} />
+          <ContextView view={view} onBack={leaveSeeing} />
         ) : (
           <>
             <RouteStrip
@@ -329,6 +337,7 @@ function DirectoryTitle({ view }: { view: DirectoryView }) {
 function Toolbar({
   seeing,
   onSeeing,
+  configButton,
   query,
   onQuery,
   filterInput,
@@ -336,6 +345,7 @@ function Toolbar({
 }: {
   seeing: boolean;
   onSeeing: (seeing: boolean) => void;
+  configButton: RefObject<HTMLButtonElement | null>;
   query: string;
   onQuery: (query: string) => void;
   filterInput: RefObject<HTMLInputElement | null>;
@@ -344,7 +354,12 @@ function Toolbar({
   return (
     <div className="toolbar">
       <fieldset className="segmented view-switch" aria-label="View">
-        <button type="button" aria-pressed={!seeing} onClick={() => onSeeing(false)}>
+        <button
+          type="button"
+          ref={configButton}
+          aria-pressed={!seeing}
+          onClick={() => onSeeing(false)}
+        >
           Config
         </button>
         <button type="button" aria-pressed={seeing} onClick={() => onSeeing(true)}>
@@ -384,6 +399,7 @@ function useListKeys({
   select,
   seeing,
   setSeeing,
+  leaveSeeing,
   onClose,
   filterInput,
 }: {
@@ -392,6 +408,8 @@ function useListKeys({
   select: (id: string, focus?: boolean) => void;
   seeing: boolean;
   setSeeing: (seeing: boolean) => void;
+  /** Leaves What Claude sees and puts focus on the view switch. */
+  leaveSeeing: () => void;
   /** Closes the inspector. */
   onClose: () => void;
   filterInput: RefObject<HTMLInputElement | null>;
@@ -402,7 +420,7 @@ function useListKeys({
       if (e.key === "Escape") {
         // Escape leaves What Claude sees first; the inspector, hidden there, keeps what it holds.
         if (seeing) {
-          setSeeing(false);
+          leaveSeeing();
           return;
         }
         onClose();
@@ -414,7 +432,7 @@ function useListKeys({
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [visible, selected, select, seeing, setSeeing, onClose, filterInput]);
+  }, [visible, selected, select, seeing, setSeeing, leaveSeeing, onClose, filterInput]);
 }
 
 /** j and k select the next or previous row on screen; 1 to 9 scroll to that section. */

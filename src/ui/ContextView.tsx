@@ -42,7 +42,13 @@ function ContextTop({ onBack }: { onBack: () => void }) {
   return (
     <header className="context-top">
       <h2>What Claude sees</h2>
-      <button type="button" className="head-action" onClick={onBack}>
+      <button
+        type="button"
+        className="head-action"
+        aria-label="Back to config"
+        aria-keyshortcuts="Escape"
+        onClick={onBack}
+      >
         <Icon name="undo" /> Back to config <kbd>Esc</kbd>
       </button>
     </header>
