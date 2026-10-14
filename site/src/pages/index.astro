@@ -109,7 +109,7 @@ const QUESTIONS = [
 
 <StarlightPage
   frontmatter={{
-    title: "ccdesk: see and change what Claude Code loads",
+    title: "See and change what Claude Code loads",
     description:
       "A local web app that shows every instruction file, setting, permission rule, hook, MCP server, subagent, skill and memory Claude Code loads in a directory, with the file each comes from, and lets you change them safely.",
     template: "splash",
@@ -123,7 +123,7 @@ const QUESTIONS = [
       <h2 id="questions">Questions it answers</h2>
       <p class="section-lede">
         Each answer is a row in ccdesk that names the file it comes from. Open a question to see
-        the row; the last column says where to find it in the app.
+        the row and where to find it in the app.
       </p>
       <table class="timetable">
         <thead>
@@ -194,8 +194,10 @@ const QUESTIONS = [
             in the meantime, ccdesk asks you to review again.
           </li>
           <li>
-            The old file is backed up first. Undo is one click, and <a href={`${base}recent-changes/`}>Recent changes</a> keeps every edit
-            restorable.
+            The old file is backed up first. Undo is one click, and
+            <a href={`${base}recent-changes/`}>Recent changes</a> can restore every file ccdesk
+            wrote. MCP servers changed through <code>claude mcp</code> are listed there with the
+            commands that put them back.
           </li>
         </ul>
       </div>
@@ -219,8 +221,9 @@ const QUESTIONS = [
           <code>~/.claude.json</code> is never written.
         </p>
         <p>
-          Transcripts are read only to count tool calls and your answers to permission prompts.
-          Commands and file contents never reach the page.
+          Transcripts are read only to count tool calls, reads of memory files and your answers to
+          permission prompts. Commands, URL hosts and the paths Claude read stay inside the ccdesk process; only
+          counts, times and rule patterns reach the page.
         </p>
       </div>
       <p><a href={`${base}safety-and-privacy/`}>Safety and privacy, in full</a></p>
