@@ -184,6 +184,7 @@ async function count(
   const projects = join(env.claudeDir, "projects");
   const storeNames = await listDir(projects);
   const tally: Tally = { taken: new Set(), calls: [], sessions: 0 };
+  const named = env.projectDirName;
   for (const folder of folders) {
     const own = storeDirName(folder);
     // Sessions started in a subfolder or a nested worktree have their own store, named with the
@@ -193,10 +194,26 @@ async function count(
     const stores = storeNames.filter(
       (name) => name === own || (!isHome(folder) && name.startsWith(`${own}-`))
     );
+    // CLAUDE_CODE_PROJECT_DIR_NAME puts every project's sessions in one store, and those from
+    // before it was set stay in the derived ones (docs: sessions#name-the-project-directory-yourself).
+    if (named && storeNames.includes(named) && !stores.includes(named)) stores.push(named);
     for (const name of stores) {
       const store = join(projects, name);
       const files = await transcriptsIn(store);
-      await countStore(transcripts, env, signal, tally, folder, files, name === own);
+      // In the shared store, the home directory takes only the sessions started in it.
+      const startsHere =
+        name === named && isHome(folder)
+          ? (start: string) => resolve(start) === resolve(folder)
+          : (start: string) => isWithin(folder, start);
+      await countStore(
+        transcripts,
+        env,
+        signal,
+        tally,
+        startsHere,
+        files,
+        name === own && name !== named
+      );
       checkStopped(signal);
       for (const path of transcripts.keys())
         if (path.startsWith(store + sep) && !files.has(path)) transcripts.delete(path);
@@ -222,16 +239,16 @@ interface Tally {
 }
 
 /**
- * Adds the transcripts in one store whose session started in `folder`. A subagent's session
- * decides; one whose session file is gone goes by its own start, or, without one, by whether the
- * store is the folder's own.
+ * Adds the transcripts in one store whose session started where `startsHere` says. A subagent's
+ * session decides; one whose session file is gone goes by its own start, or, without one, by
+ * whether the store is the folder's own.
  */
 async function countStore(
   transcripts: Cache,
   env: ScanEnv,
   signal: AbortSignal,
   tally: Tally,
-  folder: string,
+  startsHere: (start: string) => boolean,
   files: Map<string, string>,
   ownStore: boolean
 ): Promise<void> {
@@ -240,7 +257,7 @@ async function countStore(
     const start =
       (await transcript(transcripts, env, session, signal))?.startCwd ??
       (await transcript(transcripts, env, file, signal))?.startCwd;
-    if (start ? !isWithin(folder, start) : !ownStore) continue;
+    if (start ? !startsHere(start) : !ownStore) continue;
     tally.taken.add(file);
     tally.calls.push(...((await transcript(transcripts, env, file, signal))?.calls ?? []));
     if (file === session) tally.sessions++;

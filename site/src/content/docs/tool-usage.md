@@ -9,6 +9,8 @@ ccdesk reads Claude Code's transcripts for the open directory to fill three thin
 
 Transcripts live in `~/.claude/projects/` (or the `projects` folder in `$CLAUDE_CONFIG_DIR`), one folder per directory Claude Code was started in.
 
+With `CLAUDE_CODE_PROJECT_DIR_NAME` set beside `CLAUDE_CONFIG_DIR`, Claude Code keeps every project's transcripts in the one folder it names, so ccdesk also reads that folder and counts each session by the directory it started in. Sessions from before the name was set stay in their own folders and still count.
+
 - **In a git repository**: every session started anywhere in the repository or in one of its worktrees, because rules at the repository root apply there too.
 - **Outside git**, or when the repository is your home folder: sessions started in the directory or one of its subfolders.
 

@@ -29,7 +29,10 @@ export interface ScanEnv {
   processEnv: NodeJS.ProcessEnv;
   /** CLAUDE_CODE_DISABLE_AUTO_MEMORY from the shell ccdesk runs in; it outranks autoMemoryEnabled. */
   disableAutoMemory?: string | undefined;
-  /** CLAUDE_CODE_PROJECT_DIR_NAME, read only beside CLAUDE_CONFIG_DIR: one memory store for every project. */
+  /**
+   * CLAUDE_CODE_PROJECT_DIR_NAME, read only beside CLAUDE_CONFIG_DIR and only when Claude Code
+   * accepts the name: one store for every project's memory and transcripts.
+   */
   projectDirName?: string | undefined;
 }
 
@@ -54,8 +57,18 @@ export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
     platform: process.platform,
     processEnv,
     disableAutoMemory: processEnv.CLAUDE_CODE_DISABLE_AUTO_MEMORY,
-    projectDirName: configDir ? processEnv.CLAUDE_CODE_PROJECT_DIR_NAME || undefined : undefined,
+    projectDirName: configDir ? projectDirName(processEnv.CLAUDE_CODE_PROJECT_DIR_NAME) : undefined,
   };
+}
+
+/**
+ * CLAUDE_CODE_PROJECT_DIR_NAME if Claude Code accepts it: 1-64 letters, digits, `-` or `_`, and not
+ * a Windows device name. Claude Code ignores any other value and uses the derived name
+ * (docs: sessions#name-the-project-directory-yourself).
+ */
+function projectDirName(name: string | undefined): string | undefined {
+  if (!name || !/^[A-Za-z0-9_-]{1,64}$/.test(name)) return undefined;
+  return /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])$/i.test(name) ? undefined : name;
 }
 
 /** Your configuration home: your home directory, or the folder whose .claude is CLAUDE_CONFIG_DIR. */
