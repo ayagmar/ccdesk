@@ -364,9 +364,11 @@ Claude Code cannot read these files and may skip them:
     text-underline-offset: 0.2em;
   }
 
+  /* On the first line of a question that wraps, not between its lines. */
   .ask svg {
     flex: none;
-    align-self: center;
+    align-self: flex-start;
+    margin-top: calc((1lh - 14px) / 2);
     fill: none;
     stroke: var(--muted);
     stroke-width: 1.6;
