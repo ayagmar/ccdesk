@@ -910,6 +910,15 @@
       "type": "array of environment variable names",
       "default": "unset, so each hook's own `allowedEnvVars` list applies"
     },
+    "idleCompaction": {
+      "summary": "Stop Claude Code from compacting a long conversation while your terminal session is idle",
+      "category": "Memory and context",
+      "scopes": ["managed", "user", "project", "local"],
+      "docs": "https://code.claude.com/docs/en/settings-reference#idlecompaction",
+      "about": "Idle compaction [compacts](https://code.claude.com/docs/en/context-window#what-survives-compaction) a long conversation that you've stepped away from, shortly before its prompt cache expires. Your next message then sends a summary instead of the whole conversation. When you come back, the conversation shows `Compacted while idle, before the prompt cache expired`.\n\nIdle compaction is on by default for conversations that meet all of these conditions:",
+      "type": "Boolean\n* `true`: Claude Code compacts idle conversations that meet the conditions\n* `false`: Claude Code doesn't compact while your session is idle",
+      "default": "`true`"
+    },
     "includeCoAuthoredBy": {
       "summary": "Deprecated; use `attribution` to hide or change commit and PR attribution",
       "category": "Git and attribution",
