@@ -2054,7 +2054,8 @@ button:disabled {
   min-width: 0;
 }
 
-.context-name .mono {
+.context-name .mono,
+.context-name .context-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
