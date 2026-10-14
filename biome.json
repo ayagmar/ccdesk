@@ -143,18 +143,59 @@
             "noNodejsModules": "error"
           },
           "style": {
+            "noProcessEnv": "error"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/shared/**"],
+      "linter": {
+        "rules": {
+          "style": {
             "noRestrictedImports": {
               "level": "error",
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/core/**", "**/server/**"],
-                    "message": "The page, view and shared types do not import the core or the server."
+                    "group": ["**/core/**", "**/server/**", "**/view/**", "**/ui/**"],
+                    "message": "src/shared imports nothing else in src: everything else imports it."
                   }
                 ]
               }
-            },
-            "noProcessEnv": "error"
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/view/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/core/**", "**/server/**", "**/ui/**"],
+                    "message": "src/view imports only src/shared, so the CLI and the page format the same way."
+                  },
+                  {
+                    "group": ["**/shared/requests.ts"],
+                    "message": "The page imports src/view, so the request schemas would put TypeBox in its bundle; import their types from src/shared/types.ts."
+                  },
+                  {
+                    "group": ["react", "react/**", "react-dom", "react-dom/**"],
+                    "message": "src/view formats for the CLI as well as the page, so it does not use React."
+                  }
+                ],
+                "paths": {
+                  "typebox": "The page imports src/view, so TypeBox would land in its bundle; import request types from src/shared/types.ts.",
+                  "typebox/compile": "The page imports src/view, so TypeBox would land in its bundle; import request types from src/shared/types.ts."
+                }
+              }
+            }
           }
         }
       }
@@ -174,7 +215,7 @@
                 "patterns": [
                   {
                     "group": ["**/core/**", "**/server/**"],
-                    "message": "The page, view and shared types do not import the core or the server."
+                    "message": "The page reaches the core and the server only over HTTP; it imports src/view and src/shared."
                   },
                   {
                     "group": ["**/shared/requests.ts"],
@@ -198,8 +239,36 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/server/**"],
-                    "message": "src/core imports nothing from src/server."
+                    "group": ["**/server/**", "**/ui/**", "**/view/**"],
+                    "message": "src/core imports only src/shared: the server, the CLI and the page are built on it, not the other way round."
+                  },
+                  {
+                    "group": ["react", "react/**", "react-dom", "react-dom/**"],
+                    "message": "src/core runs without a page."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/server/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/core/**", "!**/core/index.ts"],
+                    "message": "The server and CLI use the core through src/core/index.ts, as any other front end would; export what they need there."
+                  },
+                  {
+                    "group": ["**/ui/**"],
+                    "message": "The server serves the built page; it does not import its source."
                   }
                 ]
               }
