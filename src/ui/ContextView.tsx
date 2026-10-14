@@ -102,9 +102,14 @@ export function ContextView({ view }: { view: DirectoryView }) {
                   <span className="num">{i + 1}</span>
                   {b.scope ? <Bullet line={b.scope} hollow={b.text === null} /> : <span />}
                   <span className="context-name">
-                    <span className="mono" title={tilde(b.path)}>
-                      {label(b, view)}
-                    </span>
+                    {/* A listing ccdesk assembled has a label, not a path, so it is set as prose. */}
+                    {isFile(b) ? (
+                      <span className="mono" title={tilde(b.path)}>
+                        {label(b, view)}
+                      </span>
+                    ) : (
+                      <span className="context-label">{label(b, view)}</span>
+                    )}
                     {note(b, view) && <span className="muted small">{note(b, view)}</span>}
                   </span>
                   <span className="num">{b.text === null ? "" : `${b.lines} lines`}</span>
