@@ -56,7 +56,7 @@ pnpm --dir site typecheck
 
 Pages are in `site/src/content/docs/` and link to each other with relative paths such as `../settings/`. The site's address is set once, in `site/astro.config.ts`; `llms.txt`, `llms-full.txt` and the `.md` version of each page are generated from the same pages at build time.
 
-The screenshots come from a made-up setup, never your own. `pnpm --dir site screenshots` builds a throwaway home folder in `/var/tmp/ccdesk-demo`, starts the built ccdesk in it, captures each page in both themes with a headless Chromium, and deletes the folder. It also saves the close crops the landing page's questions open to, and `regions.json`, which records where each scope's rows are in the directory screenshot so the route strip can light them up. Run `pnpm build` in the repository first. Set `CHROMIUM_PATH` to use a Chromium you already have, or run `pnpm --dir site exec playwright-core install chromium` once.
+The screenshots come from a made-up setup, never your own. `pnpm --dir site screenshots` builds a throwaway home folder in `/var/tmp/ccdesk-demo`, starts the built ccdesk in it, captures each page in both themes with a headless Chromium, and deletes the folder. It also saves the close crops the landing page's questions open to, and `regions.json`, which records where each scope's rows are in the landing page's screenshot so its route strip can light them up. Run `pnpm build` in the repository first. Set `CHROMIUM_PATH` to use a Chromium you already have, or run `pnpm --dir site exec playwright-core install chromium` once.
 
 The site is deployed to GitHub Pages from `master` by the Pages workflow, which also builds it for every pull request.
 
