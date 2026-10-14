@@ -41,7 +41,7 @@ export function ScopeButtons<S extends Scope>({
           title={unavailable(s)}
           onClick={() => onPick(s)}
         >
-          <Bullet line={s} hollow={scope !== s} /> {lineName(s)}
+          <Bullet line={s} hollow={scope !== s} ariaHidden /> {lineName(s)}
         </button>
       ))}
     </fieldset>

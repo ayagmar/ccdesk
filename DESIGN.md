@@ -284,7 +284,7 @@ Both are bundled through `@fontsource-variable`, so the app never depends on a n
 
 ### Hierarchy
 - **Display** (700, 22px, -0.015em): page titles on full pages such as All directories.
-- **Headline** (mono 700, 19px, -0.01em): the current directory path at the top of the workspace. The path is the title, so it is set in mono. Its end names the directory, so a path too long for its row loses its start ("…/services/billing-worker"), with the whole path in its tooltip; the flags beside it give way only once the path is down to 16 characters. On phones it wraps instead.
+- **Headline** (mono 700, 19px, -0.01em): the current directory path at the top of the workspace. The path is the title, so it is set in mono. Its end names the directory, so a path too long for its row loses its start ("…/services/billing-worker"), with the whole path in its tooltip; the flags beside it never shrink, and the path keeps at least 16 characters. On phones it wraps instead.
 - **Title** (700, 15px; 16px in the inspector head; 13px for inspector sub-heads): timetable section names (Instructions, Settings, Permissions, Memory, Hooks, MCP servers, Agents, skills & plugins, All settings) and the selected item's name.
 - **Body** (400, 14px, 1.45): interface text, timetable cells, the "why" column.
 - **Prose** (400, 13.5px, 1.6, max 68ch): rendered markdown of instruction and memory files in the inspector; headings inside it stay at 14px so a file's own h1 never outshouts the interface, and they are rendered two levels down (a file's h1 is an h3 under the inspector's h2) so the page outline keeps one h1.
@@ -349,7 +349,7 @@ The directory drawn as a line. A 3px ink line runs through a row of equal-width 
 - **Narrow column:** below 680px of main column (phones, or a small window beside the inspector) the strip turns vertical with the line running down the left, one stop per row with its facts beside the name.
 
 ### Bullets
-A circle with the scope letter, filled with the line colour and lettered in its "on" ink, 22px on the route strip and 20px in tables, the palette and the layer list. A hollow bullet marks a scope that is present but not in force (skipped file, idle stop, losing layer); on the two light lines, Local and Auto memory, its letter is set in ink because the line colour is too pale for an 11px letter on paper. Several bullets in one cell (a setting merged from User and Project) sit 3px apart. To a screen reader a bullet is an image named for its scope ("User"), not the letter; on the route strip, where the name follows, it is hidden.
+A circle with the scope letter, filled with the line colour and lettered in its "on" ink, 22px on the route strip and 20px in tables, the palette and the layer list. A hollow bullet marks a scope that is present but not in force (skipped file, idle stop, losing layer); on the two light lines, Local and Auto memory, its letter is set in ink because the line colour is too pale for an 11px letter on paper. Several bullets in one cell (a setting merged from User and Project) sit 3px apart. To a screen reader a bullet is an image named for its scope ("User"), not the letter; wherever the scope's name is written beside it (route stops, layer pickers), the bullet is hidden from assistive tech so the name is read once.
 
 ### Timetable
 - **Section head:** 2px ink rule, title, mono count, optional segmented filter or head action, and inline warning flags.

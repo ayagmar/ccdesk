@@ -474,13 +474,9 @@ input::placeholder {
   unicode-bidi: isolate;
 }
 
-/* Flags give way only once the path is down to its minimum; the tiny shrink factor keeps them whole until then. */
+/* Flags state the folder's state, so they keep their whole text; the path gives way instead. */
 .dir-title .flag {
-  display: block;
-  flex: 0 0.001 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: none;
 }
 
 /* The session the page describes: a rare choice, so it sits under the header, not in it. */
@@ -1955,8 +1951,10 @@ button:disabled {
   font-size: 13.5px;
 }
 
+/* The files sit beside their label, and drop under it when even the longest file name would not fit. */
 .sharing-group {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: baseline;
   min-width: 0;
@@ -1967,6 +1965,7 @@ button:disabled {
 }
 
 .sharing dd {
+  flex: 1 1 0;
   display: flex;
   flex-wrap: wrap;
   gap: 2px 14px;
