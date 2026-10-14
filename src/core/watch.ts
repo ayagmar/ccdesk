@@ -5,7 +5,7 @@ import { storeDirName } from "../shared/memory.ts";
 import { type DirectoryView, type Plugin, type SessionProfile } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
 import { isDir, isFile, isNetworkPath } from "./scan/files.ts";
-import { mainWorktreeRoot } from "./scan/git.ts";
+import { mainWorktreeRoot, memoryKey } from "./scan/git.ts";
 import { scanDirectory } from "./scan/index.ts";
 import { loadPlugin, manifestCommandMap, manifestPaths } from "./scan/plugins.ts";
 
@@ -40,12 +40,15 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
     },
     ...CONFIG_FOLDERS.map((sub) => ({ path: join(folder, sub), recursive: true })),
   ];
-  const memoryKey = (await mainWorktreeRoot(dir)) ?? dir;
+  const mainRoot = (await mainWorktreeRoot(dir)) ?? dir;
   const out: Target[] = [
     ...claude(env.claudeDir),
     // Only the install list: Windows reports a write deep in a plugin as a change to `cache`.
     { path: join(env.claudeDir, "plugins"), recursive: false, names: ["installed_plugins.json"] },
-    { path: join(env.claudeDir, "projects", storeDirName(memoryKey), "memory"), recursive: false },
+    {
+      path: join(env.claudeDir, "projects", storeDirName(await memoryKey(dir)), "memory"),
+      recursive: false,
+    },
     { path: env.managedDir, recursive: false },
     { path: join(env.managedDir, "managed-settings.d"), recursive: false },
     { path: join(env.managedDir, ".claude", "rules"), recursive: true },
@@ -61,7 +64,7 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
     if (join(d, ".claude") !== env.claudeDir) out.push(...claude(join(d, ".claude")));
     if (dirname(d) === d) break;
   }
-  if (memoryKey !== dir) out.push(...claude(join(memoryKey, ".claude")));
+  if (mainRoot !== dir) out.push(...claude(join(mainRoot, ".claude")));
   return out.filter((t) => !isNetworkPath(t.path));
 }
 
