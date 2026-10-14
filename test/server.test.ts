@@ -951,6 +951,30 @@ test("comparing two directories lists each key's value in both, with the files t
   assertRefused(relative, 400, /a must be an absolute path/);
 });
 
+test("hidden values that differ compare as different, without either value in the answer", async () => {
+  const a = fixture.at("work/compare-hidden-a");
+  const b = fixture.at("work/compare-hidden-b");
+  const c = fixture.at("work/compare-hidden-c");
+  fixture.json("work/compare-hidden-a/.claude/settings.json", { env: { API_TOKEN: "fake-one" } });
+  fixture.json("work/compare-hidden-b/.claude/settings.json", { env: { API_TOKEN: "fake-two" } });
+  fixture.json("work/compare-hidden-c/.claude/settings.json", { env: { API_TOKEN: "fake-one" } });
+  const compare = async (x: string, y: string) => {
+    const res = await call(`/api/compare?a=${encodeURIComponent(x)}&b=${encodeURIComponent(y)}`);
+    assert.doesNotMatch(JSON.stringify(res.json), /fake-one|fake-two/);
+    const { settings } = res.json as {
+      settings: Array<{ key: string; same: boolean; hiddenDiffers?: boolean }>;
+    };
+    return settings.find((s) => s.key === "env");
+  };
+
+  const differ = await compare(a, b);
+  assert.equal(differ?.same, false);
+  assert.equal(differ?.hiddenDiffers, true);
+  const alike = await compare(a, c);
+  assert.equal(alike?.same, true);
+  assert.equal(alike?.hiddenDiffers, undefined);
+});
+
 test("settings that differ only in the order of their keys compare the same", async () => {
   const a = fixture.at("work/compare-order-a");
   const b = fixture.at("work/compare-order-b");

@@ -56,7 +56,7 @@ export function ComparePage({ dir, other, onOpen, onPickOther }: Props) {
           <button type="button" className="link mono" onClick={() => onOpen(other)}>
             {tilde(other)}
           </button>
-          , with the files each value comes from. Hidden values count as the same.{" "}
+          , with the files each value comes from. Hidden values stay hidden, but are compared.{" "}
           <button type="button" className="link" onClick={onPickOther}>
             Compare with another directory
           </button>
@@ -103,7 +103,12 @@ export function ComparePage({ dir, other, onOpen, onPickOther }: Props) {
               <tbody>
                 {shown.map((s) => (
                   <tr key={s.key} className={s.same ? "dim" : ""}>
-                    <td className="mono">{s.key}</td>
+                    <td>
+                      <span className="cmp-value mono">{s.key}</span>
+                      {s.hiddenDiffers && (
+                        <span className="cmp-from">The hidden values differ</span>
+                      )}
+                    </td>
                     <ValueCell value={s.a} dir={dir} />
                     <ValueCell value={s.b} dir={other} />
                   </tr>

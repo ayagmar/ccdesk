@@ -13,8 +13,10 @@ export interface ComparedSetting {
   /** Null where no settings file Claude Code reads there sets the key. */
   a: ComparedValue | null;
   b: ComparedValue | null;
-  /** Whether both have the same value as ccdesk shows it; two hidden values count as the same. */
+  /** Whether both have the same value, hidden values included. */
   same: boolean;
+  /** Set when the two differ only in values ccdesk hides, so they look the same on the page. */
+  hiddenDiffers?: true;
 }
 
 /** The effective settings of two directories, key by key. */
