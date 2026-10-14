@@ -107,5 +107,8 @@ export const MemoryBody = Type.Object({
 
 export const OpenBody = Type.Object({ path: Type.String() });
 
+/** Preview forgetting a directory whose folder is gone; forgetting it also sends the revision. */
+export const ForgetBody = Type.Object({ path: Type.String() });
+
 /** Preview restoring a backup; restoring it also sends the revision. */
 export const BackupBody = Type.Object({ id: Type.String() });

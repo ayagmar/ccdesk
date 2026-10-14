@@ -245,7 +245,7 @@ export async function removeExactly(path: string, expected: string): Promise<boo
 /** What a backup folder records about its change, in its manifest. */
 export const BackupManifestSchema = Type.Object({
   kind: Type.Enum(BACKUP_KINDS),
-  /** The file that changed (for a deleted memory: the memory file). */
+  /** The file that changed (for a deleted memory: the memory file; for a forgotten directory: its store folder). */
   target: Type.String(),
   createdAt: Type.String(),
   /** Revision of the target before the change; "missing" when ccdesk created it. */
@@ -256,7 +256,7 @@ export const BackupManifestSchema = Type.Object({
   removedIndexLines: Type.Optional(Type.Array(Type.String())),
   /** For a change made through `claude mcp`: the commands that put it back, values hidden. */
   undoCommands: Type.Optional(Type.Array(Type.String())),
-  /** For a memory change: the directory its store is saved for. */
+  /** For a memory change or a forgotten directory: the directory its store is saved for. */
   projectPath: Type.Optional(Type.String()),
 });
 export type BackupManifest = Static<typeof BackupManifestSchema>;
@@ -271,6 +271,8 @@ export function forgetChange(env: ScanEnv, id: string): Promise<void> {
 export const SNAPSHOT = "before";
 /** For a change made through `claude mcp`: the affected servers after it, values hidden. */
 export const SHOWN_AFTER = "after";
+/** For a forgotten directory: its store folder, moved into the backup folder as it was. */
+export const MOVED_STORE = "store";
 
 /** A new, empty backup folder that only you can read, and its id. */
 async function newBackup(env: ScanEnv, kind: BackupKind) {
@@ -331,7 +333,8 @@ export async function recordChange<T extends { revision: string }>(
     /** Whether disk is still as before the change; by default, whether the target is. */
     unchanged?: () => Promise<boolean>;
   },
-  change: () => Promise<T>
+  /** Makes the change; it is given the change's backup folder, for a change that moves into it. */
+  change: (backupDir: string) => Promise<T>
 ): Promise<T & { id: string; created: boolean }> {
   const { createdAt, id, dir } = await newBackup(env, record.kind);
   const manifest: BackupManifest = {
@@ -359,7 +362,7 @@ export async function recordChange<T extends { revision: string }>(
   }
   let result: T;
   try {
-    result = await change();
+    result = await change(dir);
   } catch (error) {
     const unchanged =
       record.unchanged ??

@@ -14,6 +14,7 @@ const WHAT: Record<BackupKind, string> = {
   "memory-delete": "Memory deleted",
   "memory-restore": "Memory restored",
   "mcp-claude": "MCP servers changed through claude mcp",
+  "directory-forget": "Directory forgotten",
 };
 
 /** Changes grouped under the day they were made, newest first, as they come from the server. */
