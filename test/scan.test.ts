@@ -272,6 +272,26 @@ test("a plugin without an enabledPlugins entry follows its own default", async (
   );
 });
 
+test("a manifest's commands map replaces the default commands folder, as a path does", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/plugins/installed_plugins.json", {
+    plugins: { "kit@market": [{ scope: "user", installPath: f.at("plugins/kit") }] },
+  });
+  f.json("plugins/kit/.claude-plugin/plugin.json", {
+    name: "kit",
+    commands: { about: { content: "Explain the kit.", description: "About kit" } },
+  });
+  f.write("plugins/kit/commands/extra.md", "---\ndescription: not loaded\n---\n");
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(
+    view.inventory.commands.map((c) => c.id),
+    ["kit:about"]
+  );
+});
+
 test("autoMemoryDirectory moves the store; from repository settings it waits for trust and is off while outside reads are blocked", async () => {
   const f = makeFixture();
   f.write("home/notes/memory/MEMORY.md", "- [a](a.md) — note\n");
