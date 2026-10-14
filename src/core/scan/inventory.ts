@@ -12,7 +12,7 @@ import {
   type SettingsLayer,
   type Trust,
 } from "../../shared/types.ts";
-import { redactSecrets, shownUrl } from "../secrets.ts";
+import { redactSecrets, shownText, shownUrl } from "../secrets.ts";
 import { isUserClaudeFolder, type ScanEnv } from "./env.ts";
 import {
   isDir,
@@ -286,7 +286,8 @@ async function manifestCommands(
       path: c.path,
       scope: "plugin",
       plugin,
-      text: c.text ?? "",
+      // Shown as a command file's text is, with env and header values hidden.
+      text: shownText(c.text) ?? "",
     };
     const read =
       c.text === null
