@@ -37,8 +37,20 @@ function note(block: ContextBlock, view: DirectoryView): string {
   return block.text === null ? "not counted" : "";
 }
 
+/** The view's title row, with the way back to the tables; Escape takes the same way. */
+function ContextTop({ onBack }: { onBack: () => void }) {
+  return (
+    <header className="context-top">
+      <h2>What Claude sees</h2>
+      <button type="button" className="head-action" onClick={onBack}>
+        <Icon name="undo" /> Back to config <kbd>Esc</kbd>
+      </button>
+    </header>
+  );
+}
+
 /** Everything Claude Code puts in context when a session starts here, in the order it loads. */
-export function ContextView({ view }: { view: DirectoryView }) {
+export function ContextView({ view, onBack }: { view: DirectoryView; onBack: () => void }) {
   const blocks = view.context;
   const total = blocks.reduce((sum, b) => sum + b.bytes, 0);
   const measured = blocks.filter((b) => b.text !== null);
@@ -47,7 +59,8 @@ export function ContextView({ view }: { view: DirectoryView }) {
 
   if (measured.length === 0) {
     return (
-      <section className="context">
+      <section className="context" aria-label="What Claude sees">
+        <ContextTop onBack={onBack} />
         <p className="tt-empty">
           Nothing is loaded at session start here: no instruction files and no auto memory.
         </p>
@@ -58,6 +71,7 @@ export function ContextView({ view }: { view: DirectoryView }) {
 
   return (
     <section className="context" aria-label="What Claude sees">
+      <ContextTop onBack={onBack} />
       <p className="context-summary">
         At session start your config adds about <strong>≈{count(tokens(total))}</strong> tokens from{" "}
         <strong>{measured.length}</strong> {measured.length === 1 ? "part" : "parts"}. Sizes are

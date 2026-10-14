@@ -1994,6 +1994,24 @@ button:disabled {
   padding-top: 12px;
 }
 
+.context-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+}
+
+.context-top h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+
+.context-top kbd {
+  margin-left: 2px;
+}
+
 .context-summary {
   margin: 0 0 4px;
   font-size: var(--text-lg);

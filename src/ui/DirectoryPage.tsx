@@ -201,7 +201,7 @@ export function DirectoryPage({
         <UnreadManagedSources view={view} />
         <ManagedRepairs view={view} />
         {seeing ? (
-          <ContextView view={view} />
+          <ContextView view={view} onBack={() => setSeeing(false)} />
         ) : (
           <>
             <RouteStrip
@@ -400,8 +400,11 @@ function useListKeys({
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target) || e.altKey || e.ctrlKey || e.metaKey) return;
       if (e.key === "Escape") {
-        // The inspector is hidden in What Claude sees; Escape there must not drop what it holds.
-        if (seeing) return;
+        // Escape leaves What Claude sees first; the inspector, hidden there, keeps what it holds.
+        if (seeing) {
+          setSeeing(false);
+          return;
+        }
         onClose();
       } else if (e.key === "/") {
         e.preventDefault();
