@@ -319,6 +319,26 @@ test("opening the home directory counts only sessions started there", async () =
   assert.deepEqual([usage.sessions, usage.tools[0]?.calls], [1, 1]);
 });
 
+test("with CLAUDE_CODE_PROJECT_DIR_NAME, the named store's sessions count by where they started, beside the derived store's", async () => {
+  const f = makeFixture();
+  const env = { ...f.env, projectDirName: "shared-profile" };
+  const dir = f.at("work", "app");
+  const named = join(f.env.claudeDir, "projects", "shared-profile");
+  // One store for every project launched with the name, so each session goes by its start.
+  f.write(join(named, "here.jsonl"), bash("make", undefined, join(dir, "src")));
+  f.write(join(named, "elsewhere.jsonl"), bash("ls", undefined, f.at("work", "other")));
+  // Sessions from before the name was set stay in the derived store.
+  f.write(join(storeOf(f, dir), "before.jsonl"), bash("make", undefined, dir));
+
+  const usage = await readUsage(env, dir, []);
+
+  assert.deepEqual([usage.sessions, usage.tools.map((t) => [t.tool, t.calls])], [2, [["Bash", 2]]]);
+  // The home folder takes only the named store's sessions started in it, as with its own store.
+  f.write(join(named, "home.jsonl"), bash("pwd", undefined, f.env.home));
+  f.write(join(named, "below-home.jsonl"), bash("ls", undefined, join(f.env.home, "notes")));
+  assert.equal((await readUsage(env, f.env.home, [])).sessions, 1);
+});
+
 test("a subagent whose session file is gone counts by where it started", async () => {
   const f = makeFixture();
   const repo = f.at("work", "app");
