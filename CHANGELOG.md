@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.2](https://github.com/ayagmar/ccdesk/compare/v0.4.1...v0.4.2) (2026-10-14)
+
+### Features
+
+* **ui:** a way back from What Claude sees ([4b6995c](https://github.com/ayagmar/ccdesk/commit/4b6995c84de34b2675521fdd3537d4d1dc91db3c))
+* **ui:** hide the rail, and fold the main directory list ([7010cf4](https://github.com/ayagmar/ccdesk/commit/7010cf43a0ee53feba42dd628547a3424aa60335))
+
+### Bug Fixes
+
+* **ui:** keep keyboard focus when leaving What Claude sees ([02bd51d](https://github.com/ayagmar/ccdesk/commit/02bd51d61fda13f881ad4d4ffac02db394ca9e81))
+* **ui:** keep the hidden rail to wide windows, and the phone bar on one row ([f5f9fa2](https://github.com/ayagmar/ccdesk/commit/f5f9fa27597d0b41e2083be8545892b2fb71ecb2))
+
 ## [0.4.1](https://github.com/ayagmar/ccdesk/compare/v0.4.0...v0.4.1) (2026-10-14)
 
 ## [0.4.0](https://github.com/ayagmar/ccdesk/compare/v0.3.0...v0.4.0) (2026-10-14)
