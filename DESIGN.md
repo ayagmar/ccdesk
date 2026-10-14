@@ -372,7 +372,7 @@ The alternative to the timetable for one directory: a summary sentence with the 
 Below the list, **When Claude touches a file** sits under a hairline: a heading, one muted sentence, a mono path input with a Check button, and result rows of bullet, muted kind ("path rule", "skill", "folder instructions"), mono name and a muted "matches <glob>".
 
 ### Recent Changes
-A page reached from the rail. Each change is a row on a hairline: bold kind ("Settings changed", "Memory deleted"), mono file path, muted relative time, and a "Review restore" head action. The row opens into the same diff review as the setting editor, with "Restore this version" as the primary button, or a warn flag when the restore is blocked. On phones the row stacks: kind and time, then path, then the action.
+A page reached from the rail. Each change is a row on a hairline: bold kind ("Settings changed", "Memory deleted"), mono file path, muted mono relative time ("11m ago", the exact time in its tooltip, as everywhere else), and a "Review restore" head action. The row opens into the same diff review as the setting editor, with "Restore this version" as the primary button, or a warn flag when the restore is blocked. On phones the row stacks: kind and time, then path, then the action.
 
 ### Problems Strip
 Above the route strip when ccdesk could not parse a settings file or `.mcp.json`: an amber-tinted box with a warn icon and one line per file (mono path, the parser's message). When the folder is not yet trusted in Claude Code, a "not trusted yet" warn flag sits beside the directory title.

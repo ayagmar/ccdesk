@@ -24,7 +24,7 @@ export const memory = defineSection<R>({
       label: "Checks",
       sort: (r) => Number(!r.item.inIndex) * 10 + r.item.brokenLinks.length,
     },
-    { label: "Updated", sort: (r) => r.item.mtime },
+    { label: "Changed", sort: (r) => r.item.mtime },
   ],
   empty: (view) =>
     view.memory.index

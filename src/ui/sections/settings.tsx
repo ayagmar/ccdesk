@@ -126,7 +126,10 @@ export const settings: SectionUi<R> = {
         </table>
         <h3 className="sub-title">Value Claude Code uses</h3>
         {s.note && <p className="muted small">{s.note}</p>}
-        <pre className="raw">{JSON.stringify(s.value, null, 2)}</pre>
+        {/* A string bare, as the Value column and the file list show it. */}
+        <pre className="raw">
+          {typeof s.value === "string" ? s.value : JSON.stringify(s.value, null, 2)}
+        </pre>
         <h3 className="sub-title">Change it</h3>
         <SettingEditor
           key={s.key}
