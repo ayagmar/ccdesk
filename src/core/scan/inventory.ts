@@ -31,6 +31,7 @@ import { readMcpServers } from "./mcp.ts";
 import { foldedName, isReservedName, isSyncedFolder } from "./names.ts";
 import { hooksWait } from "./permissions.ts";
 import {
+  isSkillsDirPlugin,
   type LoadedPlugin,
   manifestCommandMap,
   manifestConfigs,
@@ -39,6 +40,7 @@ import {
   pluginOnlyNote,
   pluginOnlySurfaces,
   readPlugins,
+  turnedOffFolders,
   unwrapped,
 } from "./plugins.ts";
 
@@ -248,7 +250,7 @@ async function pluginSkills(
   // `skills` adds to the default folder; the other keys replace theirs (docs: plugins-reference).
   // A skills-dir plugin's own SKILL.md is a skill of its skills folder, never one of the plugin's
   // (observed in v2.1.296).
-  const inPlace = loaded.plugin.id.endsWith("@skills-dir");
+  const inPlace = isSkillsDirPlugin(loaded.plugin);
   const extraSkills = await manifestPaths(loaded, "skills");
   const skillDirs = [
     join(root, "skills"),
@@ -456,6 +458,7 @@ async function readLocalSkills(
   env: ScanEnv,
   folders: ProjectFolders,
   locked: boolean,
+  turnedOff: Map<string, string>,
   problems: Problem[]
 ): Promise<{ skills: Entry[]; winners: Map<string, Entry> }> {
   // Project skills come from the start directory and every parent up to the repository root.
@@ -473,7 +476,8 @@ async function readLocalSkills(
       const real = skill.realPath ?? skill.folder ?? skill.path;
       if (seenFolders.has(real)) continue;
       seenFolders.add(real);
-      if (!skill.skipped && locked && scope !== "managed") skill.skipped = pluginOnlyNote("skills");
+      const skipped = skill.skipped ?? withheld(skill, scope, locked, turnedOff);
+      if (skipped) skill.skipped = skipped;
       skills.push(skill);
       if (skill.skipped) continue;
       const winner = winners.get(skill.name);
@@ -482,6 +486,17 @@ async function readLocalSkills(
     }
   }
   return { skills, winners };
+}
+
+/** Why a skill of yours or the project's does not load though it reads: a plugin-only lock, or its skills-dir plugin turned off. */
+function withheld(
+  skill: Entry,
+  scope: Source,
+  locked: boolean,
+  turnedOff: Map<string, string>
+): string | undefined {
+  if (locked && scope !== "managed") return pluginOnlyNote("skills");
+  return turnedOff.get(skill.folder ?? "");
 }
 
 /**
@@ -595,7 +610,13 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
     active.map((plugin) => pluginEntries(env, plugin, problems))
   );
   const folders = (sub: string) => projectFolders(env, input, sub);
-  const { skills, winners } = await readLocalSkills(env, folders, locked.has("skills"), problems);
+  const { skills, winners } = await readLocalSkills(
+    env,
+    folders,
+    locked.has("skills"),
+    turnedOffFolders(layers, plugins),
+    problems
+  );
   const commands = await readCommands(env, folders, locked.has("skills"), winners, problems);
   const synced = await readSyncedSkills(input, locked.has("skills"));
   const fromPluginSkills = fromPlugins.flatMap((p) => p.skills);

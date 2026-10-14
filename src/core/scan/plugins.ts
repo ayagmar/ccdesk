@@ -90,12 +90,38 @@ export function pluginsRoot(env: ScanEnv): string {
 /** The origin of plugins saved as folders under a skills folder (docs: plugins/loading#find-where-a-plugin-came-from). */
 const SKILLS_DIR = "skills-dir";
 
+/** Whether a plugin is a folder in a skills folder, loaded in place. */
+export function isSkillsDirPlugin(plugin: Plugin): boolean {
+  return plugin.id.endsWith(`@${SKILLS_DIR}`);
+}
+
+/**
+ * The skills-dir plugin folders that settings turn off, each with why: enabledPlugins false for the
+ * plugin also skips the SKILL.md in its folder, whatever else keeps the plugin from loading
+ * (observed in v2.1.296).
+ */
+export function turnedOffFolders(
+  layers: SettingsLayer[],
+  plugins: LoadedPlugin[]
+): Map<string, string> {
+  const off = new Map<string, string>();
+  for (const { plugin } of plugins.filter((p) => isSkillsDirPlugin(p.plugin))) {
+    const setting = enabledPluginsEntry(layers, [plugin.id]);
+    if (setting?.value === false)
+      off.set(
+        plugin.installPath,
+        `${plugin.id} is turned off in ${setting.scope} settings, which skips the skill in its folder too`
+      );
+  }
+  return off;
+}
+
 /**
  * A plugin that comes from the repository: one in the project's .claude/skills. Its MCP servers
  * wait for the same approval as the project's .mcp.json (docs: plugins/loading#plugins-shared-through-a-repository).
  */
 export function fromRepository(plugin: Plugin): boolean {
-  return plugin.scope === "project" && plugin.id.endsWith(`@${SKILLS_DIR}`);
+  return plugin.scope === "project" && isSkillsDirPlugin(plugin);
 }
 
 /** Where a scan starts (see canonicalRoot), with the trust and managed settings that gate plugins. */
