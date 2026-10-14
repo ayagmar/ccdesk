@@ -34,12 +34,17 @@ The part after `#token=` is a key generated for this run. The page needs it to t
 npx ccdesk [options]                     Open the page in your browser
 npx ccdesk scan [dir] --json             Print what Claude Code loads in dir, as JSON
 npx ccdesk explain <file> [--dir <dir>]  Print what loads once Claude reads or edits file
+npx ccdesk check [dir] [--json]          Exit 1 when a session started in dir reads a file
+                                         Claude Code cannot read or parse
 
   --port <n>            Port to listen on (default: a free port)
   --no-open             Print the URL instead of opening a browser
   --config-dir <path>   Claude folder to read, as CLAUDE_CONFIG_DIR sets it for Claude Code
                         (wins over $CLAUDE_CONFIG_DIR)
   --dir <dir>           For explain: the folder the session starts in (default: the current one)
+  --strict              For check: also fail on entries Claude Code may skip in a file it reads
+  --all                 For check: also count ~/.claude, ~/.claude.json, managed settings and
+                        files outside dir's repository
   -h, --help            Show this help
 ```
 
@@ -64,7 +69,31 @@ Once Claude reads or edits src/api/users.ts in ~/code/acme-api, these load:
   project  folder instructions  src/CLAUDE.md
 ```
 
-Both only read: they write no file and keep no backup. Values the page hides, such as env values and headers, are hidden in their output too.
+`ccdesk check` fails when a session started in a folder would trip over a file it reads: a `.claude/settings.json` or `.mcp.json` that is not valid JSON, a settings file whose shape Claude Code's schema rejects, a `CLAUDE.md` or rule it cannot read. It checks what a session started in that one folder reads, the current one or the one you name, so a monorepo whose packages have their own `.claude` folder needs one run per folder people start Claude Code in. It exits 0 when there are none, 1 when there are, and 2 when the arguments are wrong, the folder does not exist, or ccdesk cannot run the check, so a mistyped path fails too. Run it in CI to catch a broken file before anyone pulls it. In a GitHub Actions job, after checking out the repository and setting up Node.js 22.19 or newer:
+
+```yaml
+- run: npx --yes ccdesk@0.3 check
+- run: npx --yes ccdesk@0.3 check packages/api
+```
+
+Pin the version you tested, so that a new release cannot change what fails your build.
+
+```sh
+$ npx ccdesk check
+Claude Code cannot read these files and may skip them:
+  .claude/settings.json: not valid JSON (line 4, column 3)
+  .mcp.json: not valid JSON (line 2, column 1)
+
+2 problems in a session started in ~/code/acme-api.
+```
+
+Problems are listed in the order to fix them: files that stop Claude Code from starting (a managed settings file that does not parse as a JSON object), then files it cannot read, then files it reads with some entries skipped. Paths are relative to the repository.
+
+- Only the repository's own files count: those under the git root, or under the folder itself outside git, and for a linked worktree also those in the main checkout, which the session reads through to. Your Claude folder, `~/.claude.json` and managed settings never count, even when the repository holds them. A CI runner usually has none of them, and a broken one is the machine's, not the repository's. ccdesk says how many such files it left out; `--all` counts them too.
+- A file Claude Code reads with some entries skipped, such as a `permissions.defaultMode` it does not know, is listed but passes. ccdesk's settings schema can lag a newer Claude Code, so failing on these could fail a valid file. `--strict` fails on them.
+- `--json` prints each problem with its absolute `path`, the `file` as shown, the error, and `counted`, whether it fails the check. `failed` is the overall answer.
+
+All three only read: they write no file and keep no backup. Values the page hides, such as env values and headers, are hidden in their output too.
 
 ## What it reads
 

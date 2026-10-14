@@ -99,16 +99,21 @@ More in [Reading the interface](https://ayagmar.github.io/ccdesk/interface/).
 npx ccdesk [options]                     Open the page in your browser
 npx ccdesk scan [dir] --json             Print what Claude Code loads in dir, as JSON
 npx ccdesk explain <file> [--dir <dir>]  Print what loads once Claude reads or edits file
+npx ccdesk check [dir] [--json]          Exit 1 when a session started in dir reads a file
+                                         Claude Code cannot read or parse
 
   --port <n>            Port to listen on (default: a free port)
   --no-open             Print the URL instead of opening a browser
   --config-dir <path>   Claude folder to read, as CLAUDE_CONFIG_DIR sets it for Claude Code
                         (wins over $CLAUDE_CONFIG_DIR)
   --dir <dir>           For explain: the folder the session starts in (default: the current one)
+  --strict              For check: also fail on entries Claude Code may skip in a file it reads
+  --all                 For check: also count ~/.claude, ~/.claude.json, managed settings and
+                        files outside dir's repository
   -h, --help            Show this help
 ```
 
-ccdesk reads `~/.claude` and `~/.claude.json`, or `$CLAUDE_CONFIG_DIR` when it is set, as Claude Code does. To look at another profile without exporting the variable, pass `--config-dir <path>`. `ccdesk scan` prints the same view the page shows for a directory, for scripts; `ccdesk explain` lists the path rules, skills and folder instructions that load once Claude reads or edits a file. Both only read, and hidden values stay hidden in what they print. Edits made in another editor or by Claude show up within a second. Changes to `~/.claude.json`, such as trust decisions and MCP approvals, show up when you return to the tab. Requires Node.js 22.19 or newer. See [Platform notes](https://ayagmar.github.io/ccdesk/platforms/) for Windows, macOS and WSL.
+ccdesk reads `~/.claude` and `~/.claude.json`, or `$CLAUDE_CONFIG_DIR` when it is set, as Claude Code does. To look at another profile without exporting the variable, pass `--config-dir <path>`. `ccdesk scan` prints the same view the page shows for a directory, for scripts; `ccdesk explain` lists the path rules, skills and folder instructions that load once Claude reads or edits a file. `ccdesk check` exits 1 when a session started in a folder reads a settings file, `.mcp.json` or other file of the repository that Claude Code cannot read or parse, so CI can catch it before anyone pulls the change. All three only read, and hidden values stay hidden in what they print. Edits made in another editor or by Claude show up within a second. Changes to `~/.claude.json`, such as trust decisions and MCP approvals, show up when you return to the tab. Requires Node.js 22.19 or newer. See [Platform notes](https://ayagmar.github.io/ccdesk/platforms/) for Windows, macOS and WSL.
 
 ## Privacy and safety
 
