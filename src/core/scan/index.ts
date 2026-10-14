@@ -18,7 +18,14 @@ import { buildContext } from "./context.ts";
 import { localInConfigHome, type ScanEnv } from "./env.ts";
 import { isDir, isFile, isWithin, readJsonObject, stringsIn } from "./files.ts";
 import { isRecord } from "./data.ts";
-import { claudeJsonKey, gitRoot, mainWorktreeRoot, trustKey, visibilityOf } from "./git.ts";
+import {
+  claudeJsonKey,
+  gitRoot,
+  mainWorktreeRoot,
+  memoryKey,
+  trustKey,
+  visibilityOf,
+} from "./git.ts";
 import { AGENTS_MD_MODES, resolveInstructions } from "./instructions.ts";
 import { readInventory } from "./inventory.ts";
 import { readMemoryStore } from "./memory.ts";
@@ -134,7 +141,8 @@ export async function scanDirectory(
   });
 
   const sharing = await shareProjectFiles(path, root, instructions, settings, inventory);
-  const memory = await readMemory(env, mainRoot, path, effective, trustOptions, problems);
+  const key = exists ? await memoryKey(path) : path;
+  const memory = await readMemory(env, key, effective, trustOptions, problems);
   const permissions = permissionsOf(settings, trustOptions);
 
   return {
@@ -304,13 +312,11 @@ function importAnswer(project: Record<string, unknown>): Trust["externalImports"
  */
 async function readMemory(
   env: ScanEnv,
-  mainRoot: string | null,
-  path: string,
+  key: string,
   effective: EffectiveSetting[],
   trustOptions: TrustOptions,
   problems: Problem[]
 ): Promise<MemoryStore> {
-  const key = mainRoot ?? path;
   const setting = effective.find((s) => s.key === "autoMemoryDirectory");
   // A value from a repository file counts under the same trust rule as hooks (docs:
   // settings-reference#automemorydirectory); until then the next file down that sets it decides.

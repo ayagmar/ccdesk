@@ -30,6 +30,42 @@ test("a worktree and a subdirectory of a repository share the main repository's 
   }
 });
 
+test("a submodule's subfolders share the submodule's memory, and a bare repository's worktrees share the bare folder's", async () => {
+  const f = makeFixture();
+  const commit = (dir: string) => {
+    f.git(dir, "init", "-q");
+    f.git(dir, "add", ".");
+    f.git(dir, "commit", "-qm", "init");
+  };
+  f.write("lib-src/pkg/README.md", "lib");
+  commit("lib-src");
+  f.write("super/README.md", "super");
+  commit("super");
+  f.git(
+    "super",
+    "-c",
+    "protocol.file.allow=always",
+    "submodule",
+    "add",
+    "-q",
+    f.at("lib-src"),
+    "lib"
+  );
+  f.git("lib-src", "clone", "-q", "--bare", f.at("lib-src"), f.at("repo.git"));
+  f.git("repo.git", "worktree", "add", "-q", f.at("wt"));
+
+  for (const [dir, key] of [
+    ["super/lib/pkg", "super/lib"],
+    ["super/lib", "super/lib"],
+    // Claude Code names the store after the bare folder itself, not its parent (observed in v2.1.296).
+    ["wt/pkg", "repo.git"],
+  ] as const) {
+    const view = await scanDirectory(f.env, f.at(dir));
+    assert.equal(view.memory.projectPath, f.at(key), dir);
+    assert.equal(view.memory.dir, memoryDirFor(f, f.at(key)), dir);
+  }
+});
+
 test("MEMORY.md past 200 lines is flagged as partly unread", async () => {
   const f = makeFixture();
   const lines = Array.from({ length: 230 }, (_, i) => `- [m${i}](m${i}.md) — note`);

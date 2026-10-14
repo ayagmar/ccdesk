@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { dirname, normalize, relative } from "node:path";
+import { basename, dirname, join, normalize, relative } from "node:path";
 import { promisify } from "node:util";
 import { type Visibility } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
@@ -49,6 +49,37 @@ export async function mainWorktreeRoot(dir: string): Promise<string | null> {
       : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * The folder Claude Code names a repository's auto memory after, so that every worktree and
+ * subfolder shares one store (docs: memory#storage-location): the main checkout's root, the bare
+ * folder itself for a worktree of a bare repository, else the repository root, as in a submodule
+ * (observed in v2.1.296). Outside git it is `dir`.
+ */
+export async function memoryKey(dir: string): Promise<string> {
+  try {
+    const { stdout } = await run(
+      "git",
+      [
+        "-C",
+        dir,
+        "rev-parse",
+        "--path-format=absolute",
+        "--show-toplevel",
+        "--git-common-dir",
+        "--git-dir",
+      ],
+      { timeout: 5000 }
+    );
+    const [top, common, gitDir] = stdout.split("\n").map((line) => normalize(line.trim()));
+    if (!top || !common || !gitDir) return dir;
+    if (basename(common) === ".git") return dirname(common);
+    // A linked worktree's git folder is <common>/worktrees/<name>; a submodule's is the common one.
+    return dirname(gitDir) === join(common, "worktrees") ? common : top;
+  } catch {
+    return dir;
   }
 }
 
