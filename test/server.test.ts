@@ -274,6 +274,37 @@ test("the usage count answers for no file outside the directory's memory folder"
   assert.deepEqual((res.json as Usage).memories, {});
 });
 
+test("the usage count is refused for a relative path", async () => {
+  // Catches the route scanning and counting a folder relative to wherever ccdesk was started.
+  const res = await call("/api/usage", { method: "POST", body: { path: "work", rules: [] } });
+
+  assertRefused(res, 400, /path must be an absolute path/);
+});
+
+test("the usage count for a print session counts the memory files of the store it uses", async () => {
+  // A repository's autoMemoryDirectory waits for trust in an interactive session but applies to
+  // claude -p at once; catches counting the interactive store for the print view, whose memories
+  // would then never fill in.
+  const project = fixture.at("work", "printed");
+  const custom = fixture.at("work", "printed-notes");
+  fixture.json("work/printed/.claude/settings.json", { autoMemoryDirectory: custom });
+  const printed = fixture.write(join(custom, "printed.md"), memoryFile("p", "project", "d", "x"));
+  const interactive = fixture.write(
+    join(memoryDirFor(fixture, project), "kept.md"),
+    memoryFile("k", "project", "d", "x")
+  );
+  const count = async (profile: string) =>
+    Object.keys(
+      (
+        (await call("/api/usage", { method: "POST", body: { path: project, rules: [], profile } }))
+          .json as Usage
+      ).memories
+    );
+
+  assert.deepEqual(await count("print"), [printed]);
+  assert.deepEqual(await count("interactive"), [interactive]);
+});
+
 test("a large memory folder does not stop tool calls being counted", async () => {
   // Catches the page sending every memory's path again: a few hundred long paths passed the
   // request size limit, and the tools' counts failed with it.
