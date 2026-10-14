@@ -87,7 +87,7 @@ export function useConfig(requested: string | null | undefined, profile: Session
     if (dirRef.current !== null) load(dirRef.current, profileRef.current, false);
   }, [reference.state, overview.state, retryReference, refreshOverview, load]);
 
-  const watching = useWatch(dir, reloadDirectory);
+  const following = useWatch(dir, reloadDirectory);
 
   useEffect(() => {
     let last = Date.now();
@@ -142,7 +142,7 @@ export function useConfig(requested: string | null | undefined, profile: Session
     dir,
     reload,
     retry,
-    watching,
+    following,
   };
 }
 
@@ -163,17 +163,25 @@ function useReference(): [Load<Reference>, () => void] {
   return [reference, load];
 }
 
+/** How the page follows changes: the folders ccdesk cannot watch, and whether its server answers. */
+export interface Following {
+  unwatched: string[];
+  reachable: boolean;
+}
+
+const FOLLOWING_ALL: Following = { unwatched: [], reachable: true };
+
 /**
- * Calls `onChange` after each change to a config file of `dir`, and says whether every one of them
- * is watched, so the page updates on its own.
+ * Calls `onChange` after each change to a config file of `dir`, and says which folders ccdesk cannot
+ * watch, so the page can say it may not update on its own.
  */
-function useWatch(dir: string | null, onChange: () => void): boolean {
-  const [watching, setWatching] = useState(true);
+function useWatch(dir: string | null, onChange: () => void): Following {
+  const [following, setFollowing] = useState(FOLLOWING_ALL);
   useEffect(() => {
     if (dir === null) return;
     const stop = new AbortController();
     const pause = () => new Promise((resolve) => setTimeout(resolve, 5000));
-    setWatching(true);
+    setFollowing(FOLLOWING_ALL);
     const listen = async () => {
       let since = Date.now();
       while (!stop.signal.aborted) {
@@ -181,15 +189,16 @@ function useWatch(dir: string | null, onChange: () => void): boolean {
           const answer = await api.watch(dir, since, stop.signal);
           since = Math.max(since, answer.at);
           if (stop.signal.aborted) return;
-          setWatching(answer.watching);
+          setFollowing({ unwatched: answer.unwatched, reachable: true });
           // Only the open directory's files are watched, so the overview, which scans every
           // project, waits for your next save or for you to come back to the tab.
           if (answer.changed) onChange();
-          // Without a watch on every file the answer comes at once, so ask again after a while.
-          if (!answer.watching) await pause();
+          // With folders it cannot watch, the server answers at once, so ask again after a while.
+          if (answer.unwatched.length > 0) await pause();
         } catch {
-          // Server stopped or the request was cancelled: wait before trying again.
-          if (!stop.signal.aborted) setWatching(false);
+          // Cancelled, as when you open another directory, or the server stopped.
+          if (stop.signal.aborted) return;
+          setFollowing({ unwatched: [], reachable: false });
           await pause();
         }
       }
@@ -197,5 +206,5 @@ function useWatch(dir: string | null, onChange: () => void): boolean {
     void listen();
     return () => stop.abort();
   }, [dir, onChange]);
-  return watching;
+  return following;
 }
