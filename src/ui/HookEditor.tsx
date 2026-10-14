@@ -4,7 +4,7 @@ import { type DirectoryView, type Hook, type HookEdit, type Scope } from "../sha
 import { parseJson } from "../view/settings.ts";
 import { api } from "./api.ts";
 import { tilde } from "./format.ts";
-import { fileFor, projectOrUser, ScopePicker } from "./editorKit.tsx";
+import { fileFor, projectOrUser, ScopePicker, writableOr } from "./editorKit.tsx";
 import { reference } from "./reference.ts";
 import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
 import { Icon } from "./Icon.tsx";
@@ -27,7 +27,8 @@ export function HookEditor({ view, hook, onSaved }: Props) {
   const [event, setEvent] = useState(hook?.event ?? "PreToolUse");
   const [matcher, setMatcher] = useState(hook?.matcher ?? "");
   const [text, setText] = useState(hook ? JSON.stringify(hook.definition, null, 2) : NEW_HOOK);
-  const [scope, setScope] = useState<Scope>(() => projectOrUser(view));
+  const [picked, setScope] = useState<Scope>(() => projectOrUser(view));
+  const scope = writableOr(view, picked);
   const ids = { event: useId(), matcher: useId(), hook: useId() };
 
   if (hook && (hook.source === "plugin" || !EDITABLE_SCOPES.includes(hook.source)))

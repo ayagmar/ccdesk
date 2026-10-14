@@ -14,7 +14,7 @@ import { sessionsHere } from "../../view/usage.ts";
 import { Bullet } from "../Bullet.tsx";
 import { plural, tilde } from "../format.ts";
 import { Icon } from "../Icon.tsx";
-import { fileFor, ScopePicker } from "../editorKit.tsx";
+import { fileFor, ScopePicker, writableOr } from "../editorKit.tsx";
 import { usePermissionChange } from "../PermissionEditor.tsx";
 import { Field, NameButton } from "./kit.tsx";
 import { type Actions, type SectionUi } from "./types.ts";
@@ -103,7 +103,8 @@ function ToolSwitch({ tool, actions }: { tool: BuiltinTool; actions: Actions }) 
   const { view } = actions;
   const change = usePermissionChange(view, actions.onSaved);
   const [picking, setPicking] = useState(false);
-  const [scope, setScope] = useState<Scope>("user");
+  const [picked, setScope] = useState<Scope>("user");
+  const scope = writableOr(view, picked);
   if (tool.name === "EndConversation") return null;
 
   const rules = removingRules(view, tool);
