@@ -501,6 +501,11 @@ input::placeholder {
   white-space: nowrap;
 }
 
+/* The index scrolls sideways too, so its ring sits inside the link. */
+.section-index a:focus-visible {
+  outline-offset: -2px;
+}
+
 .section-index a:hover {
   background: var(--hover);
   color: var(--ink);
@@ -1160,6 +1165,18 @@ input::placeholder {
 .segmented button[aria-pressed="true"] {
   background: var(--ink);
   color: var(--paper);
+}
+
+/*
+ * The control scrolls sideways, which would clip a ring drawn outside it, so the ring sits inside
+ * the option; on the pressed option a paper line keeps it apart from the ink.
+ */
+.segmented button:focus-visible {
+  outline-offset: -2px;
+}
+
+.segmented button[aria-pressed="true"]:focus-visible {
+  box-shadow: inset 0 0 0 3px var(--paper);
 }
 
 .segmented.small button {

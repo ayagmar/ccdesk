@@ -390,7 +390,7 @@ Editing happens inside the inspector. A segmented control picks the target layer
 
 ### Inputs / Fields
 - **Style:** paper fill, hairline border, 6px radius, 30px (filters) or 32px (editor fields) tall. Filter boxes carry a leading search icon and a trailing keycap hint.
-- **Focus:** filter boxes turn their border focus-blue; editor fields get a 2px focus outline. Everything else uses the global 2px focus-visible outline offset by 2px.
+- **Focus:** filter boxes turn their border focus-blue; editor fields get a 2px focus outline. Everything else uses the global 2px focus-visible outline offset by 2px. Inside anything that scrolls sideways (segmented controls, the section index) the ring is drawn 2px inside the option instead, because the scroll box would clip it; on a pressed option a 1px paper line separates the ring from the ink fill.
 - **Keycaps:** mono 11px, hairline border with a 2px bottom edge, 4px radius.
 
 ### Chips and Segmented Controls
