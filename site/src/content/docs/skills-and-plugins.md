@@ -23,7 +23,7 @@ Outside plugins, Claude Code skips a skill folder named `synced` in any case, an
 
 A skill with `disable-model-invocation` is marked as one that runs only when you call it. The `skillOverrides` setting can turn a skill off, keep it out of the listing Claude sees, or show only its name; ccdesk applies it to user, project and managed skills and to commands. [What Claude sees](../what-claude-sees/) shows the skill listing as Claude gets it.
 
-When managed settings set `strictPluginOnlyCustomization` to `true`, or to a list naming `skills`, Claude Code loads skills and commands only from plugins and the managed folder: your skills and commands, synced ones included, and the project's are marked as skipped and left out of the listing.
+When managed settings set `strictPluginOnlyCustomization` to `true`, or to a list naming `skills`, Claude Code loads skills only from plugins and the managed folder: your skills, synced ones included, and the project's are marked as skipped and left out of the listing. Command files in `.claude/commands` are skipped too, the managed folder's included: the settings reference says the lock keeps managed sources, but Claude Code 2.1.296 loads no command file while it is on, and ccdesk follows it. Plugin commands still load.
 
 ## Commands and output styles
 
@@ -35,6 +35,14 @@ Installed plugins come from `installed_plugins.json` in the plugins root, which 
 
 A folder in `~/.claude/skills` or in the open directory's `.claude/skills` that holds `.claude-plugin/plugin.json` is a plugin too, listed as `<name>@skills-dir` under the name in its manifest. Parent folders are not searched for these. Its `SKILL.md` stays a skill of the skills folder, as in Claude Code 2.1.296, and is not one of the plugin's skills. Setting `"<name>@skills-dir": false` in `enabledPlugins` turns that skill off too, and setting it back to `true` turns it on again; a plugin that is off for any other reason, such as trust, leaves the skill as it is. A project one loads only once you accept the trust dialog for the open directory's project; trusting a parent folder or running `claude -p` is not enough. Until then it is listed as not loaded. Its MCP servers then wait for the same approval as the project's `.mcp.json`. When two of these share a name, the one in `~/.claude/skills` loads, and an enabled installed plugin of the same name beats both. Managed settings stop all of them when `strictPluginOnlyCustomization` locks any surface, when `strictKnownMarketplaces` lacks the `{ "source": "skills-dir" }` entry, or when `blockedMarketplaces` has it. The settings reference says an allowlist stops only the ones in `~/.claude/skills`, but Claude Code 2.1.296 drops the project's ones as well, and so does ccdesk.
 
-ccdesk does not list plugins synced from your claude.ai account (`<name>@synced`), plugins loaded for one session with `--plugin-dir`, or project plugin monitors.
+Some plugin sources and rules are not covered:
+
+- Plugins synced from your claude.ai account (`<name>@synced`) are not listed.
+- Session-only plugins from `--plugin-dir`, `--plugin-url` or `CLAUDE_CODE_PLUGIN_DIRS` (`<name>@inline`) are not listed.
+- A folder in `~/.claude/skills` that the skills sync claims in its `manifest.json` is not a plugin in Claude Code; ccdesk still lists it as one.
+- In a session with `CLAUDE_CODE_RESTRICT_PERSONAL_CONFIG`, Claude Code loads the folders in `~/.claude/skills` as skills only; ccdesk still lists them as plugins.
+- For a project skills-dir plugin, Claude Code skips MCP servers declared as an MCP bundle (`.mcpb` or `.dxt`); ccdesk does not.
+- ccdesk does not list plugin monitors, so it does not show that a project skills-dir plugin's monitors do not load.
+- ccdesk counts only an enabled installed plugin as taking a skills-dir plugin's name; whether a turned-off one does too is not confirmed.
 
 A plugin is on or off according to the highest settings file that lists it in `enabledPlugins`; with no entry, the `defaultEnabled` of the plugin's marketplace entry decides, then its own manifest's, and plugins are on by default. A plugin that is off is dimmed and contributes nothing. An enabled plugin can add skills, commands, subagents, output styles, hooks and MCP servers, each listed in its own section with the **X** bullet, and the route strip gains a Plugin stop. A manifest that sets `commands`, `agents` or `outputStyles` replaces the plugin's default folder for it, and `commands` may be a map of names to a file or inline text, which replaces the folder too; `skills` adds to the `skills` folder. The plugins reference says `agents` entries must be `.md` files, but Claude Code 2.1.296 also loads a folder named there, and so does ccdesk.
