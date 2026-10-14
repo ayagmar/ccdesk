@@ -1277,6 +1277,15 @@ input::placeholder {
   overflow-wrap: anywhere;
 }
 
+/* The heading takes focus when the drawer opens so reading starts there; it is not a control. */
+.insp-head h2:focus {
+  outline: none;
+}
+
+.drawer-scrim {
+  display: none;
+}
+
 .insp-body {
   padding: 14px 18px 40px;
 }
@@ -2016,6 +2025,14 @@ button:disabled {
     width: min(var(--inspector), 100vw);
     z-index: 10;
     box-shadow: -16px 0 40px -16px rgb(0 0 0 / 0.35);
+  }
+
+  .drawer-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 9;
+    background: color-mix(in srgb, var(--paper) 55%, transparent);
   }
 
   /* Keyboard hints are for a full keyboard and a wide window. */
