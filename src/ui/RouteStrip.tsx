@@ -1,54 +1,9 @@
 import { type DirectoryView } from "../shared/types.ts";
-import { LINES, type Line } from "../view/lines.ts";
+import { type Line } from "../view/lines.ts";
+import { routeStops } from "../view/route.ts";
 import { Bullet } from "./Bullet.tsx";
 import { plural } from "./format.ts";
-
-interface Stop {
-  line: Line;
-  name: string;
-  /** What this stop contributes when Claude starts here. */
-  facts: string[];
-  active: boolean;
-}
-
-function stopsFor(view: DirectoryView): Stop[] {
-  const inv = view.inventory;
-  return LINES.filter((l) => l.line !== "plugin" || inv.plugins.some((p) => p.enabled)).map(
-    ({ line, name }) => {
-      const facts: string[] = [];
-      if (line === "memory") {
-        const count = view.memory.memories.length;
-        if (count) facts.push(plural(count, "memory", "memories"));
-        return { line, name, facts, active: count > 0 };
-      }
-      if (line === "plugin") {
-        const enabled = inv.plugins.filter((p) => p.enabled).length;
-        if (enabled) facts.push(plural(enabled, "plugin"));
-        return { line, name, facts, active: enabled > 0 };
-      }
-      const here = view.instructions.filter((i) => i.scope === line);
-      const loaded = here.filter((i) => i.status !== "skipped").length;
-      const skipped = here.length - loaded;
-      if (loaded) facts.push(plural(loaded, "file"));
-      if (skipped) facts.push(`${skipped} skipped`);
-      const settings = view.effective.filter((s) => s.from.includes(line as never)).length;
-      if (settings) facts.push(plural(settings, "setting"));
-      const hooks = inv.hooks.filter((h) => h.source === line).length;
-      if (hooks) facts.push(plural(hooks, "hook"));
-      const servers = inv.mcpServers.filter((m) => m.scope === line).length;
-      if (servers) facts.push(`${servers} MCP`);
-      const extensions = [
-        ...inv.agents,
-        ...inv.skills,
-        ...inv.commands,
-        ...inv.outputStyles,
-      ].filter((e) => e.scope === line).length;
-      if (extensions) facts.push(plural(extensions, "extension"));
-      const extras = hooks + servers + extensions;
-      return { line, name, facts, active: loaded > 0 || settings > 0 || extras > 0 };
-    }
-  );
-}
+import { Icon } from "./Icon.tsx";
 
 interface Props {
   view: DirectoryView;
@@ -60,7 +15,7 @@ interface Props {
 
 /** The directory drawn as a line: each stop is a scope Claude Code loads from, in load order. */
 export function RouteStrip({ view, lit, filter, onFilter }: Props) {
-  const stops = stopsFor(view);
+  const stops = routeStops(view);
   return (
     <nav className="route" aria-label="Load order for this directory">
       <ol className="route-stops">
@@ -82,9 +37,16 @@ export function RouteStrip({ view, lit, filter, onFilter }: Props) {
                   <Bullet line={stop.line} hollow={!stop.active} />
                 </span>
                 <span className="stop-name">{stop.name}</span>
-                <span className="stop-facts">
-                  {stop.facts.length ? stop.facts.join(" · ") : "not used"}
-                </span>
+                {(stop.facts.length > 0 || !stop.active) && (
+                  <span className="stop-facts">
+                    {stop.facts.length ? stop.facts.join(" · ") : "not used"}
+                  </span>
+                )}
+                {stop.unreadable > 0 && (
+                  <span className="flag warn">
+                    <Icon name="warn" /> {plural(stop.unreadable, "file")} can't be read
+                  </span>
+                )}
               </button>
             </li>
           );

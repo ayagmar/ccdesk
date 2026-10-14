@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
 import { REFERENCE, scanDirectory } from "../src/core/index.ts";
-import { buildRows, formatter, SECTIONS, type ViewContext } from "../src/view/index.ts";
+import { buildRows, formatter, routeStops, SECTIONS, type ViewContext } from "../src/view/index.ts";
 import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
 /** A project with something in every section of the directory page. */
@@ -66,4 +66,19 @@ test("paths in labels are shown from the home folder the caller gives", async ()
   // A second formatter does not change what the first shows.
   assert.deepEqual(labels(""), [f.at("home/.claude/CLAUDE.md")]);
   assert.deepEqual(labels(f.env.home), [mine]);
+});
+
+test("the route strip flags a scope whose settings file cannot be read instead of calling it unused", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "# App rules\n");
+  f.write("app/.claude/settings.local.json", '{ "model": "opus", permissions: { allow: [ }\n');
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  const stops = routeStops(view);
+  const local = stops.find((s) => s.line === "local");
+  assert.equal(local?.unreadable, 1);
+  assert.equal(local?.active, true);
+  // A scope with nothing in it stays an idle stop.
+  const managed = stops.find((s) => s.line === "managed");
+  assert.deepEqual([managed?.unreadable, managed?.active], [0, false]);
 });

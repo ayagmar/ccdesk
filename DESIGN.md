@@ -340,6 +340,7 @@ Icons are a small drawn set on a 16px grid with a 1.5px round-capped stroke in t
 The directory drawn as a line. A 3px ink line runs through a row of equal-width stops, one per scope in load order, under a 2px ink rule and over a hairline.
 - **Stop:** a 22px bullet on a paper node, the scope name (700, 13.5px), and mono facts underneath ("2 files · 3 settings · 1 more" or "nothing here").
 - **Idle stop:** a scope that contributes nothing gets a hollow bullet (paper fill, coloured letter and ring) and a muted, lighter name.
+- **Unreadable file:** a stop whose settings file ccdesk could not read is not idle, whatever else it contributes: it keeps a solid bullet and carries a warn flag ("1 file can't be read"), so the strip never calls a scope unused while the problems strip above names its broken file.
 - **Lit:** selecting a timetable row rings the bullet of that row's scope.
 - **Filter:** clicking a stop filters the timetable to that scope; the pressed stop gets a sunk background and an underlined name. Clicking it again shows every scope.
 - **Narrow screens:** the strip turns vertical with the line running down the left.
