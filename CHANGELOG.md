@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.4.0](https://github.com/ayagmar/ccdesk/compare/v0.3.0...v0.4.0) (2026-10-14)
+
+### Features
+
+* **core:** forget a directory whose folder is gone ([ce3a58f](https://github.com/ayagmar/ccdesk/commit/ce3a58fa169db17025f9925c1e332044a5698284))
+* **core:** watch ~/.claude.json and wake the page when what it shows changes ([f96ccd4](https://github.com/ayagmar/ccdesk/commit/f96ccd42bbcadd5743c92f3e5f1ab87afd951127))
+* push config changes to the page over server-sent events ([8a4d198](https://github.com/ayagmar/ccdesk/commit/8a4d198234c51e711642818d548a6e527d5c3d84))
+* **ui:** fold deleted folders away in the rail and the overview ([6d64e23](https://github.com/ayagmar/ccdesk/commit/6d64e23a8c13175fb661ecb9f3d5ff5e9ec14746))
+* **ui:** forget a directory whose folder is gone ([ae90e30](https://github.com/ayagmar/ccdesk/commit/ae90e30964a1e74b9c683fc4e03141e7fbe428cd))
+* **view:** filter settings by the file that decides each value ([b6808d2](https://github.com/ayagmar/ccdesk/commit/b6808d2df107d1368ecbfc0620d2fe7f911391a1))
+* **view:** mark a setting whose value is Claude Code's default ([b577227](https://github.com/ayagmar/ccdesk/commit/b577227872e79833dab503bd52641b1e03c444c6))
+
+### Bug Fixes
+
+* **core:** follow a linked ~/.claude.json to the file it leads to ([b09b985](https://github.com/ayagmar/ccdesk/commit/b09b9853fc299de8f1603ae100786023052fa4a4))
+* **core:** keep a shared store a live repository's auto memory uses ([74dbfcc](https://github.com/ayagmar/ccdesk/commit/74dbfcc3b0093e0063a72a5a419f700acbb2d86e))
+* **core:** never forget a store a live directory shares, or a folder ccdesk cannot reach ([5bc8609](https://github.com/ayagmar/ccdesk/commit/5bc860914fbc4c9306f8c252e9cd522ffa76745a))
+* **core:** read ~/.claude.json once its events settle ([a2db8f7](https://github.com/ayagmar/ccdesk/commit/a2db8f7d037d37415d522efcb83ce5006ce49e4e))
+* **core:** read the ~/.claude.json baseline again when its project entries change ([6c16599](https://github.com/ayagmar/ccdesk/commit/6c16599990e318e5060cca4690c1b5a0ea893be3))
+* **core:** stop listing a gone directory known only from ~/.claude.json ([736afd2](https://github.com/ayagmar/ccdesk/commit/736afd25e3f25694cb23fc0d4eaa595dc0193799))
+* **core:** wait for every queued ~/.claude.json read before reusing a scan ([032a856](https://github.com/ayagmar/ccdesk/commit/032a8562074cd35ecb974e7d3f02fd11069bba93))
+* **core:** word the refused store restore without guessing why ([a39eb5f](https://github.com/ayagmar/ccdesk/commit/a39eb5f53d01bcc0592b6f9052d4deb4ba5a462d))
+* **ui:** disable the forget button while the review is read again ([07e7918](https://github.com/ayagmar/ccdesk/commit/07e7918967a43d90e8130930a688b0dd4931d839))
+* **ui:** keep the open deleted folder in its rail group ([ff4b963](https://github.com/ayagmar/ccdesk/commit/ff4b963de984fea2e26bab029df8ef2669677b28))
+* **ui:** let a rail group fold while it holds the open directory ([dd9c14a](https://github.com/ayagmar/ccdesk/commit/dd9c14abf38bd490c6ab3da49e3c4061b6f52749))
+* **ui:** reload the directory once each event stream opens ([5c37c66](https://github.com/ayagmar/ccdesk/commit/5c37c66f6f5c0cc9cda089e3094c6e4e87194714))
+* **ui:** shorten the badge on an extension Claude is not offered ([d018699](https://github.com/ayagmar/ccdesk/commit/d0186997b6c5a95a11e65e10e2f3a092616dec11))
+* **ui:** warn about a running session and keep the forget button after a refusal ([5daff37](https://github.com/ayagmar/ccdesk/commit/5daff37bb2d53f036bd6f5ad30d49285e79f370d))
+* **view:** do not mark a default that overrides a different value ([098e484](https://github.com/ayagmar/ccdesk/commit/098e4848dae172d086304a95a1a0ac21eff7bb20))
+* **view:** give settings held for trust their own filter value ([a276233](https://github.com/ayagmar/ccdesk/commit/a2762338991cadb1ce6c6f9a641162d4defd455e))
+
+### Reverts
+
+* Revert "chore: update Claude Code data (claude-agent-sdk 0.3.299)" ([cd63df8](https://github.com/ayagmar/ccdesk/commit/cd63df87ffc23083897991552d4c6a209c62e17e))
+
 ## [0.3.0](https://github.com/ayagmar/ccdesk/compare/v0.2.7...v0.3.0) (2026-10-14)
 
 ### Features
