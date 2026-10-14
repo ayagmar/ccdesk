@@ -49,7 +49,7 @@ Below the strips, each kind of config has its own table. The numbers are the key
 5. [Memory](../memory/)
 6. [Hooks](../hooks/)
 7. [MCP servers](../mcp-servers/)
-8. Agents, skills and plugins: [Subagents](../subagents/) and [Skills, commands, output styles and plugins](../skills-and-plugins/)
+8. Agents, skills & plugins: [Subagents](../subagents/) and [Skills, commands, output styles and plugins](../skills-and-plugins/)
 9. [All settings](../settings/#all-settings)
 
 Every table can be filtered with the box at the top, narrowed with the chips beside its title, and sorted by clicking a column heading. Long tables show 50 rows at a time, with a button for the next 50. The filter text, the scope you picked on the route strip, sorting and chips are kept in the address, so a reload or a shared link opens the same view. Opening another directory starts it unfiltered.
@@ -58,7 +58,7 @@ Every table can be filtered with the box at the top, narrowed with the chips bes
 
 ## The inspector
 
-Click a row to open it in the inspector on the right: why it is or is not in force, the file it comes from (with copy and open buttons), the file's contents, and the controls to change it. Until you pick a row, the tables take the full width. On windows narrower than 1180 pixels the inspector slides in over the page instead.
+Click a row to open it in the inspector on the right: why it is or is not in force, the file it comes from (with copy and open buttons), the file's contents, and the controls to change it. For a Markdown file, **Read** renders it without its frontmatter, and **Raw** shows the file exactly as written. Until you pick a row, the tables take the full width. On windows 1180 pixels wide or narrower, the inspector slides in over the page instead.
 
 The open button starts your editor. ccdesk uses `$CCDESK_EDITOR` when it is set. Otherwise it tries `$VISUAL` and `$EDITOR` if they name a graphical editor, then the first of `code`, `cursor`, `zed`, `codium`, `subl`, `kate`, `gnome-text-editor` and `gedit` found on your `PATH`, and finally your system's default app. Terminal editors such as `vim` are skipped, because a background server has no terminal to run them in.
 
@@ -106,6 +106,6 @@ On a phone-sized window the rail moves above the page, the route strip turns ver
 
 <Screenshot
   name="phone"
-  alt="ccdesk at phone width in the dark theme: the rail on top, then the directory title and a vertical route strip"
+  alt="ccdesk at phone width: the rail on top, then the directory title and a vertical route strip"
   width={390}
 />

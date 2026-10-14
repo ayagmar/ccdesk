@@ -31,9 +31,9 @@ By default Claude Code loads `AGENTS.md` only when no `CLAUDE.md` or `CLAUDE.loc
 
 Not in the page. Every file has an open button that starts your editor; ccdesk picks up the change within a second. ccdesk edits settings, permission rules, hooks, MCP servers, subagent files and memory.
 
-## Why can I not change an MCP server or an `env` setting?
+## Why can I not change some MCP servers or `env` settings?
 
-Their values are hidden from the page, and ccdesk will not write values it does not show. Change them in the file or with `claude mcp`. You can still remove an MCP server.
+A server or setting that holds hidden values, such as `env` values, headers, a URL's user name, password or query string, or a secret in arguments, cannot be changed from ccdesk, because it will not write values it does not show. Change it in the file or with `claude mcp`. You can still remove such an MCP server.
 
 ## How do I undo a change?
 

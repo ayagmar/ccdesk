@@ -44,7 +44,7 @@ Each piece lives in its own file, at one of six scopes: managed, user, project, 
 | **MCP servers** | Every server, and the ones waiting for approval, off, rejected or overridden | Add, change or remove servers in `.mcp.json`, or through `claude mcp` for user and local ones | [MCP servers](https://ayagmar.github.io/ccdesk/mcp-servers/) |
 | **Subagents** | Every agent from managed, project, user and plugin folders, and which definition wins | Create, change or delete agent files | [Subagents](https://ayagmar.github.io/ccdesk/subagents/) |
 | **Skills and plugins** | Skills, commands, output styles and plugins, by scope | Open them in your editor | [Skills and plugins](https://ayagmar.github.io/ccdesk/skills-and-plugins/) |
-| **Memory** | Auto memory for the directory, with memories missing from `MEMORY.md`, broken links and duplicates flagged | Delete a memory and its index line, fix the index | [Memory](https://ayagmar.github.io/ccdesk/memory/) |
+| **Memory** | Auto memory for the directory, how often Claude read each memory, and memories missing from `MEMORY.md`, broken links and duplicates flagged | Delete a memory and its index line, fix the index | [Memory](https://ayagmar.github.io/ccdesk/memory/) |
 | **What Claude sees** | What your config puts in context when a session starts, with sizes and estimated tokens | | [What Claude sees](https://ayagmar.github.io/ccdesk/what-claude-sees/) |
 
 <table>
@@ -71,57 +71,30 @@ Each piece lives in its own file, at one of six scopes: managed, user, project, 
 <a href="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/review-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/review-dark.webp" /><img align="right" width="300" alt="Changing the model setting: the files that set it, the value Claude Code uses, and the diff to project settings before saving" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/review-light.webp" /></picture></a>
 
 - You see the exact diff before anything is written, and Save writes exactly that diff. If the file changed in the meantime, ccdesk asks you to review again.
-- Settings and hooks are checked against Claude Code's settings schema. Other keys in the file stay as they are.
 - The old file is backed up to `~/.claude/backups/ccdesk/` first. Undo is one click, and **Recent changes** can restore any earlier edit.
-- A settings file that is a symlink, such as one in a dotfiles repository, is written through and stays a link.
-- A file with other hard links is not saved: replacing it would split it from its other names. Edit it in your editor.
-- ccdesk never writes `~/.claude.json`. User and local MCP server changes go through Claude Code's own `claude mcp` command, so they need `claude` on your PATH. ccdesk keeps no backup of these and cannot undo them; **Recent changes** lists each one with the commands that reverse it.
+- ccdesk never writes `~/.claude.json`. User and local MCP server changes go through Claude Code's own `claude mcp` command, and **Recent changes** lists the commands that reverse each one.
 
 Details: [Recent changes, backups and undo](https://ayagmar.github.io/ccdesk/recent-changes/)
 
 <br clear="right" />
 
-## Keyboard
-
-| Key | Action |
-| --- | --- |
-| `j` / `k` | Next / previous row |
-| `1` to `9` | Jump to a section |
-| `/` | Filter rows |
-| `Ctrl K` / `⌘ K` | Jump to any directory, file, setting, rule or memory |
-| `Esc` | Close details |
-
-More in [Reading the interface](https://ayagmar.github.io/ccdesk/interface/).
-
-## Options
+## Commands
 
 ```
-npx ccdesk [options]                     Open the page in your browser
-npx ccdesk scan [dir] --json             Print what Claude Code loads in dir, as JSON
-npx ccdesk explain <file> [--dir <dir>]  Print what loads once Claude reads or edits file
-npx ccdesk check [dir] [--json]          Exit 1 when a session started in dir reads a file
-                                         Claude Code cannot read or parse
-
-  --port <n>            Port to listen on (default: a free port)
-  --no-open             Print the URL instead of opening a browser
-  --config-dir <path>   Claude folder to read, as CLAUDE_CONFIG_DIR sets it for Claude Code
-                        (wins over $CLAUDE_CONFIG_DIR)
-  --dir <dir>           For explain: the folder the session starts in (default: the current one)
-  --strict              For check: also fail on entries Claude Code may skip in a file it reads
-  --all                 For check: also count ~/.claude, ~/.claude.json, managed settings and
-                        files outside dir's repository
-  -h, --help            Show this help
+npx ccdesk                    Open the page in your browser
+npx ccdesk scan [dir] --json  Print what Claude Code loads in dir, as JSON
+npx ccdesk explain <file>     Print what loads once Claude reads or edits file
+npx ccdesk check [dir]        Exit 1 when a session started in dir reads a file
+                              Claude Code cannot read or parse, for CI
 ```
 
-ccdesk reads `~/.claude` and `~/.claude.json`, or `$CLAUDE_CONFIG_DIR` when it is set, as Claude Code does. To look at another profile without exporting the variable, pass `--config-dir <path>`. `ccdesk scan` prints the same view the page shows for a directory, for scripts; `ccdesk explain` lists the path rules, skills and folder instructions that load once Claude reads or edits a file. `ccdesk check` exits 1 when a session started in a folder reads a settings file, `.mcp.json` or other file of the repository that Claude Code cannot read or parse, so CI can catch it before anyone pulls the change. All three only read, and hidden values stay hidden in what they print. Edits made in another editor or by Claude show up within a second. Changes to `~/.claude.json`, such as trust decisions and MCP approvals, show up when you return to the tab. Requires Node.js 22.19 or newer. See [Platform notes](https://ayagmar.github.io/ccdesk/platforms/) for Windows, macOS and WSL.
+Requires Node.js 22.19 or newer. Options, the `check` command in CI, and what ccdesk reads and writes are in [Getting started](https://ayagmar.github.io/ccdesk/getting-started/); keyboard shortcuts are in [Reading the interface](https://ayagmar.github.io/ccdesk/interface/#keyboard-shortcuts), and Windows, macOS and WSL in [Platform notes](https://ayagmar.github.io/ccdesk/platforms/).
 
 ## Privacy and safety
 
 - The server listens on `127.0.0.1` only, and every API call needs a token generated for that run. Nothing leaves your machine.
-- Values under `env` and `headers`, and keys in an MCP server's `args` (after flags such as `--token` or `--api-key`, in a `--header` such as `Authorization: Bearer …`, or starting like `sk-` or `ghp_`), are hidden everywhere in the UI, diffs included, and ccdesk refuses any edit that would change them.
-- ccdesk never reads `~/.claude/.credentials.json`.
-- From your transcripts, only counts and rule patterns (a command's program and subcommand, a fetch's domain) reach the page, never commands or file contents.
-- Backups are readable only by you on Linux and macOS.
+- Values under `env` and `headers`, a URL's user name, password and query string, and secrets in MCP server arguments are hidden everywhere in the UI, diffs included, and ccdesk refuses any edit that would change them.
+- ccdesk never reads `~/.claude/.credentials.json`. From your transcripts, only counts and rule patterns reach the page.
 
 The full list is in [Safety and privacy](https://ayagmar.github.io/ccdesk/safety-and-privacy/).
 
@@ -134,7 +107,7 @@ pnpm dev:ui     # UI with hot reload on localhost:4320
 pnpm check      # typecheck, lint, format, tests, build
 ```
 
-Tests never touch your real `~/.claude`; each one builds a throwaway home directory. The settings schema, scopes and built-in tools are generated from [`@anthropic-ai/claude-agent-sdk`](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk), Claude Code's docs and, for documented keys the SDK lacks, [SchemaStore](https://json.schemastore.org/claude-code-settings.json), and a daily workflow opens a pull request when they change. [Contributing](https://ayagmar.github.io/ccdesk/contributing/) covers the generators, the docs site and releases. [ARCHITECTURE.md](ARCHITECTURE.md) explains how the code fits together, and [`docs/`](docs/) holds the plan for splitting the core from the web server and feature ideas.
+[Contributing](https://ayagmar.github.io/ccdesk/contributing/) covers the tests, the data generated from Claude Code, the docs site and releases. [ARCHITECTURE.md](ARCHITECTURE.md) explains how the code fits together.
 
 ## License
 

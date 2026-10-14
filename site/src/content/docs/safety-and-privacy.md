@@ -39,7 +39,7 @@ ccdesk makes no network requests of its own. It does not connect to MCP servers,
 
 Nothing is written until you have seen the diff and pressed the button that saves it, and ccdesk saves exactly the change you reviewed: if the file changed in the meantime, it refuses and asks you to review again. The old file is copied to `~/.claude/backups/ccdesk/` first, and on Linux and macOS those copies are readable only by you. See [Recent changes](../recent-changes/).
 
-Writes go to a temporary file that replaces the original in one step, so a crash cannot leave half a file. A file that is a link stays a link.
+Writes go to a temporary file that replaces the original in one step, so a crash cannot leave half a file. A file that is a link stays a link. A file with other hard links is not saved, since replacing it would split it from its other names; edit it in your editor.
 
 ## Transcripts
 
