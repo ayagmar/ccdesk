@@ -173,9 +173,9 @@ const FOLLOWING_ALL: Following = { unwatched: [], reachable: true };
 
 /**
  * Calls `onChange` after each change to a config file of `dir`, which the server pushes, and says
- * which folders ccdesk cannot watch, so the page can say it may not update on its own. A lost
- * stream is opened again after a while, and `onChange` is called then, since a change made
- * meanwhile was not pushed.
+ * which folders ccdesk cannot watch, so the page can say it may not update on its own. It is also
+ * called once each stream opens, since a change made before its watchers started, after the page's
+ * scan or while a lost stream was down, was not pushed. A lost stream is opened again after a while.
  */
 function useWatch(dir: string | null, onChange: () => void): Following {
   const [following, setFollowing] = useState(FOLLOWING_ALL);
@@ -185,18 +185,18 @@ function useWatch(dir: string | null, onChange: () => void): Following {
     const pause = () => new Promise((resolve) => setTimeout(resolve, 5000));
     setFollowing(FOLLOWING_ALL);
     const listen = async () => {
-      let lost = false;
       while (!stop.signal.aborted) {
+        let opened = false;
         try {
           for await (const event of api.events(dir, stop.signal)) {
             // Only the open directory's files are watched, so the overview, which scans every
             // project, waits for your next save or for you to come back to the tab.
             if (event.type === "change") onChange();
             else {
-              // Each stream starts with this event.
               setFollowing({ unwatched: event.folders, reachable: true });
-              if (lost) onChange();
-              lost = false;
+              // Each stream starts with this event, once its watchers have started.
+              if (!opened) onChange();
+              opened = true;
             }
           }
         } catch {
@@ -204,7 +204,6 @@ function useWatch(dir: string | null, onChange: () => void): Following {
         }
         if (stop.signal.aborted) return;
         setFollowing({ unwatched: [], reachable: false });
-        lost = true;
         await pause();
       }
     };
