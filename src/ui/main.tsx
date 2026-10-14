@@ -10,6 +10,8 @@ try {
   if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
   const size = localStorage.getItem("ccdesk-text-size");
   if (size === "smaller" || size === "larger") document.documentElement.dataset.textSize = size;
+  if (localStorage.getItem("ccdesk-rail") === "hidden")
+    document.documentElement.dataset.rail = "hidden";
 } catch {
   // Storage blocked: follow the system theme, at the default text size.
 }

@@ -109,6 +109,8 @@ export function App() {
         onToggleTheme={appearance.toggleTheme}
         textSize={appearance.textSize}
         onTextSize={appearance.changeTextSize}
+        hidden={appearance.railHidden}
+        onToggleHidden={appearance.toggleRail}
       />
       <main className="main">
         {/* Navigating starts the next page afresh, so one view's error does not stick to the others. */}
@@ -161,9 +163,12 @@ function railCurrent(page: Page, path: string | null): string | null | undefined
   return page.kind === "all" ? null : undefined;
 }
 
-/** The theme and text size, kept on the document and remembered in this browser. */
+/** The theme, text size and whether the rail is hidden, kept on the document and remembered in this browser. */
 function useAppearance() {
   const [dark, setDark] = useState(isDark);
+  const [railHidden, setRailHidden] = useState(
+    () => document.documentElement.dataset.rail === "hidden"
+  );
   const [textSize, setTextSize] = useState<TextSize>(
     () => (document.documentElement.dataset.textSize as TextSize | undefined) ?? "default"
   );
@@ -187,7 +192,19 @@ function useAppearance() {
       // The size just won't persist.
     }
   };
-  return { dark, toggleTheme, textSize, changeTextSize };
+  const toggleRail = () => {
+    const next = !railHidden;
+    if (next) document.documentElement.dataset.rail = "hidden";
+    else delete document.documentElement.dataset.rail;
+    setRailHidden(next);
+    try {
+      if (next) localStorage.setItem("ccdesk-rail", "hidden");
+      else localStorage.removeItem("ccdesk-rail");
+    } catch {
+      // The choice just won't persist.
+    }
+  };
+  return { dark, toggleTheme, textSize, changeTextSize, railHidden, toggleRail };
 }
 
 /** The page the URL names, or why it cannot be shown yet. */

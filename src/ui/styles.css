@@ -199,6 +199,7 @@ kbd {
 
 .brand {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 2px 6px 14px;
@@ -229,8 +230,30 @@ kbd {
   text-underline-offset: 3px;
 }
 
-.brand .text-size {
+/* The controls stay together and never squeeze; in a narrow rail they wrap under the name as one. */
+.brand-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-left: auto;
+  flex: none;
+}
+
+/* Hidden, the rail is a strip holding only the button that brings it back; the page takes the room. */
+.app:has(.rail.hidden) {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.rail.hidden {
+  padding: 14px 6px;
+}
+
+.rail.hidden .brand {
+  padding: 0;
+}
+
+.rail.hidden :is(.brand-link, .text-size, .theme, .rail-body) {
+  display: none;
 }
 
 /* The three sizes show as the letter A at three clearly different sizes standing on one line, so
@@ -2271,6 +2294,19 @@ button:disabled {
 
   .rail:not(.open) :is(.rail-body, .text-size) {
     display: none;
+  }
+
+  /* The bar's own toggle opens the rail over the page; the wide-window hide button has no place here. */
+  .rail-hide {
+    display: none;
+  }
+
+  .rail.hidden :is(.brand-link, .theme) {
+    display: inline-flex;
+  }
+
+  .rail.hidden.open :is(.rail-body, .text-size) {
+    display: contents;
   }
 
   .rail.open {
