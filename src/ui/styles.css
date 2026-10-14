@@ -247,6 +247,15 @@ kbd {
   letter-spacing: -0.01em;
 }
 
+/* Beside a wide window the rail shows whole; the bar's toggle and the body wrapper are for phones. */
+.rail-toggle {
+  display: none;
+}
+
+.rail-body {
+  display: contents;
+}
+
 .brand-link {
   display: inline-flex;
   align-items: center;
@@ -1998,7 +2007,7 @@ button:disabled {
   }
 
   /* Keyboard hints are for a full keyboard and a wide window. */
-  .rail-keys {
+  .rail .rail-keys {
     display: none;
   }
 }
@@ -2009,10 +2018,49 @@ button:disabled {
     grid-template-rows: auto minmax(0, 1fr);
   }
 
+  /* The rail is one bar: brand, where you are, theme. Its button opens the rest over the page. */
   .rail {
-    max-height: 34vh;
+    overflow: visible;
+    padding: 8px 10px;
     border-right: 0;
     border-bottom: 1px solid var(--rule);
+  }
+
+  .rail .brand {
+    padding: 0 0 0 6px;
+  }
+
+  .rail-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 30px;
+    padding: 0 10px;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--panel);
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-align: left;
+  }
+
+  .rail:not(.open) :is(.rail-body, .text-size) {
+    display: none;
+  }
+
+  .rail.open {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    overflow-y: auto;
+    padding-bottom: 32px;
+  }
+
+  .rail.open .brand {
+    padding-bottom: 14px;
   }
 
   .work-main,
@@ -2089,8 +2137,9 @@ button:disabled {
     width: 40px;
   }
 
+  /* Room for three bullets, a setting merged from three files. */
   .tt-settings th:first-child:nth-child(n) {
-    width: 64px;
+    width: 76px;
   }
 
   /* The key gets its own line, so both values keep the width they need. */
@@ -2128,16 +2177,26 @@ button:disabled {
   .tt-hooks :is(th, td):nth-child(4),
   .tt-mcp :is(th, td):nth-child(4),
   .tt-extensions :is(th, td):nth-child(4),
-  .tt-shared :is(th, td):nth-child(n + 4) {
+  .tt-shared :is(th, td):nth-child(n + 4),
+  .tt-dirs :is(th, td):is(:nth-child(2), :nth-child(3)) {
     display: none;
   }
 
+  /* The directory is the row's name, not a bullet, so it takes the room. */
+  .tt-dirs th:first-child:nth-child(n) {
+    width: auto;
+  }
+
+  .tt-dirs th:nth-child(4):nth-child(n) {
+    width: 96px;
+  }
+
   .tt-instructions th:nth-child(4):nth-child(n) {
-    width: 72px;
+    width: 84px;
   }
 
   .tt-instructions th:nth-child(7):nth-child(n) {
-    width: 84px;
+    width: 112px;
   }
 
   /* The header wraps to a variable height here, so column heads scroll with their table. */
