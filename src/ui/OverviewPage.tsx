@@ -15,6 +15,14 @@ const COLUMNS: Column<ProjectSummary>[] = [
   { label: "Last used", sort: (p) => p.lastActive ?? "" },
 ];
 
+/** What an empty directory table says: that there are none, that all are deleted, or that none match. */
+function emptyText(total: number, listed: number): string {
+  if (total === 0)
+    return "No directories yet. Temporary and test directories are listed in the sidebar.";
+  if (listed === 0) return "Every directory's folder has been deleted. Choose All to list them.";
+  return "No directory matches.";
+}
+
 export function OverviewPage({
   overview,
   onOpen,
@@ -112,11 +120,7 @@ export function OverviewPage({
           </tbody>
         </table>
         {matching.length === 0 && (
-          <p className="tt-empty">
-            {listed.length === 0
-              ? "No directories yet. Temporary and test directories are listed in the sidebar."
-              : "No directory matches."}
-          </p>
+          <p className="tt-empty">{emptyText(projects.length, listed.length)}</p>
         )}
         <ShowMore
           shown={Math.min(shown, matching.length)}

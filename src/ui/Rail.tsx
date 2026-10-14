@@ -33,9 +33,13 @@ function label(path: string, home: string): string {
   return path === home ? "~ (home)" : tilde(path);
 }
 
-/** What an empty directory list says: that it failed to load, that nothing matches, or that it is empty. */
-function emptyText(failed: boolean, query: string): string {
+/**
+ * What an empty directory list says: that it failed to load, that what there is sits in the folded
+ * groups below, that nothing matches, or that it is empty.
+ */
+function emptyText(failed: boolean, query: string, folded: number): string {
   if (failed) return "ccdesk could not list your directories.";
+  if (folded > 0) return query ? "Only the groups below match." : "Only the groups below.";
   return query ? "No directory matches." : "No other directories yet.";
 }
 
@@ -68,10 +72,12 @@ export function Rail({
   const match = (p: ProjectSummary) => !query || p.path.toLowerCase().includes(query.toLowerCase());
   const launch = projects.find((p) => p.path === overview?.launchDir);
   const listed = projects.filter((p) => p !== launch && match(p));
-  // A deleted folder stays in its list while it is open, so the row you are on never vanishes.
-  const gone = listed.filter((p) => !p.exists && p.path !== current);
-  const regular = listed.filter((p) => !p.ephemeral && !gone.includes(p));
-  const ephemeral = listed.filter((p) => p.ephemeral && !gone.includes(p));
+  const gone = listed.filter((p) => !p.exists);
+  const regular = listed.filter((p) => p.exists && !p.ephemeral);
+  const ephemeral = listed.filter((p) => p.exists && p.ephemeral);
+  // A folded group stays open while it holds the open directory, so the row you are on never hides.
+  const ephemeralOpen = showEphemeral || ephemeral.some((p) => p.path === current);
+  const goneOpen = showGone || gone.some((p) => p.path === current);
 
   const item = (p: ProjectSummary) => (
     <li key={p.path}>
@@ -184,20 +190,22 @@ export function Rail({
         {regular.length > 0 ? (
           <ul className="rail-list">{regular.map(item)}</ul>
         ) : (
-          <p className="rail-empty">{emptyText(overviewFailed, query)}</p>
+          <p className="rail-empty">
+            {emptyText(overviewFailed, query, ephemeral.length + gone.length)}
+          </p>
         )}
         {ephemeral.length > 0 && (
           <>
             <button
               type="button"
               className="rail-group toggle"
-              aria-expanded={showEphemeral}
-              onClick={() => setShowEphemeral(!showEphemeral)}
+              aria-expanded={ephemeralOpen}
+              onClick={() => setShowEphemeral(!ephemeralOpen)}
             >
               <Icon name="chevron" /> Temporary and test dirs{" "}
               <span className="rail-count">{ephemeral.length}</span>
             </button>
-            {showEphemeral && <ul className="rail-list">{ephemeral.map(item)}</ul>}
+            {ephemeralOpen && <ul className="rail-list">{ephemeral.map(item)}</ul>}
           </>
         )}
         {gone.length > 0 && (
@@ -205,13 +213,13 @@ export function Rail({
             <button
               type="button"
               className="rail-group toggle"
-              aria-expanded={showGone}
-              onClick={() => setShowGone(!showGone)}
+              aria-expanded={goneOpen}
+              onClick={() => setShowGone(!goneOpen)}
             >
               <Icon name="chevron" /> Deleted folders{" "}
               <span className="rail-count">{gone.length}</span>
             </button>
-            {showGone && <ul className="rail-list">{gone.map(item)}</ul>}
+            {goneOpen && <ul className="rail-list">{gone.map(item)}</ul>}
           </>
         )}
         {typeof current === "string" && (
