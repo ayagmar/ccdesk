@@ -446,8 +446,7 @@ export function applySkillOverrides(entries: Entry[], overrides: unknown) {
 }
 
 /**
- * Skills from the managed folder, yours, synced ones and the project's, and the one that runs for
- * each name. The same name in two of managed, yours and the project runs the first, in that order
+ * Skills from the managed folder, yours and the project's, and the one that runs for each name. The same name in two of managed, yours and the project runs the first, in that order
  * (docs: skills#resolve-skills-that-share-a-name).
  */
 async function readLocalSkills(
@@ -460,9 +459,6 @@ async function readLocalSkills(
   const skillDirs: [string, Source][] = [
     [join(env.managedDir, ".claude", "skills"), "managed"],
     [join(env.claudeDir, "skills"), "user"],
-    ...(await listDir(join(env.claudeDir, "skills", "synced")))
-      .filter((bucket) => !bucket.startsWith("."))
-      .map((bucket): [string, Source] => [join(env.claudeDir, "skills", "synced", bucket), "user"]),
     ...(await folders("skills")).map((dir): [string, Source] => [dir, "project"]),
   ];
   const skills: Entry[] = [];
@@ -522,6 +518,68 @@ async function readCommands(
   return commands;
 }
 
+/**
+ * A name as Claude Code compares a synced skill's with other commands': without case, spacing or
+ * invisible characters, with compatibility forms such as fullwidth letters and dash variants as
+ * their plain equivalents (docs: skills#when-a-synced-skill-name-matches-another-command).
+ */
+function foldedName(name: string): string {
+  return name
+    .normalize("NFKC")
+    .replace(/[\p{Z}\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]/gu, "")
+    .replace(/[\p{Pd}\u2212]/gu, "-")
+    .toLowerCase();
+}
+
+/**
+ * Skills synced from your claude.ai account. Claude Code downloads each account's into
+ * `synced/<organization>_<account>` and loads only the folder of the account `~/.claude.json` says
+ * you are signed in with (observed in v2.1.296), and none after `syncClaudeAiSkills: false`
+ * (docs: skills#where-synced-skills-load). They take no part in the precedence of your skills.
+ */
+async function readSyncedSkills(input: InventoryInput, locked: boolean): Promise<Entry[]> {
+  const { env, claudeJson, problems } = input;
+  const root = join(env.claudeDir, "skills", "synced");
+  const account = isRecord(claudeJson?.oauthAccount) ? claudeJson.oauthAccount : {};
+  const org = stringField(account, "organizationUuid");
+  const user = stringField(account, "accountUuid");
+  const signedIn = org && user ? `${org}_${user}`.toLowerCase() : null;
+  const setting = input.effective.find((s) => s.key === "syncClaudeAiSkills");
+  // Only false counts: true is the same as unset.
+  const off = [setting?.value, ...(setting?.overridden ?? []).map((o) => o.value)].includes(false);
+  const notLoaded = (bucket: string): string | null => {
+    if (locked) return pluginOnlyNote("skills");
+    if (off) return "syncClaudeAiSkills is false, so Claude Code loads no synced skill";
+    if (!signedIn)
+      return "Claude Code loads synced skills only when you sign in with a claude.ai account";
+    if (bucket !== signedIn)
+      return "Synced for a claude.ai account other than the one you are signed in with";
+    return null;
+  };
+  const skills: Entry[] = [];
+  for (const bucket of await listDir(root)) {
+    if (bucket.startsWith(".")) continue;
+    for (const skill of await readSkills(env, join(root, bucket), "user", { problems })) {
+      skill.synced = true;
+      const skipped = skill.skipped ?? notLoaded(bucket);
+      if (skipped) skill.skipped = skipped;
+      skills.push(skill);
+    }
+  }
+  return skills;
+}
+
+/**
+ * Gives a synced skill its full name, anthropic-skills:<name>, when another skill or command uses
+ * its short name: the other one keeps it (docs: skills#when-a-synced-skill-name-matches-another-command).
+ */
+function nameSyncedSkills(synced: Entry[], others: Entry[]): void {
+  const taken = new Set(others.filter((e) => !e.skipped).map((e) => foldedName(e.name)));
+  for (const skill of synced)
+    if (!skill.skipped && taken.has(foldedName(skill.name)))
+      skill.id = `anthropic-skills:${skill.name}`;
+}
+
 export async function readInventory(input: InventoryInput): Promise<Inventory> {
   const { env, layers, problems } = input;
   const locked = pluginOnlySurfaces(input.managed);
@@ -533,15 +591,18 @@ export async function readInventory(input: InventoryInput): Promise<Inventory> {
   const folders = (sub: string) => projectFolders(env, input, sub);
   const { skills, winners } = await readLocalSkills(env, folders, locked.has("skills"), problems);
   const commands = await readCommands(env, folders, locked.has("skills"), winners, problems);
+  const synced = await readSyncedSkills(input, locked.has("skills"));
+  const fromPluginSkills = fromPlugins.flatMap((p) => p.skills);
+  nameSyncedSkills(synced, [...skills, ...commands, ...fromPluginSkills]);
   const overrides = input.effective.find((s) => s.key === "skillOverrides")?.value;
-  applySkillOverrides([...skills, ...commands], overrides);
+  applySkillOverrides([...skills, ...synced, ...commands], overrides);
 
   return {
     agents: [
       ...(await readAgents(env, folders, locked.has("agents"), problems)),
       ...fromPlugins.flatMap((p) => p.agents),
     ],
-    skills: [...skills, ...fromPlugins.flatMap((p) => p.skills)],
+    skills: [...skills, ...synced, ...fromPluginSkills],
     commands: [...commands, ...fromPlugins.flatMap((p) => p.commands)],
     outputStyles: [
       ...(await readOutputStyles(env, folders, problems)),

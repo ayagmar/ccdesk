@@ -53,7 +53,7 @@ export const extensions = defineSection<R>({
   text: (row) =>
     row.kind === "plugin"
       ? `plugin ${row.item.id}`
-      : `${row.kind} ${row.item.id ?? row.item.name} ${row.item.description}`,
+      : `${row.kind} ${row.item.id ?? row.item.name} ${row.item.synced ? "claude.ai sync " : ""}${row.item.description}`,
   label: (row) =>
     row.kind === "plugin" ? `plugin ${row.item.id}` : `${row.kind} ${row.item.id ?? row.item.name}`,
   heading: (row) => (row.kind === "plugin" ? row.item.id : (row.item.id ?? row.item.name)),

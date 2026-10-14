@@ -258,6 +258,8 @@ export interface Entry {
    * the plugin, as in `my-plugin:review` or the subagent `my-plugin:review:security`.
    */
   id?: string;
+  /** A skill synced from your claude.ai account into `~/.claude/skills/synced`. */
+  synced?: true;
   /** A skill's `when_to_use`, appended to its description in the listing. */
   whenToUse?: string;
   /** A skill's `paths:` globs: Claude loads it on its own only for matching files. */
