@@ -28,6 +28,7 @@ import {
 import { isRecord, parseFrontmatter } from "./data.ts";
 import { ancestorsRootFirst } from "./instructions.ts";
 import { readMcpServers } from "./mcp.ts";
+import { foldedName, isReservedName, isSyncedFolder } from "./names.ts";
 import { hooksWait } from "./permissions.ts";
 import {
   type LoadedPlugin,
@@ -170,11 +171,6 @@ export async function readSkill(
   return entry;
 }
 
-/** Whether a name is in the `anthropic-skills` namespace, which Claude Code keeps for synced skills. */
-function isReservedName(name: string): boolean {
-  return name === "anthropic-skills" || name.startsWith("anthropic-skills:");
-}
-
 const RESERVED_NOTE =
   "Claude Code keeps the name anthropic-skills for skills synced from claude.ai and skips this one";
 
@@ -185,7 +181,7 @@ const RESERVED_NOTE =
  */
 export function reservedSkillNote(skill: Entry): string | null {
   const folder = basename(skill.folder ?? "");
-  if (folder.toLowerCase() === "synced")
+  if (isSyncedFolder(folder))
     return "Claude Code keeps the folder name synced for skills synced from claude.ai and skips this one";
   if (isReservedName(folder) || isReservedName(skill.name)) return RESERVED_NOTE;
   return null;
@@ -523,19 +519,6 @@ async function readCommands(
       else winners.set(command.name, command);
     }
   return commands;
-}
-
-/**
- * A name as Claude Code compares a synced skill's with other commands': without case, spacing or
- * invisible characters, with compatibility forms such as fullwidth letters and dash variants as
- * their plain equivalents (docs: skills#when-a-synced-skill-name-matches-another-command).
- */
-function foldedName(name: string): string {
-  return name
-    .normalize("NFKC")
-    .replace(/[\p{Z}\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]/gu, "")
-    .replace(/[\p{Pd}\u2212]/gu, "-")
-    .toLowerCase();
 }
 
 /**
