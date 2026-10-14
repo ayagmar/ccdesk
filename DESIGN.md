@@ -296,14 +296,14 @@ Both are bundled through `@fontsource-variable`, so the app never depends on a n
 
 ## Layout
 
-The shell is a three-column grid: the directory rail (248px), the main column, and the inspector (440px, growing to 30% of the window up to 600px). The main column scrolls on its own with a 28px gutter and carries, top to bottom, a sticky directory header (the path with the Config / What Claude sees switch, row filter and palette button beside it, then the section index with its 1–9 keys, which drops the key hints and then the counts when the column is narrow so it stays on one line), the route strip (stops with nothing to contribute take half the width), and the timetable sections spaced 26px apart.
+The shell is a three-column grid: the directory rail (248px), the main column, and the inspector (440px, growing to 30% of the window up to 600px). The main column scrolls on its own with a 28px gutter and carries, top to bottom, a sticky directory header (the path with the Config / What Claude sees switch, row filter and palette button beside it, then the section index with its 1–9 keys, which drops the key hints and then the counts when the column is narrow so it stays on one line), the route strip (stops with nothing to contribute take half the width, and no stop gets narrower than its name), and the timetable sections spaced 26px apart.
 
 Timetable rows are exactly one row unit (32px) tall, with 8px cell padding, single-line cells that truncate with an ellipsis, and fixed column widths per table so the bullet, name and file columns land in the same place from section to section. Column heads (26px) stick directly under the sticky directory header, so a section's columns stay labelled while you scroll it. The header is 92px tall; in a main column narrower than 960px the tools move to a row of their own under the path and it grows to 130px, so the path keeps the column's width. The palette's results use the same 32px row.
 
-Responsive behaviour is three window steps, plus column drops keyed to the main column's own width (a container query), since the inspector takes room at any window size. Below 880px of main column, Built-in tools drops its Description column, which the inspector shows.
+Responsive behaviour is three window steps, plus column drops keyed to the main column's own width (a container query), since the inspector takes room at any window size. Below 880px of main column, Built-in tools drops its Description column, which the inspector shows; below 680px the route strip turns vertical.
 - **1181–1400px:** the rail narrows to 220px and the inspector to 360px; the Instructions "Lines" column is dropped because the inspector already shows it.
 - **≤1180px:** the inspector leaves the grid and slides over from the right edge as a drawer when a row is selected; with nothing selected it is hidden.
-- **≤760px:** the rail stacks above the content (capped at 34% of the viewport), gutters shrink to 16px, the palette button is hidden in favour of the keyboard shortcut, the route strip turns vertical with the line running down the left, each table keeps only the columns that answer "is it loaded, and who sees it", and column heads stop sticking because the header height varies.
+- **≤760px:** the rail stacks above the content (capped at 34% of the viewport), gutters shrink to 16px, the palette button is hidden in favour of the keyboard shortcut, each table keeps only the columns that answer "is it loaded, and who sees it", and column heads stop sticking because the header height varies.
 
 ### Named Rules
 **The One Row Rule.** Every list row is 32px. A new list joins this grid; it does not invent a taller card row.
@@ -338,12 +338,12 @@ Icons are a small drawn set on a 16px grid with a 1.5px round-capped stroke in t
 
 ### Route Strip (signature)
 The directory drawn as a line. A 3px ink line runs through a row of equal-width stops, one per scope in load order, under a 2px ink rule and over a hairline.
-- **Stop:** a 22px bullet on a paper node, the scope name (700, 13.5px), and mono facts underneath ("2 files · 3 settings · 1 more" or "nothing here").
+- **Stop:** a 22px bullet on a paper node, the scope name (700, 13.5px), and mono facts underneath ("1 file · 8 settings · 2 hooks", or "not used"). Facts break between each other, never inside one, and stop at two lines with an ellipsis; the stop's tooltip lists them all.
 - **Idle stop:** a scope that contributes nothing gets a hollow bullet (paper fill, coloured letter and ring) and a muted, lighter name.
 - **Unreadable file:** a stop whose settings file ccdesk could not read is not idle, whatever else it contributes: it keeps a solid bullet and carries a warn flag ("1 file can't be read"), so the strip never calls a scope unused while the problems strip above names its broken file.
 - **Lit:** selecting a timetable row rings the bullet of that row's scope.
 - **Filter:** clicking a stop filters the timetable to that scope; the pressed stop gets a sunk background and an underlined name. Clicking it again shows every scope.
-- **Narrow screens:** the strip turns vertical with the line running down the left.
+- **Narrow column:** below 680px of main column (phones, or a small window beside the inspector) the strip turns vertical with the line running down the left, one stop per row with its facts beside the name.
 
 ### Bullets
 A circle with the scope letter, filled with the line colour and lettered in its "on" ink, 22px on the route strip and 20px in tables, the palette and the layer list. A hollow bullet marks a scope that is present but not in force (skipped file, idle stop, losing layer); on the two light lines, Local and Auto memory, its letter is set in ink because the line colour is too pale for an 11px letter on paper. Several bullets in one cell (a setting merged from User and Project) sit 3px apart.
