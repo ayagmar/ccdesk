@@ -155,7 +155,7 @@ function PathTester({ view }: { view: DirectoryView }) {
           className="mono"
           value={file}
           onChange={(e) => setFile(e.target.value)}
-          placeholder="src/api/users.ts"
+          placeholder="e.g. src/api/users.ts"
           spellCheck={false}
         />
         <button type="submit">Check</button>

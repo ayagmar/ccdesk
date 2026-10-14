@@ -45,7 +45,7 @@ export function AgentEditor({ view, agent, onSaved }: Props) {
             id={ids.file}
             className="mono"
             value={file}
-            placeholder="reviewer"
+            placeholder="e.g. reviewer"
             spellCheck={false}
             onChange={(e) => {
               setFile(e.target.value);
