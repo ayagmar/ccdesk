@@ -1,5 +1,15 @@
-import Markdown from "react-markdown";
+import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+
+// A file's own headings sit under the inspector's h2, so they start at h3 and keep their order.
+const HEADINGS: Components = {
+  h1: ({ children }) => <h3>{children}</h3>,
+  h2: ({ children }) => <h4>{children}</h4>,
+  h3: ({ children }) => <h5>{children}</h5>,
+  h4: ({ children }) => <h6>{children}</h6>,
+  h5: ({ children }) => <h6>{children}</h6>,
+  h6: ({ children }) => <h6>{children}</h6>,
+};
 
 /**
  * Markdown as the page renders it. The renderer is most of the page's script, so this module is
@@ -20,8 +30,9 @@ export default function MarkdownText({
   return (
     <Markdown
       remarkPlugins={gfm ? [remarkGfm] : []}
-      components={
-        linksInNewTab
+      components={{
+        ...HEADINGS,
+        ...(linksInNewTab
           ? {
               a: ({ href, children }) => (
                 <a href={href} target="_blank" rel="noreferrer">
@@ -29,8 +40,8 @@ export default function MarkdownText({
                 </a>
               ),
             }
-          : {}
-      }
+          : {}),
+      }}
     >
       {text}
     </Markdown>

@@ -4,7 +4,13 @@ import { LINES, type Line } from "../view/lines.ts";
 export function Bullet({ line, hollow = false }: { line: Line; hollow?: boolean }) {
   const info = LINES.find((l) => l.line === line);
   return (
-    <span className={`bullet bullet-${line}${hollow ? " hollow" : ""}`} title={info?.name}>
+    // An image named for its scope, so a screen reader says "User" rather than the letter "U".
+    <span
+      className={`bullet bullet-${line}${hollow ? " hollow" : ""}`}
+      role="img"
+      aria-label={info?.name}
+      title={info?.name}
+    >
       {info?.letter}
     </span>
   );

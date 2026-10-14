@@ -21,10 +21,16 @@ export interface Actions {
   onChange: (run: () => Promise<Change>, message: string, select?: string | null) => Promise<void>;
 }
 
+/** What a row's NameButton needs: how to select the row, and whether it is the selected one. */
+export interface RowName {
+  onClick: () => void;
+  current: boolean;
+}
+
 /** The page's half of a section: its cells, the notes beside its heading, and its inspector. */
 export interface SectionUi<R extends Row> {
-  /** The row's cells, in column order; the name cell holds the row's button. */
-  cells: (row: R, actions: Actions, select: () => void) => ReactNode;
+  /** The row's cells, in column order; the name cell holds the row's NameButton, given `name`. */
+  cells: (row: R, actions: Actions, name: RowName) => ReactNode;
   /** How a facet value is shown on its button; defaults to the value. */
   renderFacet?: (value: string) => ReactNode;
   /** Notes and buttons beside the section heading. */

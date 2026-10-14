@@ -65,7 +65,10 @@ export function Timetable({
               <p className="tt-empty">{section.empty(actions.view)}</p>
             ) : (
               <>
-                <table className={`tt tt-${section.id} ${section.tableClass?.(all) ?? ""}`}>
+                <table
+                  className={`tt tt-${section.id} ${section.tableClass?.(all) ?? ""}`}
+                  aria-labelledby={`h-${section.id}`}
+                >
                   <SortHeaders
                     columns={section.columns}
                     sort={sort}
@@ -79,7 +82,10 @@ export function Timetable({
                         className={`${row.id === selected ? "selected" : ""}${section.dimmed?.(row) ? " dim" : ""}`}
                         onClick={() => onSelect(row.id)}
                       >
-                        {section.cells(row, actions, () => onSelect(row.id))}
+                        {section.cells(row, actions, {
+                          onClick: () => onSelect(row.id),
+                          current: row.id === selected,
+                        })}
                       </tr>
                     ))}
                   </tbody>

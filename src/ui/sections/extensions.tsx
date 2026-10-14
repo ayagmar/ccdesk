@@ -22,7 +22,7 @@ function notOffered(e: Entry): string | null {
 }
 
 export const extensions: SectionUi<R> = {
-  cells: (row, _actions, select) => {
+  cells: (row, _actions, name) => {
     if (row.kind === "plugin") {
       const p = row.item;
       return (
@@ -32,7 +32,7 @@ export const extensions: SectionUi<R> = {
           </td>
           <td>plugin</td>
           <td className="mono">
-            <NameButton onClick={select}>{p.id}</NameButton>
+            <NameButton {...name}>{p.id}</NameButton>
           </td>
           <td className="desc">
             v{p.version} · {p.note}
@@ -48,7 +48,7 @@ export const extensions: SectionUi<R> = {
         </td>
         <td>{row.kind}</td>
         <td className="mono">
-          <NameButton onClick={select}>{e.id ?? e.name}</NameButton>
+          <NameButton {...name}>{e.id ?? e.name}</NameButton>
           <LinkMark realPath={e.realPath} />
         </td>
         <td className="desc">

@@ -69,14 +69,14 @@ function SetIt({
 }
 
 export const catalog: SectionUi<R> = {
-  cells: (row, { view }, select) => {
+  cells: (row, { view }, name) => {
     const s = row.item;
     const { value } = valueHere(view, s.key);
     return (
       <>
         <td>{row.line && <Bullet line={row.line} />}</td>
         <td className="mono">
-          <NameButton onClick={select}>{s.key}</NameButton>
+          <NameButton {...name}>{s.key}</NameButton>
         </td>
         <td className="desc">{plain(s.summary)}</td>
         <td className="catalog-files">
