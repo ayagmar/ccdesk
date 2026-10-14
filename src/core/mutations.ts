@@ -5,7 +5,7 @@ import { type ScanEnv } from "./scan/env.ts";
 import { isWithin, revisionOf, stringField } from "./scan/files.ts";
 import { parseFrontmatter } from "./scan/data.ts";
 import { shownText } from "./secrets.ts";
-import { deadLinks, indexMentions } from "./scan/memory.ts";
+import { deadLinks, indexMentions, missingLinks, pointsOnlyAt } from "./scan/memory.ts";
 import {
   type Planned,
   RefusedError,
@@ -79,7 +79,10 @@ function indexLines(index: string | null): string[] {
   return lines;
 }
 
-/** Deletes a memory with the MEMORY.md lines that point at it. */
+/**
+ * Deletes a memory with the MEMORY.md lines that point at it. A line that also points at another
+ * memory stays as it is, so the delete never drops a pointer that still works.
+ */
 async function planDelete(env: ScanEnv, path: string): Promise<Plan> {
   const real = await assertMemoryFile(env, path);
   const text = await readIfExists(env, real);
@@ -87,7 +90,7 @@ async function planDelete(env: ScanEnv, path: string): Promise<Plan> {
   const index = await readIfExists(env, indexPath);
   const removedIndexLines: string[] = [];
   const kept = (index ?? "").split("\n").filter((line) => {
-    if (!indexMentions(line, basename(real))) return true;
+    if (!indexMentions(line, basename(real)) || !pointsOnlyAt(line, [basename(real)])) return true;
     removedIndexLines.push(line);
     return false;
   });
@@ -181,16 +184,27 @@ async function planAdd(env: ScanEnv, memoryPath: string): Promise<Plan> {
   return planIndex(env, dirname(real), (lines) => [...lines, line], text);
 }
 
-/** Removes every MEMORY.md line that points at a memory file that no longer exists. */
+/**
+ * Removes every MEMORY.md line that points only at memory files that no longer exist. A line that
+ * also points at a memory that is there stays, to be fixed by hand.
+ */
 async function planRemoveDead(env: ScanEnv, indexPath: string): Promise<Plan> {
   if (basename(indexPath) !== "MEMORY.md")
     throw new RefusedError("Only a memory folder's MEMORY.md can be changed.");
   const store = await assertMemoryDir(env, dirname(indexPath));
   const files = (await readdir(store)).sort();
+  const missing = await missingLinks(
+    store,
+    (await readIfExists(env, await indexPathIn(store))) ?? ""
+  );
   return planIndex(
     env,
     store,
-    (lines) => lines.filter((line) => deadLinks(line, files).length === 0),
+    (lines) =>
+      lines.filter((line) => {
+        const dead = deadLinks(line, missing);
+        return dead.length === 0 || !pointsOnlyAt(line, dead);
+      }),
     files.join("\n")
   );
 }

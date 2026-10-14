@@ -94,15 +94,21 @@ test("upkeep problems are reported: unindexed memory, broken links, index entrie
   const f = makeFixture();
   mkdirSync(f.at("app"));
   const dir = memoryDirFor(f, f.at("app"));
-  f.write(`${dir}/MEMORY.md`, "- [A](a.md) — first\n- [Gone](gone.md) — deleted by hand\n");
   f.write(`${dir}/a.md`, memoryFile("a", "user", "first", "See [[b]] and [[missing]]."));
   f.write(`${dir}/b.md`, memoryFile("b", "reference", "second", "Plain."));
+  // A percent-encoded link names a file that is there.
+  f.write(
+    `${dir}/MEMORY.md`,
+    "- [A](a.md) — first\n- [Gone](gone.md) — deleted by hand\n- [C](my%20c.md)\n"
+  );
+  f.write(`${dir}/my c.md`, memoryFile("c", "user", "third", "Spaces."));
 
   const view = await scanDirectory(f.env, f.at("app"));
   const byName = Object.fromEntries((view.memory?.memories ?? []).map((m) => [m.name, m]));
 
   assert.equal(byName.a?.inIndex, true);
   assert.equal(byName.b?.inIndex, false);
+  assert.equal(byName.c?.inIndex, true);
   assert.deepEqual(byName.a?.brokenLinks, ["missing"]);
   assert.deepEqual(byName.b?.linkedFrom, ["a"]);
   assert.deepEqual(view.memory?.index?.missingFiles, ["gone.md"]);
