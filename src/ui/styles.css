@@ -43,7 +43,8 @@
     "JetBrains Mono Variable", ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas,
     "Liberation Mono", monospace;
   --row: 32px;
-  /* Sticky directory header: 16 + 32 + 8 + 28 + 8. */
+  /* Sticky directory header: 16 + 32 + 8 + 28 + 8. In What Claude sees it is shorter, with nothing
+     sticky under it. */
   --head: 92px;
   --rail: 248px;
   --inspector: clamp(440px, 30vw, 600px);
@@ -220,6 +221,11 @@ kbd {
 /* Until a row is selected, the tables get the inspector's room. */
 .workspace.no-details {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace.seeing .inspector,
+.workspace.seeing .drawer-scrim {
+  display: none;
 }
 
 .work-main {
@@ -1892,8 +1898,20 @@ button:disabled {
   display: none;
 }
 
+/* What Claude sees has no sections, so the header drops their row and keeps the others' heights. */
 .section-index.hidden {
-  visibility: hidden;
+  display: none;
+}
+
+.dir-head:has(> .section-index.hidden) {
+  height: auto;
+  grid-template-rows: 32px;
+}
+
+@container (max-width: 960px) {
+  .dir-head:has(> .section-index.hidden) {
+    grid-template-rows: 32px 30px;
+  }
 }
 
 .context {
@@ -1947,6 +1965,12 @@ button:disabled {
 .bar-memory {
   background: var(--line-memory);
 }
+.bar-plugin {
+  background: var(--line-plugin);
+}
+.bar-mixed {
+  background: var(--muted);
+}
 
 .context-list {
   list-style: none;
@@ -1958,15 +1982,33 @@ button:disabled {
   border-bottom: 1px solid var(--rule);
 }
 
+.context-head,
 .context-list summary {
   display: grid;
   grid-template-columns: 28px 26px minmax(0, 1fr) 84px 64px 64px;
   align-items: center;
   gap: 8px;
-  min-height: var(--row);
   padding: 6px 4px;
+}
+
+.context-list summary {
+  min-height: var(--row);
   cursor: pointer;
   list-style: none;
+}
+
+/* The list's column heads, set as a table's. */
+.context-head {
+  height: 26px;
+  padding-block: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.context-head span:nth-child(n + 4) {
+  text-align: right;
 }
 
 .context-list summary::-webkit-details-marker {
@@ -2219,6 +2261,10 @@ button:disabled {
     padding-top: 18px;
   }
 
+  .dir-head:has(> .section-index.hidden) {
+    grid-template-rows: auto;
+  }
+
   /* The header grows here, so the path wraps whole and the flags wrap under it. */
   .dir-title {
     flex-wrap: wrap;
@@ -2238,10 +2284,13 @@ button:disabled {
     display: none;
   }
 
+  .context-head,
   .context-list summary {
     grid-template-columns: 22px 26px minmax(0, 1fr) 56px;
   }
 
+  .context-head span:nth-child(4),
+  .context-head span:last-child,
   .context-list summary .num:nth-child(4),
   .context-list summary .num:last-child {
     display: none;

@@ -387,7 +387,8 @@ export interface ContextBlock {
     | "not-counted";
   /** A file, or a label for a listing ccdesk assembled. */
   path: string;
-  scope: Scope | "memory" | "plugin";
+  /** Where it comes from; null for Claude Code's own part, or a listing gathered from several places. */
+  scope: Scope | "memory" | "plugin" | null;
   /** For an import: the file that imports it. */
   via?: string;
   /** Null when ccdesk does not show or count this block; `note` says why. */

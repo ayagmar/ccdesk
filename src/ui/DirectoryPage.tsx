@@ -144,7 +144,11 @@ export function DirectoryPage({
   });
 
   return (
-    <div className={`workspace${selectedRow || adding ? "" : " no-details"}`}>
+    // What Claude sees has no rows to inspect, so the inspector is hidden; it stays mounted, keeping
+    // the selection and any draft for when the tables come back.
+    <div
+      className={`workspace${seeing ? " seeing" : ""}${!seeing && (selectedRow || adding) ? "" : " no-details"}`}
+    >
       <div className="work-main">
         <header className="dir-head">
           <DirectoryTitle view={view} />
@@ -372,6 +376,8 @@ function useListKeys({
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target) || e.altKey || e.ctrlKey || e.metaKey) return;
       if (e.key === "Escape") {
+        // The inspector is hidden in What Claude sees; Escape there must not drop what it holds.
+        if (seeing) return;
         setSelected(null);
         setAdding(null);
       } else if (e.key === "/") {
