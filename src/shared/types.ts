@@ -228,6 +228,11 @@ export interface RestorePreview {
   removes?: boolean;
   /** Why this backup cannot be restored right now. */
   blocked?: string;
+  /**
+   * The folder the restore creates again because it no longer exists, such as a deleted project
+   * folder: the outermost one missing above the file.
+   */
+  createsFolder?: string;
   /** For a deleted memory: the lines put back into MEMORY.md. */
   indexLines?: string[];
   /**

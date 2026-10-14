@@ -238,6 +238,12 @@ function RestoreReview({
         </p>
       ) : (
         <>
+          {preview.createsFolder && (
+            <p className="flag warn">
+              {tilde(preview.createsFolder)} no longer exists; restoring creates it again with only
+              this file.
+            </p>
+          )}
           <p className="muted small">{restoreHint(preview)}</p>
           <DiffView before={preview.before ?? ""} after={preview.after} />
         </>

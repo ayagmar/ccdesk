@@ -44,6 +44,7 @@ interface RestorePreview {
   revision: string;
   removes?: boolean;
   blocked?: string;
+  createsFolder?: string;
   indexLines?: string[];
   undoCommands?: string[];
 }
@@ -754,6 +755,7 @@ test("a saved settings change shows up in recent changes and can be restored aft
   const preview = await call("/api/backups/preview", { method: "POST", body: { id: backup?.id } });
   const shown = preview.json as RestorePreview;
   assert.equal(JSON.parse(shown.after).model, "sonnet");
+  assert.equal(shown.createsFolder, undefined);
   assert.doesNotMatch(JSON.stringify(shown), /s3cret/, "a restore preview hides secrets too");
 
   const restored = await call("/api/backups/restore", {
@@ -767,6 +769,21 @@ test("a saved settings change shows up in recent changes and can be restored aft
   });
   // The opus version is backed up before the restore, so the restore can be undone too.
   assert.equal((await backups()).filter((b) => b.target === file).length, 2);
+});
+
+test("restoring a file of a deleted folder says the restore creates the folder again", async () => {
+  // Catches a restore of a deleted worktree's settings looking like any other new file, then
+  // leaving behind a folder holding only that file.
+  const dir = fixture.at("work/deleted");
+  const file = fixture.json("work/deleted/.claude/settings.json", { model: "sonnet" });
+  await saveSetting({ dir, scope: "project", key: "model", value: "opus" });
+  const backup = (await backups()).find((b) => b.target === file);
+  rmSync(dir, { recursive: true });
+
+  const shown = (await call("/api/backups/preview", { method: "POST", body: { id: backup?.id } }))
+    .json as RestorePreview;
+
+  assert.equal(shown.createsFolder, dir);
 });
 
 test("a restore is refused when the file changed after it was reviewed", async () => {
