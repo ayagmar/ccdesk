@@ -383,14 +383,15 @@ test("a change a watcher reports without naming the file wakes a page waiting fo
   assert.equal((await waiting).changed, true);
 });
 
-test("each folder is watched once, however many of the files ccdesk reads are in it", async () => {
+test("each folder is watched once for each kind of watch, however many files ccdesk reads in it", async () => {
   const f = makeFixture();
   f.write("work/team/app/README.md", "x");
+  f.write("work/team/app/.claude/rules/api.md", "API\n");
   const watched: string[] = [];
   const host: WatchHost = {
     platform: "linux",
-    watch: ((path: string) => {
-      watched.push(path);
+    watch: ((path: string, options: { recursive: boolean }) => {
+      watched.push(`${options.recursive ? "recursive" : "plain"} ${path}`);
       const fake = Object.assign(new EventEmitter(), { close: () => undefined });
       return fake as unknown as FSWatcher;
     }) as typeof watch,
@@ -398,13 +399,21 @@ test("each folder is watched once, however many of the files ccdesk reads are in
   const watcher = new Watcher(f.env, scanDirectory, host);
   watchers.push(watcher);
 
-  // No folder on the way up has a .claude, so each one stands in for several missing targets.
+  // No folder above the project has a .claude, so each one stands in for several missing targets.
+  await watcher.scan(f.at("work/team/app"));
   await started(watcher, f.at("work/team/app"));
 
   assert.deepEqual(
-    watched.filter((path, i) => watched.indexOf(path) !== i),
+    watched.filter((entry, i) => watched.indexOf(entry) !== i),
     []
   );
+  // The rule file read is watched plainly beside the recursive watch of its folder: on Linux the
+  // recursive watch can lose track of a file that an editor saves by renaming over it.
+  const rules = f.at("work/team/app/.claude/rules");
+  assert.deepEqual(watched.filter((entry) => entry.endsWith(` ${rules}`)).sort(), [
+    `plain ${rules}`,
+    `recursive ${rules}`,
+  ]);
 });
 
 test("closing the watcher does not tell a subscriber something changed", async () => {

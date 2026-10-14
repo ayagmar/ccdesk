@@ -176,27 +176,25 @@ async function nearestWatchable(target: Target): Promise<Target> {
 }
 
 /**
- * One target per folder. Several missing files and folders can stand in for the same folder that
- * exists, and each watch costs a handle on Windows and a path in the macOS stream. A folder watched
- * for every entry, or recursively, covers the narrower watches beside it.
+ * One target per folder and kind. Several missing files and folders can stand in for the same
+ * folder that exists, and each watch costs a handle on Windows and a path in the macOS stream. A
+ * plain watch is kept beside a recursive one: on Linux, Node's recursive watch can lose track of a
+ * file after an editor saves it by renaming over it, and the plain watch still reports it.
  */
 function oncePerFolder(list: Target[]): Target[] {
-  const byPath = new Map<string, Target>();
+  const byKind = new Map<string, Target>();
   for (const target of list) {
-    const known = byPath.get(target.path);
+    const key = `${target.recursive}:${target.path}`;
+    const known = byKind.get(key);
     if (!known) {
-      byPath.set(target.path, target);
+      byKind.set(key, target);
       continue;
     }
     const names =
       known.names && target.names ? [...new Set([...known.names, ...target.names])] : undefined;
-    byPath.set(target.path, {
-      path: target.path,
-      recursive: known.recursive || target.recursive,
-      ...(names && { names }),
-    });
+    byKind.set(key, { path: target.path, recursive: target.recursive, ...(names && { names }) });
   }
-  return [...byPath.values()];
+  return [...byKind.values()];
 }
 
 interface Subscription {
