@@ -210,7 +210,7 @@ function PageContent({
   onProfile: (profile: SessionProfile) => void;
   onCompare: (from: string) => void;
 }) {
-  const { view, data, reload, retry } = config;
+  const { view, data, reload, retry, watching } = config;
   if (config.overview.state === "error")
     return (
       <Problem
@@ -275,6 +275,7 @@ function PageContent({
       jump={jump}
       onJumped={onJumped}
       reload={reload}
+      watching={watching}
       onToast={onToast}
       onOpenDirectory={onOpenDirectory}
       onOpenPalette={onOpenPalette}

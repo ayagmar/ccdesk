@@ -131,9 +131,12 @@ export const api = {
     request<SettingsEditPreview>("/api/hooks/preview", { method: "POST", body: edit }),
   saveHook: (edit: HookEdit, revision: string) =>
     request<Change>("/api/hooks/save", { method: "POST", body: { ...edit, revision } }),
-  /** Waits up to 25 seconds for a config file that affects `dir` to change after `since`. */
+  /**
+   * Waits up to 25 seconds for a config file that affects `dir` to change after `since`. While
+   * some cannot be watched, it answers at once with `watching` false.
+   */
   watch: (dir: string, since: number, signal: AbortSignal) =>
-    request<{ changed: boolean; at: number }>(
+    request<{ changed: boolean; at: number; watching: boolean }>(
       `/api/watch?dir=${encodeURIComponent(dir)}&since=${since}`,
       undefined,
       signal

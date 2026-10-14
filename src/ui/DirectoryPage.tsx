@@ -29,6 +29,8 @@ interface Props {
   /** Called once a jump is handled, so a later visit to this page does not repeat it. */
   onJumped: () => void;
   reload: () => void;
+  /** Whether every config file here is watched, so the page updates when one changes. */
+  watching: boolean;
   onToast: (toast: ToastMessage) => void;
   onOpenDirectory: (path: string) => void;
   onOpenPalette: () => void;
@@ -55,6 +57,7 @@ export function DirectoryPage({
   jump,
   onJumped,
   reload,
+  watching,
   onToast,
   onOpenDirectory,
   onOpenPalette,
@@ -156,6 +159,7 @@ export function DirectoryPage({
         </header>
         <SessionSwitch profile={view.profile} onProfile={onProfile} />
         <Problems problems={view.problems} />
+        {!watching && <NotWatching />}
         <UnreadManagedSources view={view} />
         <ManagedRepairs view={view} />
         {seeing ? (
@@ -537,6 +541,19 @@ function ManagedRepairs({ view }: { view: DirectoryView }) {
           </ul>
         </li>
       </ul>
+    </section>
+  );
+}
+
+/** Says the page may miss a change, while ccdesk cannot watch every config file here. */
+function NotWatching() {
+  return (
+    <section className="problems" role="status" aria-label="Live updates">
+      <Icon name="warn" />
+      <p>
+        ccdesk is not watching every config file here, so this page may not update when one changes.
+        It reads them again when you come back to this tab.
+      </p>
     </section>
   );
 }

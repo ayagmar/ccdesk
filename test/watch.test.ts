@@ -493,25 +493,40 @@ test("the path tester scans again after ~/.claude.json changes, which is not wat
   assert.equal(counter.scans, 2);
 });
 
-test("the path tester does not reuse a scan while a folder it read cannot be watched", async () => {
-  const f = makeFixture();
-  f.write("app/.claude/rules/api.md", "---\npaths: src/api/**\n---\nAPI\n");
-  // As when the system runs out of watches: the project's rules folder cannot be watched.
-  const host: WatchHost = {
+/** A host on which `folder` cannot be watched, as when the system runs out of watches. */
+function cannotWatch(folder: string): WatchHost {
+  return {
     platform: process.platform,
     watch: ((path: string, options?: { recursive?: boolean }, listener?: WatchListener<string>) => {
-      if (path === f.at("app/.claude/rules"))
-        throw Object.assign(new Error(`ENOSPC: System limit for number of file watchers reached`), {
+      if (path === folder)
+        throw Object.assign(new Error("ENOSPC: System limit for number of file watchers reached"), {
           code: "ENOSPC",
         });
       return listener ? watch(path, options ?? {}, listener) : watch(path);
     }) as typeof watch,
   };
-  const { pathTest } = await countingWatcher(f, host);
+}
+
+test("the path tester does not reuse a scan while a folder it read cannot be watched", async () => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/api.md", "---\npaths: src/api/**\n---\nAPI\n");
+  const { pathTest } = await countingWatcher(f, cannotWatch(f.at("app/.claude/rules")));
   await pathTest();
 
   f.write("app/.claude/rules/web.md", "---\npaths: src/**\n---\nWeb\n");
   const result = await pathTest();
 
   assert.ok(result.matches.some((m) => m.path.endsWith("web.md")));
+});
+
+test("while a folder cannot be watched, a waiting page hears at once that live updates are off", async () => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/api.md", "API\n");
+  const watcher = new Watcher(f.env, scanDirectory, cannotWatch(f.at("app/.claude/rules")));
+  watchers.push(watcher);
+
+  const answer = await watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+
+  assert.equal(answer.watching, false);
+  assert.equal(answer.changed, false);
 });

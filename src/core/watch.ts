@@ -308,20 +308,21 @@ export class Watcher {
 
   /**
    * Answers once something changed after `since` (ms since the epoch), or after `timeoutMs` with
-   * the last change time, whichever comes first.
+   * the last change time, whichever comes first. While some files cannot be watched, it answers at
+   * once with `watching` false, since a change to them would never end the wait.
    */
   async wait(
     dir: string,
     since: number,
     signal: AbortSignal,
     timeoutMs = WAIT_MS
-  ): Promise<{ changed: boolean; at: number }> {
+  ): Promise<{ changed: boolean; at: number; watching: boolean }> {
     const subscription = await this.watching(dir);
     clearTimeout(subscription.idle);
     // Closed while its watchers were starting: there is nothing left to wait on.
     const closed = this.subscriptions.get(dir) !== subscription;
     try {
-      if (!closed && subscription.changedAt <= since && !signal.aborted)
+      if (!closed && subscription.complete && subscription.changedAt <= since && !signal.aborted)
         await new Promise<void>((resolve) => {
           const done = () => {
             clearTimeout(timer);
@@ -336,7 +337,11 @@ export class Watcher {
     } finally {
       this.release(dir, subscription);
     }
-    return { changed: subscription.changedAt > since, at: subscription.changedAt };
+    return {
+      changed: subscription.changedAt > since,
+      at: subscription.changedAt,
+      watching: subscription.complete,
+    };
   }
 
   /**
@@ -500,7 +505,10 @@ export class Watcher {
         );
         watcher.on("error", () => {
           watcher.close();
-          if (subscription.watchers.includes(watcher)) subscription.complete = false;
+          if (!subscription.watchers.includes(watcher)) return;
+          subscription.complete = false;
+          // A page waiting for a change hears that this folder is no longer watched.
+          for (const wake of [...subscription.waiters]) wake();
         });
         subscription.watchers.push(watcher);
         started.push(target.path);
