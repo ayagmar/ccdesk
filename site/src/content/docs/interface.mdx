@@ -15,7 +15,7 @@ The switch under the page header picks the kind of session the page describes. *
 
 Allow rules and extra folders from `.claude/settings.json`, or from a local file tracked in git, still wait until you trust the folder in an interactive session. The choice is kept in the address as `profile=print`, so a reload or a shared link keeps it.
 
-A directory that no longer exists is struck through in the rail. Its page starts by saying the folder no longer exists and whether its auto memory is still saved. The tables show what still applies from your user and managed files, and the editors offer only your user files, since writing the folder's project or local files would create it again. A local MCP server of that folder cannot be changed from ccdesk, because Claude Code changes one from inside its folder.
+A directory that no longer exists is struck through and kept in the rail's **Deleted folders** group, folded until you open it. All directories leaves it out until you switch its table from **On disk** to **All**. Its page starts by saying the folder no longer exists and whether its auto memory is still saved. The tables show what still applies from your user and managed files, and the editors offer only your user files, since writing the folder's project or local files would create it again. A local MCP server of that folder cannot be changed from ccdesk, because Claude Code changes one from inside its folder.
 
 Claude Code keeps a store for every directory it ran in, under `~/.claude/projects`, with the sessions and auto memory, and it never removes one. **Forget this directory…** on that notice, or **Forget…** on a row marked *folder gone* in All directories, clears one away. The review lists the store folder, its sessions, memories and size. Forgetting moves the store into ccdesk's backup folder, then opens All directories, where the directory is no longer listed; [Recent changes](../recent-changes/#forgotten-directories) can move it back. The directory ccdesk was started in cannot be forgotten, and neither can one whose folder exists again when you press the button. Claude Code names a store after its directory with every character but letters and digits turned into a dash, so `my.app` and `my-app` share one; ccdesk refuses to forget a store that another directory still on disk uses, including a repository whose auto memory is kept there because Claude Code ran in one of its subfolders. It also refuses when it cannot tell whether the folder exists, such as behind a folder you cannot open. A folder on a drive that is not connected looks gone, so connect the drive instead. The review warns when a session was written there in the last few minutes, since a Claude Code still running in the deleted folder would start a new store with its next message.
 
@@ -94,13 +94,13 @@ Everywhere:
 | <kbd>↑</kbd> / <kbd>↓</kbd>, <kbd>Enter</kbd> | Move through palette results and open one |
 | <kbd>Esc</kbd> | Close the palette |
 
-The single-key shortcuts do nothing while you are typing in a field. In What Claude sees, <kbd>j</kbd>, <kbd>k</kbd> and the number keys are off, and <kbd>/</kbd> switches back to Config first.
+The single-key shortcuts do nothing while you are typing in a field. In What Claude sees, <kbd>j</kbd>, <kbd>k</kbd> and the number keys are off, <kbd>/</kbd> switches back to Config first, and <kbd>Esc</kbd> goes back to Config.
 
 ## Theme and text size
 
 ccdesk follows your system's light or dark setting. The sun button at the top of the rail switches theme, and ccdesk remembers your choice in that browser.
 
-The panel button beside it hides the rail, leaving a strip with the same button to bring it back, so a page with wide tables gets the room. Each group of directories in the rail folds on its own heading too, and a search in the rail shows its matches whether or not the list is folded. ccdesk remembers both.
+On a wide window, the panel button beside it hides the rail, leaving a strip with the same button to bring it back, so a page with wide tables gets the room. Each group of directories in the rail folds on its own heading too, and a search in the rail shows its matches whether or not the list is folded. ccdesk remembers both.
 
 The three A buttons beside it make the whole page smaller (90%), the default size, or larger (115%). ccdesk remembers that choice in the browser too.
 
