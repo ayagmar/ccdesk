@@ -48,6 +48,14 @@
   --head: 92px;
   --rail: 248px;
   --inspector: clamp(440px, 30vw, 600px);
+  /* The type scale. Every font size is one of these steps; body text is --text-lg. */
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 15px;
+  --text-xl: 19px;
+  --text-2xl: 22px;
   color-scheme: light;
 }
 
@@ -133,7 +141,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font: 15px / 1.45 var(--sans);
+  font: var(--text-lg) / 1.45 var(--sans);
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
@@ -168,7 +176,7 @@ code,
 pre,
 kbd {
   font-family: var(--mono);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 
 kbd {
@@ -176,7 +184,7 @@ kbd {
   border-bottom-width: 2px;
   border-radius: 4px;
   padding: 0 5px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted);
   background: var(--panel);
 }
@@ -186,7 +194,7 @@ kbd {
 }
 
 .small {
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 
 .icon {
@@ -253,7 +261,7 @@ kbd {
   gap: 8px;
   padding: 2px 6px 14px;
   font-weight: 700;
-  font-size: 16px;
+  font-size: var(--text-lg);
   letter-spacing: -0.01em;
 }
 
@@ -291,11 +299,11 @@ kbd {
 }
 
 .brand .text-size button.smaller {
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 
 .brand .text-size button.larger {
-  font-size: 15px;
+  font-size: var(--text-lg);
 }
 
 /* The text size control scales the whole page, layout included, so fixed heights never clip. */
@@ -309,7 +317,7 @@ html[data-text-size="larger"] #root {
 
 .rail-group {
   margin: 14px 6px 4px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--muted);
   display: flex;
@@ -345,7 +353,7 @@ html[data-text-size="larger"] #root {
   border-radius: 6px;
   background: none;
   text-align: left;
-  font-size: 14.5px;
+  font-size: var(--text-md);
 }
 
 .rail-item:hover {
@@ -372,7 +380,7 @@ html[data-text-size="larger"] #root {
 
 .rail-count {
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
@@ -463,7 +471,7 @@ input::placeholder {
 /* The end of a path names the directory, so a long one loses its start. */
 .dir-title h1 {
   margin: 0;
-  font-size: 19px;
+  font-size: var(--text-xl);
   font-weight: 700;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -502,7 +510,7 @@ input::placeholder {
   gap: 8px;
   margin: 4px 0 12px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .section-index {
@@ -522,7 +530,7 @@ input::placeholder {
   border-radius: 6px;
   color: var(--ink-2);
   text-decoration: none;
-  font-size: 14px;
+  font-size: var(--text-md);
   white-space: nowrap;
 }
 
@@ -560,13 +568,13 @@ input::placeholder {
 @container (max-width: 680px) {
   .section-index a {
     padding: 0 3px;
-    font-size: 12.5px;
+    font-size: var(--text-xs);
   }
 }
 
 .seg-count {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
@@ -619,7 +627,7 @@ input::placeholder {
   border: 1px solid var(--rule);
   border-radius: 6px;
   background: var(--panel);
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .palette-button:hover {
@@ -698,14 +706,14 @@ input::placeholder {
 
 .stop-name {
   font-weight: 700;
-  font-size: 14.5px;
+  font-size: var(--text-md);
   white-space: nowrap;
 }
 
 /* Facts break between each other, never inside one, and stop at two lines; the title has them all. */
 .stop-facts {
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: var(--text-xs);
   color: var(--muted);
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -777,7 +785,7 @@ input::placeholder {
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  font: 700 11.5px / 1 var(--sans);
+  font: 700 var(--text-2xs) / 1 var(--sans);
   flex-shrink: 0;
   background: var(--bullet);
   color: var(--bullet-ink);
@@ -830,7 +838,6 @@ input::placeholder {
 .change-store .bullet {
   width: 20px;
   height: 20px;
-  font-size: 10.5px;
 }
 
 /* ---------- timetable ---------- */
@@ -850,14 +857,14 @@ input::placeholder {
 
 .tt-head h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--text-lg);
   font-weight: 700;
   letter-spacing: -0.005em;
 }
 
 .tt-count {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
@@ -881,7 +888,7 @@ input::placeholder {
   z-index: 1;
   background: var(--paper);
   text-align: left;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--muted);
   height: 26px;
@@ -929,7 +936,7 @@ input::placeholder {
 .tt td.num {
   text-align: right;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 .tt td.num.used {
@@ -1144,7 +1151,7 @@ input::placeholder {
   gap: 4px;
   margin-right: 10px;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .beaten s {
@@ -1152,7 +1159,7 @@ input::placeholder {
 }
 
 .status {
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 
@@ -1167,7 +1174,7 @@ input::placeholder {
 }
 
 .vis {
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 
 .vis-tracked {
@@ -1186,7 +1193,7 @@ input::placeholder {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 /* Memory types are told apart by shape in ink, so colour keeps meaning scope lines only. */
@@ -1222,7 +1229,7 @@ input::placeholder {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12.5px;
+  font-size: var(--text-xs);
   line-height: 18px;
   padding: 0 6px;
   border-radius: 4px;
@@ -1293,7 +1300,7 @@ input::placeholder {
   background: var(--panel);
   padding: 0 9px;
   height: 24px;
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 
 .segmented button:last-child {
@@ -1319,7 +1326,7 @@ input::placeholder {
 
 .segmented.small button {
   height: 22px;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 /* ---------- inspector ---------- */
@@ -1345,7 +1352,7 @@ input::placeholder {
 
 .insp-head h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--text-lg);
   font-weight: 700;
   flex: 1;
   min-width: 0;
@@ -1383,7 +1390,7 @@ input::placeholder {
   grid-template-columns: 104px minmax(0, 1fr);
   gap: 6px 12px;
   margin: 0 0 16px;
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .fields dt {
@@ -1409,7 +1416,7 @@ input::placeholder {
 
 .copied {
   flex-basis: 100%;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--ok);
 }
 
@@ -1447,7 +1454,7 @@ input::placeholder {
 .sub h3,
 .sub-title {
   margin: 0 0 6px;
-  font-size: 14px;
+  font-size: var(--text-md);
   font-weight: 700;
 }
 
@@ -1508,7 +1515,7 @@ input::placeholder {
   align-items: center;
   padding: 8px 0;
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 pre.raw {
@@ -1523,14 +1530,14 @@ pre.raw {
 }
 
 .prose {
-  font-size: 14.5px;
+  font-size: var(--text-md);
   line-height: 1.6;
   max-width: 68ch;
   overflow-wrap: anywhere;
 }
 
 .prose :is(h3, h4, h5, h6) {
-  font-size: 14px;
+  font-size: var(--text-md);
   margin: 18px 0 6px;
 }
 
@@ -1603,7 +1610,7 @@ pre.raw {
   height: 30px;
   padding: 0 10px;
   color: var(--bad);
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .quiet-danger:hover {
@@ -1619,7 +1626,7 @@ pre.raw {
 
 .confirm p {
   margin: 0 0 10px;
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .confirm-buttons {
@@ -1633,7 +1640,7 @@ pre.raw {
   border-radius: 6px;
   border: 1px solid var(--rule);
   background: var(--panel);
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .confirm-buttons button.danger {
@@ -1664,7 +1671,7 @@ button:disabled {
 
 .page-head h1 {
   margin: 0 0 4px;
-  font-size: 22px;
+  font-size: var(--text-2xl);
   letter-spacing: -0.015em;
 }
 
@@ -1744,7 +1751,7 @@ button:disabled {
 
 .palette-why,
 .palette-note {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
@@ -1763,7 +1770,7 @@ button:disabled {
 .palette-what {
   flex: none;
   margin-left: auto;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
@@ -1824,7 +1831,7 @@ button:disabled {
   padding: 8px 8px 8px 14px;
   box-shadow: 0 12px 32px -10px rgb(0 0 0 / 0.4);
   animation: rise 220ms cubic-bezier(0.16, 1, 0.3, 1);
-  font-size: 14.5px;
+  font-size: var(--text-md);
 }
 
 .toast button {
@@ -1880,7 +1887,7 @@ button:disabled {
 }
 
 .problem h1 {
-  font-size: 15px;
+  font-size: var(--text-lg);
   font-weight: 700;
   margin: 0;
 }
@@ -1902,12 +1909,12 @@ button:disabled {
 .tt-note {
   order: 1;
   flex-basis: 100%;
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
 .perm {
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 .perm-allow {
@@ -1977,7 +1984,7 @@ button:disabled {
 
 .context-summary {
   margin: 0 0 4px;
-  font-size: 15px;
+  font-size: var(--text-lg);
 }
 
 .context > .muted {
@@ -2056,7 +2063,7 @@ button:disabled {
 .context-head {
   height: 26px;
   padding-block: 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--muted);
   border-bottom: 1px solid var(--rule-strong);
@@ -2076,7 +2083,7 @@ button:disabled {
 
 .context-list summary .num {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--text-sm);
   text-align: right;
   color: var(--ink-2);
 }
@@ -2119,7 +2126,7 @@ button:disabled {
   flex-wrap: wrap;
   gap: 6px 24px;
   margin: 0 0 4px;
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 
 /* The files sit beside their label, and drop under it when even the longest file name would not fit. */
@@ -2165,7 +2172,7 @@ button:disabled {
   border-radius: 6px;
   background: var(--warn-bg);
   color: var(--warn);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 
 .problems .problem-path {
@@ -2260,7 +2267,7 @@ button:disabled {
     border: 1px solid var(--rule);
     border-radius: 6px;
     background: var(--panel);
-    font-size: 14px;
+    font-size: var(--text-md);
     font-weight: 400;
     letter-spacing: 0;
     text-align: left;
@@ -2444,7 +2451,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: 6px;
   background: var(--panel);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 
 .head-action:hover {
@@ -2467,7 +2474,7 @@ button:disabled {
 
 .hint {
   color: var(--ink-2);
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .editor .segmented {
@@ -2478,7 +2485,7 @@ button:disabled {
 .field {
   display: grid;
   gap: 4px;
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
@@ -2492,7 +2499,7 @@ button:disabled {
   background: var(--paper);
   color: var(--ink);
   padding: 6px 8px;
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .field input:not([type="checkbox"]),
@@ -2554,7 +2561,7 @@ fieldset.field {
   align-items: center;
   gap: 8px;
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .check input {
@@ -2577,7 +2584,7 @@ fieldset.field {
   border-radius: 6px;
   border: 1px solid var(--rule);
   background: var(--panel);
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .editor-buttons button:hover,
@@ -2616,7 +2623,7 @@ fieldset.field {
   padding: 6px 8px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 
 .key-results [role="option"] .muted {
@@ -2657,7 +2664,7 @@ fieldset.field {
   border: 1px solid var(--rule);
   border-radius: 4px;
   background: var(--panel);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .suggestions button[aria-pressed="true"] {
@@ -2680,7 +2687,7 @@ fieldset.field {
   border-radius: 6px;
   background: var(--panel);
   color: var(--ink);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 
 .catalog-files {
@@ -2770,7 +2777,7 @@ pre.diff span {
 
 .rail-empty {
   margin: 2px 8px;
-  font-size: 14px;
+  font-size: var(--text-md);
   color: var(--muted);
 }
 
@@ -2780,7 +2787,7 @@ pre.diff span {
   padding: 24px 0 0;
   display: grid;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
@@ -2814,7 +2821,7 @@ pre.diff span {
 
 .sort-mark {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--text-xs);
   opacity: 0;
   transition: opacity 120ms;
 }
@@ -2834,7 +2841,7 @@ pre.diff span {
   border-bottom: 1px solid var(--rule);
   background: none;
   text-align: left;
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 
@@ -2850,7 +2857,7 @@ pre.diff span {
 /* ---------- built-in tools ---------- */
 
 .tool-outcome {
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 
 .tool-denied {
@@ -2911,7 +2918,7 @@ pre.diff span {
 
 .cmp-from {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .cmp-from > * + * {
@@ -2929,7 +2936,7 @@ pre.diff span {
   margin: 0 0 4px;
   padding-top: 8px;
   border-top: 2px solid var(--rule-strong);
-  font-size: 14px;
+  font-size: var(--text-md);
   font-weight: 700;
 }
 
@@ -2955,7 +2962,7 @@ pre.diff span {
   grid-template-areas: "what file when action";
   gap: 6px 12px;
   align-items: baseline;
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .change-what {
@@ -2971,7 +2978,7 @@ pre.diff span {
 }
 
 .change-file .muted {
-  font-size: 12.5px;
+  font-size: var(--text-xs);
 }
 
 /*
@@ -2979,7 +2986,7 @@ pre.diff span {
  * the opened change. Inline, so a long directory wraps under the words rather than squeezing them.
  */
 .change-store {
-  font-size: 12.5px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
@@ -3044,7 +3051,7 @@ pre.diff span {
 .path-matches {
   display: grid;
   gap: 6px;
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 
 .path-matches li {

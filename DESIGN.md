@@ -67,33 +67,33 @@ typography:
     letterSpacing: "-0.005em"
   body:
     fontFamily: "Hanken Grotesk Variable, Helvetica Neue, Helvetica, Arial, sans-serif"
-    fontSize: "14px"
+    fontSize: "15px"
     fontWeight: 400
     lineHeight: 1.45
     fontFeature: "tnum"
   prose:
     fontFamily: "Hanken Grotesk Variable, Helvetica Neue, Helvetica, Arial, sans-serif"
-    fontSize: "13.5px"
+    fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.6
   label:
     fontFamily: "Hanken Grotesk Variable, Helvetica Neue, Helvetica, Arial, sans-serif"
-    fontSize: "12px"
+    fontSize: "13px"
     fontWeight: 600
     lineHeight: 1.45
   mono:
     fontFamily: "JetBrains Mono Variable, ui-monospace, Menlo, Consolas, monospace"
-    fontSize: "12.5px"
+    fontSize: "13px"
     fontWeight: 400
     lineHeight: 1.45
   mono-count:
     fontFamily: "JetBrains Mono Variable, ui-monospace, Menlo, Consolas, monospace"
-    fontSize: "11.5px"
+    fontSize: "12px"
     fontWeight: 400
     lineHeight: 1.45
   bullet:
     fontFamily: "Hanken Grotesk Variable, Helvetica Neue, Helvetica, Arial, sans-serif"
-    fontSize: "11.5px"
+    fontSize: "11px"
     fontWeight: 700
     lineHeight: 1
 rounded:
@@ -283,14 +283,16 @@ Both are bundled through `@fontsource-variable`, so the app never depends on a n
 **Character:** a plain, workhorse grotesk that behaves like timetable print, paired with a monospace that keeps paths, keys and numbers aligned to the character. Tabular numerals are on for the whole document.
 
 ### Hierarchy
+Every size is a step of one scale, kept as tokens in `styles.css`: `--text-2xs` 11px, `--text-xs` 12px, `--text-sm` 13px, `--text-md` 14px, `--text-lg` 15px, `--text-xl` 19px and `--text-2xl` 22px. A new style picks a step; it does not add a size between them.
+
 - **Display** (700, 22px, -0.015em): page titles on full pages such as All directories.
 - **Headline** (mono 700, 19px, -0.01em): the current directory path at the top of the workspace. The path is the title, so it is set in mono. Its end names the directory, so a path too long for its row loses its start ("…/services/billing-worker"), with the whole path in its tooltip; the flags beside it never shrink, and the path keeps at least 16 characters. The one flag that names a path, "inside" the repository root, gives way only once the path is down to those 16 characters. On phones it wraps instead.
-- **Title** (700, 15px; 16px in the inspector head; 13px for inspector sub-heads): timetable section names (Instructions, Settings, Permissions, Memory, Hooks, MCP servers, Agents, skills & plugins, All settings) and the selected item's name.
-- **Body** (400, 14px, 1.45): interface text, timetable cells, the "why" column.
-- **Prose** (400, 13.5px, 1.6, max 68ch): rendered markdown of instruction and memory files in the inspector; headings inside it stay at 14px so a file's own h1 never outshouts the interface, and they are rendered two levels down (a file's h1 is an h3 under the inspector's h2) so the page outline keeps one h1.
-- **Label** (600, 12px, muted): column heads and rail group names, in sentence case.
-- **Mono** (12.5px): file paths, setting keys and values, hook commands, raw file contents. **Mono count** (11.5–12px, muted): section counts, rail counts, stop facts, line counts, relative times.
-- **Bullet** (700, 11.5px; 10.5px at table size): the scope letter inside a route bullet.
+- **Title** (700, 15px, also in the inspector head; 14px for inspector sub-heads): timetable section names (Instructions, Settings, Permissions, Memory, Hooks, MCP servers, Agents, skills & plugins, All settings) and the selected item's name.
+- **Body** (400, 15px, 1.45): interface text, timetable cells, the "why" column.
+- **Prose** (400, 14px, 1.6, max 68ch): rendered markdown of instruction and memory files in the inspector; headings inside it stay at 14px so a file's own h1 never outshouts the interface, and they are rendered two levels down (a file's h1 is an h3 under the inspector's h2) so the page outline keeps one h1.
+- **Label** (600, 13px, muted): column heads and rail group names, in sentence case.
+- **Mono** (13px): file paths, setting keys and values, hook commands, raw file contents. **Mono count** (12–13px, muted): section counts, rail counts, stop facts, line counts, relative times.
+- **Bullet** (700, 11px at both sizes): the scope letter inside a route bullet.
 
 ### Named Rules
 **The Character Grid Rule.** Anything a user might compare across rows, a path, key, value, count or time, is set in mono with tabular figures so it lines up column by column.
@@ -341,7 +343,7 @@ Icons are a small drawn set on a 16px grid with a 1.5px round-capped stroke in t
 
 ### Route Strip (signature)
 The directory drawn as a line. A 3px ink line runs through a row of equal-width stops, one per scope in load order, under a 2px ink rule and over a hairline.
-- **Stop:** a 22px bullet on a paper node, the scope name (700, 13.5px), and mono facts underneath ("1 file · 8 settings · 2 hooks", or "not used"). Facts break between each other, never inside one, and stop at two lines with an ellipsis; the stop's tooltip lists them all.
+- **Stop:** a 22px bullet on a paper node, the scope name (700, 14px), and mono facts underneath ("1 file · 8 settings · 2 hooks", or "not used"). Facts break between each other, never inside one, and stop at two lines with an ellipsis; the stop's tooltip lists them all.
 - **Idle stop:** a scope that contributes nothing gets a hollow bullet (paper fill, coloured letter and ring) and a muted, lighter name.
 - **Unreadable file:** a stop whose settings file ccdesk could not read is not idle, whatever else it contributes: it keeps a solid bullet and carries a warn flag ("1 file can't be read"), so the strip never calls a scope unused while the problems strip above names its broken file.
 - **Lit:** selecting a timetable row rings the bullet of that row's scope.
@@ -387,7 +389,7 @@ A panel-white column with a sticky head (bullet, item name, close) closed by a 2
 Editing happens inside the inspector. A segmented control picks the target layer by bullet, the file path is shown in mono, and the field matches the setting's schema type: text, number, select, checkbox, one entry per line in a textarea that does not wrap, a toggle button per value for lists the schema limits, or an indented group with a labelled field per property for objects, each property's description cut to its first sentence with the rest behind a disclosure. Anything else is a JSON textarea with a muted line saying what shape it takes, and an "Edit as JSON" / "Edit in form" button switches between the two. An `autoMode` list without `"$defaults"`, empty ones included, gets a warning flag that names `claude auto-mode defaults`, under its field with a "Keep built-in entries" button in the form, or under the textarea in JSON. "Review change" shows a unified diff in a sunk mono well: additions tinted green, removals tinted red and struck through, unchanged context muted and long unchanged runs collapsed into an italic "… n unchanged lines". Save and Cancel follow the diff, with a muted note that the old file is backed up first.
 
 ### Buttons
-- **Shape:** gently rounded (6px), 30px tall, 13px text.
+- **Shape:** gently rounded (6px), 30px tall, 14px text (13px for head actions).
 - **Primary:** ink fill, paper text, 600 weight. One per action group (Review change, Save).
 - **Secondary:** panel fill, hairline border; the border darkens to second ink on hover.
 - **Danger:** fault red fill, used only inside the delete confirmation. **Quiet danger:** panel fill, hairline border, fault red text and icon; the border turns red on hover.
@@ -397,14 +399,14 @@ Editing happens inside the inspector. A segmented control picks the target layer
 ### Inputs / Fields
 - **Style:** paper fill, control line border, 6px radius, 30px (filters) or 32px (editor fields) tall. Filter boxes carry a leading search icon and a trailing keycap hint.
 - **Focus:** filter boxes turn their border focus-blue; editor fields get a 2px focus outline. Everything else uses the global 2px focus-visible outline offset by 2px. Inside anything that scrolls sideways (segmented controls, the section index) the ring is drawn 2px inside the option instead, because the scroll box would clip it; on a pressed option a 1px paper line separates the ring from the ink fill.
-- **Keycaps:** mono 11px, hairline border with a 2px bottom edge, 4px radius.
+- **Keycaps:** mono 12px, hairline border with a 2px bottom edge, 4px radius.
 
 ### Chips and Segmented Controls
-- **Flags:** 18px tall, 4px radius, 11.5px text with an optional 13px icon; neutral (sunk), warning (amber) or fault (red).
+- **Flags:** 18px tall, 4px radius, 12px text with an optional 13px icon; neutral (sunk), warning (amber) or fault (red).
 - **Segmented control:** joined options with control line dividers and border and a 6px outer radius; the pressed option fills with ink. Used for memory-type filters (with the type shapes), Read/Raw, and layer choice (with bullets).
 
 ### Navigation
-- **Rail:** panel white with a hairline right edge. The brand mark is Murmeli's badge at 26px beside "ccdesk" in 700. "All directories" and "Recent changes" sit under it as icon links. Groups ("Opened from", "Used with Claude") are 12px muted labels. Items are 30px, 13.5px, with a mono count on the right; hover in hover paper; the current directory is inverted (ink fill, paper text); a directory that no longer exists is struck through.
+- **Rail:** panel white with a hairline right edge. The brand mark is Murmeli's badge at 26px beside "ccdesk" in 700. "All directories" and "Recent changes" sit under it as icon links. Groups ("Opened from", "Used with Claude") are 13px muted labels. Items are 30px, 14px, with a mono count on the right; hover in hover paper; the current directory is inverted (ink fill, paper text); a directory that no longer exists is struck through.
 - **Command palette:** opened with Ctrl/⌘K over a paper scrim, 640px wide with a 46px input and 32px result rows, each led by a bullet; the active option is selection cream. It rises 6px into place over 180ms.
 - **Keyboard:** j/k move between rows and move focus with them, / focuses the row filter, Ctrl/⌘K opens the palette.
 
