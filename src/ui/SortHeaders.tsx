@@ -1,4 +1,5 @@
 import { type Column } from "../view/sections/types.ts";
+import { Icon } from "./Icon.tsx";
 import { type Sort } from "./url.ts";
 
 /** Ascending, then descending, then back to the list's own order. */
@@ -11,8 +12,9 @@ function ariaSort(sort: Sort): "ascending" | "descending" {
   return sort.descending ? "descending" : "ascending";
 }
 
-function sortMark(sort: Sort): string {
-  return sort.descending ? "↓" : "↑";
+function sortMark(sort: Sort | undefined, column: number) {
+  if (sort?.column !== column) return "sort";
+  return sort.descending ? "sort-down" : "sort-up";
 }
 
 /** A table's column heads; a sortable one is a button that cycles its order. */
@@ -44,7 +46,7 @@ export function SortHeaders<R>({
                 >
                   {column.label || <span className="visually-hidden">Scope</span>}
                   <span className={`sort-mark${on ? " on" : ""}`} aria-hidden="true">
-                    {on ? sortMark(sort) : "↕"}
+                    <Icon name={sortMark(sort, index)} />
                   </span>
                 </button>
               ) : (
