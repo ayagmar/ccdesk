@@ -2209,6 +2209,17 @@ test("a new agent goes in the project's agents folder, and a deleted one can be 
   assert.equal(readFileSync(path, "utf8"), agentText("reviewer", "Be kind."));
 });
 
+test("a project agent for a folder that no longer exists is refused, and the folder stays gone", async () => {
+  const dir = fixture.at("work/agents-gone");
+  const res = await saveAgent({
+    dir,
+    create: { scope: "project", file: "reviewer" },
+    text: agentText("reviewer", "Be strict."),
+  });
+  assertRefused(res, 409, /is not a directory on this machine/);
+  assert.equal(existsSync(dir), false);
+});
+
 test("a new agent's file name may be typed with .md, and gets only one", async () => {
   const dir = fixture.at("work/agents-md");
   fixture.write("work/agents-md/README.md", "x");
