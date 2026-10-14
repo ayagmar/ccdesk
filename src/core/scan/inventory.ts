@@ -224,10 +224,10 @@ async function pluginEntries(env: ScanEnv, loaded: LoadedPlugin, problems: Probl
       separator,
     });
   const skills = await pluginSkills(env, loaded, problems);
-  const commands = [
-    ...(await listed("commands", "commands", ":")),
-    ...(await manifestCommands(env, loaded, problems)),
-  ];
+  // A commands map replaces the default folder as a path does (docs: plugins-reference#how-each-key-combines-with-its-default-location).
+  const commands = isRecord(loaded.manifest.commands)
+    ? await manifestCommands(env, loaded, problems)
+    : await listed("commands", "commands", ":");
   // A plugin's skills and commands are called as plugin-name:name; a name that already has the
   // prefix keeps it once (docs: skills#how-a-skill-gets-its-command-name).
   for (const entry of [...skills, ...commands])
