@@ -1,11 +1,12 @@
 import { stat } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { storeDirName } from "../../shared/memory.ts";
 import { type MemoryStore, type ProjectSummary } from "../../shared/types.ts";
 import { type ScanEnv } from "./env.ts";
 import { isDir, listDir, openUnlessCredentials } from "./files.ts";
 import { isRecord } from "./data.ts";
+import { canonicalRoot } from "./git.ts";
 import { readMemoryStore } from "./memory.ts";
 
 interface KnownProject extends ProjectSummary {
@@ -26,6 +27,19 @@ export async function listProjects(
     (key) => (env.platform === "win32" ? key.replaceAll("/", "\\") : key)
   );
 
+  const add = async (path: string, storeDir: string, sessions: Transcript[]) => {
+    const store = await readMemoryStore(env, join(storeDir, "memory"), path);
+    byPath.set(path, {
+      path,
+      store,
+      exists: await isDir(path),
+      sessions: sessions.length,
+      lastActive: sessions[0] ? new Date(sessions[0].mtime).toISOString() : null,
+      memories: store?.memories.length ?? 0,
+      ephemeral: isEphemeral(env, path),
+    });
+  };
+  const unnamed: Array<{ name: string; storeDir: string; sessions: Transcript[] }> = [];
   for (const name of await listDir(storesRoot)) {
     const storeDir = join(storesRoot, name);
     if (!(await isDir(storeDir))) continue;
@@ -37,18 +51,19 @@ export async function listProjects(
       knownPaths.find((p) => storeDirName(p) === name) ??
       (await sessionCwd(env, storeDir, sessions)) ??
       null;
-    if (!path) continue;
-    const store = await readMemoryStore(env, join(storeDir, "memory"), path);
-    byPath.set(path, {
-      path,
-      store,
-      exists: await isDir(path),
-      sessions: sessions.length,
-      lastActive: sessions[0] ? new Date(sessions[0].mtime).toISOString() : null,
-      memories: store?.memories.length ?? 0,
-      ephemeral: isEphemeral(env, path),
-    });
+    if (path) await add(path, storeDir, sessions);
+    else unnamed.push({ name, storeDir, sessions });
   }
+  const byName = storeNames([...knownPaths, ...byPath.keys(), resolve(launchDir)]);
+  const claims = await Promise.all(
+    unnamed.map(async (store) => {
+      const match = byName.get(store.name);
+      if (!match || byPath.has(match.path)) return null;
+      return (await usesStore(match, store.name, store.storeDir)) ? { ...store, ...match } : null;
+    })
+  );
+  for (const claim of claims)
+    if (claim && !byPath.has(claim.path)) await add(claim.path, claim.storeDir, claim.sessions);
   for (const path of [...knownPaths, resolve(launchDir)]) {
     if (byPath.has(path)) continue;
     byPath.set(path, {
@@ -62,6 +77,42 @@ export async function listProjects(
     });
   }
   return [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/**
+ * Auto memory is named after the repository root, so a repository where Claude Code only ran in
+ * subfolders has a store with no sessions and no entry of its own. Such a store goes to the known
+ * directory, or the nearest ancestor of one, that gives its name (see `usesStore`). A name can come from more than
+ * one path (a/b and a-b both give "a-b"); Claude Code then uses one store for both, and ccdesk
+ * lists it under the nearer one, else the first by path.
+ */
+function storeNames(known: string[]): Map<string, { path: string; depth: number }> {
+  const byName = new Map<string, { path: string; depth: number }>();
+  for (const path of known) {
+    for (let d = path, depth = 0; ; d = dirname(d), depth++) {
+      const name = storeDirName(d);
+      const seen = byName.get(name);
+      if (!seen || depth < seen.depth || (depth === seen.depth && d.localeCompare(seen.path) < 0))
+        byName.set(name, { path: d, depth });
+      if (dirname(d) === d) break;
+    }
+  }
+  return byName;
+}
+
+/**
+ * Whether a store matched by name is the one Claude Code uses at `match.path` and holds memory. An
+ * ancestor's store can be a leftover, such as one from before `git init` at a parent folder, which
+ * Claude Code no longer uses there; its page would show another store. A store without a memory
+ * folder adds only an empty row.
+ */
+async function usesStore(
+  match: { path: string; depth: number },
+  name: string,
+  storeDir: string
+): Promise<boolean> {
+  if (!(await isDir(join(storeDir, "memory")))) return false;
+  return storeDirName(await canonicalRoot(match.path)) === name;
 }
 
 function isEphemeral(env: ScanEnv, path: string): boolean {

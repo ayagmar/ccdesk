@@ -175,3 +175,111 @@ test("a project path over 200 characters gets the store name Claude Code gives i
   assert.equal(storeDirName(deep), `-home-dev-${"monorepo-packages-".repeat(10)}service-wi-9nhroh`);
   assert.equal(storeDirName("/home/dev/app"), "-home-dev-app");
 });
+
+test("a repository's memory store shows under the repository when Claude Code only ran in a subfolder of it", async () => {
+  const f = makeFixture();
+  const repo = f.at("repo");
+  const api = f.at("repo/services/api");
+  mkdirSync(api, { recursive: true });
+  // Sessions are kept under the folder Claude Code ran in; memory under the repository root.
+  f.write(
+    join(f.env.claudeDir, "projects", storeDirName(api), "one.jsonl"),
+    `${JSON.stringify({ type: "user", cwd: api })}\n`
+  );
+  const review = memoryFile("review", "feedback", "how to review", "Use a fresh reviewer.");
+  f.write(`${memoryDirFor(f, repo)}/review.md`, review);
+  f.write(`${memoryDirFor(f, "/work/other")}/review.md`, review);
+  f.json("home/.claude.json", { projects: { "/work/other": {} } });
+
+  const overview = await scanOverview(f.env, f.at("home"));
+
+  const row = overview.projects.find((p) => p.path === repo);
+  assert.deepEqual(row && { exists: row.exists, sessions: row.sessions, memories: row.memories }, {
+    exists: true,
+    sessions: 0,
+    memories: 1,
+  });
+  assert.deepEqual(
+    overview.memoryCatalog.filter((m) => m.projectPath === repo).map((m) => m.name),
+    ["review"]
+  );
+  assert.deepEqual(
+    overview.sharedMemories.map((s) => s.stores.map((store) => store.projectPath).sort()),
+    [[repo, "/work/other"].sort()]
+  );
+});
+
+test("a store named like the launch directory goes to it, not to a parent of another directory with the same store name", async () => {
+  const f = makeFixture();
+  // a/b and a-b/c's parent a-b both give the store name ...-a-b.
+  const launch = f.at("a/b");
+  mkdirSync(launch, { recursive: true });
+  f.json("home/.claude.json", { projects: { [f.at("a-b/c")]: {} } });
+  f.write(`${memoryDirFor(f, launch)}/note.md`, memoryFile("note", "user", "d", "b"));
+
+  const overview = await scanOverview(f.env, launch);
+
+  assert.deepEqual(
+    overview.memoryCatalog.map((m) => m.projectPath),
+    [launch]
+  );
+  assert.equal(
+    overview.projects.find((p) => p.path === f.at("a-b")),
+    undefined
+  );
+});
+
+test("a leftover store named after a subfolder of a repository is not listed under that subfolder", async () => {
+  const f = makeFixture();
+  const api = f.at("repo/services/api");
+  mkdirSync(api, { recursive: true });
+  f.git("repo", "init", "-q");
+  f.json("home/.claude.json", { projects: { [api]: {} } });
+  // Left from before `git init` at the root: Claude Code in repo/services now uses repo's store.
+  f.write(`${memoryDirFor(f, f.at("repo/services"))}/old.md`, memoryFile("old", "user", "d", "b"));
+  f.write(`${memoryDirFor(f, f.at("repo"))}/new.md`, memoryFile("new", "user", "d", "b"));
+
+  const overview = await scanOverview(f.env, f.at("home"));
+
+  assert.deepEqual(
+    overview.memoryCatalog.map((m) => [m.projectPath, m.name]),
+    [[f.at("repo"), "new"]]
+  );
+  assert.equal(
+    overview.projects.find((p) => p.path === f.at("repo/services")),
+    undefined
+  );
+});
+
+test("a leftover store named after the launch directory inside a repository is not its memory", async () => {
+  // Catches the launch directory taking a store Claude Code no longer uses there: All directories
+  // and the palette would list a memory its page does not show.
+  const f = makeFixture();
+  const services = f.at("repo/services");
+  mkdirSync(services, { recursive: true });
+  f.git("repo", "init", "-q");
+  f.write(`${memoryDirFor(f, services)}/old.md`, memoryFile("old", "user", "d", "b"));
+
+  const overview = await scanOverview(f.env, services);
+
+  assert.deepEqual(overview.memoryCatalog, []);
+  assert.equal(overview.projects.find((p) => p.path === services)?.memories, 0);
+});
+
+test("a store without memory adds no row for a parent folder", async () => {
+  const f = makeFixture();
+  const app = f.at("src/app");
+  mkdirSync(app, { recursive: true });
+  f.json("home/.claude.json", { projects: { [app]: {} } });
+  // What a cleanup of old transcripts leaves: a session folder and no memory.
+  mkdirSync(join(f.env.claudeDir, "projects", storeDirName(f.at("src")), "session-1"), {
+    recursive: true,
+  });
+
+  const overview = await scanOverview(f.env, f.at("home"));
+
+  assert.equal(
+    overview.projects.find((p) => p.path === f.at("src")),
+    undefined
+  );
+});
