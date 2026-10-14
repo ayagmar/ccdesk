@@ -1565,6 +1565,9 @@ test("a synced skill never takes a name from your skills or commands; it runs as
   // Names compare ignoring case and compatibility forms (docs: skills#when-a-synced-skill-name-matches-another-command).
   f.write(`${bucket}/Commit/SKILL.md`, skill("Ｃommit", "synced commit"));
   f.write(`${bucket}/pdf/SKILL.md`, skill("pdf", "synced pdf"));
+  // A renamed skill is still invoked by its folder's name (docs: skills#how-a-skill-gets-its-command-name).
+  f.write("home/.claude/skills/ship/SKILL.md", skill("release", "my release"));
+  f.write(`${bucket}/ship/SKILL.md`, skill("ship", "synced ship"));
 
   const view = await scanDirectory(f.env, f.at("app"));
 
@@ -1579,6 +1582,7 @@ test("a synced skill never takes a name from your skills or commands; it runs as
       ["anthropic-skills:Ｃommit", null],
       ["anthropic-skills:deploy", null],
       ["pdf", null],
+      ["anthropic-skills:ship", null],
     ]
   );
   const listing = view.context.find((b) => b.kind === "skills")?.text ?? "";

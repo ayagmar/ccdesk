@@ -564,10 +564,26 @@ async function readSyncedSkills(input: InventoryInput, locked: boolean): Promise
  * its short name: the other one keeps it (docs: skills#when-a-synced-skill-name-matches-another-command).
  */
 function nameSyncedSkills(synced: Entry[], others: Entry[]): void {
-  const taken = new Set(others.filter((e) => !e.skipped).map((e) => foldedName(e.name)));
+  const taken = new Set(
+    others
+      .filter((e) => !e.skipped)
+      .flatMap(invocationNames)
+      .map(foldedName)
+  );
   for (const skill of synced)
     if (!skill.skipped && taken.has(foldedName(skill.name)))
       skill.id = `anthropic-skills:${skill.name}`;
+}
+
+/**
+ * The names that invoke an entry: its name and full id, and for your or the project's skill its
+ * folder's name too, which still invokes it after frontmatter renames it (docs:
+ * skills#how-a-skill-gets-its-command-name).
+ */
+function invocationNames(entry: Entry): string[] {
+  const names = [entry.name, entry.id ?? entry.name];
+  if (entry.scope !== "plugin" && entry.folder) names.push(basename(entry.folder));
+  return names;
 }
 
 export async function readInventory(input: InventoryInput): Promise<Inventory> {
