@@ -10,6 +10,7 @@ import {
 import { type ScanEnv } from "./env.ts";
 import { isWithin, listDir, readJsonOrReport, resolvedPath, stringField } from "./files.ts";
 import { isRecord } from "./data.ts";
+import { isSyncedFolder } from "./names.ts";
 
 function manifestPath(plugin: Plugin): string {
   return join(plugin.installPath, ".claude-plugin", "plugin.json");
@@ -264,7 +265,7 @@ async function skillsDirFolders(
   for (const { dir, scope } of folders)
     for (const folder of await listDir(dir)) {
       // The folder synced skills live in, and hidden folders, are never plugins (observed in v2.1.296).
-      if (folder.startsWith(".") || folder.toLowerCase() === "synced") continue;
+      if (folder.startsWith(".") || isSyncedFolder(folder)) continue;
       const installPath = join(dir, folder);
       const manifestFile = join(installPath, ".claude-plugin", "plugin.json");
       const manifest = await readJsonOrReport(env, manifestFile, problems);

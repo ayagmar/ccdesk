@@ -254,6 +254,11 @@ test("a subfolder's skills load on demand, whatever their paths, only when Claud
   );
   // Reserved names do not load here either (docs: skills#where-skills-live).
   f.write("app/src/.claude/skills/SYNCED/SKILL.md", "---\nname: s\ndescription: s\n---\n");
+  f.write("app/src/.claude/skills/synced./SKILL.md", "---\nname: d\ndescription: d\n---\n");
+  f.write(
+    "app/src/.claude/skills/tool/SKILL.md",
+    "---\nname: Anthropic-Skills:tool\ndescription: t\n---\n"
+  );
   f.write(
     "app/src/.claude/skills/pdf/SKILL.md",
     "---\nname: anthropic-skills:pdf\ndescription: p\n---\n"

@@ -1513,6 +1513,12 @@ test("skill folders named synced in any case, and skills and commands named anth
   f.write("app/.claude/skills/anthropic-skills/SKILL.md", skill("helper", "reserved folder"));
   f.write("app/.claude/skills/pdf/SKILL.md", skill("anthropic-skills:pdf", "reserved name"));
   f.write("app/.claude/skills/deploy/SKILL.md", skill("deploy", "kept"));
+  // Claude Code compares without case, and drops trailing dots and spaces from a folder name.
+  f.write("home/.claude/skills/Synced./SKILL.md", skill("dotted", "personal Synced."));
+  f.json("home/.claude/skills/Synced./.claude-plugin/plugin.json", { name: "dotted" });
+  f.write("home/.claude/skills/synced /SKILL.md", skill("spaced", "personal synced space"));
+  f.write("app/.claude/skills/tool/SKILL.md", skill("Anthropic-Skills:Tool", "reserved name"));
+  f.write("app/.claude/commands/Anthropic-Skills.md", "---\ndescription: reserved command\n---\n");
   f.write("app/.claude/commands/anthropic-skills.md", "---\ndescription: reserved command\n---\n");
   f.write("app/.claude/commands/anthropic-skills/x.md", "---\ndescription: reserved folder\n---\n");
   f.write("app/.claude/commands/ship.md", "---\ndescription: ship it\n---\n");
@@ -1530,8 +1536,12 @@ test("skill folders named synced in any case, and skills and commands named anth
     "anthropic-skills:anthropic-skills",
     "deploy",
   ]);
-  assert.equal(view.inventory.skills.filter((s) => s.skipped).length, 4);
+  assert.equal(view.inventory.skills.filter((s) => s.skipped).length, 7);
   assert.deepEqual(loaded(view.inventory.commands), ["ship"]);
+  assert.deepEqual(
+    view.inventory.plugins.map((p) => p.id),
+    ["anthropic-skills@market"]
+  );
   const listing = view.context.find((b) => b.kind === "skills")?.text ?? "";
   assert.doesNotMatch(listing, /synced|Synced|reserved/);
 });
