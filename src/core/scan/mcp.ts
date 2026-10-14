@@ -15,11 +15,13 @@ import { readJsonOrReport, stringField, stringsIn, wildcard } from "./files.ts";
 import { isRecord } from "./data.ts";
 import { claudeJsonKey } from "./git.ts";
 import {
+  fromRepository,
   type LoadedPlugin,
   manifestConfigs,
   pluginNamespace,
   pluginOnlyNote,
   pluginOnlySurfaces,
+  pluginsRoot,
 } from "./plugins.ts";
 import { hooksWait } from "./permissions.ts";
 import { unredactedData } from "./settings.ts";
@@ -277,6 +279,9 @@ export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Pro
   const policy = policyOf(layers, environments);
   const disabledHere = stringsIn(project.disabledMcpServers);
   const answersFor = approvalAnswers(input, project);
+  const repository = new Set(
+    plugins.filter((p) => fromRepository(p.plugin)).map((p) => p.plugin.id)
+  );
 
   const byName = new Map<string, Defined>();
   const enabledEndpoints = new Map<string, Defined>();
@@ -304,7 +309,8 @@ export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Pro
     if (blocked) set(server, "blocked", blocked);
     else if (disabledHere.includes(server.name))
       set(server, "disabled", "Turned off for this project in /mcp");
-    else if (server.scope === "project") approve(server, answersFor(server.name), profile);
+    else if (server.scope === "project" || repository.has(server.plugin ?? ""))
+      approve(server, answersFor(server.name), profile);
     if (server.status === "active" || server.status === "pending")
       enabledEndpoints.set(endpoint(d), d);
   }
@@ -371,7 +377,7 @@ async function pluginServers(
     // The path placeholders a plugin's servers may use (docs: plugins-reference#environment-variables).
     const placeholders = {
       CLAUDE_PLUGIN_ROOT: plugin.installPath,
-      CLAUDE_PLUGIN_DATA: join(env.claudeDir, "plugins", "data", plugin.id.replace(/[^\w-]/g, "-")),
+      CLAUDE_PLUGIN_DATA: join(pluginsRoot(env), "data", plugin.id.replace(/[^\w-]/g, "-")),
     };
     // Claude Code registers each under plugin:<plugin>:<key>, the name policy entries and /mcp use
     // (docs: mcp#plugin-provided-mcp-servers).
@@ -578,7 +584,7 @@ function approve(server: McpServer, answers: McpApproval[], profile: SessionProf
   // claude -p connects them without asking, approved or not (docs: permissions#what-runs-before-you-trust-a-folder).
   if (profile === "print") {
     server.note =
-      "Not approved, but claude -p connects .mcp.json servers without asking; the SDK does when settingSources includes project";
+      "Not approved, but claude -p connects the repository's servers without asking; the SDK does when settingSources includes project";
     return;
   }
   set(
@@ -586,6 +592,6 @@ function approve(server: McpServer, answers: McpApproval[], profile: SessionProf
     "pending",
     waiting
       ? `Claude Code asks before starting it: ${waiting.key} in ${answerSource(waiting)} counts once you trust this folder`
-      : "Claude Code asks before starting servers from .mcp.json: answer its prompt, or list the server in enabledMcpjsonServers in your user settings"
+      : "Claude Code asks before starting servers from the repository: answer its prompt, or list the server in enabledMcpjsonServers in your user settings"
   );
 }

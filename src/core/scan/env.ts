@@ -34,6 +34,8 @@ export interface ScanEnv {
    * accepts the name: one store for every project's memory and transcripts.
    */
   projectDirName?: string | undefined;
+  /** CLAUDE_CODE_PLUGIN_CACHE_DIR: the plugins root, in place of `<claudeDir>/plugins` (see pluginsRoot). */
+  pluginsDir?: string | undefined;
 }
 
 /** `configDirFlag`, from `--config-dir`, stands in for CLAUDE_CONFIG_DIR and wins over it. */
@@ -58,6 +60,7 @@ export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
     processEnv,
     disableAutoMemory: processEnv.CLAUDE_CODE_DISABLE_AUTO_MEMORY,
     projectDirName: configDir ? projectDirName(processEnv.CLAUDE_CODE_PROJECT_DIR_NAME) : undefined,
+    pluginsDir: pluginsDir(processEnv.CLAUDE_CODE_PLUGIN_CACHE_DIR, home),
   };
 }
 
@@ -69,6 +72,12 @@ export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
 function projectDirName(name: string | undefined): string | undefined {
   if (!name || !/^[A-Za-z0-9_-]{1,64}$/.test(name)) return undefined;
   return /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])$/i.test(name) ? undefined : name;
+}
+
+/** CLAUDE_CODE_PLUGIN_CACHE_DIR as Claude Code reads it: a leading ~ is your home folder (observed in v2.1.296). */
+function pluginsDir(value: string | undefined, home: string): string | undefined {
+  if (!value) return undefined;
+  return value === "~" || /^~[/\\]/.test(value) ? join(home, value.slice(1)) : resolve(value);
 }
 
 /** Your configuration home: your home directory, or the folder whose .claude is CLAUDE_CONFIG_DIR. */

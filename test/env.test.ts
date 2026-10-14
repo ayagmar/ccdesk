@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { scanEnvFromProcess } from "../src/core/index.ts";
@@ -59,5 +60,18 @@ test("CLAUDE_CODE_PROJECT_DIR_NAME counts only beside CLAUDE_CONFIG_DIR, and onl
   } finally {
     delete process.env.CLAUDE_CONFIG_DIR;
     delete process.env.CLAUDE_CODE_PROJECT_DIR_NAME;
+  }
+});
+
+test("CLAUDE_CODE_PLUGIN_CACHE_DIR names the plugins root, with ~ standing for the home folder", () => {
+  try {
+    process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR = join("~", "plugin-root");
+    assert.equal(scanEnvFromProcess().pluginsDir, join(homedir(), "plugin-root"));
+    process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR = "plugin-root";
+    assert.equal(scanEnvFromProcess().pluginsDir, resolve("plugin-root"));
+    delete process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR;
+    assert.equal(scanEnvFromProcess().pluginsDir, undefined);
+  } finally {
+    delete process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR;
   }
 });

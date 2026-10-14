@@ -30,7 +30,8 @@ export const extensions = defineSection<R>({
       ),
       ...inv.plugins.map(
         (item): R => ({
-          id: `plug:${item.id}`,
+          // Two skills-dir copies can share an id, so the folder tells them apart.
+          id: `plug:${item.id}:${item.installPath}`,
           section: "extensions",
           line: "plugin",
           item,

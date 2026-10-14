@@ -250,9 +250,15 @@ async function pluginSkills(
   const root = loaded.plugin.installPath;
   const options = { plugin: loaded.plugin.id, problems };
   // `skills` adds to the default folder; the other keys replace theirs (docs: plugins-reference).
+  // A skills-dir plugin's own SKILL.md is a skill of its skills folder, never one of the plugin's
+  // (observed in v2.1.296).
+  const inPlace = loaded.plugin.id.endsWith("@skills-dir");
   const extraSkills = await manifestPaths(loaded, "skills");
-  const skillDirs = [join(root, "skills"), ...(extraSkills ?? [])];
-  const rootSkill = extraSkills === null && !(await isDir(join(root, "skills")));
+  const skillDirs = [
+    join(root, "skills"),
+    ...(extraSkills ?? []).filter((dir) => !(inPlace && dir === root)),
+  ];
+  const rootSkill = !inPlace && extraSkills === null && !(await isDir(join(root, "skills")));
   const skills: Entry[] = [];
   if (rootSkill)
     for (const skill of await readSkills(env, root, "plugin", options)) {
