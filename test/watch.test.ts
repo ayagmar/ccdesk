@@ -114,6 +114,20 @@ test("~/.claude.json replaced by renaming a new file over it, as Claude Code sav
   assert.equal(await changed, true);
 });
 
+test("a linked ~/.claude.json, written through its link, wakes a page", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "one\n");
+  const real = f.json("dotfiles/claude.json", { projects: {} });
+  f.link(f.env.claudeJson, real);
+  const watcher = watcherFor(f);
+  await settled(watcher, f.at("app"));
+
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
+  f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
+
+  assert.equal(await changed, true);
+});
+
 test("editing a project's CLAUDE.md wakes a page waiting for changes", async () => {
   const f = makeFixture();
   f.write("app/CLAUDE.md", "one\n");
