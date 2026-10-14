@@ -13,7 +13,7 @@ import {
 import { type AddressInfo } from "node:net";
 import { join } from "node:path";
 import { after, before, beforeEach, test } from "node:test";
-import { createCore, RefusedError, revisionOf } from "../src/core/index.ts";
+import { createCore, RefusedError, revisionOf, Watcher } from "../src/core/index.ts";
 import { createCcdeskServer } from "../src/server/server.ts";
 import { type Usage } from "../src/shared/types.ts";
 import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
@@ -191,6 +191,111 @@ async function saveSetting(edit: Record<string, unknown>) {
 test("API calls without the session token are refused", async () => {
   const res = await call("/api/overview", { headers: { "x-ccdesk-token": "wrong" } });
   assertRefused(res, 401, /Missing or wrong token/);
+});
+
+/**
+ * Opens the page's event stream for `dir`: `next()` gives the next event, or fails after 5 s, and
+ * `close()` closes the stream as a page does when it leaves the directory.
+ */
+async function openEvents(dir: string) {
+  const { request } = await import("node:http");
+  const url = new URL(`/api/events?dir=${encodeURIComponent(dir)}`, base);
+  return new Promise<{
+    type: string | undefined;
+    next: () => Promise<{ event: string; data: unknown }>;
+    close: () => void;
+  }>((resolve, reject) => {
+    const req = request(url, { headers: { "x-ccdesk-token": TOKEN } }, (res) => {
+      const events: Array<{ event: string; data: unknown }> = [];
+      let text = "";
+      let arrived = () => {
+        // Replaced while a test waits for an event.
+      };
+      res.setEncoding("utf8");
+      res.on("data", (chunk: string) => {
+        text += chunk;
+        const blocks = text.split("\n\n");
+        text = blocks.pop() ?? "";
+        for (const block of blocks) {
+          const field = (name: string) =>
+            block
+              .split("\n")
+              .find((line) => line.startsWith(`${name}: `))
+              ?.slice(name.length + 2);
+          const event = field("event");
+          if (event) events.push({ event, data: JSON.parse(field("data") ?? "null") });
+        }
+        arrived();
+      });
+      const next = async () => {
+        const deadline = Date.now() + 5000;
+        while (events.length === 0) {
+          if (Date.now() > deadline) throw new Error("no event within 5 s");
+          await new Promise<void>((done) => {
+            arrived = done;
+            setTimeout(done, 100);
+          });
+        }
+        return events.shift() as { event: string; data: unknown };
+      };
+      resolve({ type: res.headers["content-type"], next, close: () => req.destroy() });
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+test("the page hears about a change to a config file over its event stream", async () => {
+  const dir = fixture.at("work/events");
+  fixture.write("work/events/CLAUDE.md", "one\n");
+  const stream = await openEvents(dir);
+  try {
+    assert.match(stream.type ?? "", /^text\/event-stream/);
+    // First, once the watchers have started: the folders ccdesk cannot watch.
+    assert.deepEqual(await stream.next(), { event: "unwatched", data: [] });
+
+    fixture.write("work/events/CLAUDE.md", "two\n");
+
+    assert.equal((await stream.next()).event, "change");
+  } finally {
+    stream.close();
+  }
+});
+
+test("closing the event stream stops watching for it", async (t) => {
+  const stopped: string[] = [];
+  const subscribe = Watcher.prototype.subscribe;
+  t.mock.method(
+    Watcher.prototype,
+    "subscribe",
+    async function (this: Watcher, ...args: Parameters<Watcher["subscribe"]>) {
+      const unsubscribe = await subscribe.apply(this, args);
+      return () => {
+        stopped.push(args[0]);
+        unsubscribe();
+      };
+    }
+  );
+  const dir = fixture.at("work/events-closed");
+  fixture.write("work/events-closed/CLAUDE.md", "one\n");
+  const stream = await openEvents(dir);
+  await stream.next();
+
+  stream.close();
+  for (let i = 0; i < 50 && stopped.length === 0; i++)
+    await new Promise((done) => setTimeout(done, 20));
+
+  assert.deepEqual(stopped, [dir]);
+});
+
+test("the event stream needs the session token, and an absolute directory", async () => {
+  const dir = encodeURIComponent(fixture.at("work"));
+  assertRefused(
+    await call(`/api/events?dir=${dir}`, { headers: { "x-ccdesk-token": "wrong" } }),
+    401,
+    /Missing or wrong token/
+  );
+  assertRefused(await call("/api/events?dir=work"), 400, /dir must be an absolute path/);
 });
 
 test("requests addressed to another host name are refused (DNS rebinding)", async () => {
@@ -1835,20 +1940,13 @@ test("a request body that is not well formed is answered 400, naming what is wro
   ]);
 });
 
-test("paths in the address must be absolute, and a bad since is reported as such", async () => {
-  // Catches a relative directory being read from wherever the server was started, and the watch
-  // route blaming dir for a since that is not a whole number.
+test("paths in the address must be absolute", async () => {
+  // Catches a relative directory being read from wherever the server was started.
   const error = async (path: string) => {
     const res = await call(path);
     return [res.status, (res.json as { error: string }).error];
   };
-  const dir = encodeURIComponent(fixture.at("work"));
-
   assert.deepEqual(await error("/api/directory?path=work"), [400, "path must be an absolute path"]);
-  assert.deepEqual(await error(`/api/watch?dir=${dir}&since=soon`), [
-    400,
-    "since must be a whole number",
-  ]);
   assert.deepEqual(await error(`/api/path-test?dir=work&file=CLAUDE.md`), [
     400,
     "dir must be an absolute path",

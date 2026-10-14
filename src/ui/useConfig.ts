@@ -172,8 +172,10 @@ export interface Following {
 const FOLLOWING_ALL: Following = { unwatched: [], reachable: true };
 
 /**
- * Calls `onChange` after each change to a config file of `dir`, and says which folders ccdesk cannot
- * watch, so the page can say it may not update on its own.
+ * Calls `onChange` after each change to a config file of `dir`, which the server pushes, and says
+ * which folders ccdesk cannot watch, so the page can say it may not update on its own. A lost
+ * stream is opened again after a while, and `onChange` is called then, since a change made
+ * meanwhile was not pushed.
  */
 function useWatch(dir: string | null, onChange: () => void): Following {
   const [following, setFollowing] = useState(FOLLOWING_ALL);
@@ -183,24 +185,27 @@ function useWatch(dir: string | null, onChange: () => void): Following {
     const pause = () => new Promise((resolve) => setTimeout(resolve, 5000));
     setFollowing(FOLLOWING_ALL);
     const listen = async () => {
-      let since = Date.now();
+      let lost = false;
       while (!stop.signal.aborted) {
         try {
-          const answer = await api.watch(dir, since, stop.signal);
-          since = Math.max(since, answer.at);
-          if (stop.signal.aborted) return;
-          setFollowing({ unwatched: answer.unwatched, reachable: true });
-          // Only the open directory's files are watched, so the overview, which scans every
-          // project, waits for your next save or for you to come back to the tab.
-          if (answer.changed) onChange();
-          // With folders it cannot watch, the server answers at once, so ask again after a while.
-          if (answer.unwatched.length > 0) await pause();
+          for await (const event of api.events(dir, stop.signal)) {
+            // Only the open directory's files are watched, so the overview, which scans every
+            // project, waits for your next save or for you to come back to the tab.
+            if (event.type === "change") onChange();
+            else {
+              // Each stream starts with this event.
+              setFollowing({ unwatched: event.folders, reachable: true });
+              if (lost) onChange();
+              lost = false;
+            }
+          }
         } catch {
           // Cancelled, as when you open another directory, or the server stopped.
-          if (stop.signal.aborted) return;
-          setFollowing({ unwatched: [], reachable: false });
-          await pause();
         }
+        if (stop.signal.aborted) return;
+        setFollowing({ unwatched: [], reachable: false });
+        lost = true;
+        await pause();
       }
     };
     void listen();

@@ -51,6 +51,12 @@ const SECURITY_HEADERS = {
   "Cache-Control": "no-store",
 };
 
+/** How often an event stream sends a comment, so the browser and any proxy keep it open. */
+const HEARTBEAT_MS = 25_000;
+
+/** What a route returns when it answered the request itself, as an event stream does. */
+const ANSWERED = Symbol("answered");
+
 /** A request ccdesk will not take, answered with `status`. */
 class RequestError extends Error {
   readonly status: number;
@@ -94,7 +100,7 @@ interface Request {
 interface Route {
   method: "GET" | "POST";
   path: string;
-  /** What the request is answered with, as JSON with status 200. */
+  /** What the request is answered with, as JSON with status 200, or ANSWERED. */
   action: (request: Request) => Promise<unknown>;
 }
 
@@ -129,6 +135,39 @@ function stopOnClose(res: ServerResponse): AbortSignal {
   const stop = new AbortController();
   res.once("close", () => stop.abort());
   return stop.signal;
+}
+
+/**
+ * Pushes the changes to what ccdesk shows for `dir` as server-sent events until the page closes
+ * the stream: `unwatched` with the folders ccdesk cannot watch, first and whenever they change, and
+ * `change` after each change. A stream whose watchers cannot start ends at once.
+ */
+async function streamChanges(watcher: Watcher, dir: string, res: ServerResponse): Promise<void> {
+  // Sent at once, so the page knows the stream is open while the watchers start.
+  res.writeHead(200, { ...SECURITY_HEADERS, "Content-Type": "text/event-stream; charset=utf-8" });
+  res.flushHeaders();
+  const event = (name: string, data: unknown) =>
+    res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
+  const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), HEARTBEAT_MS);
+  const closed = stopOnClose(res);
+  let unsubscribe = () => {
+    // Replaced once subscribed.
+  };
+  closed.addEventListener("abort", () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
+  try {
+    unsubscribe = await watcher.subscribe(
+      dir,
+      () => event("change", {}),
+      (unwatched) => event("unwatched", unwatched)
+    );
+  } catch {
+    res.end();
+  }
+  // Closed while its watchers were starting.
+  if (closed.aborted) unsubscribe();
 }
 
 function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
@@ -187,11 +226,9 @@ function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
     ),
     post("/api/mcp/preview", async ({ body }) => core.previewMcpEdit(parseMcpEdit(body))),
     post("/api/mcp/save", async ({ body }) => core.saveMcpEdit(parseMcpEdit(body), revision(body))),
-    get("/api/watch", async ({ url, res }) => {
-      const dir = absoluteParam(url, "dir");
-      const since = Number(url.searchParams.get("since") ?? "0");
-      if (!Number.isInteger(since)) throw new RequestError(400, "since must be a whole number");
-      return watcher.wait(resolve(dir), since, stopOnClose(res));
+    get("/api/events", async ({ url, res }) => {
+      await streamChanges(watcher, resolve(absoluteParam(url, "dir")), res);
+      return ANSWERED;
     }),
     get("/api/compare", async ({ url }) =>
       core.compareSettings(absoluteParam(url, "a"), absoluteParam(url, "b"))
@@ -251,7 +288,8 @@ async function handle(
   const route = table.find((r) => r.method === req.method && r.path === url.pathname);
   if (!route) return send(res, 404, { error: "Not found" });
   const body = route.method === "POST" ? await readBody(req) : undefined;
-  return send(res, 200, await route.action({ url, body, res }));
+  const answer = await route.action({ url, body, res });
+  if (answer !== ANSWERED) send(res, 200, answer);
 }
 
 const MAX_BODY = 64 * 1024;

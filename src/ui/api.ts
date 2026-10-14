@@ -59,6 +59,14 @@ export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** The error a failed response carries, with the message the server put in its body. */
+async function failure(response: Response): Promise<ApiError> {
+  const body: unknown = await response.json().catch(() => null);
+  const message =
+    typeof body === "object" && body && "error" in body ? String(body.error) : response.statusText;
+  return new ApiError(message, response.status);
+}
+
 async function request<T>(
   path: string,
   init?: { method: string; body: unknown },
@@ -73,15 +81,42 @@ async function request<T>(
     },
     ...(init ? { body: JSON.stringify(init.body) } : {}),
   });
-  const body: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message =
-      typeof body === "object" && body && "error" in body
-        ? String(body.error)
-        : response.statusText;
-    throw new ApiError(message, response.status);
+  if (!response.ok) throw await failure(response);
+  return (await response.json().catch(() => null)) as T;
+}
+
+/** What the server pushes about the open directory's config files. */
+export type WatchEvent = { type: "change" } | { type: "unwatched"; folders: string[] };
+
+/**
+ * The events of a server-sent event stream, read with fetch: EventSource cannot send the token
+ * header, and the token must not go into the URL. Ends when the stream does.
+ */
+async function* events(path: string, signal: AbortSignal): AsyncGenerator<WatchEvent> {
+  const response = await fetch(path, { signal, headers: { "x-ccdesk-token": sessionToken } });
+  if (!response.ok || !response.body) throw await failure(response);
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    buffer += value;
+    // An event ends with a blank line. A line that starts with a colon, such as the heartbeat, is a
+    // comment, and the server sends no other fields than these two.
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) {
+      const field = (name: string) =>
+        block
+          .split("\n")
+          .find((line) => line.startsWith(`${name}: `))
+          ?.slice(name.length + 2);
+      const event = field("event");
+      if (event === "change") yield { type: "change" };
+      else if (event === "unwatched")
+        yield { type: "unwatched", folders: JSON.parse(field("data") ?? "[]") as string[] };
+    }
   }
-  return body as T;
 }
 
 export const api = {
@@ -142,15 +177,12 @@ export const api = {
   saveHook: (edit: HookEdit, revision: string) =>
     request<Change>("/api/hooks/save", { method: "POST", body: { ...edit, revision } }),
   /**
-   * Waits up to 25 seconds for a config file that affects `dir` to change after `since`. While
-   * some folders cannot be watched, it answers at once with them in `unwatched`.
+   * The changes to the config files that affect `dir`, until `signal` aborts or the server goes
+   * away: first the folders ccdesk cannot watch, then each change, and those folders again whenever
+   * they change.
    */
-  watch: (dir: string, since: number, signal: AbortSignal) =>
-    request<{ changed: boolean; at: number; unwatched: string[] }>(
-      `/api/watch?dir=${encodeURIComponent(dir)}&since=${since}`,
-      undefined,
-      signal
-    ),
+  events: (dir: string, signal: AbortSignal) =>
+    events(`/api/events?dir=${encodeURIComponent(dir)}`, signal),
   /** The effective settings of two directories, key by key. */
   compare: (a: string, b: string) =>
     request<SettingsComparison>(
