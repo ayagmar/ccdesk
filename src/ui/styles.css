@@ -850,9 +850,11 @@ input::placeholder {
   padding: 6px 0;
 }
 
+/* Separate borders: Chromium paints collapsed ones with the table, so a sticky head lost its rule. */
 .tt {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
 }
 
