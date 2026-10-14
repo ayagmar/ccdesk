@@ -7,7 +7,7 @@ import { type ScanEnv } from "./scan/env.ts";
 import { isDir, isFile, isNetworkPath } from "./scan/files.ts";
 import { canonicalRoot, mainWorktreeRoot } from "./scan/git.ts";
 import { scanDirectory } from "./scan/index.ts";
-import { loadPlugin, manifestCommandMap, manifestPaths } from "./scan/plugins.ts";
+import { loadPlugin, manifestCommandMap, manifestPaths, pluginsRoot } from "./scan/plugins.ts";
 
 /** How long one request waits for a change before answering "nothing changed". */
 const WAIT_MS = 25_000;
@@ -44,7 +44,7 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
   const out: Target[] = [
     ...claude(env.claudeDir),
     // Only the install list: Windows reports a write deep in a plugin as a change to `cache`.
-    { path: join(env.claudeDir, "plugins"), recursive: false, names: ["installed_plugins.json"] },
+    { path: pluginsRoot(env), recursive: false, names: ["installed_plugins.json"] },
     {
       path: join(env.claudeDir, "projects", storeDirName(await canonicalRoot(dir)), "memory"),
       recursive: false,

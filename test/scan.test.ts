@@ -272,6 +272,129 @@ test("a plugin without an enabledPlugins entry follows its own default", async (
   );
 });
 
+test("CLAUDE_CODE_PLUGIN_CACHE_DIR moves the plugins root, and a marketplace entry's defaultEnabled beats the manifest's", async () => {
+  const f = makeFixture();
+  const env = { ...f.env, pluginsDir: f.at("plugin-root") };
+  const install = (name: string) => [{ scope: "user", installPath: f.at(`plugins/${name}`) }];
+  f.json("plugin-root/installed_plugins.json", {
+    plugins: { "quiet@market": install("quiet"), "loud@market": install("loud") },
+  });
+  f.json("home/.claude/plugins/installed_plugins.json", {
+    plugins: { "stale@market": install("stale") },
+  });
+  f.json("plugin-root/known_marketplaces.json", {
+    market: {
+      source: { source: "directory", path: f.at("market") },
+      installLocation: f.at("market"),
+    },
+  });
+  f.json("market/.claude-plugin/marketplace.json", {
+    name: "market",
+    plugins: [
+      { name: "quiet", source: "./quiet", defaultEnabled: false },
+      { name: "loud", source: "./loud" },
+    ],
+  });
+  f.json("plugins/quiet/.claude-plugin/plugin.json", { name: "quiet", defaultEnabled: true });
+  f.json("plugins/loud/.claude-plugin/plugin.json", { name: "loud" });
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(env, f.at("app"));
+
+  assert.deepEqual(
+    view.inventory.plugins.map((p) => [p.id, p.enabled]),
+    [
+      ["quiet@market", false],
+      ["loud@market", true],
+    ]
+  );
+});
+
+test("a skill folder with a plugin manifest loads as <name>@skills-dir, a project one only once the folder is trusted", async () => {
+  const f = makeFixture();
+  const plugin = (dir: string, name: string, extra: Record<string, unknown> = {}) => {
+    f.json(`${dir}/.claude-plugin/plugin.json`, { name, ...extra });
+    f.write(`${dir}/SKILL.md`, `---\ndescription: ${name} skill\n---\n`);
+    f.write(`${dir}/agents/helper.md`, "---\nname: helper\ndescription: h\n---\n");
+  };
+  plugin("home/.claude/skills/tools", "tools");
+  plugin("home/.claude/skills/later", "later", { defaultEnabled: false });
+  plugin("app/.claude/skills/shared", "shared");
+  plugin("app/.claude/skills/tools-copy", "tools");
+  f.json("app/.claude/skills/shared/.mcp.json", {
+    mcpServers: { db: { command: "db-server" } },
+  });
+  f.json("home/.claude/settings.json", { enabledPlugins: { "later@skills-dir": true } });
+  f.write("app/README.md", "x");
+
+  const untrusted = await scanDirectory(f.env, f.at("app"));
+  const plugins = (view: View) => view.inventory.plugins.map((p) => [p.id, p.scope, p.enabled]);
+  assert.deepEqual(plugins(untrusted), [
+    ["later@skills-dir", "user", true],
+    ["tools@skills-dir", "user", true],
+    ["shared@skills-dir", "project", false],
+    ["tools@skills-dir", "project", false],
+  ]);
+  assert.deepEqual(untrusted.inventory.agents.map((a) => a.id).sort(), [
+    "later:helper",
+    "tools:helper",
+  ]);
+  // The root SKILL.md stays a skill of its folder, not a plugin skill.
+  assert.deepEqual(untrusted.inventory.skills.map((s) => [s.name, s.scope]).sort(), [
+    ["later", "user"],
+    ["shared", "project"],
+    ["tools", "user"],
+    ["tools-copy", "project"],
+  ]);
+
+  f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
+  const trusted = await scanDirectory(f.env, f.at("app"));
+  assert.deepEqual(plugins(trusted).slice(2), [
+    ["shared@skills-dir", "project", true],
+    // The copy in your own skills folder keeps the name.
+    ["tools@skills-dir", "project", false],
+  ]);
+  // Its servers wait for the same approval as the project's .mcp.json.
+  assert.deepEqual(
+    trusted.inventory.mcpServers.map((s) => [s.name, s.status]),
+    [["plugin:shared:db", "pending"]]
+  );
+});
+
+test("an installed plugin, a plugin-only lock or a marketplace allowlist keeps a skills-dir plugin from loading", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/plugins/installed_plugins.json", {
+    plugins: { "tools@market": [{ scope: "user", installPath: f.at("plugins/tools") }] },
+  });
+  f.json("plugins/tools/.claude-plugin/plugin.json", { name: "tools" });
+  f.json("home/.claude/skills/tools/.claude-plugin/plugin.json", { name: "tools" });
+  f.json("home/.claude/skills/extra/.claude-plugin/plugin.json", { name: "extra" });
+  f.write("app/README.md", "x");
+  const loaded = async () =>
+    (await scanDirectory(f.env, f.at("app"))).inventory.plugins.map((p) => [p.id, p.enabled]);
+
+  assert.deepEqual(await loaded(), [
+    ["tools@market", true],
+    ["extra@skills-dir", true],
+    ["tools@skills-dir", false],
+  ]);
+  for (const managed of [
+    { strictPluginOnlyCustomization: ["hooks"] },
+    { strictKnownMarketplaces: [] },
+    { blockedMarketplaces: [{ source: "skills-dir" }] },
+  ]) {
+    f.json("etc/claude-code/managed-settings.json", managed);
+    assert.deepEqual((await loaded()).slice(1), [
+      ["extra@skills-dir", false],
+      ["tools@skills-dir", false],
+    ]);
+  }
+  f.json("etc/claude-code/managed-settings.json", {
+    strictKnownMarketplaces: [{ source: "skills-dir" }],
+  });
+  assert.deepEqual((await loaded())[1], ["extra@skills-dir", true]);
+});
+
 test("a manifest's commands map replaces the default commands folder, as a path does", async () => {
   const f = makeFixture();
   f.json("home/.claude/plugins/installed_plugins.json", {
