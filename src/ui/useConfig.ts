@@ -141,6 +141,7 @@ export function useConfig(requested: string | null | undefined, profile: Session
     data: withUsage,
     dir,
     reload,
+    refreshOverview,
     retry,
     following,
   };

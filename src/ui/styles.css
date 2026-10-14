@@ -904,6 +904,20 @@ input::placeholder {
   color: var(--muted);
 }
 
+.tt .forget-row {
+  margin-left: 8px;
+  font-family: var(--sans);
+  font-size: var(--text-sm);
+}
+
+.tt tbody tr.forget-review {
+  cursor: default;
+}
+
+.tt tbody tr.forget-review:hover td {
+  background: none;
+}
+
 .tt td.num {
   text-align: right;
   font-family: var(--mono);
@@ -2153,6 +2167,12 @@ button:disabled {
 
 .problems .problem-path {
   display: block;
+}
+
+/* A review opened from a notice reads as one, not in the notice's warning ink. */
+.problems .confirm {
+  margin-top: 8px;
+  color: var(--ink);
 }
 
 .problems ul,

@@ -4,6 +4,7 @@ import {
   type BackupSummary,
   type Change,
   type DirectoryView,
+  type ForgetPreview,
   type MemoryAction,
   type MemoryChangePreview,
   type Overview,
@@ -139,6 +140,12 @@ export const api = {
       method: "POST",
       body: { action, path, revision, ...(projectPath && { projectPath }) },
     }),
+  /** What forgetting a directory whose folder is gone would move away. */
+  previewForget: (path: string) =>
+    request<ForgetPreview>("/api/forget/preview", { method: "POST", body: { path } }),
+  /** Forgets the directory, only while its store is as reviewed and its folder still gone. */
+  forgetDirectory: (path: string, revision: string) =>
+    request<Change>("/api/forget/change", { method: "POST", body: { path, revision } }),
   open: (path: string) =>
     request<{ editor: string }>("/api/open", { method: "POST", body: { path } }),
   previewSettings: (edit: SettingsEdit) =>

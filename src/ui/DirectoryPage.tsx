@@ -7,6 +7,7 @@ import {
 } from "../shared/types.ts";
 import { api, errorText } from "./api.ts";
 import { ContextView } from "./ContextView.tsx";
+import { ForgetReview } from "./ForgetReview.tsx";
 import { plural, tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
 import { Inspector } from "./Inspector.tsx";
@@ -33,6 +34,8 @@ interface Props {
   /** The folders ccdesk cannot watch here, and whether its server answers. */
   following: Following;
   onToast: (toast: ToastMessage) => void;
+  /** Called with the toast's text once this directory, its folder gone, is forgotten. */
+  onForgotten: (text: string) => void;
   onOpenDirectory: (path: string) => void;
   onOpenPalette: () => void;
   /** Describe an interactive session or claude -p and the SDK instead. */
@@ -80,6 +83,7 @@ export function DirectoryPage({
   reload,
   following,
   onToast,
+  onForgotten,
   onOpenDirectory,
   onOpenPalette,
   onProfile,
@@ -190,7 +194,7 @@ export function DirectoryPage({
           />
           <SectionIndex groups={groups} hidden={seeing} />
         </header>
-        <GoneFolder view={view} />
+        <GoneFolder view={view} launchDir={overview?.launchDir ?? null} onForgotten={onForgotten} />
         <SessionSwitch profile={view.profile} onProfile={onProfile} />
         <Problems problems={view.problems} />
         <NotFollowing following={following} />
@@ -606,9 +610,19 @@ function problemOutcome(p: DirectoryView["problems"][number]): string {
 
 /**
  * Leads a folder that no longer exists with that fact, and with what is left of it. Its project
- * and local files are gone, so the editors offer only your user files (`canWrite`).
+ * and local files are gone, so the editors offer only your user files (`canWrite`). What Claude
+ * Code keeps for it can be forgotten, except for the directory ccdesk was started in.
  */
-function GoneFolder({ view }: { view: DirectoryView }) {
+function GoneFolder({
+  view,
+  launchDir,
+  onForgotten,
+}: {
+  view: DirectoryView;
+  launchDir: string | null;
+  onForgotten: (text: string) => void;
+}) {
+  const [forgetting, setForgetting] = useState(false);
   if (view.exists) return null;
   const memories = view.memory.memories.length;
   return (
@@ -625,6 +639,19 @@ function GoneFolder({ view }: { view: DirectoryView }) {
           hooks, servers and agents go to your user files only, since writing the folder's own files
           would create it again.
         </p>
+        {launchDir !== null &&
+          view.path !== launchDir &&
+          (forgetting ? (
+            <ForgetReview
+              path={view.path}
+              onForgotten={onForgotten}
+              onClose={() => setForgetting(false)}
+            />
+          ) : (
+            <button type="button" className="quiet-danger" onClick={() => setForgetting(true)}>
+              <Icon name="trash" /> Forget this directory…
+            </button>
+          ))}
       </div>
     </section>
   );

@@ -145,17 +145,7 @@ function ChangeItem({
             </span>
           )}
         </span>
-        <span className="change-file">
-          <span className="mono">{b.target.split(/[/\\]/).pop()}</span>
-          {b.projectPath ? (
-            <span className="change-store">
-              <Bullet line="memory" ariaHidden /> auto memory of{" "}
-              <span className="mono wrap">{tilde(b.projectPath)}</span>
-            </span>
-          ) : (
-            <span className="mono wrap muted">{folder}</span>
-          )}
-        </span>
+        <ChangeFile change={b} folder={folder} />
         <span className="mono muted num" title={new Date(b.createdAt).toLocaleString()}>
           {ago(b.createdAt)}
         </span>
@@ -163,7 +153,7 @@ function ChangeItem({
           <Icon name={icon} /> {toggle}
         </button>
       </div>
-      {open && b.projectPath && (
+      {open && b.projectPath && b.kind !== "directory-forget" && (
         <p className="muted small change-folder">
           Memory folder: <span className="mono wrap">{folder}</span>
         </p>
@@ -175,6 +165,30 @@ function ChangeItem({
       )}
       {open && b.kind !== "memory-restore" && <Restore id={b.id} onDone={onDone} />}
     </li>
+  );
+}
+
+/** Which file a change touched, and where: for a forgotten directory, the directory and its store. */
+function ChangeFile({ change: b, folder }: { change: BackupSummary; folder: string }) {
+  if (b.kind === "directory-forget")
+    return (
+      <span className="change-file">
+        <span className="mono wrap">{tilde(b.projectPath ?? b.target)}</span>
+        <span className="mono wrap muted">{tilde(b.target)}</span>
+      </span>
+    );
+  return (
+    <span className="change-file">
+      <span className="mono">{b.target.split(/[/\\]/).pop()}</span>
+      {b.projectPath ? (
+        <span className="change-store">
+          <Bullet line="memory" ariaHidden /> auto memory of{" "}
+          <span className="mono wrap">{tilde(b.projectPath)}</span>
+        </span>
+      ) : (
+        <span className="mono wrap muted">{folder}</span>
+      )}
+    </span>
   );
 }
 
@@ -199,7 +213,7 @@ function Restore({ id, onDone }: { id: string; onDone: (text: string) => void })
   const restore = () => {
     setBusy(true);
     api.restore(id, preview.revision).then(
-      ({ target }) => onDone(`${preview.removes ? "Removed" : "Restored"} ${tilde(target)}`),
+      ({ target }) => onDone(`${restoredText(preview)} ${tilde(target)}`),
       (error: unknown) => {
         setBusy(false);
         fail(error);
@@ -213,6 +227,11 @@ function Restore({ id, onDone }: { id: string; onDone: (text: string) => void })
   );
 }
 
+function restoredText(preview: RestorePreview): string {
+  if (preview.movesBack) return "Moved back";
+  return preview.removes ? "Removed" : "Restored";
+}
+
 /** What restoring changes, or why it cannot, with the button that does it. */
 function RestoreReview({
   preview,
@@ -224,6 +243,21 @@ function RestoreReview({
   onRestore: () => void;
 }) {
   if (preview.blocked) return <p className="flag warn">{preview.blocked}</p>;
+  if (preview.movesBack)
+    return (
+      <>
+        <p className="muted small">
+          Restoring moves the store back to{" "}
+          <span className="mono wrap">{tilde(preview.movesBack)}</span> with its{" "}
+          {preview.after.trim()}, and the directory is listed again.
+        </p>
+        <div className="editor-buttons">
+          <button type="button" className="primary" disabled={busy} onClick={onRestore}>
+            {busy ? "Moving back…" : "Move the store back"}
+          </button>
+        </div>
+      </>
+    );
   const unchanged = preview.before === preview.after;
   if (unchanged && !preview.indexLines)
     return <p className="muted small">The file already matches this backup.</p>;
