@@ -156,7 +156,7 @@ export function DirectoryPage({
         </header>
         <SessionSwitch profile={view.profile} onProfile={onProfile} />
         <Problems problems={view.problems} />
-        <HigherManagedSources view={view} />
+        <UnreadManagedSources view={view} />
         <ManagedRepairs view={view} />
         {seeing ? (
           <ContextView view={view} />
@@ -473,27 +473,39 @@ function SessionSwitch({
   );
 }
 
-/** Managed sources ccdesk does not read that rank above the managed settings files it shows. */
-function HigherManagedSources({ view }: { view: DirectoryView }) {
-  const higher = view.settings.find((l) => l.scope === "managed")?.higherSources;
-  if (!higher) return null;
+/** Managed sources ccdesk does not read, above or below the managed settings files it shows. */
+function UnreadManagedSources({ view }: { view: DirectoryView }) {
+  const layer = view.settings.find((l) => l.scope === "managed");
+  const higher = layer?.higherSources;
+  const lower = layer?.lowerSources;
+  if (!higher && !lower) return null;
+  const names = (paths: string[]) =>
+    paths.map((path, i) => (
+      <span key={path}>
+        {i > 0 && " and "}
+        <span className="mono">{tilde(path)}</span>
+      </span>
+    ));
   return (
     <section className="problems" aria-label="Managed settings ccdesk does not read">
       <Icon name="warn" />
       <ul className="plain">
-        <li>
-          Your organisation may also set policy in{" "}
-          {higher.map((path, i) => (
-            <span key={path}>
-              {i > 0 && " and "}
-              <span className="mono">{tilde(path)}</span>
-            </span>
-          ))}
-          , which ccdesk does not read. Claude Code uses the first managed source that sets a
-          policy, and these come before the managed settings files, so the managed values shown here
-          may not apply. <span className="mono">/status</span> in Claude Code names the source it
-          uses.
-        </li>
+        {higher && (
+          <li>
+            Your organisation may also set policy in {names(higher)}, which ccdesk does not read.
+            Claude Code uses the first managed source that sets a policy, and these come before the
+            managed settings files, so the managed values shown here may not apply.{" "}
+            <span className="mono">/status</span> in Claude Code names the source it uses.
+          </li>
+        )}
+        {lower && (
+          <li>
+            The registry key {names(lower)} also holds a policy, which ccdesk does not read. Claude
+            Code applies it only when no admin source is present above it: server-managed settings,
+            a configuration profile, the HKLM key or the managed settings files.{" "}
+            <span className="mono">/status</span> in Claude Code names the source it uses.
+          </li>
+        )}
       </ul>
     </section>
   );

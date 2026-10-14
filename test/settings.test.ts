@@ -405,6 +405,30 @@ test("under a trusted parent folder outside git, a project env applies without i
   assert.deepEqual(env?.ignored, []);
 });
 
+test("a Windows registry policy is named, HKLM above the managed files and HKCU below them", async () => {
+  const f = makeFixture();
+  const keys = new Set<string>();
+  const env = { ...f.env, hasRegistryPolicy: async (key: string) => keys.has(key) };
+  f.json("etc/claude-code/managed-settings.json", { model: "opus" });
+  const managed = async () =>
+    (await scanDirectory(env, f.at("app"))).settings.find((l) => l.scope === "managed");
+
+  assert.equal((await managed())?.higherSources, undefined);
+  assert.equal((await managed())?.lowerSources, undefined);
+
+  // docs: managed-settings#where-each-mechanism-stores-the-policy
+  keys.add("HKLM\\SOFTWARE\\Policies\\ClaudeCode");
+  keys.add("HKCU\\SOFTWARE\\Policies\\ClaudeCode");
+  f.json("home/.claude/remote-settings.json", { model: "sonnet" });
+  const layer = await managed();
+  assert.deepEqual(layer?.higherSources, [
+    f.at("home/.claude/remote-settings.json"),
+    "HKLM\\SOFTWARE\\Policies\\ClaudeCode",
+  ]);
+  assert.deepEqual(layer?.lowerSources, ["HKCU\\SOFTWARE\\Policies\\ClaudeCode"]);
+  assert.equal(layer?.data?.model, "opus");
+});
+
 test("env variables a repository may not set, or no file may set, are ignored by name", async () => {
   const f = makeFixture();
   // Trusted, so only the per-variable rules hold values back.

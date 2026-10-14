@@ -125,9 +125,12 @@ export interface SettingsLayer {
   blocksStart?: boolean;
   /**
    * For managed settings: managed sources that rank above these files and that ccdesk does not
-   * read, such as the server-managed settings cache or a macOS configuration profile.
+   * read, such as the server-managed settings cache, a macOS configuration profile or the HKLM
+   * registry key.
    */
   higherSources?: string[];
+  /** For managed settings: the HKCU registry key, when it holds a policy ccdesk does not read. */
+  lowerSources?: string[];
   /** For managed settings: entries that fail validation, which `data` holds as Claude Code reads them. */
   repairs?: ManagedRepair[];
 }
