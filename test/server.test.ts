@@ -494,6 +494,46 @@ test("deleting a memory keeps an index line that also links to another memory", 
   assert.equal(readFileSync(`${dir}/MEMORY.md`, "utf8"), `${line}\n`);
 });
 
+test("removing dead index lines reads titled, relative and reference links, and keeps a line it cannot read whole", async () => {
+  const dir = memoryDirFor(fixture, "/work/link-forms");
+  const kept = [
+    '- [Gone](gone.md), see [Live](live.md "kept")',
+    "- [Gone](gone.md), see [Live][live]",
+    "- [Gone](gone.md), see [Live](<./live.md>)",
+    "- [Gone](gone.md), see [Notes](../notes/live.md)",
+    "[live]: live.md",
+  ];
+  const indexPath = fixture.write(
+    `${dir}/MEMORY.md`,
+    [
+      '- [Gone](gone.md "a title") — titled',
+      "- [Gone](./gone.md) — relative",
+      "- [Gone](<gone.md>) — angle brackets",
+      ...kept,
+      "",
+    ].join("\n")
+  );
+  fixture.write(`${dir}/live.md`, memoryFile("live", "user", "ok", "x"));
+
+  const removed = await changeMemory("remove-dead", indexPath);
+
+  assert.equal(removed.status, 200);
+  assert.equal(readFileSync(indexPath, "utf8"), `${kept.join("\n")}\n`);
+});
+
+test("deleting a memory keeps an index line whose other link has a title or a relative path", async () => {
+  const dir = memoryDirFor(fixture, "/work/titled-line");
+  const lines = ['- [A](a.md), see [B](b.md "second")', "- [A](./a.md), see [B](./b.md)"];
+  fixture.write(`${dir}/MEMORY.md`, `- [A](./a.md "first")\n${lines.join("\n")}\n`);
+  const a = fixture.write(`${dir}/a.md`, memoryFile("a", "user", "first", "x"));
+  fixture.write(`${dir}/b.md`, memoryFile("b", "user", "second", "y"));
+
+  const deleted = await deleteMemory(a);
+
+  assert.equal(deleted.status, 200);
+  assert.equal(readFileSync(`${dir}/MEMORY.md`, "utf8"), `${lines.join("\n")}\n`);
+});
+
 test("index changes are refused outside a memory folder's MEMORY.md", async () => {
   const target = fixture.write("home/.claude/CLAUDE.md", "keep me\n");
 
