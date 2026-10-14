@@ -1,4 +1,4 @@
-import { type FSWatcher, watch } from "node:fs";
+import { type BigIntStats, type FSWatcher, watch } from "node:fs";
 import { stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { storeDirName } from "../shared/memory.ts";
@@ -204,17 +204,25 @@ interface Seen {
 
 const nothingSeen = (): Seen => ({ counts: false, checking: 0, states: new Map() });
 
+const identity = (info: BigIntStats) => `${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}`;
+
+/** A path's inode, size and times, or undefined when it cannot be read. */
+async function fileState(path: string): Promise<string | undefined> {
+  const info = await stat(path, { bigint: true }).catch(() => null);
+  return info ? identity(info) : undefined;
+}
+
 /**
- * A file's inode, size and times, or undefined when they cannot show that it changed. The change
- * time moves on every write, even when a tool sets the modification time back, and a file renamed
- * over it has another inode. That needs times finer than a second: on a volume that keeps whole
+ * `fileState` of a file, or undefined when it cannot tell a repeat from a change. The change time
+ * moves on every write, even when a tool sets the modification time back, and a file renamed over
+ * it has another inode. That needs times finer than a second: on a volume that keeps whole
  * seconds, such as HFS+ or FAT, two writes in one second look alike. A folder's own state does not
  * move when a file in it is edited, so a folder has none either.
  */
-async function fileState(path: string): Promise<string | undefined> {
+async function repeatState(path: string): Promise<string | undefined> {
   const info = await stat(path, { bigint: true }).catch(() => null);
   if (!info?.isFile() || info.ctimeNs % 1_000_000_000n === 0n) return undefined;
-  return `${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}`;
+  return identity(info);
 }
 
 /** The latest scan of a directory, with when it started and ~/.claude.json as it was then. */
@@ -411,7 +419,7 @@ export class Watcher {
       const told = Date.now() < subscription.repeatsUntil ? subscription.told.get(path) : undefined;
       if (told === undefined) seen.counts = true;
       else seen.checking++;
-      void fileState(path).then((state) => {
+      void repeatState(path).then((state) => {
         if (state !== undefined) seen.states.set(path, state);
         if (told === undefined) return;
         seen.checking--;
