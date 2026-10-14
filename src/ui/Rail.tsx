@@ -64,8 +64,9 @@ export function Rail({
   onTextSize,
 }: Props) {
   const [query, setQuery] = useState("");
-  const [showEphemeral, setShowEphemeral] = useState(false);
-  const [showGone, setShowGone] = useState(false);
+  // Each folded group follows the open directory until the user folds or unfolds it themselves.
+  const [showEphemeral, setShowEphemeral] = useState<boolean>();
+  const [showGone, setShowGone] = useState<boolean>();
   // On a phone the rail is one bar; this opens the rest of it over the page.
   const [open, setOpen] = useState(false);
   const projects = overview?.projects ?? [];
@@ -75,9 +76,9 @@ export function Rail({
   const gone = listed.filter((p) => !p.exists);
   const regular = listed.filter((p) => p.exists && !p.ephemeral);
   const ephemeral = listed.filter((p) => p.exists && p.ephemeral);
-  // A folded group stays open while it holds the open directory, so the row you are on never hides.
-  const ephemeralOpen = showEphemeral || ephemeral.some((p) => p.path === current);
-  const goneOpen = showGone || gone.some((p) => p.path === current);
+  // A folded group opens when it holds the open directory, so the row you are on is not hidden.
+  const ephemeralOpen = showEphemeral ?? ephemeral.some((p) => p.path === current);
+  const goneOpen = showGone ?? gone.some((p) => p.path === current);
 
   const item = (p: ProjectSummary) => (
     <li key={p.path}>
