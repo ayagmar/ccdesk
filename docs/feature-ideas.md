@@ -10,7 +10,7 @@ Ideas, not commitments: each one is something the code is already close to suppo
 
 **`ccdesk changes` and `ccdesk undo <id>`** (M). Lists Recent changes and restores one, through a core's `listBackups`, `previewRestore` and `restoreBackup`. Restoring needs a review step in the terminal: print the diff, ask, then pass the reviewed revision, as the page does.
 
-**`ccdesk rules --suggest [dir]`** (M). Lists the allow rules that would cover calls you approved by hand, with how many calls each covers. The counting is a core's `readUsage`; the suggestions are built by `suggestedRules`, which lives in the page today and moves with step 4 of the split plan.
+**`ccdesk rules --suggest [dir]`** (M). Lists the allow rules that would cover calls you approved by hand, with how many calls each covers. The counting is a core's `readUsage`; the suggestions are built by `suggestedRules` in `src/view/usage.ts`.
 
 ## On the page
 

@@ -4,7 +4,7 @@ ccdesk's reading and writing code should be usable without the HTTP server, so t
 
 ## Decision: one package with subpath exports first
 
-The core stays a folder in this package, reached through `exports` subpaths in `package.json` (`ccdesk` today; later `ccdesk/core` and `ccdesk/view`). It becomes a separate workspace package only when a CLI or TUI needs to be released on a different schedule from the web app. Until then a split would mean changing the test glob, both tsconfigs, Biome's file list, the release workflow, release-it's config and the data workflow's `git add` list together, for no user-visible gain.
+The core stays a folder in this package, reached through `exports` subpaths in `package.json` (`ccdesk` for the core and `ccdesk/view` for the rows). It becomes a separate workspace package only when a CLI or TUI needs to be released on a different schedule from the web app. Until then a split would mean changing the test glob, both tsconfigs, Biome's file list, the release workflow, release-it's config and the data workflow's `git add` list together, for no user-visible gain.
 
 ## Done
 

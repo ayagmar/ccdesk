@@ -20,11 +20,11 @@ Changes that go through `claude mcp`, for user and local MCP servers, are listed
 
 ## Undo
 
-After a save or a delete, a toast at the bottom of the page offers **Undo** for 12 seconds. Undo is the same as restoring that change from Recent changes. Undoing a change that created its file removes the file.
+After a save or a delete, a toast at the bottom of the page offers **Undo** for 12 seconds, and stays while the pointer is on it or focus is in it. Undo is the same as restoring that change from Recent changes. Undoing a change that created its file removes the file.
 
 ## Restoring
 
-Press **Review restore** on a change to see the diff from the file as it is now to the version in the backup, then **Restore this version**. Before replacing the file, ccdesk backs up its current text, so a restore is itself a change you can undo. If the file's folder no longer exists, such as a deleted worktree, the review says so: restoring creates the folder again with only that file in it.
+Press **Review restore** on a change to see the diff from the file as it is now to the version in the backup, then **Restore this version**. Before replacing the file, ccdesk backs up its current text, so a restore is itself a change you can undo. If the folder of a settings file, a `.mcp.json` or an agent file no longer exists, such as a deleted worktree, the review says so: restoring creates the folder again with only that file in it. Undoing that restore removes the file but leaves the folder.
 
 Restoring a deleted memory also puts its line back in `MEMORY.md`. A memory change names the directory the memory is saved for, and opening it shows the memory folder under `~/.claude/projects`. Changes ccdesk could not tie to one directory show the folder instead: older ones, and those to a memory folder that `autoMemoryDirectory` or `CLAUDE_CODE_PROJECT_DIR_NAME` sets, which every directory may share.
 
