@@ -421,6 +421,31 @@ test("a plugin's broken plugin.json, .mcp.json and hooks.json are each reported"
   assert.deepEqual(view.problems.map((p) => p.path).sort(), broken.sort());
 });
 
+test("a plugin's hooks file without a top-level hooks object loads no hooks and is reported; an inline map needs none", async () => {
+  const f = makeFixture();
+  f.json("home/.claude/plugins/installed_plugins.json", {
+    plugins: { "kit@market": [{ scope: "user", installPath: f.at("plugins/kit") }] },
+  });
+  const group = (command: string) => [{ hooks: [{ type: "command", command }] }];
+  f.json("plugins/kit/.claude-plugin/plugin.json", {
+    name: "kit",
+    hooks: ["./config/bare.json", "./config/wrapped.json", { Stop: group("inline") }],
+  });
+  // docs: plugins-reference#hooks, a file holding only the event map fails to load.
+  f.json("plugins/kit/config/bare.json", { PreToolUse: group("bare") });
+  f.json("plugins/kit/config/wrapped.json", { hooks: { PostToolUse: group("wrapped") } });
+  f.json("plugins/kit/hooks/hooks.json", { SessionStart: group("default-bare") });
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("app"));
+
+  assert.deepEqual(view.inventory.hooks.map((h) => h.command).sort(), ["inline", "wrapped"]);
+  assert.deepEqual(view.problems.map((p) => f.rel(p.path)).sort(), [
+    "plugins/kit/config/bare.json",
+    "plugins/kit/hooks/hooks.json",
+  ]);
+});
+
 test("a project's disableAllHooks false overrides a user true", async () => {
   const f = makeFixture();
   f.json("home/.claude/settings.json", {

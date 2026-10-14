@@ -148,13 +148,15 @@ export async function manifestPaths(
 
 /**
  * The value of a manifest key that is a path, an inline object, or a list of either. A file it
- * names that is there but does not parse goes into `problems`.
+ * names that is there but does not parse goes into `problems`. A file holds the value under `key`,
+ * or is the value itself; with `wrapped`, only under `key`, and a file without it is a problem.
  */
 export async function manifestConfigs(
   env: ScanEnv,
   { plugin, manifest }: LoadedPlugin,
   key: string,
-  problems: Problem[]
+  problems: Problem[],
+  wrapped = false
 ): Promise<Array<{ value: unknown; path: string }>> {
   const value = manifest[key];
   if (value === undefined) return [];
@@ -164,9 +166,29 @@ export async function manifestConfigs(
     if (typeof item !== "string") continue;
     const path = await inside(plugin, item);
     const file = path ? await readJsonOrReport(env, path, problems) : null;
-    if (path && file) out.push({ value: file[key] ?? file, path });
+    if (!path || !file) continue;
+    const problem = wrapped ? unwrapped(file, key) : null;
+    if (problem) problems.push({ path, error: problem });
+    else out.push({ value: wrapped ? file[key] : (file[key] ?? file), path });
   }
   return out;
+}
+
+/**
+ * Why Claude Code loads nothing from a file that must hold its value under `key`, as a plugin's
+ * hooks file does, or null: `key` is not an object, or is missing beside other keys, such as an
+ * event map written without the wrapper (docs: plugins-reference#hooks). A file with only a
+ * description or hook modules is not one.
+ */
+export function unwrapped(file: Record<string, unknown>, key: string): string | null {
+  const value = file[key];
+  if (
+    value === undefined
+      ? Object.keys(file).every((k) => k === "description" || k === "modules")
+      : isRecord(value)
+  )
+    return null;
+  return `no top-level "${key}" object, so Claude Code loads none of it`;
 }
 
 type ManifestCommand = { name: string; path: string; description: string; text: string | null };
