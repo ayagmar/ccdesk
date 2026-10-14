@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { basename } from "node:path";
+import { basename, dirname } from "node:path";
 import { test } from "node:test";
 import { scanDirectory, testPath } from "../src/core/index.ts";
 import { makeFixture } from "./helpers/fixture.ts";
@@ -89,6 +89,53 @@ test("paths split at commas outside braces, in a string and in each list item", 
       ["app/.claude/rules/web.md", "src/**/*.{ts,tsx}"],
     ]
   );
+});
+
+test("rule and skill paths match as Claude Code matches them: by gitignore rules, in any case, dot folders included", async () => {
+  // Claude Code 2.1.296 matches paths with the ignore package, after cutting a trailing /**; the
+  // docs' table says *.md is the project root only (docs: memory#path-specific-rules).
+  const f = makeFixture();
+  const rule = (name: string, glob: string) =>
+    f.write(`app/.claude/rules/${name}.md`, `---\npaths: "${glob}"\n---\n${name}`);
+  rule("markdown", "*.md");
+  rule("source", "src/**");
+  rule("types", "**/*.ts");
+  rule("upper", "*.TXT");
+  f.write(
+    "app/.claude/skills/docs/SKILL.md",
+    '---\nname: docs\ndescription: d\npaths: "*.md"\n---\n'
+  );
+  const matched = async (file: string) =>
+    (await testPath(f.env, f.at("app"), file)).matches
+      .map((m) => (basename(dirname(m.path)) === "docs" ? "docs skill" : basename(m.path)))
+      .sort();
+
+  assert.deepEqual(await matched("guide/intro.md"), ["docs skill", "markdown.md"]);
+  assert.deepEqual(await matched("packages/x/src/a.go"), ["source.md"]);
+  assert.deepEqual(await matched(".github/x.ts"), ["types.md"]);
+  assert.deepEqual(await matched("notes/a.txt"), ["upper.md"]);
+});
+
+test("user and managed rules and skills with paths are matched from the start directory, project rules from their folder", async () => {
+  const f = makeFixture();
+  const paths = '---\npaths: "src/**/*.ts"\n---\n';
+  f.write("home/.claude/rules/user.md", `${paths}user`);
+  f.write("etc/claude-code/.claude/rules/managed.md", `${paths}managed`);
+  f.write(
+    "home/.claude/skills/types/SKILL.md",
+    `---\nname: types\ndescription: t\npaths: "src/**/*.ts"\n---\n`
+  );
+  f.write("repo/.claude/rules/root.md", `${paths}root`);
+  f.write("repo/pkg/README.md", "x");
+  f.git("repo", "init", "-q");
+
+  const result = await testPath(f.env, f.at("repo/pkg"), "src/a.ts");
+
+  assert.deepEqual(result.matches.map((m) => f.rel(m.path)).sort(), [
+    "etc/claude-code/.claude/rules/managed.md",
+    "home/.claude/rules/user.md",
+    "home/.claude/skills/types/SKILL.md",
+  ]);
 });
 
 test("a file outside the start directory gets nothing from it", async () => {

@@ -6,6 +6,7 @@ import {
   isWithin,
   listDir,
   MAX_TEXT_BYTES,
+  matchingGlob,
   readTextFile,
   resolvedPath,
   stringsIn,
@@ -21,7 +22,6 @@ import {
   linkedRuleBlock,
   rulePaths,
   ruleTarget,
-  safeMatch,
 } from "./instructions.ts";
 import { applySkillOverrides, readSkill } from "./inventory.ts";
 import { pluginOnlySurfaces } from "./plugins.ts";
@@ -29,11 +29,6 @@ import { pluginOnlySurfaces } from "./plugins.ts";
 /** Globs are written with forward slashes on every platform. */
 function slashed(path: string): string {
   return path.split(sep).join("/");
-}
-
-/** An invalid pattern matches nothing; the others still count (docs: memory#path-specific-rules). */
-function firstMatch(globs: string[], path: string): string | undefined {
-  return globs.find((glob) => safeMatch(path, glob));
 }
 
 /**
@@ -53,7 +48,6 @@ export async function testPath(
     return { file: target, inside: false, exists: false, matches: [] };
 
   const view = await viewOf(cwd);
-  const projectRoot = view.gitRoot ?? cwd;
   const test: FolderTest = {
     env,
     cwd,
@@ -72,7 +66,7 @@ export async function testPath(
       view.settings.find((l) => l.scope === "managed")?.data ?? null
     ).has("skills"),
   };
-  const matches = startRuleMatches(view, target, projectRoot);
+  const matches = startRuleMatches(view, target, cwd);
   // Folders below the start directory load their own instructions, rules and skills on demand.
   const between: string[] = [];
   for (let d = dirname(target); d !== cwd && isWithin(cwd, d); d = dirname(d)) between.unshift(d);
@@ -82,7 +76,7 @@ export async function testPath(
       ...(await nestedRules(test, folder)),
       ...(await nestedSkills(test, folder))
     );
-  matches.push(...startSkillMatches(view, target, projectRoot));
+  matches.push(...startSkillMatches(view, target, cwd));
   return { file: target, inside: true, exists: await isFile(target), matches };
 }
 
@@ -103,13 +97,14 @@ interface FolderTest {
 }
 
 /** Path rules Claude Code would use at all: not excluded, not waiting for approval. */
-function startRuleMatches(view: DirectoryView, target: string, projectRoot: string): PathMatch[] {
+function startRuleMatches(view: DirectoryView, target: string, cwd: string): PathMatch[] {
   const matches: PathMatch[] = [];
   for (const rule of view.instructions) {
     if (!rule.paths || rule.status !== "on-match") continue;
-    // A project rule's globs are relative to the folder holding its .claude; others to the project.
-    const base = rule.scope === "project" || rule.scope === "local" ? rule.dir : projectRoot;
-    const glob = firstMatch(rule.paths, slashed(relative(base, target)));
+    // A project rule's globs are relative to the folder holding its .claude; user and managed
+    // rules' to the start directory (observed in v2.1.296; the docs do not say).
+    const base = rule.scope === "project" || rule.scope === "local" ? rule.dir : cwd;
+    const glob = matchingGlob(rule.paths, slashed(relative(base, target)));
     if (glob) matches.push({ kind: "rule", path: rule.path, scope: rule.scope, glob });
   }
   return matches;
@@ -152,7 +147,7 @@ async function nestedRules(test: FolderTest, folder: string): Promise<PathMatch[
     const globs = rulePaths(text.text);
     if (linkedRuleBlock(linked, realCwd, approved, globs.length > 0)) continue;
     const glob =
-      globs.length === 0 ? undefined : firstMatch(globs, slashed(relative(folder, target)));
+      globs.length === 0 ? undefined : matchingGlob(globs, slashed(relative(folder, target)));
     if (globs.length === 0 || glob)
       matches.push({ kind: "nested", path, scope: "project", ...(glob ? { glob } : {}) });
   }
@@ -173,7 +168,7 @@ async function nestedSkills(test: FolderTest, folder: string): Promise<PathMatch
     if (!skill) continue;
     applySkillOverrides([skill], overrides);
     if (skill.listed === false) continue;
-    const glob = skill.paths && firstMatch(skill.paths, slashed(relative(folder, target)));
+    const glob = skill.paths && matchingGlob(skill.paths, slashed(relative(folder, target)));
     if (skill.paths && !glob) continue;
     // A nested skill whose folder name another skill has is called by its folder as well, as
     // apps/web:deploy (docs: skills#how-a-skill-gets-its-command-name).
@@ -188,11 +183,14 @@ async function nestedSkills(test: FolderTest, folder: string): Promise<PathMatch
   return matches;
 }
 
-/** Skills Claude can pick on its own; one with disable-model-invocation only runs when you call it. */
-function startSkillMatches(view: DirectoryView, target: string, projectRoot: string): PathMatch[] {
+/**
+ * Skills Claude can pick on its own; one with disable-model-invocation only runs when you call it.
+ * Their globs are relative to the start directory, wherever the skill is (observed in v2.1.296).
+ */
+function startSkillMatches(view: DirectoryView, target: string, cwd: string): PathMatch[] {
   return view.inventory.skills.flatMap((skill): PathMatch[] => {
     if (!skill.paths || skill.listed === false || skill.shadowedBy || skill.skipped) return [];
-    const glob = firstMatch(skill.paths, slashed(relative(projectRoot, target)));
+    const glob = matchingGlob(skill.paths, slashed(relative(cwd, target)));
     if (!glob) return [];
     return [
       { kind: "skill", path: skill.path, scope: skill.scope, glob, name: skill.id ?? skill.name },
