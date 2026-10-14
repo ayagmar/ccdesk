@@ -32,7 +32,12 @@ export const hooks: SectionUi<R> = {
     );
   },
   Head: ({ actions }) => (
-    <button type="button" className="head-action" onClick={() => actions.onAdd("hook")}>
+    <button
+      type="button"
+      className="head-action"
+      data-adds="hook"
+      onClick={() => actions.onAdd("hook")}
+    >
       <Icon name="plus" /> Add hook
     </button>
   ),

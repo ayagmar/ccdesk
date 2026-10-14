@@ -31,7 +31,12 @@ export const mcp: SectionUi<R> = {
     );
   },
   Head: ({ actions }) => (
-    <button type="button" className="head-action" onClick={() => actions.onAdd("mcp")}>
+    <button
+      type="button"
+      className="head-action"
+      data-adds="mcp"
+      onClick={() => actions.onAdd("mcp")}
+    >
       <Icon name="plus" /> Add server
     </button>
   ),

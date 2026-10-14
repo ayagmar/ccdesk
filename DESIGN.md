@@ -408,7 +408,7 @@ Editing happens inside the inspector. A segmented control picks the target layer
 ### Navigation
 - **Rail:** panel white with a hairline right edge. The brand mark is Murmeli's badge at 26px beside "ccdesk" in 700. Beside it, the text size control is a segmented control of three letter A's at 11, 15 and 19px standing on one line, smaller, default and larger, so it reads as a size ramp; the pressed one fills with ink. The sun button after it switches the theme. "All directories" and "Recent changes" sit under it as icon links. Groups ("Opened from", "Used with Claude") are 13px muted labels. Items are 30px, 14px, with a mono count on the right; hover in hover paper; the current directory or page is inverted (ink fill, paper text), so where you are never looks like a selected row in selection cream; a directory that no longer exists is struck through.
 - **Command palette:** opened with Ctrl/⌘K over a paper scrim, 640px wide with a 46px input and 32px result rows, each led by a bullet; the active option is selection cream. It rises 6px into place over 180ms.
-- **Keyboard:** j/k move between rows and move focus with them, / focuses the row filter, Ctrl/⌘K opens the palette.
+- **Keyboard:** j/k move between rows and move focus with them, / focuses the row filter, Ctrl/⌘K opens the palette. Closing the inspector, with Escape or its close button, puts focus back on the selected row's name, or on the "Add …" button that opened an add form. A row that is not listed hands focus to its section's heading, and a section the filter hides whole hands it to the filter box.
 
 ### Toast and Loading
 - **Toast:** an inverted (ink) bar with 8px corners at the bottom centre carrying the result of a destructive action and an Undo button.

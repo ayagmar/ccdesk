@@ -44,7 +44,9 @@ export function Timetable({
             aria-labelledby={`h-${section.id}`}
           >
             <header className="tt-head">
-              <h2 id={`h-${section.id}`}>{section.title}</h2>
+              <h2 id={`h-${section.id}`} tabIndex={-1}>
+                {section.title}
+              </h2>
               <span className="tt-count">
                 {matching.length === all.length
                   ? all.length

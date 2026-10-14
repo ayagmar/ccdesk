@@ -64,7 +64,12 @@ export const permissions: SectionUi<R> = {
   Head: ({ actions }) => (
     <>
       <span className="tt-note">Checked deny, then ask, then allow, across every file</span>
-      <button type="button" className="head-action" onClick={() => actions.onAdd("permission")}>
+      <button
+        type="button"
+        className="head-action"
+        data-adds="permission"
+        onClick={() => actions.onAdd("permission")}
+      >
         <Icon name="plus" /> Add rule
       </button>
     </>
