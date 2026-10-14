@@ -1,5 +1,5 @@
 import { lstat, readdir, rename, stat } from "node:fs/promises";
-import { basename, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { storeDirName } from "../shared/memory.ts";
 import { type Change, type ForgetPreview } from "../shared/types.ts";
 import { type ScanEnv } from "./scan/env.ts";
@@ -36,6 +36,15 @@ export async function storeContents(dir: string): Promise<{ listing: string; byt
   };
   await walk(dir);
   return { listing: `${lines.sort().join("\n")}\n`, bytes };
+}
+
+/** A path and every folder above it. */
+function withAncestors(path: string): string[] {
+  const out: string[] = [];
+  for (let dir = path; ; dir = dirname(dir)) {
+    out.push(dir);
+    if (dirname(dir) === dir) return out;
+  }
 }
 
 /** A session written this recently may still be running. */
@@ -81,15 +90,18 @@ async function planForget(
   if (!project || !store)
     throw new RefusedError("Claude Code keeps no sessions or memory for this directory.");
   // Store names replace every character but letters and digits with a dash, so my.app and my-app
-  // share one: a store another directory that still exists uses is never moved away.
+  // share one: a store another directory that still exists uses is never moved away. Auto memory
+  // is named after the repository root, which may be any folder above a known directory, so those
+  // count too, as in listProjects.
   const name = basename(store);
-  const sharing = [
-    ...new Set([
-      resolve(launchDir),
-      ...claudeJsonPaths(env, claudeJson),
-      ...(await storeCwds(env, store)),
-    ]),
-  ].filter((p) => p !== path && storeDirName(p) === name);
+  const known = [
+    resolve(launchDir),
+    ...claudeJsonPaths(env, claudeJson),
+    ...(await storeCwds(env, store)),
+  ];
+  const sharing = [...new Set(known.flatMap(withAncestors))].filter(
+    (p) => p !== path && storeDirName(p) === name
+  );
   for (const other of sharing)
     if (await folderExists(other))
       throw new RefusedError(

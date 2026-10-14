@@ -231,3 +231,22 @@ test("the review warns when a session was written in the last few minutes", asyn
 
   assert.deepEqual([fresh.recentlyActive, quiet.recentlyActive], [true, false]);
 });
+
+test("a shared store is kept when a live repository used only from a subfolder keeps its memory there", async () => {
+  // Auto memory is named after the repository root, which is no key and no session's cwd.
+  const f = makeFixture();
+  const gone = f.at("work/my.app");
+  const repo = f.at("work/my-app");
+  mkdirSync(join(repo, ".git"), { recursive: true });
+  mkdirSync(join(repo, "sub"), { recursive: true });
+  const store = join(f.env.claudeDir, "projects", storeDirName(repo));
+  f.write(join(store, "old.jsonl"), `${JSON.stringify({ type: "user", cwd: gone })}\n`);
+  f.write(`${memoryDirFor(f, repo)}/note.md`, memoryFile("note", "user", "d", "body"));
+  f.json("home/.claude.json", { projects: { [join(repo, "sub")]: {} } });
+
+  await assert.rejects(
+    createCore(f.env).previewForget(gone, f.at("home")),
+    /my-app exists and uses the same store/
+  );
+  assert.ok(existsSync(join(store, "memory", "note.md")));
+});
