@@ -18,8 +18,8 @@ export type Load<T> =
 
 /**
  * The overview and the open directory, kept current: files changed elsewhere (an editor, Claude
- * itself) reload the directory; coming back to the tab reloads both, since ~/.claude.json is not
- * watched, and so does a change saved here.
+ * itself) reload the directory; coming back to the tab reloads both, since the overview's projects
+ * are not watched, and so does a change saved here.
  * `dir` is the directory shown.
  */
 export function useConfig(requested: string | null | undefined, profile: SessionProfile) {

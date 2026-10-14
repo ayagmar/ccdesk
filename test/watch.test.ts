@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { type FSWatcher, mkdirSync, utimesSync, type WatchListener, watch } from "node:fs";
+import {
+  type FSWatcher,
+  mkdirSync,
+  renameSync,
+  utimesSync,
+  type WatchListener,
+  watch,
+  writeFileSync,
+} from "node:fs";
 import { EventEmitter } from "node:events";
 import { after, type TestContext, test } from "node:test";
 import { scanDirectory, testPath, Watcher } from "../src/core/index.ts";
@@ -34,6 +42,77 @@ async function settled(watcher: Watcher, dir: string): Promise<void> {
   await started(watcher, dir);
   if (process.platform === "darwin") await pause(1000);
 }
+
+/**
+ * Once the watchers of `dir` have started, `changed`: true at the next change to what ccdesk shows
+ * for `dir`, or false after `timeoutMs`.
+ */
+async function nextChange(watcher: Watcher, dir: string, timeoutMs: number) {
+  let heard = (_changed: boolean) => {
+    // Replaced below, before anything can change.
+  };
+  const changed = new Promise<boolean>((resolve) => {
+    heard = resolve;
+  });
+  const unsubscribe = await watcher.subscribe(dir, () => heard(true));
+  const timer = setTimeout(() => heard(false), timeoutMs);
+  return {
+    changed: changed.finally(() => {
+      clearTimeout(timer);
+      unsubscribe();
+    }),
+  };
+}
+
+test("answering the trust dialog, saved in ~/.claude.json, wakes a page and shows in its view", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "one\n");
+  f.json("home/.claude.json", { numStartups: 1, projects: {} });
+  const watcher = watcherFor(f);
+  await watcher.scan(f.at("app"));
+  await settled(watcher, f.at("app"));
+
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
+  f.json("home/.claude.json", {
+    numStartups: 1,
+    projects: { [f.at("app")]: { hasTrustDialogAccepted: true } },
+  });
+
+  assert.equal(await changed, true);
+  assert.equal((await watcher.view(f.at("app"))).trust.trusted, true);
+});
+
+test("a rewrite of ~/.claude.json that changes nothing ccdesk shows does not count as a change", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "one\n");
+  const state = (startups: number) => ({
+    numStartups: startups,
+    projects: { [f.at("app")]: { hasTrustDialogAccepted: true, lastCost: startups } },
+  });
+  f.json("home/.claude.json", state(1));
+  const watcher = watcherFor(f);
+  await settled(watcher, f.at("app"));
+
+  const { changed } = await nextChange(watcher, f.at("app"), 800);
+  f.json("home/.claude.json", state(2));
+
+  assert.equal(await changed, false);
+});
+
+test("~/.claude.json replaced by renaming a new file over it, as Claude Code saves it, wakes a page", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "one\n");
+  f.json("home/.claude.json", { projects: {} });
+  const watcher = watcherFor(f);
+  await settled(watcher, f.at("app"));
+
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
+  const next = f.at("home/.claude.json.tmp");
+  writeFileSync(next, JSON.stringify({ mcpServers: { docs: { command: "docs-mcp" } } }));
+  renameSync(next, f.env.claudeJson);
+
+  assert.equal(await changed, true);
+});
 
 test("editing a project's CLAUDE.md wakes a page waiting for changes", async () => {
   const f = makeFixture();
@@ -549,17 +628,27 @@ test("the path tester does not reuse a claude -p scan, since it describes an int
   assert.equal(counter.scans, 1);
 });
 
-test("the path tester scans again after ~/.claude.json changes, which is not watched", async () => {
+test("the path tester scans again after a trust answer in ~/.claude.json, and not after an unrelated rewrite", async () => {
   const f = makeFixture();
-  f.json("home/.claude.json", { projects: {} });
-  const { counter, pathTest } = await countingWatcher(f);
+  f.json("home/.claude.json", { numStartups: 1, projects: {} });
+  const { watcher, counter, pathTest } = await countingWatcher(f);
+  await pathTest();
+  counter.scans = 0;
 
+  // Another program's rewrite is seen once a watcher reports it; waits stand in for that.
+  f.json("home/.claude.json", { numStartups: 2, projects: {} });
+  await pause(500);
   await pathTest();
-  await pathTest();
-  f.json("home/.claude.json", { projects: { [f.at("app")]: { hasTrustDialogAccepted: true } } });
-  await pathTest();
+  assert.equal(counter.scans, 0);
 
-  assert.equal(counter.scans, 2);
+  const { changed } = await nextChange(watcher, f.at("app"), 5000);
+  f.json("home/.claude.json", {
+    numStartups: 2,
+    projects: { [f.at("app")]: { hasTrustDialogAccepted: true } },
+  });
+  assert.equal(await changed, true);
+  await pathTest();
+  assert.equal(counter.scans, 1);
 });
 
 /** A host on which `folder` cannot be watched while `fails.now` is set, as when the system runs out of watches. */
