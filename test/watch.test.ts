@@ -427,12 +427,16 @@ test("work in Claude Code's worktrees or unrelated files does not count as a con
  * A watcher that counts its scans, set up as a page does it: `app` is scanned, then watched, with
  * change reports from before the watch settled.
  */
-async function countingWatcher(f: ReturnType<typeof makeFixture>) {
+async function countingWatcher(f: ReturnType<typeof makeFixture>, host?: WatchHost) {
   const counter = { scans: 0 };
-  const watcher = new Watcher(f.env, (env, dir, profile) => {
-    counter.scans++;
-    return scanDirectory(env, dir, profile);
-  });
+  const watcher = new Watcher(
+    f.env,
+    (env, dir, profile) => {
+      counter.scans++;
+      return scanDirectory(env, dir, profile);
+    },
+    host
+  );
   watchers.push(watcher);
   await watcher.scan(f.at("app"));
   await settled(watcher, f.at("app"));
@@ -487,4 +491,27 @@ test("the path tester scans again after ~/.claude.json changes, which is not wat
   await pathTest();
 
   assert.equal(counter.scans, 2);
+});
+
+test("the path tester does not reuse a scan while a folder it read cannot be watched", async () => {
+  const f = makeFixture();
+  f.write("app/.claude/rules/api.md", "---\npaths: src/api/**\n---\nAPI\n");
+  // As when the system runs out of watches: the project's rules folder cannot be watched.
+  const host: WatchHost = {
+    platform: process.platform,
+    watch: ((path: string, options?: { recursive?: boolean }, listener?: WatchListener<string>) => {
+      if (path === f.at("app/.claude/rules"))
+        throw Object.assign(new Error(`ENOSPC: System limit for number of file watchers reached`), {
+          code: "ENOSPC",
+        });
+      return listener ? watch(path, options ?? {}, listener) : watch(path);
+    }) as typeof watch,
+  };
+  const { pathTest } = await countingWatcher(f, host);
+  await pathTest();
+
+  f.write("app/.claude/rules/web.md", "---\npaths: src/**\n---\nWeb\n");
+  const result = await pathTest();
+
+  assert.ok(result.matches.some((m) => m.path.endsWith("web.md")));
 });

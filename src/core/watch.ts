@@ -183,6 +183,8 @@ interface Subscription {
   touchedAt: number;
   /** When the current watchers started. */
   watchingSince: number;
+  /** Whether a watcher runs for every target that exists, so no change to them goes unseen. */
+  complete: boolean;
   waiters: Set<() => void>;
   /** Callers of `subscribe`, called after every change until they unsubscribe. */
   listeners: Set<() => void>;
@@ -281,16 +283,16 @@ export class Watcher {
 
   /**
    * The view of `dir`: the latest scan while it is known to be current, else a new scan. It is
-   * current only while watchers that started before it have seen no change since it started, and
-   * ~/.claude.json, which is not watched, is as it was. Only an interactive scan is reused, as the
-   * path tester describes an interactive session.
+   * current only while watchers that started before it, on every file it read, have seen no change
+   * since it started, and ~/.claude.json, which is not watched, is as it was. Only an interactive
+   * scan is reused, as the path tester describes an interactive session.
    */
   async view(dir: string): Promise<DirectoryView> {
     const latest = this.latest.get(dir);
     const subscription = this.subscriptions.get(dir);
     if (
       latest?.view.profile === "interactive" &&
-      subscription &&
+      subscription?.complete &&
       subscription.watchingSince < latest.startedAt &&
       subscription.touchedAt < latest.startedAt &&
       latest.stateFile === (await this.stateFile())
@@ -386,6 +388,7 @@ export class Watcher {
       changedAt: 0,
       touchedAt: 0,
       watchingSince: Number.POSITIVE_INFINITY,
+      complete: false,
       waiters: new Set(),
       listeners: new Set(),
       extra: this.scanned.get(dir) ?? [],
@@ -482,6 +485,7 @@ export class Watcher {
       return;
     }
     const started: string[] = [];
+    let complete = true;
     for (const target of list) {
       try {
         const watcher = this.host.watch(
@@ -494,16 +498,23 @@ export class Watcher {
             this.noticed(dir, subscription, name === null ? undefined : join(target.path, changed));
           }
         );
-        watcher.on("error", () => watcher.close());
+        watcher.on("error", () => {
+          watcher.close();
+          if (subscription.watchers.includes(watcher)) subscription.complete = false;
+        });
         subscription.watchers.push(watcher);
         started.push(target.path);
-      } catch {
-        // A folder that does not exist yet is caught by watching its parent.
+      } catch (error) {
+        // A folder that does not exist yet is caught by watching its parent. Any other failure, such
+        // as running out of watches, leaves the folder unwatched.
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "ENOENT" && code !== "ENOTDIR") complete = false;
       }
     }
     for (const w of old) w.close();
     if (this.host.platform === "darwin" && started.length > 0) this.waitUntilLive(dir, started);
     subscription.watchingSince = Date.now();
+    subscription.complete = complete;
   }
 
   /**
