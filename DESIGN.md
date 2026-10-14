@@ -317,7 +317,7 @@ The system is flat. Depth at rest comes from tone (paper, panel, sunk) and from 
 ### Shadow Vocabulary
 - **Palette lift** (`box-shadow: 0 18px 48px -12px rgb(0 0 0 / 0.35)`): the command palette over a 55% paper scrim.
 - **Toast lift** (`box-shadow: 0 12px 32px -10px rgb(0 0 0 / 0.4)`): the undo toast at the bottom centre.
-- **Drawer edge** (`box-shadow: -16px 0 40px -16px rgb(0 0 0 / 0.35)`): the inspector when it becomes a drawer at 1180px and below.
+- **Drawer edge** (`box-shadow: -16px 0 40px -16px rgb(0 0 0 / 0.35)`): the inspector when it becomes a drawer at 1180px and below, over the same 55% paper scrim as the palette; a click on the scrim closes the drawer.
 - **Lit stop ring** (`box-shadow: 0 0 0 2px paper, 0 0 0 4px ink`): a paper gap and an ink ring around the route-strip bullet whose scope the selected row belongs to. This is a highlight, not elevation.
 
 ### Named Rules

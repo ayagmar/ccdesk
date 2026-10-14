@@ -35,61 +35,75 @@ export function Inspector({ row, adding, actions, onClose }: Props) {
     if (shownId && matchMedia("(max-width: 1180px)").matches) heading.current?.focus();
   }, [shownId]);
 
+  // As a drawer the panel covers the page; the scrim behind it dims the page and closes it on a click.
+  const scrim = <div className="drawer-scrim" aria-hidden="true" onClick={onClose} />;
+
   if (adding) {
     const title = TITLES[adding];
     return (
-      <aside className="inspector" aria-label={title}>
-        <header className="insp-head">
-          <Icon name="plus" />
-          <h2 ref={heading} tabIndex={-1}>
-            {title}
-          </h2>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
-            <Icon name="close" />
-          </button>
-        </header>
-        <div className="insp-body">
-          {adding === "setting" && (
-            <SettingEditor
-              view={actions.view}
-              settingKey={null}
-              defaultScope="user"
-              onSaved={actions.onSaved}
-            />
-          )}
-          {adding === "permission" && (
-            <PermissionEditor view={actions.view} rule={null} onSaved={actions.onSaved} />
-          )}
-          {adding === "agent" && (
-            <AgentEditor view={actions.view} agent={null} onSaved={actions.onSaved} />
-          )}
-          {adding === "mcp" && (
-            <McpEditor view={actions.view} server={null} onSaved={actions.onSaved} />
-          )}
-          {adding === "hook" && (
-            <HookEditor view={actions.view} hook={null} onSaved={actions.onSaved} />
-          )}
-        </div>
-      </aside>
+      <>
+        {scrim}
+        <aside className="inspector" aria-label={title}>
+          <header className="insp-head">
+            <Icon name="plus" />
+            <h2 ref={heading} tabIndex={-1}>
+              {title}
+            </h2>
+            <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
+              <Icon name="close" />
+            </button>
+          </header>
+          <div className="insp-body">
+            {adding === "setting" && (
+              <SettingEditor
+                view={actions.view}
+                settingKey={null}
+                defaultScope="user"
+                onSaved={actions.onSaved}
+              />
+            )}
+            {adding === "permission" && (
+              <PermissionEditor view={actions.view} rule={null} onSaved={actions.onSaved} />
+            )}
+            {adding === "agent" && (
+              <AgentEditor view={actions.view} agent={null} onSaved={actions.onSaved} />
+            )}
+            {adding === "mcp" && (
+              <McpEditor view={actions.view} server={null} onSaved={actions.onSaved} />
+            )}
+            {adding === "hook" && (
+              <HookEditor view={actions.view} hook={null} onSaved={actions.onSaved} />
+            )}
+          </div>
+        </aside>
+      </>
     );
   }
   if (!row) return null;
   const section = sectionOf(row.section);
   const { Details } = section;
   return (
-    <aside className="inspector" aria-label="Details">
-      <header className="insp-head">
-        {row.line ? <Bullet line={row.line} /> : <Icon name="command" />}
-        <h2 ref={heading} tabIndex={-1}>
-          {section.heading(row, pageContext())}
-        </h2>
-        <button type="button" className="icon-button" onClick={onClose} aria-label="Close details">
-          <Icon name="close" />
-        </button>
-      </header>
-      <div className="insp-body">
-        <Details key={row.id} row={row} actions={actions} />
-      </div>
-    </aside>
+    <>
+      {scrim}
+      <aside className="inspector" aria-label="Details">
+        <header className="insp-head">
+          {row.line ? <Bullet line={row.line} /> : <Icon name="command" />}
+          <h2 ref={heading} tabIndex={-1}>
+            {section.heading(row, pageContext())}
+          </h2>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onClose}
+            aria-label="Close details"
+          >
+            <Icon name="close" />
+          </button>
+        </header>
+        <div className="insp-body">
+          <Details key={row.id} row={row} actions={actions} />
+        </div>
+      </aside>
+    </>
   );
 }
