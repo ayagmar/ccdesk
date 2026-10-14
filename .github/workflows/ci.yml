@@ -44,7 +44,8 @@ jobs:
       - run: pnpm run schema && git diff --exit-code -- src/shared/settings.schema.json src/shared/hook-events.json
       # Install the packed tarball the way npx would, start it in an empty home and load the page
       # and its script, so a file missing from "files" fails here. Importing the package checks
-      # that its "exports" lead to the built core and view. Then run scan and explain on a project.
+      # that its "exports" lead to the built core and view. Then run scan, explain and check on a
+      # project.
       - name: Smoke test the package
         run: |
           npm pack --pack-destination "$RUNNER_TEMP"
@@ -68,3 +69,10 @@ jobs:
           node -e 'const view = JSON.parse(require("fs").readFileSync("scan.json", "utf8")); if (!view.exists || view.instructions.length === 0) process.exit(1)'
           npx --no -- ccdesk explain "$HOME/app/src/a.ts" --dir "$HOME/app" | tee explain.txt
           grep -q "path rule .*matches src/\*\*" explain.txt
+          npx --no -- ccdesk check "$HOME/app"
+          echo '{' > "$HOME/app/.mcp.json"
+          # Exit 1 with the file named, so a crash, which also exits 1, does not pass.
+          status=0; npx --no -- ccdesk check "$HOME/app" > check.txt || status=$?
+          cat check.txt
+          test "$status" = 1
+          grep -q '^  \.mcp\.json: not valid JSON' check.txt

@@ -13,6 +13,7 @@ export { isConfigHome, type ScanEnv, scanEnvFromProcess } from "./scan/env.ts";
 // Read.
 export { compareSettings } from "./scan/compare.ts";
 export { revisionOf } from "./scan/files.ts";
+export { canonicalRoot } from "./scan/git.ts";
 export { scanDirectory, scanOverview } from "./scan/index.ts";
 export { testPath } from "./scan/path-test.ts";
 export { CountStopped } from "./scan/usage.ts";

@@ -205,8 +205,13 @@ export async function readJsonObject(
       await handle.close();
     }
   } catch (error) {
-    const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
-    return { ok: false, missing, error: String(error) };
+    // Worded as readTextFile words it, without Node's message and the absolute path it repeats.
+    const code = (error as NodeJS.ErrnoException).code;
+    return {
+      ok: false,
+      missing: code === "ENOENT",
+      error: `cannot be read (${code ?? String(error)})`,
+    };
   }
   if (emptyIsObject && raw.trim() === "") return { ok: true, data: {} };
   try {
