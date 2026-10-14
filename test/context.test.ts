@@ -190,6 +190,40 @@ test("context counts what Claude Code injects: no frontmatter, no HTML comments,
   assert.equal(byKind("agents"), "- reviewer: Reviews diffs");
 });
 
+test("a row of what Claude sees names a scope only when all of it comes from that scope", async () => {
+  const f = makeFixture();
+  f.write(
+    "home/.claude/skills/deploy/SKILL.md",
+    "---\nname: deploy\ndescription: Ship the app\n---\nx\n"
+  );
+  f.write(
+    "home/work/app/.claude/skills/migrate/SKILL.md",
+    "---\nname: migrate\ndescription: Run migrations\n---\nx\n"
+  );
+  // The project's reviewer replaces the user's, so only project agents are listed.
+  f.write(
+    "home/.claude/agents/reviewer.md",
+    "---\nname: reviewer\ndescription: Mine\n---\nPrompt.\n"
+  );
+  f.write(
+    "home/work/app/.claude/agents/reviewer.md",
+    "---\nname: reviewer\ndescription: Reviews diffs\n---\nPrompt.\n"
+  );
+  f.json("home/.claude.json", { mcpServers: { docs: { command: "docs-mcp" } } });
+
+  const view = await scanDirectory(f.env, f.at("home/work/app"));
+
+  const scopeOf = (kind: ContextBlock["kind"]) => view.context.find((b) => b.kind === kind)?.scope;
+  const notCounted = view.context.filter((b) => b.kind === "not-counted");
+  // Claude Code's own prompt comes from no settings file, managed or other.
+  assert.equal(notCounted[0]?.scope, null);
+  // The MCP tool names come from the one user server.
+  assert.equal(notCounted.at(-1)?.scope, "user");
+  // A user skill and a project skill share one listing.
+  assert.equal(scopeOf("skills"), null);
+  assert.equal(scopeOf("agents"), "project");
+});
+
 test("an import from outside the project waits for approval and is not counted", async () => {
   const f = makeFixture();
   f.write("home/.claude/shared.md", "shared rules\n");

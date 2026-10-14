@@ -61,10 +61,10 @@ function skillListing(skills: Entry[]): string {
     .join("\n");
 }
 
-/** The scope a listing shows: the one its entries share, else user. */
-function commonScope(entries: Entry[]): ContextBlock["scope"] {
-  const first = entries[0]?.scope ?? "user";
-  return entries.every((e) => e.scope === first) ? first : "user";
+/** The scope a listing shows: the one its entries share, if they share one. */
+function commonScope(entries: { scope: Entry["scope"] }[]): ContextBlock["scope"] {
+  const first = entries[0]?.scope ?? null;
+  return entries.every((e) => e.scope === first) ? first : null;
 }
 
 interface ContextInput {
@@ -84,7 +84,7 @@ export async function buildContext(input: ContextInput): Promise<ContextBlock[]>
       {
         kind: "not-counted",
         path: "Claude Code's system prompt and built-in tools",
-        scope: "managed",
+        scope: null,
         note: "Part of every session; their size depends on your Claude Code version and model",
       },
       null
@@ -111,7 +111,8 @@ function outputStyleBlock(
   effective: EffectiveSetting[],
   inventory: Inventory
 ): ContextBlock | null {
-  const style = effective.find((s) => s.key === "outputStyle")?.value;
+  const setting = effective.find((s) => s.key === "outputStyle");
+  const style = setting?.value;
   if (typeof style !== "string" || BUILT_IN_STYLES.includes(style.toLowerCase())) return null;
   const custom = inventory.outputStyles.find((s) => s.name === style);
   if (custom)
@@ -123,7 +124,8 @@ function outputStyleBlock(
     {
       kind: "not-counted",
       path: `Output style "${style}"`,
-      scope: "user",
+      // The file is missing, so the row is the setting's: the one file that names the style.
+      scope: setting?.from.length === 1 ? (setting.from[0] ?? null) : null,
       note: "ccdesk could not find this style's file",
     },
     null
@@ -222,31 +224,30 @@ function listingBlocks(inventory: Inventory): ContextBlock[] {
         listing
       )
     );
-  const agents = inventory.agents
-    .filter((a) => !a.shadowedBy && !a.skipped)
-    .map((a) => `- ${a.id ?? a.name}: ${a.description}`)
-    .join("\n");
+  const shownAgents = inventory.agents.filter((a) => !a.shadowedBy && !a.skipped);
+  const agents = shownAgents.map((a) => `- ${a.id ?? a.name}: ${a.description}`).join("\n");
   if (agents)
     blocks.push(
       block(
         {
           kind: "agents",
           path: "Subagent descriptions",
-          scope: commonScope(inventory.agents),
+          scope: commonScope(shownAgents),
           note: "Your subagents' descriptions; built-in subagents are not counted",
         },
         agents
       )
     );
 
-  const servers = inventory.mcpServers.filter((s) => s.status === "active").length;
+  const active = inventory.mcpServers.filter((s) => s.status === "active");
+  const servers = active.length;
   if (servers > 0)
     blocks.push(
       block(
         {
           kind: "not-counted",
           path: `Tool names from ${servers} MCP ${servers === 1 ? "server" : "servers"}`,
-          scope: "user",
+          scope: commonScope(active),
           note: "ccdesk does not connect to MCP servers, so it cannot count their tools",
         },
         null

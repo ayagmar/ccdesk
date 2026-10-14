@@ -79,10 +79,18 @@ export function ContextView({ view }: { view: DirectoryView }) {
         {measured.map((b) => (
           <span
             key={`${b.kind}:${b.via ?? ""}:${b.path}`}
-            className={`bar-${b.scope}`}
+            className={`bar-${b.scope ?? "mixed"}`}
             style={{ flexGrow: Math.max(b.bytes, 1) }}
           />
         ))}
+      </div>
+      <div className="context-head" aria-hidden="true">
+        <span>#</span>
+        <span />
+        <span>Part</span>
+        <span>Lines</span>
+        <span>Tokens</span>
+        <span>Total</span>
       </div>
       <ol className="context-list">
         {blocks.map((b, i) => {
@@ -92,7 +100,7 @@ export function ContextView({ view }: { view: DirectoryView }) {
               <details>
                 <summary>
                   <span className="num">{i + 1}</span>
-                  <Bullet line={b.scope} hollow={b.text === null} />
+                  {b.scope ? <Bullet line={b.scope} hollow={b.text === null} /> : <span />}
                   <span className="context-name">
                     <span className="mono" title={tilde(b.path)}>
                       {label(b, view)}
@@ -100,9 +108,22 @@ export function ContextView({ view }: { view: DirectoryView }) {
                     {note(b, view) && <span className="muted small">{note(b, view)}</span>}
                   </span>
                   <span className="num">{b.text === null ? "" : `${b.lines} lines`}</span>
-                  <span className="num">{b.text === null ? "" : `≈${count(tokens(b.bytes))}`}</span>
+                  {/* The heads above are hidden from screen readers, so each number says what it is. */}
+                  <span className="num">
+                    {b.text !== null && (
+                      <>
+                        ≈{count(tokens(b.bytes))}
+                        <span className="visually-hidden"> tokens</span>
+                      </>
+                    )}
+                  </span>
                   <span className="num muted" title="Running total">
-                    {b.text === null ? "" : `≈${count(tokens(running))}`}
+                    {b.text !== null && (
+                      <>
+                        <span className="visually-hidden">running total </span>≈
+                        {count(tokens(running))}
+                      </>
+                    )}
                   </span>
                 </summary>
                 {b.text === null ? (
