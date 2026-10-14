@@ -2,3 +2,7 @@ packages:
   - site
 allowBuilds:
   esbuild: false
+# Claude Code's SDK is published with every Claude Code release and only feeds the generated
+# settings schema, so it skips the 24 h wait pnpm puts on fresh packages.
+minimumReleaseAgeExclude:
+  - '@anthropic-ai/claude-agent-sdk*'
