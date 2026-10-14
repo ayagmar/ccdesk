@@ -9,15 +9,25 @@ import { type SectionUi } from "./types.ts";
 
 type R = RowOf<"extensions">;
 
-/** Why an agent, skill or command is not offered to Claude as usual, if it is not. */
-function notOffered(e: Entry): string | null {
-  if (e.skipped) return `skipped by Claude Code: ${e.skipped}`;
+/**
+ * Why an agent, skill or command is not offered to Claude as usual, if it is not: a word for the
+ * row's badge and the full reason for its tooltip and the inspector.
+ */
+function notOffered(e: Entry): { badge: string; why: string } | null {
+  if (e.skipped) return { badge: "skipped", why: `skipped by Claude Code: ${e.skipped}` };
   if (e.shadowedBy)
-    return `not used: ${tilde(e.shadowedBy)} defines this name with higher priority`;
-  if (e.override === "off") return "hidden by skillOverrides";
+    return {
+      badge: "shadowed",
+      why: `not used: ${tilde(e.shadowedBy)} defines this name with higher priority`,
+    };
+  if (e.override === "off") return { badge: "hidden", why: "hidden by skillOverrides" };
   if (e.override === "user-invocable-only")
-    return "only when you call it: skillOverrides hides it from Claude";
-  if (e.override === "name-only") return "listed to Claude by name only (skillOverrides)";
+    return {
+      badge: "on request",
+      why: "only when you call it: skillOverrides hides it from Claude",
+    };
+  if (e.override === "name-only")
+    return { badge: "name only", why: "listed to Claude by name only (skillOverrides)" };
   return null;
 }
 
@@ -41,6 +51,7 @@ export const extensions: SectionUi<R> = {
       );
     }
     const e = row.item;
+    const off = notOffered(e);
     return (
       <>
         <td>
@@ -53,7 +64,12 @@ export const extensions: SectionUi<R> = {
         </td>
         <td className="desc">
           {e.synced && <span className="flag">claude.ai sync</span>}{" "}
-          {notOffered(e) && <span className="flag warn">{notOffered(e)}</span>} {e.description}
+          {off && (
+            <span className="flag warn" title={off.why}>
+              {off.badge}
+            </span>
+          )}{" "}
+          {e.description}
         </td>
       </>
     );
@@ -84,6 +100,7 @@ export const extensions: SectionUi<R> = {
       );
     }
     const e = row.item;
+    const off = notOffered(e);
     return (
       <>
         {e.description && <p className="verdict">{e.description}</p>}
@@ -97,8 +114,8 @@ export const extensions: SectionUi<R> = {
               <PathValue path={e.realPath} />
             </Field>
           )}
-          {notOffered(e) ? (
-            <Field label="Offered">{notOffered(e)}</Field>
+          {off ? (
+            <Field label="Offered">{off.why}</Field>
           ) : (
             e.listed === false && (
               <Field label="Invoked">
