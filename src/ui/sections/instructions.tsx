@@ -20,13 +20,17 @@ export const instructions: SectionUi<R> = {
           <Bullet line={row.line} hollow={i.status !== "loaded"} />
         </td>
         <td className="mono">
-          <NameButton {...name}>{relativeTo(i.path, view.path)}</NameButton>
-          <LinkMark realPath={i.realPath} />
-          {i.checks.length > 0 && (
-            <span className="flag warn" title={i.checks.join("\n")}>
-              <Icon name="warn" /> {i.checks.length}
-            </span>
-          )}
+          <span className="name-marks">
+            <NameButton {...name} path>
+              {relativeTo(i.path, view.path)}
+            </NameButton>
+            <LinkMark realPath={i.realPath} />
+            {i.checks.length > 0 && (
+              <span className="flag warn" title={i.checks.join("\n")}>
+                <Icon name="warn" /> {i.checks.length}
+              </span>
+            )}
+          </span>
         </td>
         <td>
           <span className={`status status-${i.status}`}>{STATUS[i.status]}</span>

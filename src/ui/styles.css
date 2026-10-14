@@ -947,6 +947,37 @@ input::placeholder {
   vertical-align: middle;
 }
 
+/* As the directory path in the header: the end stays, the start gives way. */
+.row-name.ends-first {
+  direction: rtl;
+}
+
+.row-name.ends-first > span {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* A name with marks after it: the name gives way, so the marks stay in the cell. */
+.name-marks {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.name-marks > * {
+  flex: none;
+}
+
+/* Enough of the name stays to tell the file; past that the cell cuts the marks. */
+.name-marks > .row-name {
+  flex: 0 1 auto;
+  min-width: min(8ch, 100%);
+}
+
+.name-marks > .flag {
+  margin-left: 6px;
+}
+
 .via {
   display: inline-flex;
   vertical-align: middle;
@@ -971,7 +1002,7 @@ input::placeholder {
   width: 40px;
 }
 .tt-instructions th:nth-child(3) {
-  width: 32%;
+  width: 26%;
 }
 .tt-instructions th:nth-child(4) {
   width: 86px;
@@ -1059,9 +1090,13 @@ input::placeholder {
   width: 32%;
 }
 
-/* Too narrow for a useful description, such as beside the inspector, which shows it. */
+/* Too narrow for every column, such as beside the inspector, which shows what is left out: the
+   tools' descriptions, an instruction's line count and when a memory changed. The descriptions of
+   instructions and memories get the room. */
 @container (max-width: 880px) {
-  .tt-tools :is(th, td):nth-child(6) {
+  .tt-tools :is(th, td):nth-child(6),
+  .tt-instructions :is(th, td):nth-child(6),
+  .tt-memory :is(th, td):nth-child(6) {
     display: none;
   }
 }
@@ -1187,9 +1222,25 @@ input::placeholder {
   white-space: nowrap;
 }
 
+/* In a table cell a flag is cut short like the rest of the cell; its full text is in its title or
+   the inspector. */
+.tt td .flag {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
 .flag .icon {
   width: 13px;
   height: 13px;
+}
+
+/* A cell flag is not a flex row, so its icon sits in the line of text, spaced by the markup. */
+.tt td .flag > .icon {
+  display: inline-block;
+  vertical-align: -2px;
 }
 
 .flag.warn {
@@ -1776,7 +1827,11 @@ button:disabled {
 
 /* ---------- permissions, index fixes ---------- */
 
+/* A section's note explains the table, so it takes the line under the head, and the head line keeps
+   its actions at the right end. */
 .tt-note {
+  order: 1;
+  flex-basis: 100%;
   font-size: 13.5px;
   color: var(--muted);
 }
@@ -2005,6 +2060,10 @@ button:disabled {
   background: var(--warn-bg);
   color: var(--warn);
   font-size: 13.5px;
+}
+
+.problems .problem-path {
+  display: block;
 }
 
 .problems ul,

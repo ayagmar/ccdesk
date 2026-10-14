@@ -51,7 +51,9 @@ export const permissions: SectionUi<R> = {
           )}
         </td>
         <td className="mono value">
-          <NameButton {...name}>{p.kind === "rule" ? p.rule : tildeAll(p.value)}</NameButton>
+          <NameButton {...name} path={p.kind === "additionalDirectories"}>
+            {p.kind === "rule" ? p.rule : tildeAll(p.value)}
+          </NameButton>
         </td>
         <td className="desc">
           <Outcome p={p} usage={actions.view.usage} />
@@ -132,7 +134,14 @@ const VERDICTS = {
 
 /** What a rule or setting does here, in the table. */
 function Outcome({ p, usage }: { p: Permission; usage: Usage | null | undefined }) {
-  if (!p.inEffect) return <span className="flag warn">{p.note ?? "not in effect"}</span>;
+  if (!p.inEffect) {
+    const note = p.note ?? "not in effect";
+    return (
+      <span className="flag warn" title={note}>
+        {note}
+      </span>
+    );
+  }
   if (p.kind === "defaultMode") return "how sessions start";
   if (p.kind !== "rule") return "Claude may read and edit here";
   if (p.decidedBy)
