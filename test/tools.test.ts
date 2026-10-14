@@ -44,7 +44,7 @@ test("rules for some uses are listed under the tools they cover, Edit paths unde
   );
   assert.deepEqual(
     tools.Grep?.scoped.map((r) => r.rule),
-    ["Read(./.env)"]
+    ["Read(./.env)", "Edit(docs/**)"]
   );
   assert.deepEqual(
     tools.Monitor?.scoped.map((r) => r.rule),
@@ -59,6 +59,20 @@ test("rules for some uses are listed under the tools they cover, Edit paths unde
     tools.NotebookEdit?.scoped.map((r) => r.rule),
     ["Edit(docs/**)"]
   );
+});
+
+test("an Edit allow rule is listed under the reading tools too, since it grants reading that path", async () => {
+  const tools = await toolsFor({
+    permissions: { allow: ["Edit(~/notes/**)"], deny: ["Edit(./secrets/**)"] },
+  });
+
+  // docs: tools-reference#configure-tools-with-permission-rules-and-hooks
+  for (const name of ["Read", "Grep", "Glob", "LSP"])
+    assert.deepEqual(
+      tools[name]?.scoped.map((r) => r.rule),
+      ["Edit(~/notes/**)"],
+      name
+    );
 });
 
 test("a rule for the whole of Bash covers Monitor's commands but does not remove Monitor", async () => {

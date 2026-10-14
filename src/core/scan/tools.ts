@@ -11,12 +11,16 @@ import { CHECK_ORDER } from "./permissions.ts";
 
 /**
  * The other tools a rule for some uses covers: Bash rules apply to Monitor, Claude Code checks file
- * paths against Edit and Read rules only, and a Read deny also blocks Edit and Write on that path
+ * paths against Edit and Read rules only, an Edit allow also grants reading that path, and a Read
+ * deny also blocks Edit and Write on it
  * (docs: tools-reference#configure-tools-with-permission-rules-and-hooks, permissions#read-and-edit).
  */
 function coveredTools(tool: string, list: PermissionList): string[] {
   if (tool === "Bash") return ["Bash", "Monitor"];
-  if (tool === "Edit") return ["Edit", "Write", "NotebookEdit"];
+  if (tool === "Edit")
+    return list === "allow"
+      ? ["Edit", "Write", "NotebookEdit", "Read", "Grep", "Glob", "LSP"]
+      : ["Edit", "Write", "NotebookEdit"];
   if (tool === "Read")
     return list === "deny"
       ? ["Read", "Grep", "Glob", "LSP", "Edit", "Write"]
