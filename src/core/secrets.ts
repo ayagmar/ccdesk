@@ -1,5 +1,6 @@
 import { stringify as stringifyYaml } from "yaml";
-import { FRONTMATTER, isRecord, parseFrontmatterYaml, parseJson } from "./scan/data.ts";
+import { FRONTMATTER } from "../shared/frontmatter.ts";
+import { isRecord, parseFrontmatterYaml, parseJson } from "./scan/data.ts";
 
 /**
  * A server URL as ccdesk shows it: a user name, password or query string can carry a key, so they

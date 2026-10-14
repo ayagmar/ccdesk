@@ -1,4 +1,5 @@
 import { parse as parseYaml } from "yaml";
+import { FRONTMATTER } from "../../shared/frontmatter.ts";
 
 // Checks on parsed data shared by file reading and redaction, kept apart so neither imports the other.
 
@@ -19,9 +20,6 @@ interface Frontmatter {
 export function parseJson(text: string): unknown {
   return JSON.parse(text.startsWith("\uFEFF") ? text.slice(1) : text);
 }
-
-/** Claude Code accepts spaces after either `---` (observed in v2.1.296; the docs do not say). */
-export const FRONTMATTER = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?/;
 
 /** A value YAML reads as something else, or fails on, when it is not quoted. */
 const NEEDS_QUOTES = /[{}[\]*&#!|>%@`]|: /;
