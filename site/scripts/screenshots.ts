@@ -126,7 +126,20 @@ const SHOTS: Shot[] = [
       await pause(page);
     },
   },
-  { name: "all-directories", width: 1600, height: 1000, query: "?all" },
+  {
+    name: "all-directories",
+    width: 1600,
+    height: 1000,
+    query: "?all",
+    // Lists the deleted repository too, with its Forget button.
+    setup: async (page) => {
+      await page
+        .getByRole("group", { name: "Deleted folders" })
+        .getByRole("button", { name: /^All/ })
+        .click();
+      await pause(page);
+    },
+  },
   {
     name: "changes",
     width: 1600,

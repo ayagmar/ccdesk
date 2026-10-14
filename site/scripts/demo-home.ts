@@ -1,8 +1,9 @@
 // Builds a disposable, made-up Claude Code setup for the docs screenshots: two repositories and a
 // notes folder with instructions, settings at every scope, permission rules, hooks, MCP servers,
-// subagents, skills, a plugin, auto memory and transcripts. Nothing here is real.
+// subagents, skills, a plugin, auto memory and transcripts, and a deleted repository Claude Code
+// still keeps a store for. Nothing here is real.
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 export interface DemoHome {
@@ -438,7 +439,7 @@ function writeMemory({ claude, api, web, write }: Demo): void {
 }
 
 /** Transcripts, so tool counts, suggested rules and memory reads show up. */
-function writeTranscripts({ claude, api, web, write }: Demo): void {
+function writeTranscripts({ home, claude, api, web, write }: Demo): void {
   const apiMemory = join(claude, "projects", storeName(api), "memory");
   write(
     join(claude, "projects", storeName(api), "demo-session-1.jsonl"),
@@ -491,5 +492,20 @@ function writeTranscripts({ claude, api, web, write }: Demo): void {
       ["Bash", { command: "pnpm build" }],
       ["Read", { file_path: join(web, "CLAUDE.md") }],
     ])
+  );
+  // A repository deleted since: its folder is gone, its store and memory are not.
+  const legacy = join(home, "code", "acme-legacy");
+  const legacySession = join(claude, "projects", storeName(legacy), "demo-session-3.jsonl");
+  write(legacySession, transcript(legacy, [["Bash", { command: "make test" }]], 120));
+  // Last used is the newest transcript's modification time.
+  const lastUsed = new Date(Date.now() - 120 * DAY);
+  utimesSync(legacySession, lastUsed, lastUsed);
+  write(
+    join(claude, "projects", storeName(legacy), "memory", "MEMORY.md"),
+    "- [Build](build.md): make, not pnpm\n"
+  );
+  write(
+    join(claude, "projects", storeName(legacy), "memory", "build.md"),
+    memory("build", "project", "How this repository builds", "Run make test before a commit.")
   );
 }
