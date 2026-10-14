@@ -10,7 +10,7 @@ import { type SectionUi } from "./types.ts";
 type R = RowOf<"mcp">;
 
 export const mcp: SectionUi<R> = {
-  cells: (row, _actions, select) => {
+  cells: (row, _actions, name) => {
     const m = row.item;
     return (
       <>
@@ -18,7 +18,7 @@ export const mcp: SectionUi<R> = {
           <Bullet line={row.line} />
         </td>
         <td className="mono">
-          <NameButton onClick={select}>{m.name}</NameButton>
+          <NameButton {...name}>{m.name}</NameButton>
         </td>
         <td>{m.transport}</td>
         <td className="mono value">{tildeAll(m.target)}</td>

@@ -37,7 +37,8 @@ export function RouteStrip({ view, lit, filter, onFilter }: Props) {
                 onClick={() => onFilter(pressed ? null : stop.line)}
                 title={`${stop.name}: ${summary.join(", ") || "not used"}\n${pressed ? "Show every scope" : `Show only ${stop.name.toLowerCase()} items`}`}
               >
-                <span className="stop-node">
+                {/* The stop's name follows, so the bullet would only repeat it. */}
+                <span className="stop-node" aria-hidden="true">
                   <Bullet line={stop.line} hollow={!stop.active} />
                 </span>
                 <span className="stop-name">{stop.name}</span>

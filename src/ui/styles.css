@@ -1445,9 +1445,7 @@ pre.raw {
   overflow-wrap: anywhere;
 }
 
-.prose h1,
-.prose h2,
-.prose h3 {
+.prose :is(h3, h4, h5, h6) {
   font-size: 14px;
   margin: 18px 0 6px;
 }

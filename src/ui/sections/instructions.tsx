@@ -11,7 +11,7 @@ type R = RowOf<"instructions">;
 const VERDICT = { loaded: "ok", "on-match": "", skipped: "off" } as const;
 
 export const instructions: SectionUi<R> = {
-  cells: (row, { view }, select) => {
+  cells: (row, { view }, name) => {
     const i = row.item;
     return (
       <>
@@ -20,7 +20,7 @@ export const instructions: SectionUi<R> = {
           <Bullet line={row.line} hollow={i.status !== "loaded"} />
         </td>
         <td className="mono">
-          <NameButton onClick={select}>{relativeTo(i.path, view.path)}</NameButton>
+          <NameButton {...name}>{relativeTo(i.path, view.path)}</NameButton>
           <LinkMark realPath={i.realPath} />
           {i.checks.length > 0 && (
             <span className="flag warn" title={i.checks.join("\n")}>

@@ -18,7 +18,7 @@ type R = RowOf<"permissions">;
 const OUTCOME = { allow: "runs without asking", ask: "asks you first", deny: "blocked" } as const;
 
 export const permissions: SectionUi<R> = {
-  cells: (row, actions, select) => {
+  cells: (row, actions, name) => {
     if (isSuggested(row))
       return (
         <>
@@ -27,7 +27,7 @@ export const permissions: SectionUi<R> = {
             <span className="muted">suggested</span>
           </td>
           <td className="mono value">
-            <NameButton onClick={select}>{row.item.rule}</NameButton>
+            <NameButton {...name}>{row.item.rule}</NameButton>
           </td>
           <td className="desc">
             you allowed it {plural(row.item.approved, "time")}
@@ -51,7 +51,7 @@ export const permissions: SectionUi<R> = {
           )}
         </td>
         <td className="mono value">
-          <NameButton onClick={select}>{p.kind === "rule" ? p.rule : tildeAll(p.value)}</NameButton>
+          <NameButton {...name}>{p.kind === "rule" ? p.rule : tildeAll(p.value)}</NameButton>
         </td>
         <td className="desc">
           <Outcome p={p} usage={actions.view.usage} />

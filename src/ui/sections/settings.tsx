@@ -46,7 +46,7 @@ function layerValue(value: unknown, exists: boolean, ignored: Ignored | undefine
 }
 
 export const settings: SectionUi<R> = {
-  cells: (row, _actions, select) => {
+  cells: (row, _actions, name) => {
     const s = row.item;
     return (
       <>
@@ -56,7 +56,7 @@ export const settings: SectionUi<R> = {
           ))}
         </td>
         <td className="mono">
-          <NameButton onClick={select}>{s.key}</NameButton>
+          <NameButton {...name}>{s.key}</NameButton>
         </td>
         <td className="mono value">
           {s.from.length === 0 ? (

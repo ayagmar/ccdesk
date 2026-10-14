@@ -9,7 +9,7 @@ import { type SectionUi } from "./types.ts";
 type R = RowOf<"hooks">;
 
 export const hooks: SectionUi<R> = {
-  cells: (row, _actions, select) => {
+  cells: (row, _actions, name) => {
     const h = row.item;
     return (
       <>
@@ -17,7 +17,7 @@ export const hooks: SectionUi<R> = {
           <Bullet line={row.line} />
         </td>
         <td>
-          <NameButton onClick={select}>{h.event}</NameButton>
+          <NameButton {...name}>{h.event}</NameButton>
         </td>
         <td className="mono">{h.matcher ?? <span className="muted">any</span>}</td>
         <td className="mono value">

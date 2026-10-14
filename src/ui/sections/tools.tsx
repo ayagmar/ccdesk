@@ -222,14 +222,14 @@ function Described({ text }: { text: string }) {
 }
 
 export const tools: SectionUi<R> = {
-  cells: (row, _actions, select) => {
+  cells: (row, _actions, name) => {
     const t = row.item;
     const checked = t.scoped.filter((r) => !r.unchecked);
     return (
       <>
         <td>{row.line && <Bullet line={row.line} />}</td>
         <td className="mono">
-          <NameButton onClick={select}>{t.name}</NameButton>
+          <NameButton {...name}>{t.name}</NameButton>
         </td>
         <td>
           <span className={`tool-outcome tool-${outcomeClass(t)}`}>{outcome(t)}</span>

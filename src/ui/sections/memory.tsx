@@ -22,7 +22,7 @@ function TypeName({ type }: { type: string }) {
 }
 
 export const memory: SectionUi<R> = {
-  cells: (row, { sharedNames }, select) => {
+  cells: (row, { sharedNames }, name) => {
     const m = row.item;
     return (
       <>
@@ -30,7 +30,7 @@ export const memory: SectionUi<R> = {
           <Bullet line="memory" />
         </td>
         <td className="mono">
-          <NameButton onClick={select}>{m.name}</NameButton>
+          <NameButton {...name}>{m.name}</NameButton>
         </td>
         <td>
           <TypeName type={m.type} />
