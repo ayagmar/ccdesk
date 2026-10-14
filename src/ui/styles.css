@@ -975,17 +975,24 @@ input::placeholder {
   width: 40px;
 }
 .tt-tools th:nth-child(2) {
-  width: 190px;
+  width: 20%;
 }
 .tt-tools th:nth-child(3) {
-  width: 150px;
-}
-.tt-tools th:nth-child(4) {
-  width: 190px;
+  width: 140px;
 }
 .tt-tools th:nth-child(5) {
   width: 64px;
   text-align: right;
+}
+.tt-tools th:nth-child(6) {
+  width: 32%;
+}
+
+/* Too narrow for a useful description, such as beside the inspector, which shows it. */
+@container (max-width: 880px) {
+  .tt-tools :is(th, td):nth-child(6) {
+    display: none;
+  }
 }
 
 .tt-dirs th:nth-child(2),

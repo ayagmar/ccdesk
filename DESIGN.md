@@ -300,7 +300,7 @@ The shell is a three-column grid: the directory rail (248px), the main column, a
 
 Timetable rows are exactly one row unit (32px) tall, with 8px cell padding, single-line cells that truncate with an ellipsis, and fixed column widths per table so the bullet, name and file columns land in the same place from section to section. Column heads (26px) stick directly under the sticky directory header, so a section's columns stay labelled while you scroll it. The header is 92px tall; in a main column narrower than 960px the tools move to a row of their own under the path and it grows to 130px, so the path keeps the column's width. The palette's results use the same 32px row.
 
-Responsive behaviour is three steps:
+Responsive behaviour is three window steps, plus column drops keyed to the main column's own width (a container query), since the inspector takes room at any window size. Below 880px of main column, Built-in tools drops its Description column, which the inspector shows.
 - **1181–1400px:** the rail narrows to 220px and the inspector to 360px; the Instructions "Lines" column is dropped because the inspector already shows it.
 - **≤1180px:** the inspector leaves the grid and slides over from the right edge as a drawer when a row is selected; with nothing selected it is hidden.
 - **≤760px:** the rail stacks above the content (capped at 34% of the viewport), gutters shrink to 16px, the palette button is hidden in favour of the keyboard shortcut, the route strip turns vertical with the line running down the left, each table keeps only the columns that answer "is it loaded, and who sees it", and column heads stop sticking because the header height varies.
