@@ -71,6 +71,13 @@ export function enabledPluginsEntry(
   return undefined;
 }
 
+/** Where a scan starts: the folder, its repository root and canonical root (see canonicalRoot). */
+interface PluginPlace {
+  projectDir: string;
+  gitRoot: string | null;
+  canonicalRoot: string;
+}
+
 /**
  * Installed plugins that apply in `projectDir`, with whether each is enabled and by which file. An
  * install list or manifest that is there but does not parse goes into `problems`.
@@ -78,8 +85,7 @@ export function enabledPluginsEntry(
 export async function readPlugins(
   env: ScanEnv,
   layers: SettingsLayer[],
-  projectDir: string,
-  gitRoot: string | null,
+  { projectDir, gitRoot, canonicalRoot }: PluginPlace,
   problems: Problem[]
 ): Promise<LoadedPlugin[]> {
   const installed = await readJsonOrReport(
@@ -91,10 +97,13 @@ export async function readPlugins(
   const out: LoadedPlugin[] = [];
   for (const [id, installs] of Object.entries(installed.plugins)) {
     if (!Array.isArray(installs)) continue;
-    // A project or local install applies only in its own project; it beats a user install there.
+    // A project or local install applies only in its own project, and one made in the main
+    // checkout in its worktrees too (docs: worktrees#what-worktrees-share-with-the-main-checkout);
+    // it beats a user install there.
     const records = installs.filter((i): i is Record<string, unknown> => isRecord(i));
+    const here = [projectDir, gitRoot, canonicalRoot];
     const install =
-      records.find((i) => i.projectPath === projectDir || (gitRoot && i.projectPath === gitRoot)) ??
+      records.find((i) => typeof i.projectPath === "string" && here.includes(i.projectPath)) ??
       records.find((i) => typeof i.projectPath !== "string");
     if (!install) continue;
     const plugin: Plugin = {

@@ -320,6 +320,8 @@ interface InventoryInput {
   projectDir: string;
   /** The repository (or worktree) root, where the search for project skills stops. */
   gitRoot: string | null;
+  /** The repository's canonical root (see canonicalRoot): a linked worktree reads through to it. */
+  canonicalRoot: string;
   layers: SettingsLayer[];
   effective: EffectiveSetting[];
   /** Managed settings as written, nothing hidden: for checks that must see header values. */
@@ -333,20 +335,27 @@ interface InventoryInput {
   problems: Problem[];
 }
 
+/** The project's `.claude/<sub>` folders for a kind of entry, root first (see projectFolders). */
+type ProjectFolders = (sub: string) => Promise<string[]>;
+
 /**
  * The `.claude/<sub>` folders of the start directory and every parent up to the repository root
- * (only the start directory outside git), root first, leaving out the user folder.
+ * (only the start directory outside git), root first, leaving out the user folder. In a linked
+ * worktree whose root has no `.claude/<sub>`, the main checkout's comes first, so it loses to the
+ * worktree's own (docs: worktrees#what-worktrees-share-with-the-main-checkout; output styles are
+ * read through too, as observed in v2.1.296).
  */
 async function projectFolders(
   env: ScanEnv,
-  projectDir: string,
-  gitRoot: string | null,
+  { projectDir, gitRoot, canonicalRoot }: InventoryInput,
   sub: string
 ): Promise<string[]> {
   const dirs = ancestorsRootFirst(projectDir)
     .filter((dir) => !gitRoot || isWithin(gitRoot, dir))
     .slice(gitRoot ? 0 : -1);
   const folders: string[] = [];
+  if (gitRoot && canonicalRoot !== gitRoot && !(await isDir(join(gitRoot, ".claude", sub))))
+    folders.push(join(canonicalRoot, ".claude", sub));
   for (const dir of dirs)
     if (!(await isUserClaudeFolder(env, dir))) folders.push(join(dir, ".claude", sub));
   return folders;
@@ -376,16 +385,13 @@ export function agentProblems(text: string): string[] {
  */
 async function readAgents(
   env: ScanEnv,
-  projectDir: string,
-  gitRoot: string | null,
+  folders: ProjectFolders,
   locked: boolean,
   problems: Problem[]
 ) {
   const sources: [string, Source][] = [
     [join(env.managedDir, ".claude", "agents"), "managed"],
-    ...(await projectFolders(env, projectDir, gitRoot, "agents"))
-      .reverse()
-      .map((dir): [string, Source] => [dir, "project"]),
+    ...(await folders("agents")).reverse().map((dir): [string, Source] => [dir, "project"]),
     [join(env.claudeDir, "agents"), "user"],
   ];
   const agents: Entry[] = [];
@@ -412,17 +418,10 @@ async function readAgents(
  * repository root (the closest wins) and yours (docs: output-styles#create-a-custom-output-style).
  * The docs order only the project folders; managed, project, then yours follows subagents.
  */
-async function readOutputStyles(
-  env: ScanEnv,
-  projectDir: string,
-  gitRoot: string | null,
-  problems: Problem[]
-) {
+async function readOutputStyles(env: ScanEnv, folders: ProjectFolders, problems: Problem[]) {
   const sources: [string, Source][] = [
     [join(env.managedDir, ".claude", "output-styles"), "managed"],
-    ...(await projectFolders(env, projectDir, gitRoot, "output-styles"))
-      .reverse()
-      .map((dir): [string, Source] => [dir, "project"]),
+    ...(await folders("output-styles")).reverse().map((dir): [string, Source] => [dir, "project"]),
     [join(env.claudeDir, "output-styles"), "user"],
   ];
   const styles: Entry[] = [];
@@ -453,8 +452,7 @@ export function applySkillOverrides(entries: Entry[], overrides: unknown) {
  */
 async function readLocalSkills(
   env: ScanEnv,
-  projectDir: string,
-  gitRoot: string | null,
+  folders: ProjectFolders,
   locked: boolean,
   problems: Problem[]
 ): Promise<{ skills: Entry[]; winners: Map<string, Entry> }> {
@@ -465,10 +463,7 @@ async function readLocalSkills(
     ...(await listDir(join(env.claudeDir, "skills", "synced")))
       .filter((bucket) => !bucket.startsWith("."))
       .map((bucket): [string, Source] => [join(env.claudeDir, "skills", "synced", bucket), "user"]),
-    ...(await projectFolders(env, projectDir, gitRoot, "skills")).map((dir): [string, Source] => [
-      dir,
-      "project",
-    ]),
+    ...(await folders("skills")).map((dir): [string, Source] => [dir, "project"]),
   ];
   const skills: Entry[] = [];
   const seenFolders = new Set<string>();
@@ -499,8 +494,7 @@ async function readLocalSkills(
  */
 async function readCommands(
   env: ScanEnv,
-  projectDir: string,
-  gitRoot: string | null,
+  folders: ProjectFolders,
   locked: boolean,
   skills: Map<string, Entry>,
   problems: Problem[]
@@ -508,9 +502,7 @@ async function readCommands(
   const sources: [string, Source][] = [
     [join(env.managedDir, ".claude", "commands"), "managed"],
     [join(env.claudeDir, "commands"), "user"],
-    ...(await projectFolders(env, projectDir, gitRoot, "commands"))
-      .reverse()
-      .map((dir): [string, Source] => [dir, "project"]),
+    ...(await folders("commands")).reverse().map((dir): [string, Source] => [dir, "project"]),
   ];
   const commands: Entry[] = [];
   const winners = new Map<string, Entry>();
@@ -531,41 +523,28 @@ async function readCommands(
 }
 
 export async function readInventory(input: InventoryInput): Promise<Inventory> {
-  const { env, projectDir, gitRoot, layers, problems } = input;
+  const { env, layers, problems } = input;
   const locked = pluginOnlySurfaces(input.managed);
-  const plugins = await readPlugins(env, layers, projectDir, gitRoot, problems);
+  const plugins = await readPlugins(env, layers, input, problems);
   const active = plugins.filter((p) => p.plugin.enabled);
   const fromPlugins = await Promise.all(
     active.map((plugin) => pluginEntries(env, plugin, problems))
   );
-  const { skills, winners } = await readLocalSkills(
-    env,
-    projectDir,
-    gitRoot,
-    locked.has("skills"),
-    problems
-  );
-
-  const commands = await readCommands(
-    env,
-    projectDir,
-    gitRoot,
-    locked.has("skills"),
-    winners,
-    problems
-  );
+  const folders = (sub: string) => projectFolders(env, input, sub);
+  const { skills, winners } = await readLocalSkills(env, folders, locked.has("skills"), problems);
+  const commands = await readCommands(env, folders, locked.has("skills"), winners, problems);
   const overrides = input.effective.find((s) => s.key === "skillOverrides")?.value;
   applySkillOverrides([...skills, ...commands], overrides);
 
   return {
     agents: [
-      ...(await readAgents(env, projectDir, gitRoot, locked.has("agents"), problems)),
+      ...(await readAgents(env, folders, locked.has("agents"), problems)),
       ...fromPlugins.flatMap((p) => p.agents),
     ],
     skills: [...skills, ...fromPlugins.flatMap((p) => p.skills)],
     commands: [...commands, ...fromPlugins.flatMap((p) => p.commands)],
     outputStyles: [
-      ...(await readOutputStyles(env, projectDir, gitRoot, problems)),
+      ...(await readOutputStyles(env, folders, problems)),
       ...fromPlugins.flatMap((p) => p.outputStyles),
     ],
     hooks: await readHooks(input, active),

@@ -6,7 +6,7 @@ description: The subagents available in a directory, which definition wins, and 
 Subagents are listed in the **Agents, skills & plugins** section with the kind **agent**. ccdesk reads them from:
 
 1. your organisation's managed folder;
-2. `.claude/agents` in the open directory and every folder above it up to the repository root, the closest first;
+2. `.claude/agents` in the open directory and every folder above it up to the repository root, the closest first. In a linked git worktree whose root has no `.claude/agents`, the main checkout's comes last;
 3. `~/.claude/agents`;
 4. enabled plugins, named `plugin:agent`.
 

@@ -22,7 +22,7 @@ import {
   claudeJsonKey,
   gitRoot,
   mainWorktreeRoot,
-  memoryKey,
+  canonicalRoot,
   trustKey,
   visibilityOf,
 } from "./git.ts";
@@ -126,10 +126,12 @@ export async function scanDirectory(
     problems,
   });
 
+  const canonical = exists ? await canonicalRoot(path) : path;
   const inventory = await readInventory({
     env,
     projectDir: path,
     gitRoot: root,
+    canonicalRoot: canonical,
     layers: settings,
     effective,
     managed: managed.data,
@@ -141,8 +143,7 @@ export async function scanDirectory(
   });
 
   const sharing = await shareProjectFiles(path, root, instructions, settings, inventory);
-  const key = exists ? await memoryKey(path) : path;
-  const memory = await readMemory(env, key, effective, trustOptions, problems);
+  const memory = await readMemory(env, canonical, effective, trustOptions, problems);
   const permissions = permissionsOf(settings, trustOptions);
 
   return {
