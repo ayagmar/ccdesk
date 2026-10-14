@@ -3,9 +3,10 @@ import { stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { storeDirName } from "../shared/memory.ts";
 import { type DirectoryView, type Plugin, type SessionProfile } from "../shared/types.ts";
+import { isRecord } from "./scan/data.ts";
 import { type ScanEnv } from "./scan/env.ts";
-import { isDir, isFile, isNetworkPath } from "./scan/files.ts";
-import { canonicalRoot, mainWorktreeRoot } from "./scan/git.ts";
+import { isDir, isFile, isNetworkPath, readJsonObject } from "./scan/files.ts";
+import { canonicalRoot, claudeJsonKey, mainWorktreeRoot } from "./scan/git.ts";
 import { scanDirectory } from "./scan/index.ts";
 import {
   isSkillsDirPlugin,
@@ -44,8 +45,9 @@ const CONFIG_FOLDERS = ["rules", "agents", "skills", "commands", "output-styles"
 /**
  * The files and folders whose changes alter what ccdesk shows for `dir`. A `.claude` folder is
  * watched only for its config files and folders, never recursively, because Claude Code keeps
- * whole checkouts in `.claude/worktrees`. ~/.claude.json is left out: Claude Code rewrites it
- * during every session, and focusing the tab picks up its changes.
+ * whole checkouts in `.claude/worktrees`. ~/.claude.json is watched in its folder, since Claude
+ * Code replaces it by renaming a new file over it; a change there counts only when it changes what
+ * the scan reads (see `claudeJsonPrint`).
  */
 async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Target[]> {
   const claude = (folder: string): Target[] => [
@@ -67,6 +69,7 @@ async function targets(env: ScanEnv, dir: string, extra: Target[]): Promise<Targ
     },
     { path: env.managedDir, recursive: false },
     { path: join(env.managedDir, "managed-settings.d"), recursive: false },
+    { path: dirname(env.claudeJson), recursive: false, names: [basename(env.claudeJson)] },
     { path: join(env.managedDir, ".claude"), recursive: false, names: CONFIG_FOLDERS },
     ...CONFIG_FOLDERS.map((sub) => ({
       path: join(env.managedDir, ".claude", sub),
@@ -164,6 +167,55 @@ async function pluginTargets(env: ScanEnv, view: DirectoryView, plugin: Plugin):
   return out;
 }
 
+/** What a scan reads in a project's entry in ~/.claude.json. */
+const PROJECT_FIELDS = [
+  // Trust (trustOf) and the answer about external imports (importAnswer).
+  "hasTrustDialogAccepted",
+  "hasClaudeMdExternalIncludesApproved",
+  "hasClaudeMdExternalIncludesWarningShown",
+  // Local MCP servers, the ones turned off in /mcp, and the answers about .mcp.json servers.
+  "mcpServers",
+  "disabledMcpServers",
+  "enableAllProjectMcpServers",
+  "enabledMcpjsonServers",
+  "disabledMcpjsonServers",
+];
+
+/**
+ * The entries under `projects` in ~/.claude.json a scan of `dir` can read: the folder and every
+ * parent, since a trusted parent covers a folder outside a repository, and the main checkout's
+ * root, which a worktree's trust and local servers are saved under.
+ */
+async function projectKeys(env: ScanEnv, dir: string): Promise<string[]> {
+  const keys: string[] = [];
+  for (let d = dir; ; d = dirname(d)) {
+    keys.push(d);
+    if (dirname(d) === d) break;
+  }
+  const mainRoot = await mainWorktreeRoot(dir);
+  if (mainRoot) keys.push(mainRoot);
+  return keys.map((key) => claudeJsonKey(env, key));
+}
+
+/**
+ * The parts of ~/.claude.json a scan reads for the project `keys`: the user MCP servers, the
+ * account synced skills load for, and each entry's `PROJECT_FIELDS`. Claude Code rewrites the file
+ * all through a session, mostly for counters and caches ccdesk does not show; those leave this as
+ * it was. A missing or broken file is a state of its own, which the scan reports.
+ */
+async function claudeJsonPrint(env: ScanEnv, keys: string[]): Promise<string> {
+  const file = await readJsonObject(env, env.claudeJson);
+  if (!file.ok) return file.missing ? "missing" : `broken: ${file.error}`;
+  const { projects, mcpServers, oauthAccount } = file.data;
+  const pick = (from: unknown, fields: string[]) =>
+    isRecord(from) ? fields.map((field) => from[field]) : null;
+  return JSON.stringify([
+    mcpServers,
+    pick(oauthAccount, ["organizationUuid", "accountUuid"]),
+    keys.map((key) => pick(isRecord(projects) ? projects[key] : undefined, PROJECT_FIELDS)),
+  ]);
+}
+
 /**
  * `target`, or when it does not exist yet, the nearest folder above it that does, watched for the
  * next missing name only. Watching needs a folder that exists, and the watchers are rebuilt after
@@ -207,7 +259,10 @@ interface Subscription {
   ready: Promise<void>;
   /** When a watched file last changed, in ms since the epoch. */
   changedAt: number;
-  /** When a watcher last saw any change, before it settled; 0 for none. */
+  /**
+   * When a watcher last saw any change, before it settled; 0 for none. For ~/.claude.json, when a
+   * change to what the scan reads was found.
+   */
   touchedAt: number;
   /** When the current watchers started. */
   watchingSince: number;
@@ -223,6 +278,11 @@ interface Subscription {
   /** Callers of `subscribe`, called after every change until they unsubscribe. */
   listeners: Set<() => void>;
   extra: Target[];
+  /** The `projects` entries of ~/.claude.json the scan reads, and `claudeJsonPrint` of them. */
+  projectKeys: string[];
+  claudeJson?: string;
+  /** The latest read of ~/.claude.json after a watcher saw it change; reads run one at a time. */
+  claudeJsonRead: Promise<void>;
   /** What the watchers saw since subscribers were last told. */
   seen: Seen;
   /** On macOS, the state of each path read before subscribers were last told, until `repeatsUntil`. */
@@ -246,18 +306,12 @@ const nothingSeen = (): Seen => ({ counts: false, checking: 0, states: new Map()
 
 const identity = (info: BigIntStats) => `${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}`;
 
-/** A path's inode, size and times, or undefined when it cannot be read. */
-async function fileState(path: string): Promise<string | undefined> {
-  const info = await stat(path, { bigint: true }).catch(() => null);
-  return info ? identity(info) : undefined;
-}
-
 /**
- * `fileState` of a file, or undefined when it cannot tell a repeat from a change. The change time
- * moves on every write, even when a tool sets the modification time back, and a file renamed over
- * it has another inode. That needs times finer than a second: on a volume that keeps whole
- * seconds, such as HFS+ or FAT, two writes in one second look alike. A folder's own state does not
- * move when a file in it is edited, so a folder has none either.
+ * A file's inode, size and times, or undefined when they cannot tell a repeat from a change. The
+ * change time moves on every write, even when a tool sets the modification time back, and a file
+ * renamed over it has another inode. That needs times finer than a second: on a volume that keeps
+ * whole seconds, such as HFS+ or FAT, two writes in one second look alike. A folder's own state
+ * does not move when a file in it is edited, so a folder has none either.
  */
 async function repeatState(path: string): Promise<string | undefined> {
   const info = await stat(path, { bigint: true }).catch(() => null);
@@ -265,11 +319,10 @@ async function repeatState(path: string): Promise<string | undefined> {
   return identity(info);
 }
 
-/** The latest scan of a directory, with when it started and ~/.claude.json as it was then. */
+/** The latest scan of a directory, with when it started. */
 interface Scanned {
   view: DirectoryView;
   startedAt: number;
-  stateFile: string;
 }
 
 /**
@@ -347,11 +400,10 @@ export class Watcher {
   /** Scans `dir` and remembers what the scan read, so those files are watched too. */
   async scan(dir: string, profile: SessionProfile = "interactive"): Promise<DirectoryView> {
     const startedAt = Date.now();
-    const stateFile = await this.stateFile();
     const view = await this.scanOf(this.env, dir, profile);
     const subscription = this.subscriptions.get(view.path);
     // Only a watched directory's view can be known to be current later.
-    if (subscription) this.latest.set(view.path, { view, startedAt, stateFile });
+    if (subscription) this.latest.set(view.path, { view, startedAt });
     const extra = await dependencies(this.env, view);
     this.scanned.set(view.path, extra);
     if (subscription && JSON.stringify(extra) !== JSON.stringify(subscription.extra)) {
@@ -364,28 +416,22 @@ export class Watcher {
   /**
    * The view of `dir`: the latest scan while it is known to be current, else a new scan. It is
    * current only while watchers that started before it, on every file it read, have seen no change
-   * since it started, and ~/.claude.json, which is not watched, is as it was. Only an interactive
-   * scan is reused, as the path tester describes an interactive session.
+   * since it started. Only an interactive scan is reused, as the path tester describes an
+   * interactive session.
    */
   async view(dir: string): Promise<DirectoryView> {
-    // Read first, so a watcher that fails meanwhile is seen below.
-    const stateFile = await this.stateFile();
+    // A rewrite of ~/.claude.json still being read may change what the scan shows.
+    await this.subscriptions.get(dir)?.claudeJsonRead;
     const latest = this.latest.get(dir);
     const subscription = this.subscriptions.get(dir);
     if (
       latest?.view.profile === "interactive" &&
       subscription?.unwatched.length === 0 &&
       subscription.watchingSince < latest.startedAt &&
-      subscription.touchedAt < latest.startedAt &&
-      latest.stateFile === stateFile
+      subscription.touchedAt < latest.startedAt
     )
       return latest.view;
     return this.scan(dir);
-  }
-
-  /** ~/.claude.json's size and time; Claude Code rewrites it too often to watch. */
-  private async stateFile(): Promise<string> {
-    return (await fileState(this.env.claudeJson)) ?? "missing";
   }
 
   /**
@@ -495,6 +541,8 @@ export class Watcher {
       waiters: new Set(),
       listeners: new Set(),
       extra: this.scanned.get(dir) ?? [],
+      projectKeys: [],
+      claudeJsonRead: Promise.resolve(),
       seen: nothingSeen(),
       told: new Map(),
       repeatsUntil: 0,
@@ -541,6 +589,20 @@ export class Watcher {
   }
 
   /**
+   * Reads ~/.claude.json after a watcher saw it change, and settles a change only when what the scan
+   * reads in it changed.
+   */
+  private claudeJsonChanged(dir: string, subscription: Subscription): void {
+    subscription.claudeJsonRead = subscription.claudeJsonRead.then(async () => {
+      const print = await claudeJsonPrint(this.env, subscription.projectKeys);
+      if (print === subscription.claudeJson || this.subscriptions.get(dir) !== subscription) return;
+      subscription.claudeJson = print;
+      subscription.touchedAt = Date.now();
+      this.noticed(dir, subscription);
+    });
+  }
+
+  /**
    * Tells waiters and subscribers about a settled change, unless every event in it was a repeat of
    * one they were told about. A path still being read counts, so a slow read never hides a change.
    * The states read by now were read before this, so a subscriber reads them or newer ones.
@@ -582,6 +644,9 @@ export class Watcher {
    * A rebuild replaces the stream, so a change made during one can still be lost.
    */
   private async rewatch(dir: string, subscription: Subscription, timed: boolean): Promise<void> {
+    subscription.projectKeys = await projectKeys(this.env, dir);
+    // Read before the watchers start, so a later change is measured against it.
+    subscription.claudeJson ??= await claudeJsonPrint(this.env, subscription.projectKeys);
     const list = oncePerFolder(
       await Promise.all((await targets(this.env, dir, subscription.extra)).map(nearestWatchable))
     );
@@ -607,12 +672,10 @@ export class Watcher {
             // An event that names nothing may be about any entry, so it counts.
             if (target.names && name !== null && !target.names.includes(basename(String(name))))
               return;
+            const path = name === null ? undefined : join(target.path, String(name));
+            if (path === this.env.claudeJson) return this.claudeJsonChanged(dir, subscription);
             subscription.touchedAt = Date.now();
-            this.noticed(
-              dir,
-              subscription,
-              name === null ? undefined : join(target.path, String(name))
-            );
+            this.noticed(dir, subscription, path);
           }
         );
         watcher.on("error", () => {
