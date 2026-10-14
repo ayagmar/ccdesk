@@ -617,9 +617,9 @@ input::placeholder {
   position: relative;
 }
 
+/* Stops share the width but never shrink below their name or their longest fact. */
 .stop {
   flex: 2 1 0;
-  min-width: 0;
 }
 
 .stop.idle {
@@ -674,12 +674,19 @@ input::placeholder {
 .stop-name {
   font-weight: 700;
   font-size: 14.5px;
+  white-space: nowrap;
 }
 
+/* Facts break between each other, never inside one, and stop at two lines; the title has them all. */
 .stop-facts {
   font-family: var(--mono);
   font-size: 12.5px;
   color: var(--muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 /* A stop is narrow, so its flag wraps rather than run into the next stop. */
@@ -702,6 +709,39 @@ input::placeholder {
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-thickness: 2px;
+}
+
+/* Too narrow for the stops side by side: the line runs down the left, one stop per row. */
+@container (max-width: 680px) {
+  .route-stops {
+    flex-direction: column;
+  }
+
+  .route-stops::before {
+    left: 19px;
+    right: auto;
+    top: 22px;
+    bottom: 22px;
+    width: 3px;
+    height: auto;
+  }
+
+  .stop button {
+    grid-template-columns: 30px auto 1fr;
+    grid-template-rows: auto;
+    align-items: center;
+    padding: 6px 8px;
+  }
+
+  .stop .flag {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+
+  .stop-facts {
+    -webkit-line-clamp: none;
+    line-clamp: none;
+  }
 }
 
 /* ---------- bullets ---------- */
@@ -2035,31 +2075,6 @@ button:disabled {
   .context-list summary .num:nth-child(4),
   .context-list summary .num:last-child {
     display: none;
-  }
-
-  .route-stops {
-    flex-direction: column;
-  }
-
-  .route-stops::before {
-    left: 19px;
-    right: auto;
-    top: 22px;
-    bottom: 22px;
-    width: 3px;
-    height: auto;
-  }
-
-  .stop button {
-    grid-template-columns: 30px auto 1fr;
-    grid-template-rows: auto;
-    align-items: center;
-    padding: 6px 8px;
-  }
-
-  .stop .flag {
-    grid-column: 2 / -1;
-    justify-self: start;
   }
 
   .tt th:nth-child(n) {

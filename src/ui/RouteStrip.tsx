@@ -21,6 +21,10 @@ export function RouteStrip({ view, lit, filter, onFilter }: Props) {
       <ol className="route-stops">
         {stops.map((stop) => {
           const pressed = filter === stop.line;
+          const unreadable = stop.unreadable
+            ? `${plural(stop.unreadable, "file")} can't be read`
+            : null;
+          const summary = [...stop.facts, ...(unreadable ? [unreadable] : [])];
           return (
             <li
               key={stop.line}
@@ -31,7 +35,7 @@ export function RouteStrip({ view, lit, filter, onFilter }: Props) {
                 aria-pressed={pressed}
                 className={pressed ? "on" : ""}
                 onClick={() => onFilter(pressed ? null : stop.line)}
-                title={pressed ? "Show every scope" : `Show only ${stop.name.toLowerCase()} items`}
+                title={`${stop.name}: ${summary.join(", ") || "not used"}\n${pressed ? "Show every scope" : `Show only ${stop.name.toLowerCase()} items`}`}
               >
                 <span className="stop-node">
                   <Bullet line={stop.line} hollow={!stop.active} />
@@ -39,12 +43,12 @@ export function RouteStrip({ view, lit, filter, onFilter }: Props) {
                 <span className="stop-name">{stop.name}</span>
                 {(stop.facts.length > 0 || !stop.active) && (
                   <span className="stop-facts">
-                    {stop.facts.length ? stop.facts.join(" · ") : "not used"}
+                    {stop.facts.length ? factsLine(stop.facts) : "not used"}
                   </span>
                 )}
-                {stop.unreadable > 0 && (
+                {unreadable && (
                   <span className="flag warn">
-                    <Icon name="warn" /> {plural(stop.unreadable, "file")} can't be read
+                    <Icon name="warn" /> {unreadable}
                   </span>
                 )}
               </button>
@@ -54,6 +58,11 @@ export function RouteStrip({ view, lit, filter, onFilter }: Props) {
       </ol>
     </nav>
   );
+}
+
+/** The facts in one line that breaks only between facts, after each separator. */
+function factsLine(facts: string[]): string {
+  return facts.map((fact) => fact.replaceAll(" ", "\u00a0")).join("\u00a0· ");
 }
 
 /** Which project files reach everyone who clones the repository, and which stay on this machine. */
