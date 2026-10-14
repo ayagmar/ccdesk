@@ -236,6 +236,11 @@ export interface ForgetPreview {
    * does not change that file, so the entry stays; with no store left the directory is not listed.
    */
   claudeJsonEntry: boolean;
+  /**
+   * A session was written in the last few minutes, so Claude Code may still be running in the
+   * deleted folder; its next message would start a new store of the same name.
+   */
+  recentlyActive: boolean;
   /** Fingerprint of the store as reviewed; forgetting requires it unchanged. */
   revision: string;
 }
