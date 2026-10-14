@@ -7,6 +7,7 @@ import { tilde } from "./format.ts";
 import { fileFor, projectOrUser, ScopePicker } from "./editorKit.tsx";
 import { reference } from "./reference.ts";
 import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
+import { Icon } from "./Icon.tsx";
 
 interface Props {
   view: DirectoryView;
@@ -133,7 +134,7 @@ export function HookEditor({ view, hook, onSaved }: Props) {
                 void change.start({ dir: view.path, file, remove }, `Removed a ${hook?.event} hook`)
               }
             >
-              Remove
+              <Icon name="trash" /> Remove…
             </button>
           )}
         </div>

@@ -11,6 +11,7 @@ import { api } from "./api.ts";
 import { fileFor, projectOrUser, ScopePicker } from "./editorKit.tsx";
 import { tilde } from "./format.ts";
 import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
+import { Icon } from "./Icon.tsx";
 
 interface Props {
   view: DirectoryView;
@@ -92,7 +93,7 @@ export function PermissionEditor({ view, rule, onSaved }: Props) {
               startReview({ list: rule.list, rule: rule.rule }, undefined, `Removed ${rule.rule}`)
             }
           >
-            Remove
+            <Icon name="trash" /> Remove…
           </button>
         </div>
       ) : (

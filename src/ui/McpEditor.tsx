@@ -5,6 +5,7 @@ import { api } from "./api.ts";
 import { ScopeButtons } from "./editorKit.tsx";
 import { tilde } from "./format.ts";
 import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
+import { Icon } from "./Icon.tsx";
 
 type EditableScope = McpEdit["scope"];
 
@@ -133,7 +134,7 @@ export function McpEditor({ view, server, onSaved }: Props) {
                 )
               }
             >
-              Remove
+              <Icon name="trash" /> Remove…
             </button>
           )}
         </div>

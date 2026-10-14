@@ -136,7 +136,7 @@ function ToolSwitch({ tool, actions }: { tool: BuiltinTool; actions: Actions }) 
                   )}
                   <button
                     type="button"
-                    className="head-action"
+                    className="quiet-danger"
                     disabled={change.busy || change.reviewing}
                     onClick={() =>
                       void change.start(
@@ -147,7 +147,7 @@ function ToolSwitch({ tool, actions }: { tool: BuiltinTool; actions: Actions }) 
                       )
                     }
                   >
-                    Remove…
+                    <Icon name="trash" /> Remove…
                   </button>
                 </li>
               ))}
