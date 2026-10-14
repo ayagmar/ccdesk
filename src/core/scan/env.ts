@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { homedir, userInfo } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { resolvedPath } from "./files.ts";
@@ -50,7 +50,7 @@ export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
     claudeJson: configDir ? join(configDir, ".claude.json") : join(home, ".claude.json"),
     managedDir: managedDirFor(process.platform),
     managedProfiles: process.platform === "darwin" ? managedProfiles() : undefined,
-    hasRegistryPolicy: process.platform === "win32" ? registryQuery(processEnv) : undefined,
+    hasRegistryPolicy: process.platform === "win32" ? registryQuery(regExe(processEnv)) : undefined,
     platform: process.platform,
     processEnv,
     disableAutoMemory: processEnv.CLAUDE_CODE_DISABLE_AUTO_MEMORY,
@@ -83,21 +83,30 @@ function managedProfiles(): string[] {
 export const HKLM_POLICY = "HKLM\\SOFTWARE\\Policies\\ClaudeCode";
 export const HKCU_POLICY = "HKCU\\SOFTWARE\\Policies\\ClaudeCode";
 
-/**
- * Asks `reg.exe query <key> /v Settings`, which exits 0 when the value is there. Started from the
- * Windows folder, never found on PATH; a failure or a query over 5 s counts as no value.
- */
-function registryQuery(processEnv: NodeJS.ProcessEnv): (key: string) => Promise<boolean> {
+/** reg.exe in the Windows folder, never one found on PATH. */
+function regExe(processEnv: NodeJS.ProcessEnv): string {
   const root = processEnv.SystemRoot ?? "";
-  const regExe = join(/^[A-Za-z]:[\\/]/.test(root) ? root : "C:\\Windows", "System32", "reg.exe");
+  return join(/^[A-Za-z]:[\\/]/.test(root) ? root : "C:\\Windows", "System32", "reg.exe");
+}
+
+/**
+ * Asks `<program> query <key> /v Settings`, which exits 0 when the value is there; `leading`
+ * arguments go before the query. Only the exit status is read: what it prints, the value included,
+ * goes nowhere, so a large value still counts. A failure or a query over 5 s counts as no value.
+ */
+export function registryQuery(
+  program: string,
+  ...leading: string[]
+): (key: string) => Promise<boolean> {
   return (key) =>
     new Promise((done) => {
-      execFile(
-        regExe,
-        ["query", key, "/v", "Settings"],
-        { timeout: 5000, windowsHide: true },
-        (error) => done(!error)
-      );
+      const child = spawn(program, [...leading, "query", key, "/v", "Settings"], {
+        stdio: "ignore",
+        timeout: 5000,
+        windowsHide: true,
+      });
+      child.on("error", () => done(false));
+      child.on("close", (code) => done(code === 0));
     });
 }
 
