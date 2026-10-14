@@ -18,7 +18,7 @@ ccdesk runs on Linux, macOS and Windows with Node.js 22.19 or newer. Its tests r
 
 ## Windows
 
-- Managed settings and instructions are read from `C:\Program Files\ClaudeCode`. ccdesk does not read policies from the registry and does not warn when the `HKLM` or `HKCU` key holds one; `/status` in Claude Code names the source it uses.
+- Managed settings and instructions are read from `C:\Program Files\ClaudeCode`. ccdesk does not read policies from the registry. It runs `reg.exe query` to check whether the `HKLM` or `HKCU` key holds a `Settings` value: for `HKLM` the page warns that the policy outranks those files, and for `HKCU` that Claude Code applies it only when no admin source is present above it. `/status` in Claude Code names the source it uses.
 - Local settings (`.claude/settings.local.json`) are read from the directory you started in, not from the repository root.
 - In `~/.claude.json`, Claude Code names each folder with forward slashes, such as `C:/Users/you/app`. ccdesk looks up trust answers, local MCP servers and MCP approvals under that name.
 - A JSON file saved with a byte order mark, as Windows PowerShell 5.1's `Set-Content -Encoding UTF8` writes it, is read as Claude Code reads it. Saving it from ccdesk writes it without the mark, and the review says ccdesk rewrites the whole file.

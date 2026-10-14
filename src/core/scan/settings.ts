@@ -10,7 +10,7 @@ import {
 import { schemaErrors } from "../schema.ts";
 import { redactSecrets } from "../secrets.ts";
 import { isRecord } from "./data.ts";
-import { isUserClaudeFolder, type ScanEnv } from "./env.ts";
+import { HKCU_POLICY, HKLM_POLICY, isUserClaudeFolder, type ScanEnv } from "./env.ts";
 import { isFile, listDir, readJsonObject } from "./files.ts";
 import { mainWorktreeRoot } from "./git.ts";
 import { repairManaged } from "./managed-repair.ts";
@@ -271,6 +271,8 @@ export interface ManagedSettings {
   dropIns: string[];
   /** Managed sources ccdesk does not read that rank above the files (higherSources). */
   higher: string[];
+  /** Managed sources ccdesk does not read that rank below the files (lowerSources). */
+  lower: string[];
   errors: string[];
   /** A managed file that is there but not a JSON object: Claude Code refuses to start (docs: managed-settings#find-entries-claude-code-dropped). */
   blocksStart: boolean;
@@ -305,16 +307,24 @@ export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings
   }
   // Checked once merged, so a later drop-in's null removes a key an earlier file set.
   const repaired = data ? repairManaged(data) : null;
-  // Server-managed settings, then MDM, outrank the files; by default Claude Code uses the first
-  // source that sets a policy key and skips the rest (docs: managed-settings#how-claude-code-combines-managed-sources).
+  // Server-managed settings, then MDM (a macOS profile or the HKLM key), outrank the files; by
+  // default Claude Code uses the first source that sets a policy key and skips the rest. The HKCU
+  // key ranks last and applies only when no admin source is present above it
+  // (docs: managed-settings#how-claude-code-combines-managed-sources).
   const candidates = [join(env.claudeDir, "remote-settings.json"), ...(env.managedProfiles ?? [])];
   const higher: string[] = [];
   for (const source of candidates) if (await isFile(source)) higher.push(source);
+  const [machine, user] = await Promise.all(
+    [HKLM_POLICY, HKCU_POLICY].map(async (key) => (await env.hasRegistryPolicy?.(key)) === true)
+  );
+  if (machine) higher.push(HKLM_POLICY);
+  const lower = user ? [HKCU_POLICY] : [];
   return {
     data: repaired?.data ?? null,
     sources,
     dropIns,
     higher,
+    lower,
     errors,
     blocksStart,
     repairs: repaired?.repairs ?? [],
@@ -322,7 +332,7 @@ export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings
 }
 
 function managedLayer(path: string, managed: ManagedSettings): SettingsLayer {
-  const { data, sources, dropIns, higher, errors, blocksStart, repairs } = managed;
+  const { data, sources, dropIns, higher, lower, errors, blocksStart, repairs } = managed;
   const layer: SettingsLayer = { scope: "managed", path, exists: false, data: null };
   if (data) {
     layer.data = redactSecrets(data);
@@ -333,6 +343,7 @@ function managedLayer(path: string, managed: ManagedSettings): SettingsLayer {
   if (errors.length > 0) layer.error = errors.join("; ");
   if (blocksStart) layer.blocksStart = true;
   if (higher.length > 0) layer.higherSources = higher;
+  if (lower.length > 0) layer.lowerSources = lower;
   if (repairs.length > 0) layer.repairs = repairs;
   return layer;
 }

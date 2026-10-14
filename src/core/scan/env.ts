@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { homedir, userInfo } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { resolvedPath } from "./files.ts";
@@ -15,6 +16,11 @@ export interface ScanEnv {
   managedDir: string;
   /** macOS configuration profiles that deliver managed settings (MDM), which outrank managedDir's files. */
   managedProfiles?: string[] | undefined;
+  /**
+   * On Windows: whether a registry key holds the `Settings` value Claude Code reads managed policy
+   * from. ccdesk asks only whether it is there and drops what reg.exe prints of the value.
+   */
+  hasRegistryPolicy?: ((key: string) => Promise<boolean>) | undefined;
   platform: NodeJS.Platform;
   /**
    * The environment ccdesk runs in: where it finds an editor and `claude` (PATH, VISUAL, EDITOR,
@@ -44,6 +50,7 @@ export function scanEnvFromProcess(configDirFlag?: string): ScanEnv {
     claudeJson: configDir ? join(configDir, ".claude.json") : join(home, ".claude.json"),
     managedDir: managedDirFor(process.platform),
     managedProfiles: process.platform === "darwin" ? managedProfiles() : undefined,
+    hasRegistryPolicy: process.platform === "win32" ? registryQuery(processEnv) : undefined,
     platform: process.platform,
     processEnv,
     disableAutoMemory: processEnv.CLAUDE_CODE_DISABLE_AUTO_MEMORY,
@@ -70,6 +77,28 @@ function managedProfiles(): string[] {
   const dir = "/Library/Managed Preferences";
   const profile = "com.anthropic.claudecode.plist";
   return [join(dir, userInfo().username, profile), join(dir, profile)];
+}
+
+/** The machine's and the user's registry keys for managed policy (docs: managed-settings#where-each-mechanism-stores-the-policy). */
+export const HKLM_POLICY = "HKLM\\SOFTWARE\\Policies\\ClaudeCode";
+export const HKCU_POLICY = "HKCU\\SOFTWARE\\Policies\\ClaudeCode";
+
+/**
+ * Asks `reg.exe query <key> /v Settings`, which exits 0 when the value is there. Started from the
+ * Windows folder, never found on PATH; a failure or a query over 5 s counts as no value.
+ */
+function registryQuery(processEnv: NodeJS.ProcessEnv): (key: string) => Promise<boolean> {
+  const root = processEnv.SystemRoot ?? "";
+  const regExe = join(/^[A-Za-z]:[\\/]/.test(root) ? root : "C:\\Windows", "System32", "reg.exe");
+  return (key) =>
+    new Promise((done) => {
+      execFile(
+        regExe,
+        ["query", key, "/v", "Settings"],
+        { timeout: 5000, windowsHide: true },
+        (error) => done(!error)
+      );
+    });
 }
 
 function managedDirFor(platform: NodeJS.Platform): string {
