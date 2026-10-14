@@ -465,7 +465,8 @@ input::placeholder {
   text-overflow: ellipsis;
   direction: rtl;
   text-align: left;
-  flex: 0 1 auto;
+  /* Far more than the flags, so the path gives way first, down to 16 characters. */
+  flex: 0 1000000 auto;
   min-width: min(16ch, 100%);
 }
 
@@ -477,6 +478,15 @@ input::placeholder {
 /* Flags state the folder's state, so they keep their whole text; the path gives way instead. */
 .dir-title .flag {
   flex: none;
+}
+
+/* The one flag that names a path gives way too, once the directory's own path is at its minimum. */
+.dir-title .flag.root {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* The session the page describes: a rare choice, so it sits under the header, not in it. */
@@ -1973,8 +1983,12 @@ button:disabled {
   color: var(--ink-2);
 }
 
+/* A long path breaks after a slash, so the file name at its end stays in view; the rest of it is
+   indented, so it does not read as another file. */
 .sharing dd span {
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  padding-left: 2ch;
+  text-indent: -2ch;
 }
 
 /* ---------- files ccdesk could not read ---------- */

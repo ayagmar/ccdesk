@@ -282,7 +282,7 @@ function DirectoryTitle({ view }: { view: DirectoryView }) {
       </h1>
       {!view.exists && <span className="flag bad">folder no longer exists</span>}
       {view.gitRoot && view.gitRoot !== view.path && (
-        <span className="flag" title={`inside ${tilde(view.gitRoot)}`}>
+        <span className="flag root" title={`inside ${tilde(view.gitRoot)}`}>
           inside {tilde(view.gitRoot)}
         </span>
       )}

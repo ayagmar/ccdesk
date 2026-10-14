@@ -284,7 +284,7 @@ Both are bundled through `@fontsource-variable`, so the app never depends on a n
 
 ### Hierarchy
 - **Display** (700, 22px, -0.015em): page titles on full pages such as All directories.
-- **Headline** (mono 700, 19px, -0.01em): the current directory path at the top of the workspace. The path is the title, so it is set in mono. Its end names the directory, so a path too long for its row loses its start ("…/services/billing-worker"), with the whole path in its tooltip; the flags beside it never shrink, and the path keeps at least 16 characters. On phones it wraps instead.
+- **Headline** (mono 700, 19px, -0.01em): the current directory path at the top of the workspace. The path is the title, so it is set in mono. Its end names the directory, so a path too long for its row loses its start ("…/services/billing-worker"), with the whole path in its tooltip; the flags beside it never shrink, and the path keeps at least 16 characters. The one flag that names a path, "inside" the repository root, gives way only once the path is down to those 16 characters. On phones it wraps instead.
 - **Title** (700, 15px; 16px in the inspector head; 13px for inspector sub-heads): timetable section names (Instructions, Settings, Permissions, Memory, Hooks, MCP servers, Agents, skills & plugins, All settings) and the selected item's name.
 - **Body** (400, 14px, 1.45): interface text, timetable cells, the "why" column.
 - **Prose** (400, 13.5px, 1.6, max 68ch): rendered markdown of instruction and memory files in the inspector; headings inside it stay at 14px so a file's own h1 never outshouts the interface, and they are rendered two levels down (a file's h1 is an h3 under the inspector's h2) so the page outline keeps one h1.

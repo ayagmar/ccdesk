@@ -84,7 +84,13 @@ export function SharingStrip({ view }: { view: DirectoryView }) {
             <dt>{title}</dt>
             <dd className="mono">
               {files.map((file) => (
-                <span key={file}>{file}</span>
+                <span key={file}>
+                  {file
+                    .split("/")
+                    .flatMap((part, i, parts) =>
+                      i === 0 ? [part] : ["/", <wbr key={parts.slice(0, i).join("/")} />, part]
+                    )}
+                </span>
               ))}
             </dd>
           </div>
