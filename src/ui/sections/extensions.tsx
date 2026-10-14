@@ -4,7 +4,7 @@ import { AgentEditor } from "../AgentEditor.tsx";
 import { Bullet } from "../Bullet.tsx";
 import { ago, tilde } from "../format.ts";
 import { Icon } from "../Icon.tsx";
-import { Contents, Field, LinkMark, NameButton, PathValue, stripFrontmatter } from "./kit.tsx";
+import { Contents, Field, LinkMark, NameButton, PathValue } from "./kit.tsx";
 import { type SectionUi } from "./types.ts";
 
 type R = RowOf<"extensions">;
@@ -120,7 +120,7 @@ export const extensions: SectionUi<R> = {
             <AgentEditor key={row.id} view={actions.view} agent={e} onSaved={actions.onSaved} />
           </>
         ) : (
-          <Contents text={stripFrontmatter(e.text)} />
+          <Contents text={e.text} />
         )}
       </>
     );

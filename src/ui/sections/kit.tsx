@@ -1,4 +1,5 @@
 import { lazy, type ReactNode, Suspense, useState } from "react";
+import { FRONTMATTER } from "../../shared/frontmatter.ts";
 import { type Scope, type Visibility } from "../../shared/types.ts";
 import { api, errorText } from "../api.ts";
 import { sharedWithAgents, tilde } from "../format.ts";
@@ -120,7 +121,16 @@ export function PathValue({ path }: { path: string }) {
   );
 }
 
-export function Contents({ text, markdown = true }: { text: string; markdown?: boolean }) {
+export function Contents({
+  text,
+  markdown = true,
+  frontmatter = true,
+}: {
+  text: string;
+  markdown?: boolean;
+  /** False when the text is a body whose frontmatter was already taken off. */
+  frontmatter?: boolean;
+}) {
   const [raw, setRaw] = useState(!markdown);
   return (
     <section className="contents">
@@ -137,7 +147,12 @@ export function Contents({ text, markdown = true }: { text: string; markdown?: b
           </fieldset>
         )}
       </div>
-      {raw ? <pre className="raw">{text}</pre> : <Prose text={text} gfm />}
+      {/* Claude Code does not inject frontmatter, so Read leaves it out; Raw keeps it. */}
+      {raw ? (
+        <pre className="raw">{text}</pre>
+      ) : (
+        <Prose text={frontmatter ? text.replace(FRONTMATTER, "") : text} gfm />
+      )}
     </section>
   );
 }
@@ -170,8 +185,4 @@ export function Prose({
       </Suspense>
     </div>
   );
-}
-
-export function stripFrontmatter(text: string): string {
-  return text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
 }

@@ -340,7 +340,7 @@ function MemoryDetails({ row, actions }: { row: R; actions: Actions }) {
           )}
         </div>
       )}
-      <Contents text={m.body} />
+      <Contents text={m.body} frontmatter={false} />
     </>
   );
 }
