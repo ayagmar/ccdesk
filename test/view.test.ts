@@ -106,9 +106,13 @@ test("the settings filter counts each key under the file that decides its value"
     theme: "light",
     permissions: { allow: ["Read"] },
   });
+  // Claude Code reads allowManagedHooksOnly only from managed settings, and a project's env waits
+  // for the trust dialog.
   f.json("app/.claude/settings.json", {
     model: "opus",
     permissions: { allow: ["Bash(npm test)"] },
+    allowManagedHooksOnly: true,
+    env: { FAKE_FLAG: "1" },
   });
   f.json("app/.claude/settings.local.json", { verbose: true });
   const view = await scanDirectory(f.env, f.at("app"));
@@ -122,7 +126,7 @@ test("the settings filter counts each key under the file that decides its value"
   }
 
   // The project's model beats the user's, and merged permissions count under the higher file.
-  assert.deepEqual(counts, { User: 1, Project: 2, Local: 1 });
+  assert.deepEqual(counts, { User: 1, Project: 2, Local: 1, Ignored: 1, "Waits for trust": 1 });
 });
 
 test("a setting is marked as Claude Code's default only when its value is the one default the docs give", async () => {

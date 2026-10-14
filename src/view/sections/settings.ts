@@ -79,7 +79,11 @@ export const settings = defineSection<R>({
   facet: {
     label: "Filter settings by the file that decides them",
     // A merged value is decided by its highest file, the one the row's line shows.
-    of: (row) => (row.item.from.length === 0 ? "Ignored" : lineName(row.line)),
-    order: () => [...LINES.map((l) => l.name), "Ignored"],
+    of: (row) => {
+      if (row.item.from.length > 0) return lineName(row.line);
+      // As the table does, a value held for trust speaks for the row, since it applies once you trust the folder.
+      return row.item.ignored.some((i) => i.waitsForTrust) ? "Waits for trust" : "Ignored";
+    },
+    order: () => [...LINES.map((l) => l.name), "Ignored", "Waits for trust"],
   },
 });
