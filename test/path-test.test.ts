@@ -252,6 +252,12 @@ test("a subfolder's skills load on demand, whatever their paths, only when Claud
     "app/src/.claude/skills/css/SKILL.md",
     '---\nname: css\ndescription: c\npaths: "**/*.css"\n---\n'
   );
+  // Reserved names do not load here either (docs: skills#where-skills-live).
+  f.write("app/src/.claude/skills/SYNCED/SKILL.md", "---\nname: s\ndescription: s\n---\n");
+  f.write(
+    "app/src/.claude/skills/pdf/SKILL.md",
+    "---\nname: anthropic-skills:pdf\ndescription: p\n---\n"
+  );
 
   const skills = async (file: string) =>
     (await testPath(f.env, f.at("app"), file)).matches
