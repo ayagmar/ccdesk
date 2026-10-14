@@ -138,6 +138,21 @@ test("user and managed rules and skills with paths are matched from the start di
   ]);
 });
 
+test("a pattern too large to use matches nothing, and the rule's other patterns still match", async () => {
+  const f = makeFixture();
+  f.write(
+    "app/.claude/rules/types.md",
+    `---\npaths: ["${"a".repeat(200_000)}", "*.ts"]\n---\ntypes`
+  );
+
+  const result = await testPath(f.env, f.at("app"), "a.ts");
+
+  assert.deepEqual(
+    result.matches.map((m) => [f.rel(m.path), m.glob]),
+    [["app/.claude/rules/types.md", "*.ts"]]
+  );
+});
+
 test("a file outside the start directory gets nothing from it", async () => {
   const f = makeFixture();
   f.write("app/.claude/rules/all.md", '---\npaths: ["**/*"]\n---\nx\n');

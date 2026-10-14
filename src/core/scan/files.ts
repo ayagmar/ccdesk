@@ -282,13 +282,27 @@ export function pathsField(value: unknown): string[] {
 export function matchingGlob(globs: string[], path: string): string | undefined {
   // Claude Code matches nothing outside the folder, nor a path that starts with two dots.
   if (path === "" || path.startsWith("..")) return undefined;
-  const patterns = pathPatterns(globs);
+  const patterns = pathPatterns(globs).map((each) => each.filter(compiles));
   if (!ignore().add(patterns.flat()).ignores(path)) return undefined;
   return globs.find((_, i) =>
     ignore()
       .add(patterns[i] ?? [])
       .ignores(path)
   );
+}
+
+/**
+ * Whether the ignore package can use a pattern; one it cannot, such as one too long for a regular
+ * expression, matches nothing and the others still count, as in Claude Code 2.1.296 (docs:
+ * memory#path-specific-rules).
+ */
+function compiles(pattern: string): boolean {
+  try {
+    ignore().add([pattern]).test("probe");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
