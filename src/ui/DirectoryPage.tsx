@@ -41,6 +41,26 @@ interface Props {
   onCompare: (dir: string) => void;
 }
 
+/**
+ * After the inspector closes, focus goes back where the reader was: the selected row's name, or the
+ * "Add …" button that opened the form. When that is not listed, it goes to the row's section
+ * heading, and when a filter hides the whole section, to the filter box.
+ */
+function refocus(
+  closed: { row: string; section: SectionId } | { adding: Adding } | null,
+  filter: HTMLInputElement | null
+) {
+  requestAnimationFrame(() => {
+    let target: HTMLElement | null = null;
+    if (closed && "row" in closed)
+      target =
+        document.getElementById(`row-${closed.row}`)?.querySelector<HTMLElement>(".row-name") ??
+        document.getElementById(`h-${closed.section}`);
+    else if (closed) target = document.querySelector<HTMLElement>(`[data-adds="${closed.adding}"]`);
+    (target ?? filter)?.focus({ preventScroll: true });
+  });
+}
+
 function isTyping(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLInputElement ||
@@ -121,14 +141,22 @@ export function DirectoryPage({
     requestAnimationFrame(() => select(jump.id));
   }, [jump]);
 
+  const closeInspector = useCallback(() => {
+    // With nothing open, Escape leaves focus where it is.
+    if (!selected && !adding) return;
+    setSelected(null);
+    setAdding(null);
+    const closed = selectedRow ? { row: selectedRow.id, section: selectedRow.section } : null;
+    refocus(adding ? { adding } : closed, filterInput.current);
+  }, [selected, selectedRow, adding]);
+
   useListKeys({
     visible,
     selected,
     select,
     seeing,
     setSeeing,
-    setSelected,
-    setAdding,
+    onClose: closeInspector,
     filterInput,
   });
 
@@ -207,15 +235,7 @@ export function DirectoryPage({
           </>
         )}
       </div>
-      <Inspector
-        row={selectedRow}
-        adding={adding}
-        actions={actions}
-        onClose={() => {
-          setSelected(null);
-          setAdding(null);
-        }}
-      />
+      <Inspector row={selectedRow} adding={adding} actions={actions} onClose={closeInspector} />
     </div>
   );
 }
@@ -360,8 +380,7 @@ function useListKeys({
   select,
   seeing,
   setSeeing,
-  setSelected,
-  setAdding,
+  onClose,
   filterInput,
 }: {
   visible: Row[];
@@ -369,8 +388,8 @@ function useListKeys({
   select: (id: string, focus?: boolean) => void;
   seeing: boolean;
   setSeeing: (seeing: boolean) => void;
-  setSelected: (id: string | null) => void;
-  setAdding: (adding: Adding | null) => void;
+  /** Closes the inspector. */
+  onClose: () => void;
   filterInput: RefObject<HTMLInputElement | null>;
 }) {
   useEffect(() => {
@@ -379,8 +398,7 @@ function useListKeys({
       if (e.key === "Escape") {
         // The inspector is hidden in What Claude sees; Escape there must not drop what it holds.
         if (seeing) return;
-        setSelected(null);
-        setAdding(null);
+        onClose();
       } else if (e.key === "/") {
         e.preventDefault();
         setSeeing(false);
@@ -389,7 +407,7 @@ function useListKeys({
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [visible, selected, select, seeing, setSeeing, setSelected, setAdding, filterInput]);
+  }, [visible, selected, select, seeing, setSeeing, onClose, filterInput]);
 }
 
 /** j and k select the next or previous row on screen; 1 to 9 scroll to that section. */

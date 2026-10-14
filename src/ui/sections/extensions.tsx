@@ -59,7 +59,12 @@ export const extensions: SectionUi<R> = {
     );
   },
   Head: ({ actions }) => (
-    <button type="button" className="head-action" onClick={() => actions.onAdd("agent")}>
+    <button
+      type="button"
+      className="head-action"
+      data-adds="agent"
+      onClick={() => actions.onAdd("agent")}
+    >
       <Icon name="plus" /> Create agent
     </button>
   ),

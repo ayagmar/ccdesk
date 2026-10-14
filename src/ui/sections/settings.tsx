@@ -90,7 +90,12 @@ export const settings: SectionUi<R> = {
       <button type="button" className="head-action" onClick={actions.onCompare}>
         Compare with…
       </button>
-      <button type="button" className="head-action" onClick={() => actions.onAdd("setting")}>
+      <button
+        type="button"
+        className="head-action"
+        data-adds="setting"
+        onClick={() => actions.onAdd("setting")}
+      >
         <Icon name="plus" /> Add setting
       </button>
     </>
