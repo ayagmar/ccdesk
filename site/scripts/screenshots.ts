@@ -274,8 +274,9 @@ async function main() {
         });
         const [base, token] = ccdesk.url.split("#");
         await page.goto(`${base}${shot.query ?? ""}#${token}`);
-        // The page keeps a watch stream open, so wait for content rather than an idle network.
-        await page.locator("h2").first().waitFor();
+        // The page keeps a watch stream open, so wait for content rather than an idle network. On a
+        // phone the rail's headings are folded away, so wait for one that shows.
+        await page.locator("h2:visible").first().waitFor();
         await page.waitForTimeout(800);
         return page;
       };

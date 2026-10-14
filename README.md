@@ -57,7 +57,7 @@ Each piece lives in its own file, at one of six scopes: managed, user, project, 
     <td>What Claude sees when a session starts here</td>
   </tr>
   <tr>
-    <td><a href="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/memory-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/memory-dark.webp" /><img alt="Auto memory for a directory, with checks on the MEMORY.md index" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/memory-light.webp" /></picture></a></td>
+    <td><a href="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/memory-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/memory-dark.webp" /><img alt="Auto memory for a directory, with how often Claude read each memory and checks on the MEMORY.md index" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/memory-light.webp" /></picture></a></td>
     <td><a href="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/changes-dark.webp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/changes-dark.webp" /><img alt="Recent changes: every edit ccdesk made, each one restorable" src="https://raw.githubusercontent.com/ayagmar/ccdesk/master/site/src/assets/screenshots/changes-light.webp" /></picture></a></td>
   </tr>
   <tr>
