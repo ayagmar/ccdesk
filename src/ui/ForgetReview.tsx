@@ -37,6 +37,8 @@ export function ForgetReview({
       (error: unknown) => {
         setBusy(false);
         setProblem(errorText(error));
+        // The store may have changed since the review: show it as it is now, to forget again.
+        api.previewForget(path).then(setPreview, () => setPreview(null));
       }
     );
   };
@@ -57,6 +59,12 @@ export function ForgetReview({
             {plural(preview.memories, "memory", "memories")}, {size(preview.bytes)}, from{" "}
             <span className="mono wrap">{tilde(preview.store)}</span>.
           </p>
+          {preview.recentlyActive && (
+            <p className="flag warn">
+              A session was written here in the last few minutes. If Claude Code is still running in
+              this directory, quit it first: its next message would start a new store.
+            </p>
+          )}
           {preview.claudeJsonEntry && (
             <p className="muted small">
               Its entry in ~/.claude.json, with your trust answer, stays: ccdesk does not change
@@ -65,12 +73,13 @@ export function ForgetReview({
           )}
           <p className="muted small">
             If the folder comes back and you use Claude Code there again, Claude Code starts a new
-            store. Recent changes can move this one back while no new store has its name.
+            store. Recent changes can move this one back while no new store has its name. If this
+            folder is on a drive that is not connected, connect it instead.
           </p>
         </>
       )}
       <div className="editor-buttons">
-        {preview && !problem && (
+        {preview && (
           <button
             type="button"
             className="danger"
