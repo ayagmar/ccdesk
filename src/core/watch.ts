@@ -618,9 +618,17 @@ export class Watcher {
    * A rebuild replaces the stream, so a change made during one can still be lost.
    */
   private async rewatch(dir: string, subscription: Subscription, timed: boolean): Promise<void> {
-    subscription.projectKeys = await projectKeys(this.env, dir);
-    // Read before the watchers start, so a later change is measured against it.
-    subscription.claudeJson ??= await claudeJsonPrint(this.env, subscription.projectKeys);
+    // Read before the watchers start, so a later change is measured against it, and again when the
+    // entries it covers change, so a rewrite is never measured against other entries.
+    const keys = await projectKeys(this.env, dir);
+    if (
+      subscription.claudeJson === undefined ||
+      keys.join("\0") !== subscription.projectKeys.join("\0")
+    ) {
+      const print = await claudeJsonPrint(this.env, keys);
+      subscription.projectKeys = keys;
+      subscription.claudeJson = print;
+    }
     const list = oncePerFolder(
       await Promise.all((await targets(this.env, dir, subscription.extra)).map(nearestWatchable))
     );
