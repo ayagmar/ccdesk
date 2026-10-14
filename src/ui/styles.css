@@ -2007,7 +2007,8 @@ button:disabled {
   font-size: 13.5px;
 }
 
-.problems ul {
+.problems ul,
+.problems p {
   margin: 0;
   overflow-wrap: anywhere;
 }

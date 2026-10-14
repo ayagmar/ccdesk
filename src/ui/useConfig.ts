@@ -87,27 +87,7 @@ export function useConfig(requested: string | null | undefined, profile: Session
     if (dirRef.current !== null) load(dirRef.current, profileRef.current, false);
   }, [reference.state, overview.state, retryReference, refreshOverview, load]);
 
-  useEffect(() => {
-    if (dir === null) return;
-    const stop = new AbortController();
-    const listen = async () => {
-      let since = Date.now();
-      while (!stop.signal.aborted) {
-        try {
-          const { changed, at } = await api.watch(dir, since, stop.signal);
-          since = Math.max(since, at);
-          // Only the open directory's files are watched, so the overview, which scans every
-          // project, waits for your next save or for you to come back to the tab.
-          if (changed && !stop.signal.aborted) reloadDirectory();
-        } catch {
-          // Server stopped or the request was cancelled: wait before trying again.
-          await new Promise((resolve) => setTimeout(resolve, 5000));
-        }
-      }
-    };
-    void listen();
-    return () => stop.abort();
-  }, [dir, reloadDirectory]);
+  const watching = useWatch(dir, reloadDirectory);
 
   useEffect(() => {
     let last = Date.now();
@@ -162,6 +142,7 @@ export function useConfig(requested: string | null | undefined, profile: Session
     dir,
     reload,
     retry,
+    watching,
   };
 }
 
@@ -180,4 +161,41 @@ function useReference(): [Load<Reference>, () => void] {
   }, []);
   useEffect(load, [load]);
   return [reference, load];
+}
+
+/**
+ * Calls `onChange` after each change to a config file of `dir`, and says whether every one of them
+ * is watched, so the page updates on its own.
+ */
+function useWatch(dir: string | null, onChange: () => void): boolean {
+  const [watching, setWatching] = useState(true);
+  useEffect(() => {
+    if (dir === null) return;
+    const stop = new AbortController();
+    const pause = () => new Promise((resolve) => setTimeout(resolve, 5000));
+    setWatching(true);
+    const listen = async () => {
+      let since = Date.now();
+      while (!stop.signal.aborted) {
+        try {
+          const answer = await api.watch(dir, since, stop.signal);
+          since = Math.max(since, answer.at);
+          if (stop.signal.aborted) return;
+          setWatching(answer.watching);
+          // Only the open directory's files are watched, so the overview, which scans every
+          // project, waits for your next save or for you to come back to the tab.
+          if (answer.changed) onChange();
+          // Without a watch on every file the answer comes at once, so ask again after a while.
+          if (!answer.watching) await pause();
+        } catch {
+          // Server stopped or the request was cancelled: wait before trying again.
+          if (!stop.signal.aborted) setWatching(false);
+          await pause();
+        }
+      }
+    };
+    void listen();
+    return () => stop.abort();
+  }, [dir, onChange]);
+  return watching;
 }
