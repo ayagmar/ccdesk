@@ -24,6 +24,9 @@ export function OverviewPage({
 }) {
   const projects = useMemo(() => overview.projects.filter((p) => !p.ephemeral), [overview]);
   const memories = projects.reduce((n, p) => n + p.memories, 0);
+  const gone = projects.filter((p) => !p.exists).length;
+  const [showGone, setShowGone] = useState(false);
+  const listed = showGone || gone === 0 ? projects : projects.filter((p) => p.exists);
   const [query, setQuery] = useState(() => readListState().query);
   const [sort, setSort] = useState<Sort | undefined>(() => readListState().sort.dirs);
   const [shown, setShown] = useState(PAGE);
@@ -37,11 +40,11 @@ export function OverviewPage({
   );
   const matching = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = projects.filter((p) => !q || p.path.toLowerCase().includes(q));
+    const list = listed.filter((p) => !q || p.path.toLowerCase().includes(q));
     const key = sort && COLUMNS[sort.column]?.sort;
     if (sort && key) list.sort((a, b) => compare(key(a), key(b)) * (sort.descending ? -1 : 1));
     return list;
-  }, [projects, query, sort]);
+  }, [listed, query, sort]);
   return (
     <div className="page">
       <header className="page-head">
@@ -56,10 +59,20 @@ export function OverviewPage({
         <header className="tt-head">
           <h2 id="h-dirs">Directories</h2>
           <span className="tt-count">
-            {matching.length === projects.length
-              ? projects.length
-              : `${matching.length} of ${projects.length}`}
+            {matching.length === listed.length
+              ? listed.length
+              : `${matching.length} of ${listed.length}`}
           </span>
+          {gone > 0 && (
+            <fieldset className="segmented" aria-label="Deleted folders">
+              <button type="button" aria-pressed={!showGone} onClick={() => setShowGone(false)}>
+                On disk
+              </button>
+              <button type="button" aria-pressed={showGone} onClick={() => setShowGone(true)}>
+                All <span className="seg-count">{projects.length}</span>
+              </button>
+            </fieldset>
+          )}
           <label className="filter">
             <Icon name="search" />
             <input
@@ -100,7 +113,7 @@ export function OverviewPage({
         </table>
         {matching.length === 0 && (
           <p className="tt-empty">
-            {projects.length === 0
+            {listed.length === 0
               ? "No directories yet. Temporary and test directories are listed in the sidebar."
               : "No directory matches."}
           </p>
