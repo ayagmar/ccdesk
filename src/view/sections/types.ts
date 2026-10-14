@@ -9,6 +9,7 @@ import {
   type Instruction,
   type McpServer,
   type Memory,
+  type MemoryReads,
   type Permission,
   type Plugin,
   type Reference,
@@ -34,7 +35,16 @@ export type Row =
       /** Calls in the sessions started here; undefined while counting, null if counting failed. */
       calls: number | null | undefined;
     }
-  | { id: string; section: "memory"; line: Line; item: Memory }
+  | {
+      id: string;
+      section: "memory";
+      line: Line;
+      item: Memory;
+      /** Claude's reads of it in the sessions counted; undefined while counting, null if counting failed. */
+      reads: MemoryReads | null | undefined;
+      /** Why it looks unused, once counted: "never read" or "not read in 30 days". */
+      unread: string | null;
+    }
   | { id: string; section: "hooks"; line: Line; item: Hook }
   | { id: string; section: "mcp"; line: Line; item: McpServer }
   /** A documented setting; its line is the file that sets it here, if any. */

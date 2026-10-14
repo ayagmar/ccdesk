@@ -43,7 +43,7 @@ Writes go to a temporary file that replaces the original in one step, so a crash
 
 ## Transcripts
 
-To count tool calls and your answers to permission prompts, ccdesk reads the open directory's transcripts in `~/.claude/projects/`. Commands and URL hosts stay inside the ccdesk process; only counts and rule patterns such as `Bash(pnpm test *)` reach the page. Details are on [Tool usage counts](../tool-usage/).
+To count tool calls, reads of memory files and your answers to permission prompts, ccdesk reads the open directory's transcripts in `~/.claude/projects/`. Commands, URL hosts and the paths Claude read stay inside the ccdesk process; only counts, times and rule patterns such as `Bash(pnpm test *)` reach the page. Details are on [Tool usage counts](../tool-usage/).
 
 ## Markdown from other people
 

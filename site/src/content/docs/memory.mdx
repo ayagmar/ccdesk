@@ -5,7 +5,7 @@ description: The auto memory Claude Code saved for a directory, the checks ccdes
 
 import Screenshot from "../../components/Screenshot.astro";
 
-Claude Code's auto memory is a folder of Markdown files per project, with a `MEMORY.md` index whose start loads into every session. The Memory section lists the memories for the open directory, with their type, description and when they changed.
+Claude Code's auto memory is a folder of Markdown files per project, with a `MEMORY.md` index whose start loads into every session. The Memory section lists the memories for the open directory, with their type, description and how often Claude read them.
 
 <Screenshot
   name="memory"
@@ -32,6 +32,15 @@ Memories are filtered by their `type` frontmatter: **user**, **feedback**, **pro
 - **lines past … are not loaded**: `MEMORY.md` is longer than the 200 lines or 25 KiB that load at session start.
 - **index lines point at missing files**: `MEMORY.md` links to files that are gone.
 - **also elsewhere**: a memory with the same name is saved for another directory. The inspector lists the copies and says whether their text is the same.
+- **never read** and **not read in 30 days**: see [Reads](#reads). These are observations, not faults.
+
+## Reads
+
+Claude uses a memory by reading its file: only the index loads at session start, and Claude reads a memory file when it needs it. **Reads** counts the Read calls on each memory file in the transcripts, and **Last read** says when the latest one was; the inspector repeats both under **Read here**. A file read in parts counts once per part. Loading `MEMORY.md` at session start is not a read, and neither are the earlier reads Claude Code replays into the context after a compaction, a Read you refused or one that failed, such as a Read of a memory before it was saved. A call that Claude Code copied into the transcript of a resumed or forked session counts once.
+
+The sessions are those of [Tool usage counts](../tool-usage/#which-sessions-count): in a git repository, every session started in it, in a subfolder or in a worktree, which all share one memory folder. A read counts when its path leads to the memory file, also through a link to the Claude folder, to the file a memory links to, or written with `~`. A relative path is not counted.
+
+A memory read by none of these sessions is flagged **never read**, and one whose last read is older than 30 days **not read in 30 days**; the section head says how many of each there are. Claude Code still loads the index line of such a memory every session, so if it no longer helps, deleting it frees that line. Claude Code deletes old transcripts after `cleanupPeriodDays`, so "never" means never in the sessions still on disk. The counts arrive a moment after the rest of the page; a `?` means ccdesk could not finish reading the transcripts. The inspector shows when a memory last changed. When the table is narrow, such as beside the inspector, it leaves out Type and Last read and keeps the description.
 
 **All directories** has a table of every memory saved under more than one directory, and whether the copies match or have drifted apart.
 

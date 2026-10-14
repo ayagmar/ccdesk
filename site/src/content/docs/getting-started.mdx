@@ -103,7 +103,7 @@ ccdesk reads the same files Claude Code reads for the directory it is started in
 - `~/.claude.json` (or `.claude.json` inside that folder when it is not `~/.claude`), for folder trust, MCP servers and approvals;
 - the managed settings folder your organisation may install: `/etc/claude-code` on Linux, `/Library/Application Support/ClaudeCode` on macOS and `C:\Program Files\ClaudeCode` on Windows;
 - the directory you started in and every folder above it, for `CLAUDE.md`, `AGENTS.md`, `.claude/` and `.mcp.json`;
-- transcripts in `~/.claude/projects/`, but only to count tool calls and your answers to permission prompts. See [Tool usage counts](../tool-usage/).
+- transcripts in `~/.claude/projects/`, but only to count tool calls, reads of memory files and your answers to permission prompts. See [Tool usage counts](../tool-usage/).
 
 It never reads `~/.claude/.credentials.json`.
 

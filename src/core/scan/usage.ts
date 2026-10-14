@@ -1,8 +1,9 @@
 import { realpath, stat } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { storeDirName } from "../../shared/memory.ts";
 import {
   type Approval,
+  type MemoryReads,
   type PermissionList,
   type ToolUsage,
   type Usage,
@@ -22,12 +23,18 @@ import { namesTool, parseRule } from "./tools.ts";
 
 /** One tool call, reduced to what counting and rule matching need. Never sent to the browser. */
 interface Call {
+  /** The tool_use id; a session resumed or forked into a new transcript repeats it. */
+  id: string;
   tool: string;
   at: string;
   /** Bash and Monitor: every command a Bash rule might see in the call (see everyCommandIn). */
   commands?: string[];
   /** WebFetch: the host, for matching domain rules. */
   host?: string;
+  /** Read: the file it read, as Claude wrote it, for counting reads of memory files. */
+  file?: string;
+  /** Its result was an error: refused by a rule or hook, or the tool failed. */
+  failed?: boolean;
   /** The allow rule that would have covered the call (see ruleFor). */
   rule: string | null;
   /** Set when Claude Code asked you: true when you allowed the call. */
@@ -99,18 +106,34 @@ export function usageCounter() {
    * cache. A count stops when every `signal` it was asked with aborts, or after `timeLimitMs`: it
    * rejects with CountStopped and the next one starts, even if a read of the stopped count never
    * returns.
+   *
+   * `memories` are the memory files of the store this directory uses: the same sessions are
+   * searched for Read calls on each (see memoryReads).
    */
   return function countUsage(
     env: ScanEnv,
     dir: string,
     rules: RuleInEffect[],
     {
+      memories = [],
       signal,
       timeLimitMs = TIME_LIMIT_MS,
       maxCachedCalls = MAX_CACHED_CALLS,
-    }: { signal?: AbortSignal; timeLimitMs?: number; maxCachedCalls?: number } = {}
+    }: {
+      memories?: string[];
+      signal?: AbortSignal;
+      timeLimitMs?: number;
+      maxCachedCalls?: number;
+    } = {}
   ): Promise<Usage> {
-    const key = JSON.stringify([env.claudeDir, resolve(dir), rules, timeLimitMs, maxCachedCalls]);
+    const key = JSON.stringify([
+      env.claudeDir,
+      resolve(dir),
+      rules,
+      memories,
+      timeLimitMs,
+      maxCachedCalls,
+    ]);
     let run = waiting.get(key);
     // Nobody would wait for a new count, so none starts to hold up the queue.
     if (!run && signal?.aborted) return Promise.reject(stoppedBecause(signal));
@@ -126,7 +149,7 @@ export function usageCounter() {
           else during.addEventListener("abort", onStop, { once: true });
         });
         return Promise.race([
-          count(transcripts, env, resolve(dir), rules, during, maxCachedCalls),
+          count(transcripts, env, resolve(dir), rules, memories, during, maxCachedCalls),
           stopped,
         ]);
       });
@@ -167,6 +190,7 @@ async function count(
   env: ScanEnv,
   dir: string,
   rules: RuleInEffect[],
+  memories: string[],
   signal: AbortSignal,
   maxCachedCalls: number
 ): Promise<Usage> {
@@ -183,7 +207,7 @@ async function count(
   const folders = repository ? checkouts : [dir];
   const projects = join(env.claudeDir, "projects");
   const storeNames = await listDir(projects);
-  const tally: Tally = { taken: new Set(), calls: [], sessions: 0 };
+  const tally: Tally = { taken: new Set(), calls: [], ids: new Set(), sessions: 0 };
   const named = env.projectDirName;
   for (const folder of folders) {
     const own = storeDirName(folder);
@@ -221,6 +245,8 @@ async function count(
   }
   const { calls, sessions } = tally;
   trimCache(transcripts, tally.taken, maxCachedCalls);
+  const reads = await memoryReads(env, calls, memories);
+  checkStopped(signal);
   return {
     sessions,
     repository,
@@ -228,13 +254,97 @@ async function count(
     tools: toolUsage(calls),
     approvals: approvals(calls, rules),
     matches: Object.fromEntries(rules.map((r) => [r.rule, matchCount(r, calls)])),
+    memories: reads,
   };
+}
+
+/**
+ * How often Claude read each memory file, and when last. A Read is Claude using a memory:
+ * MEMORY.md loads at every session start, and the copies of earlier reads Claude Code replays
+ * after a compaction are attachments, not calls, so neither counts; nor does a Read that was
+ * refused or failed, since Claude never saw the file. Claude may name a file with ~, through a
+ * link to its folder, or by the target of a memory that is a link. Windows and macOS usually ignore
+ * case: on macOS, where a volume may not, a match that differs in case is confirmed on disk.
+ */
+async function memoryReads(
+  env: ScanEnv,
+  calls: Call[],
+  memories: string[]
+): Promise<Record<string, MemoryReads>> {
+  const reads: Record<string, MemoryReads> = {};
+  if (memories.length === 0) return reads;
+  const fold = env.platform === "win32" || env.platform === "darwin";
+  // resolve already turns / into \ on Windows.
+  const key = (path: string) => (fold ? path.toLowerCase() : path);
+  const realDirs = new Map<string, Promise<string>>();
+  /** The path with its folder's links resolved, once per folder. */
+  const viaRealDir = (path: string) => {
+    const folder = dirname(path);
+    let found = realDirs.get(folder);
+    if (!found) {
+      found = realpath(folder).catch(() => folder);
+      realDirs.set(folder, found);
+    }
+    return found.then((dir) => join(dir, basename(path)));
+  };
+  const byPath = new Map<string, string>();
+  /** Every path a memory goes by, in its own case. */
+  const exact = new Set<string>();
+  for (const memory of memories) {
+    reads[memory] = { reads: 0, last: null };
+    const path = resolve(memory);
+    for (const alias of [path, await viaRealDir(path), await realpath(path).catch(() => path)]) {
+      byPath.set(key(alias), memory);
+      exact.add(alias);
+    }
+  }
+  const names = new Set([...byPath.keys()].map((path) => basename(path)));
+  /** The memory a path names, as written or through its folder's links. */
+  const memoryAt = async (path: string) => {
+    const named = byPath.get(key(path));
+    if (named) return { memory: named, as: path };
+    const real = await viaRealDir(path);
+    const memory = byPath.get(key(real));
+    return memory ? { memory, as: real } : null;
+  };
+  for (const call of calls) {
+    if (call.file === undefined || call.failed) continue;
+    const path = absolutePath(env, call.file);
+    if (!path || !names.has(key(basename(path)))) continue;
+    const found = await memoryAt(path);
+    if (!found) continue;
+    if (
+      env.platform === "darwin" &&
+      !exact.has(found.as) &&
+      !(await sameFile(found.as, found.memory))
+    )
+      continue;
+    const counted = reads[found.memory];
+    if (!counted) continue;
+    counted.reads++;
+    if (call.at && (counted.last === null || call.at > counted.last)) counted.last = call.at;
+  }
+  return reads;
+}
+
+/** A path Claude gave a tool, with ~ expanded; null for a relative one, which is the session's. */
+function absolutePath(env: ScanEnv, written: string): string | null {
+  const path = /^~[/\\]/.test(written) ? join(env.home, written.slice(2)) : written;
+  return isAbsolute(path) ? resolve(path) : null;
+}
+
+/** Whether two paths lead to the same file on disk. */
+async function sameFile(a: string, b: string): Promise<boolean> {
+  const [x, y] = await Promise.all([stat(a).catch(() => null), stat(b).catch(() => null)]);
+  return x !== null && y !== null && x.dev === y.dev && x.ino === y.ino;
 }
 
 /** What a count has found so far: the transcripts it took, their calls, and how many sessions. */
 interface Tally {
   taken: Set<string>;
   calls: Call[];
+  /** The ids of the calls taken, so a call copied into another transcript counts once. */
+  ids: Set<string>;
   sessions: number;
 }
 
@@ -259,7 +369,11 @@ async function countStore(
       (await transcript(transcripts, env, file, signal))?.startCwd;
     if (start ? !startsHere(start) : !ownStore) continue;
     tally.taken.add(file);
-    tally.calls.push(...((await transcript(transcripts, env, file, signal))?.calls ?? []));
+    for (const call of (await transcript(transcripts, env, file, signal))?.calls ?? []) {
+      if (tally.ids.has(call.id)) continue;
+      tally.ids.add(call.id);
+      tally.calls.push(call);
+    }
     if (file === session) tally.sessions++;
   }
 }
@@ -355,7 +469,7 @@ async function readFrom(
 /** Takes the tool calls from an assistant line and your answers from a tool result line. */
 function read(line: string, into: Transcript): void {
   const hasCall = line.includes('"tool_use"');
-  const hasDecision = line.includes('"permissionDecision"');
+  const hasDecision = line.includes('"permissionDecision"') || line.includes('"is_error":true');
   const hasStart = !into.startCwd && line.includes('"cwd"');
   if (!hasCall && !hasDecision && !hasStart) return;
   let record: unknown;
@@ -370,7 +484,7 @@ function read(line: string, into: Transcript): void {
   const content = record.message.content;
   if (!Array.isArray(content)) return;
   if (record.type === "assistant") readCalls(record, content, into);
-  else if (record.type === "user") readDecision(record, content, into);
+  else if (record.type === "user") readResults(record, content, into);
 }
 
 /** The tool calls in an assistant line. */
@@ -379,25 +493,27 @@ function readCalls(record: Record<string, unknown>, content: unknown[], into: Tr
   for (const block of content) {
     if (!isRecord(block) || block.type !== "tool_use") continue;
     if (typeof block.id !== "string" || typeof block.name !== "string") continue;
-    const call = callOf(block.name, isRecord(block.input) ? block.input : {}, at);
+    const call = callOf(block.id, block.name, isRecord(block.input) ? block.input : {}, at);
     into.calls.push(call);
     into.byId.set(block.id, call);
   }
 }
 
-/** Your answer to the calls a tool result line answers, when you gave it by hand. */
-function readDecision(record: Record<string, unknown>, content: unknown[], into: Transcript): void {
+/** Whether the calls a tool result line answers failed, and your answer when you gave it by hand. */
+function readResults(record: Record<string, unknown>, content: unknown[], into: Transcript): void {
   const decision = record.permissionDecision;
-  if (!isRecord(decision)) return;
-  if (typeof decision.source !== "string" || !decision.source.startsWith("user")) return;
+  const byYou =
+    isRecord(decision) && typeof decision.source === "string" && decision.source.startsWith("user");
   for (const block of content) {
     if (!isRecord(block) || block.type !== "tool_result") continue;
     const call = typeof block.tool_use_id === "string" && into.byId.get(block.tool_use_id);
-    if (call) call.byYou = decision.decision === "accept";
+    if (!call) continue;
+    if (byYou) call.byYou = decision.decision === "accept";
+    if (block.is_error === true) call.failed = true;
   }
 }
 
-function callOf(tool: string, input: Record<string, unknown>, at: string): Call {
+function callOf(id: string, tool: string, input: Record<string, unknown>, at: string): Call {
   const command =
     (tool === "Bash" || tool === "Monitor") && typeof input.command === "string"
       ? input.command
@@ -410,8 +526,9 @@ function callOf(tool: string, input: Record<string, unknown>, at: string): Call 
       // Not a URL: no domain rule can match it.
     }
   }
-  const call: Call = { tool, at, rule: ruleFor(tool, command, host) };
+  const call: Call = { id, tool, at, rule: ruleFor(tool, command, host) };
   if (command !== undefined) call.commands = everyCommandIn(command);
+  if (tool === "Read" && typeof input.file_path === "string") call.file = input.file_path;
   if (host !== undefined) call.host = host;
   return call;
 }

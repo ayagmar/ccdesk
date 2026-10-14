@@ -9,7 +9,7 @@ No. It is an independent open-source tool that reads the files Claude Code docum
 
 ## Does it show my sessions or what Claude did?
 
-No. ccdesk shows what Claude is told, not what it did. It reads transcripts only to count tool calls and your answers to permission prompts, and those counts are all that reach the page. See [Tool usage counts](../tool-usage/).
+No. ccdesk shows what Claude is told, not what it did. It reads transcripts only to count tool calls, reads of memory files and your answers to permission prompts, and those counts are all that reach the page. See [Tool usage counts](../tool-usage/).
 
 ## Does it need to stay running?
 

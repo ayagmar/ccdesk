@@ -32,6 +32,18 @@ export function NameButton({
   );
 }
 
+/** A count from the transcripts, while counting, or when the count could not finish. */
+export function Count({ value }: { value: number | null | undefined }) {
+  if (value === undefined) return "…";
+  if (value === null)
+    return (
+      <span className="muted" title="ccdesk could not finish counting the transcripts">
+        ?
+      </span>
+    );
+  return value;
+}
+
 /** The symlink mark after a name; a link into ~/.agents says so, since other agents read it too. */
 export function LinkMark({ realPath }: { realPath: string | undefined }) {
   if (!realPath) return null;

@@ -16,7 +16,7 @@ import { plural, tilde } from "../format.ts";
 import { Icon } from "../Icon.tsx";
 import { fileFor, ScopePicker, writableOr } from "../editorKit.tsx";
 import { usePermissionChange } from "../PermissionEditor.tsx";
-import { Field, NameButton } from "./kit.tsx";
+import { Count, Field, NameButton } from "./kit.tsx";
 import { type Actions, type SectionUi } from "./types.ts";
 
 type R = RowOf<"tools">;
@@ -44,18 +44,6 @@ function outcomeClass(t: BuiltinTool): string {
 function verdictClass(t: BuiltinTool): string {
   if (t.verdict === "denied") return "off";
   return t.verdict === "allowed" || (!t.asks && t.verdict === "default") ? "ok" : "";
-}
-
-/** The calls counted, while counting, or when the count could not finish. */
-function Calls({ calls }: { calls: number | null | undefined }) {
-  if (calls === undefined) return "…";
-  if (calls === null)
-    return (
-      <span className="muted" title="ccdesk could not finish counting the transcripts">
-        ?
-      </span>
-    );
-  return calls;
 }
 
 function explanation(tool: BuiltinTool): string {
@@ -249,7 +237,7 @@ export const tools: SectionUi<R> = {
           {t.hooks > 0 && <span className="flag">{plural(t.hooks, "hook")}</span>}
         </td>
         <td className={`num${row.calls ? " used" : ""}`}>
-          <Calls calls={row.calls} />
+          <Count value={row.calls} />
         </td>
         <td className="desc">
           <Described text={t.description.split(/(?<=\.)\s/)[0] ?? ""} />
