@@ -20,6 +20,7 @@ Claude Code pools the rules from all files and checks deny first, then ask, then
 - A rule that the same rule in an earlier-checked list beats is dimmed, with a flag naming the rule that wins. ccdesk compares rule text; it does not work out whether two different patterns overlap.
 - **Not in effect** marks allow rules and extra folders from a project or local file that wait for you to accept Claude Code's trust dialog for the folder. Your local file applies without the trust step when you start in your home folder, or in the folder whose `.claude` is `CLAUDE_CONFIG_DIR`, unless Claude Code keeps the local file at the root of a repository around that folder. Started in a subfolder, the same file waits for trust. Deny and ask rules apply right away. The header of the page says when the folder is not trusted yet.
 - When managed settings set `allowManagedPermissionRulesOnly`, every rule outside managed settings is marked not in effect.
+- An allow rule whose tool name is a glob, such as `*` or `mcp__*`, is marked not in effect: Claude Code skips it with a warning. An allow glob works only after a server name, as in `mcp__github__get_*`. Deny and ask rules may glob any tool name.
 
 An allow rule is flagged **covered no call here** when the transcripts for this directory contain no call it would have allowed. That can mean the rule is stale. ccdesk counts calls for whole-tool rules, Bash command patterns and `WebFetch(domain:…)` rules; path rules and other rules with a specifier are not counted and never flagged.
 
