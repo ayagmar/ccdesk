@@ -239,21 +239,26 @@ kbd {
   flex: none;
 }
 
-/* Hidden, the rail is a strip holding only the button that brings it back; the page takes the room. */
-.app:has(.rail.hidden) {
-  grid-template-columns: auto minmax(0, 1fr);
-}
+/*
+ * Hidden, the rail is a strip holding only the button that brings it back; the page takes the room.
+ * Only beside a wide window: on a phone the rail is a bar with its own toggle, whatever was saved.
+ */
+@media (min-width: 761px) {
+  .app:has(.rail.hidden) {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
 
-.rail.hidden {
-  padding: 14px 6px;
-}
+  .rail.hidden {
+    padding: 14px 6px;
+  }
 
-.rail.hidden .brand {
-  padding: 0;
-}
+  .rail.hidden .brand {
+    padding: 0;
+  }
 
-.rail.hidden :is(.brand-link, .text-size, .theme, .rail-body) {
-  display: none;
+  .rail.hidden :is(.brand-link, .text-size, .theme, .rail-body) {
+    display: none;
+  }
 }
 
 /* The three sizes show as the letter A at three clearly different sizes standing on one line, so
@@ -305,8 +310,12 @@ html[data-text-size="larger"] #root {
   text-align: left;
 }
 
-.rail-group.toggle:hover {
+.rail-group.toggle:hover:not(:disabled) {
   color: var(--ink);
+}
+
+.rail-group.toggle:disabled {
+  cursor: default;
 }
 
 /* The chevron points right while the group is folded and down once it is open. */
@@ -2319,12 +2328,9 @@ button:disabled {
     display: none;
   }
 
-  .rail.hidden :is(.brand-link, .theme) {
-    display: inline-flex;
-  }
-
-  .rail.hidden.open :is(.rail-body, .text-size) {
-    display: contents;
+  /* One row: the where-you-are label truncates rather than wrapping under the logo. */
+  .rail .brand {
+    flex-wrap: nowrap;
   }
 
   .rail.open {

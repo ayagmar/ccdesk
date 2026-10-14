@@ -118,7 +118,7 @@ function Controls({
         onClick={onToggleHidden}
         aria-expanded={!hidden}
         aria-controls="rail-body"
-        aria-label={hidden ? "Show the directory list" : "Hide the directory list"}
+        aria-label="Directory list"
         title={hidden ? "Show the directory list" : "Hide the directory list"}
       >
         <Icon name="panel" />
@@ -256,6 +256,8 @@ export function Rail({
           type="button"
           className="rail-group toggle"
           aria-expanded={regularOpen}
+          // A search shows its matches whatever the fold, so folding during one would do nothing.
+          disabled={query !== ""}
           onClick={() => {
             setShowRegular(!regularOpen);
             rememberFolded(regularOpen ? "folded" : null);
