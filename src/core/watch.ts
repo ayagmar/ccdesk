@@ -173,6 +173,12 @@ interface Scanned {
   stateFile: string;
 }
 
+/** The file watching the watchers run on: Node's, on the platform ccdesk runs on. */
+export interface WatchHost {
+  watch: typeof watch;
+  platform: NodeJS.Platform;
+}
+
 /** One set of file watchers per directory a page is looking at, shared by its requests. */
 export class Watcher {
   private readonly subscriptions = new Map<string, Subscription>();
@@ -181,10 +187,16 @@ export class Watcher {
   private readonly latest = new Map<string, Scanned>();
   private readonly env: ScanEnv;
   private readonly scanOf: typeof scanDirectory;
+  private readonly host: WatchHost;
 
-  constructor(env: ScanEnv, scanOf: typeof scanDirectory = scanDirectory) {
+  constructor(
+    env: ScanEnv,
+    scanOf: typeof scanDirectory = scanDirectory,
+    host: WatchHost = { watch, platform: process.platform }
+  ) {
     this.env = env;
     this.scanOf = scanOf;
+    this.host = host;
   }
 
   /** Scans `dir` and remembers what the scan read, so those files are watched too. */
@@ -199,7 +211,7 @@ export class Watcher {
     this.scanned.set(view.path, extra);
     if (subscription && JSON.stringify(extra) !== JSON.stringify(subscription.extra)) {
       subscription.extra = extra;
-      subscription.ready = this.rewatch(view.path, subscription);
+      this.restart(view.path, subscription);
     }
     return view;
   }
@@ -317,7 +329,7 @@ export class Watcher {
       extra: this.scanned.get(dir) ?? [],
     };
     this.subscriptions.set(dir, subscription);
-    subscription.ready = this.rewatch(dir, subscription);
+    this.restart(dir, subscription);
     await subscription.ready;
     return subscription;
   }
@@ -334,15 +346,25 @@ export class Watcher {
     for (const wake of [...subscription.waiters]) wake();
   }
 
+  /** Rewatches `dir`. A failure rejects `ready` for whoever awaits it, and is handled when no one does. */
+  private restart(dir: string, subscription: Subscription): void {
+    subscription.ready = this.rewatch(dir, subscription);
+    subscription.ready.catch(() => {
+      // Reported to the callers that await `ready`; a change that triggered it has no caller.
+    });
+  }
+
   /**
    * (Re)creates the watchers, so a folder created since, such as a new .claude, is watched. The old
-   * watchers close only once the new ones have started, so a change made while they move is seen.
+   * watchers close only once the new ones have started, so no folder goes without a watch between
+   * the two sets.
    *
-   * On macOS, libuv runs every folder watch in the process through one FSEvents stream, which its
+   * On macOS, libuv runs every folder watch of an event loop through one FSEvents stream, which its
    * own thread rebuilds whenever a watch starts or closes. Starting a watch returns before that
    * rebuild, so a change made right after it is lost; closing one waits until the rebuilt stream,
-   * with every watch started before it, is running. Closing a spare watch last makes the new
-   * watchers live before this resolves.
+   * with every watch started before it, is running. Closing a spare watch last therefore makes the
+   * new watchers live before this resolves, and without one this fails rather than resolve early.
+   * A rebuild replaces the stream, so a change made during one can still be lost.
    */
   private async rewatch(dir: string, subscription: Subscription): Promise<void> {
     const extra = await Promise.all(subscription.extra.map(nearestWatchable));
@@ -353,36 +375,53 @@ export class Watcher {
       for (const w of old) w.close();
       return;
     }
-    let live: string | undefined;
+    const started: string[] = [];
     for (const target of list) {
       try {
-        const watcher = watch(target.path, { recursive: target.recursive }, (_event, name) => {
-          const changed = name === null ? "" : String(name);
-          if (target.names && !target.names.includes(basename(changed))) return;
-          subscription.touchedAt = Date.now();
-          clearTimeout(subscription.settle);
-          subscription.settle = setTimeout(() => {
-            subscription.changedAt = Date.now();
-            // First, so a subscriber that throws cannot leave the old watchers in place.
-            subscription.ready = this.rewatch(dir, subscription);
-            for (const wake of [...subscription.waiters, ...subscription.listeners]) wake();
-          }, SETTLE_MS);
-        });
+        const watcher = this.host.watch(
+          target.path,
+          { recursive: target.recursive },
+          (_event, name) => {
+            const changed = name === null ? "" : String(name);
+            if (target.names && !target.names.includes(basename(changed))) return;
+            subscription.touchedAt = Date.now();
+            clearTimeout(subscription.settle);
+            subscription.settle = setTimeout(() => {
+              subscription.changedAt = Date.now();
+              // First, so a subscriber that throws cannot leave the old watchers in place.
+              this.restart(dir, subscription);
+              for (const wake of [...subscription.waiters, ...subscription.listeners]) wake();
+            }, SETTLE_MS);
+          }
+        );
         watcher.on("error", () => watcher.close());
         subscription.watchers.push(watcher);
-        live ??= target.path;
+        started.push(target.path);
       } catch {
         // A folder that does not exist yet is caught by watching its parent.
       }
     }
     for (const w of old) w.close();
-    if (live !== undefined && process.platform === "darwin") {
+    if (this.host.platform === "darwin" && started.length > 0) this.waitUntilLive(dir, started);
+    subscription.watchingSince = Date.now();
+  }
+
+  /**
+   * Opens and closes a spare watch on one of the `started` folders, which on macOS returns once the
+   * watchers are live. A folder can go away meanwhile, so each is tried in turn. When none opens,
+   * the watchers are dropped and the error is thrown, since they may not be live.
+   */
+  private waitUntilLive(dir: string, started: string[]): void {
+    let error: unknown;
+    for (const path of started) {
       try {
-        watch(live).close();
-      } catch {
-        // The folder went away since; its watcher reports that change.
+        this.host.watch(path).close();
+        return;
+      } catch (e) {
+        error = e;
       }
     }
-    subscription.watchingSince = Date.now();
+    this.drop(dir);
+    throw error;
   }
 }

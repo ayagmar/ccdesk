@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, type WatchListener, watch } from "node:fs";
 import { after, test } from "node:test";
 import { scanDirectory, testPath, Watcher } from "../src/core/index.ts";
+import { type WatchHost } from "../src/core/watch.ts";
 import { makeFixture } from "./helpers/fixture.ts";
 
 const watchers: Watcher[] = [];
@@ -91,6 +92,36 @@ test("creating the missing folder of an import, then the file, wakes a page each
   const file = watcher.wait(f.at("app"), first.at, signal, 5000);
   f.write("app/docs/new-folder/new.md", "Now here.\n");
   assert.equal((await file).changed, true);
+});
+
+test("on macOS, subscribing fails while the watchers cannot be shown to be live, and works once they can", async () => {
+  const f = makeFixture();
+  f.write("app/CLAUDE.md", "one\n");
+  // The watchers open. The spare watch, opened without a listener to show they are live, fails
+  // while `spareFails` is set, as when its folder goes away or no more watches can open.
+  let spareFails = true;
+  const host: WatchHost = {
+    platform: "darwin",
+    watch: ((path: string, options?: { recursive?: boolean }, listener?: WatchListener<string>) => {
+      if (listener) return watch(path, options ?? {}, listener);
+      if (spareFails)
+        throw Object.assign(new Error(`ENOENT: no such file or directory, watch '${path}'`), {
+          code: "ENOENT",
+        });
+      return watch(path);
+    }) as typeof watch,
+  };
+  const watcher = new Watcher(f.env, scanDirectory, host);
+  watchers.push(watcher);
+
+  await assert.rejects(started(watcher, f.at("app")), { code: "ENOENT" });
+
+  // The failed start is not kept: the next subscriber starts the watchers again.
+  spareFails = false;
+  await started(watcher, f.at("app"));
+  const waiting = watcher.wait(f.at("app"), Date.now(), new AbortController().signal, 5000);
+  f.write("app/CLAUDE.md", "two\n");
+  assert.equal((await waiting).changed, true);
 });
 
 /** A watcher on `app`, with the plugin `alpha` installed at `plugin` and its manifest. */
