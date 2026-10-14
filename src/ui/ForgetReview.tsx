@@ -25,6 +25,8 @@ export function ForgetReview({
   const [preview, setPreview] = useState<ForgetPreview | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Reading the preview again after a refusal: the button waits for the new revision.
+  const [rereading, setRereading] = useState(false);
 
   useEffect(() => {
     api.previewForget(path).then(setPreview, (error: unknown) => setProblem(errorText(error)));
@@ -38,7 +40,11 @@ export function ForgetReview({
         setBusy(false);
         setProblem(errorText(error));
         // The store may have changed since the review: show it as it is now, to forget again.
-        api.previewForget(path).then(setPreview, () => setPreview(null));
+        setRereading(true);
+        api
+          .previewForget(path)
+          .then(setPreview, () => setPreview(null))
+          .finally(() => setRereading(false));
       }
     );
   };
@@ -83,7 +89,7 @@ export function ForgetReview({
           <button
             type="button"
             className="danger"
-            disabled={busy}
+            disabled={busy || rereading}
             onClick={() => forget(preview.revision)}
           >
             {busy ? "Forgetting…" : "Forget directory"}
