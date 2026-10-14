@@ -428,8 +428,13 @@ export class Watcher {
    * interactive session.
    */
   async view(dir: string): Promise<DirectoryView> {
-    // A rewrite of ~/.claude.json still being read may change what the scan shows.
-    await this.subscriptions.get(dir)?.claudeJsonRead;
+    // A rewrite of ~/.claude.json still being read may change what the scan shows, and a read
+    // queued meanwhile may too, so this waits until no read is added.
+    for (;;) {
+      const read = this.subscriptions.get(dir)?.claudeJsonRead;
+      await read;
+      if (read === this.subscriptions.get(dir)?.claudeJsonRead) break;
+    }
     const latest = this.latest.get(dir);
     const subscription = this.subscriptions.get(dir);
     if (
@@ -437,8 +442,9 @@ export class Watcher {
       subscription?.unwatched.length === 0 &&
       subscription.watchingSince < latest.startedAt &&
       subscription.touchedAt < latest.startedAt &&
-      // One that has not settled yet may too.
-      subscription.claudeJsonSettle === undefined
+      // One that has not settled or started yet may too.
+      subscription.claudeJsonSettle === undefined &&
+      !subscription.claudeJsonQueued
     )
       return latest.view;
     return this.scan(dir);
