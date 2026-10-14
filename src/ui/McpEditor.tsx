@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 import { type DirectoryView, type McpEdit, type McpServer } from "../shared/types.ts";
 import { parseJson } from "../view/settings.ts";
 import { api } from "./api.ts";
-import { ScopeButtons } from "./editorKit.tsx";
+import { canWrite, ScopeButtons, writable, writableOr } from "./editorKit.tsx";
 import { tilde } from "./format.ts";
 import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
 import { Icon } from "./Icon.tsx";
@@ -40,9 +40,19 @@ export function McpEditor({ view, server, onSaved }: Props) {
   const [text, setText] = useState(
     server ? JSON.stringify(server.definition, null, 2) : NEW_SERVER
   );
-  const [scope, setScope] = useState<EditableScope>("project");
+  const [picked, setScope] = useState<EditableScope>(() => writableOr(view, "project"));
+  const scope = writableOr(view, picked);
   const ids = { name: useId(), server: useId() };
 
+  // Claude Code changes a local server from inside its folder, so with the folder gone ccdesk cannot.
+  if (server && isEditable(server.scope) && !canWrite(view, server.scope))
+    return (
+      <p className="muted small">
+        This folder no longer exists, so its local servers can't be changed here. Run{" "}
+        <code>claude mcp remove --scope local</code> in the folder once it is back, or edit
+        ~/.claude.json.
+      </p>
+    );
   if (server && !isEditable(server.scope))
     return (
       <p className="muted small">
@@ -101,7 +111,7 @@ export function McpEditor({ view, server, onSaved }: Props) {
       {!server && (
         <ScopeButtons
           label="Where the server goes"
-          scopes={SCOPES}
+          scopes={writable(view, SCOPES)}
           scope={scope}
           onPick={(s) => {
             setScope(s);

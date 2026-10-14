@@ -15,6 +15,8 @@ The switch under the page header picks the kind of session the page describes. *
 
 Allow rules and extra folders from `.claude/settings.json`, or from a local file tracked in git, still wait until you trust the folder in an interactive session. The choice is kept in the address as `profile=print`, so a reload or a shared link keeps it.
 
+A directory that no longer exists is struck through in the rail. Its page starts by saying the folder no longer exists and whether its auto memory is still saved. The tables show what still applies from your user and managed files, and the editors offer only your user files, since writing the folder's project or local files would create it again. A local MCP server of that folder cannot be changed from ccdesk, because Claude Code changes one from inside its folder.
+
 ## The route strip
 
 The line across the top is the load order for this directory, one stop per scope:

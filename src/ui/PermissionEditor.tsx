@@ -8,7 +8,7 @@ import {
 } from "../shared/types.ts";
 import { type Rule } from "../view/sections/permissions.ts";
 import { api } from "./api.ts";
-import { fileFor, projectOrUser, ScopePicker } from "./editorKit.tsx";
+import { fileFor, projectOrUser, ScopePicker, writableOr } from "./editorKit.tsx";
 import { tilde } from "./format.ts";
 import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
 import { Icon } from "./Icon.tsx";
@@ -46,7 +46,8 @@ export function PermissionEditor({ view, rule, onSaved }: Props) {
   const { busy } = change;
   const [list, setList] = useState<PermissionList>("allow");
   const [text, setText] = useState("");
-  const [scope, setScope] = useState<Scope>(() => projectOrUser(view));
+  const [picked, setScope] = useState<Scope>(() => projectOrUser(view));
+  const scope = writableOr(view, picked);
   const ruleId = useId();
 
   const fileScope = rule?.scope ?? scope;

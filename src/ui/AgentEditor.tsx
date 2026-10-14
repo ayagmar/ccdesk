@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { type AgentEdit, type DirectoryView, type Entry } from "../shared/types.ts";
 import { api } from "./api.ts";
-import { ScopeButtons } from "./editorKit.tsx";
+import { ScopeButtons, writable, writableOr } from "./editorKit.tsx";
 import { type Saved, useReviewedChange } from "./useReviewedChange.tsx";
 import { Icon } from "./Icon.tsx";
 
@@ -33,7 +33,8 @@ export function AgentEditor({ view, agent, onSaved }: Props) {
   const [file, setFile] = useState("");
   const [text, setText] = useState(agent?.text ?? template(""));
   const [touched, setTouched] = useState(false);
-  const [scope, setScope] = useState<AgentScope>("project");
+  const [picked, setScope] = useState<AgentScope>(() => writableOr(view, "project"));
+  const scope = writableOr(view, picked);
   const ids = { file: useId(), text: useId() };
 
   const where = agent ? { path: agent.path } : { create: { scope, file: file.trim() } };
@@ -76,7 +77,7 @@ export function AgentEditor({ view, agent, onSaved }: Props) {
         <>
           <ScopeButtons
             label="Where the agent goes"
-            scopes={["project", "user"] as const}
+            scopes={writable(view, ["project", "user"] as const)}
             scope={scope}
             onPick={(s) => {
               setScope(s);

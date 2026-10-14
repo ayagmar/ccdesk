@@ -7,7 +7,7 @@ import { type RowOf } from "../../view/sections/types.ts";
 import { sessionsHere } from "../../view/usage.ts";
 import { Bullet } from "../Bullet.tsx";
 import { ago, plural, tilde, tildeAll } from "../format.ts";
-import { fileFor, ScopePicker } from "../editorKit.tsx";
+import { fileFor, ScopePicker, writableOr } from "../editorKit.tsx";
 import { Icon } from "../Icon.tsx";
 import { PermissionEditor, usePermissionChange } from "../PermissionEditor.tsx";
 import { SettingEditor } from "../SettingEditor.tsx";
@@ -213,7 +213,8 @@ function CoveredCalls({ rule, usage }: { rule: Rule; usage: Usage | null | undef
 function SuggestedRule({ row, actions }: { row: Suggested; actions: Actions }) {
   const { view } = actions;
   const change = usePermissionChange(view, actions.onSaved);
-  const [scope, setScope] = useState<Scope>("local");
+  const [picked, setScope] = useState<Scope>(() => writableOr(view, "local"));
+  const scope = writableOr(view, picked);
   const file = fileFor(view, scope);
   const { rule, approved, last } = row.item;
   const prefix = /^Bash\((.+) \*\)$/.exec(rule)?.[1];

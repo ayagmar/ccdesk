@@ -27,7 +27,7 @@ import {
   toDraft,
 } from "../view/settings.ts";
 import { api } from "./api.ts";
-import { ScopeButtons } from "./editorKit.tsx";
+import { ScopeButtons, writable, writableOr } from "./editorKit.tsx";
 import { tilde } from "./format.ts";
 import { documentedValues } from "./settingsCatalog.ts";
 import { propertyFor, schemaSource, settingKeys } from "./settingsSchema.ts";
@@ -48,7 +48,8 @@ function isHidden(value: unknown): boolean {
 
 export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props) {
   const [key, setKey] = useState(settingKey ?? "");
-  const [scope, setScope] = useState<Scope>(defaultScope);
+  const [picked, setScope] = useState<Scope>(() => writableOr(view, defaultScope));
+  const scope = writableOr(view, picked);
   const property = propertyFor(key);
   const layer = view.settings.find((l) => l.scope === scope && !l.legacy);
   const current = layer?.data?.[key];
@@ -63,9 +64,9 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
   const allowed = allowedScopes(key);
   // Start on a file Claude Code reads this key from.
   useEffect(() => {
-    const usable = EDITABLE_SCOPES.filter((s) => allowedScopes(key).includes(s));
+    const usable = writable(view, EDITABLE_SCOPES).filter((s) => allowedScopes(key).includes(s));
     setScope((s) => (usable.includes(s) || !usable[0] ? s : usable[0]));
-  }, [key]);
+  }, [key, view]);
 
   // A review describes one value in one file; changing either sends you back to review again.
   const pickKey = (next: string) => {
@@ -110,7 +111,7 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
           {property.$comment && <p className="muted small">{property.$comment}</p>}
           <ScopeButtons
             label="File to change"
-            scopes={EDITABLE_SCOPES}
+            scopes={writable(view, EDITABLE_SCOPES)}
             scope={scope}
             onPick={pickScope}
             unavailable={(s) =>

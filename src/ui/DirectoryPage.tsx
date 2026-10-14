@@ -162,6 +162,7 @@ export function DirectoryPage({
           />
           <SectionIndex groups={groups} hidden={seeing} />
         </header>
+        <GoneFolder view={view} />
         <SessionSwitch profile={view.profile} onProfile={onProfile} />
         <Problems problems={view.problems} />
         <NotFollowing following={following} />
@@ -583,6 +584,32 @@ function problemOutcome(p: DirectoryView["problems"][number]): string {
   // The message already names both outcomes for the file.
   if (p.partial) return "";
   return "Claude Code may skip this file.";
+}
+
+/**
+ * Leads a folder that no longer exists with that fact, and with what is left of it. Its project
+ * and local files are gone, so the editors offer only your user files (`canWrite`).
+ */
+function GoneFolder({ view }: { view: DirectoryView }) {
+  if (view.exists) return null;
+  const memories = view.memory.memories.length;
+  return (
+    <section className="problems" aria-label="Folder no longer exists">
+      <Icon name="warn" />
+      <div>
+        <p>
+          <strong>This folder no longer exists.</strong>{" "}
+          {memories > 0 &&
+            `Its auto memory is still saved (${plural(memories, "memory", "memories")}).`}
+        </p>
+        <p>
+          The tables show what still applies from your user and managed files. Settings, rules,
+          hooks, servers and agents go to your user files only, since writing the folder's own files
+          would create it again.
+        </p>
+      </div>
+    </section>
+  );
 }
 
 /** The files ccdesk could not read or parse here: each path on its own line, the message under it. */
