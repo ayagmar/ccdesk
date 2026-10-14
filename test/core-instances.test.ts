@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { chmodSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { setTimeout as sleep } from "node:timers/promises";
 import { createCore, RefusedError, storeDirName } from "../src/core/index.ts";
 import { type Fixture, makeFixture } from "./helpers/fixture.ts";
 
@@ -117,9 +118,28 @@ test("an editor that will not start is refused with how to set one, not a server
 // The fake programs are shell scripts.
 const notOnWindows = { skip: process.platform === "win32" };
 
-/** A program that writes the arguments it got, one per line, after `$MARKER`, to `out`. */
+/**
+ * A program that writes the arguments it got, one per line, after `$MARKER`, to `out`, then
+ * creates `out.done`.
+ */
 function fakeProgram(f: Fixture, path: string, out: string): void {
-  chmodSync(f.write(path, `#!/bin/sh\nprintf '%s\\n' "$MARKER" "$@" > '${out}'\n`), 0o755);
+  chmodSync(
+    f.write(path, `#!/bin/sh\nprintf '%s\\n' "$MARKER" "$@" > '${out}'\n: > '${out}.done'\n`),
+    0o755
+  );
+}
+
+/**
+ * What a fake program wrote, once it has finished. An editor counts as opened once it has run for a
+ * while, so on a busy machine the fake may not have written anything yet when openFile resolves.
+ */
+async function writtenBy(out: string): Promise<string> {
+  const deadline = Date.now() + 10_000;
+  while (!existsSync(`${out}.done`)) {
+    if (Date.now() > deadline) throw new Error(`${out} was never written`);
+    await sleep(20);
+  }
+  return readFileSync(out, "utf8");
 }
 
 test("a core for a Windows machine opens a .cmd editor through cmd.exe", notOnWindows, async () => {
@@ -136,7 +156,7 @@ test("a core for a Windows machine opens a .cmd editor through cmd.exe", notOnWi
   const target = f.write("app/CLAUDE.md", "# Rules\n");
 
   assert.equal(await createCore(env).openFile(target), "code");
-  assert.deepEqual(readFileSync(out, "utf8").split("\n"), [
+  assert.deepEqual((await writtenBy(out)).split("\n"), [
     "from env",
     "/d",
     "/s",
