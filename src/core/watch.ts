@@ -1,5 +1,5 @@
 import { type BigIntStats, type FSWatcher, watch } from "node:fs";
-import { stat } from "node:fs/promises";
+import { realpath, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { storeDirName } from "../shared/memory.ts";
 import { type DirectoryView, type Plugin, type SessionProfile } from "../shared/types.ts";
@@ -284,6 +284,8 @@ interface Subscription {
   /** The `projects` entries of ~/.claude.json the scan reads, and `claudeJsonPrint` of them. */
   projectKeys: string[];
   claudeJson?: string;
+  /** ~/.claude.json, and when it is a link, the file it leads to. */
+  claudeJsonPaths: string[];
   /** Waits for a change to ~/.claude.json to settle before reading it (see `claudeJsonChanged`). */
   claudeJsonSettle?: NodeJS.Timeout | undefined;
   /** The latest read of ~/.claude.json, and whether one is waiting to start; one runs at a time. */
@@ -501,6 +503,7 @@ export class Watcher {
       listeners: new Set(),
       extra: this.scanned.get(dir) ?? [],
       projectKeys: [],
+      claudeJsonPaths: [this.env.claudeJson],
       claudeJsonRead: Promise.resolve(),
       claudeJsonQueued: false,
       seen: nothingSeen(),
@@ -646,8 +649,17 @@ export class Watcher {
       subscription.projectKeys = keys;
       subscription.claudeJson = print;
     }
+    // A linked ~/.claude.json written through its link changes only the file it leads to.
+    const linked = await realpath(this.env.claudeJson).catch(() => this.env.claudeJson);
+    subscription.claudeJsonPaths = [...new Set([this.env.claudeJson, linked])];
+    const linkTarget: Target[] =
+      linked === this.env.claudeJson
+        ? []
+        : [{ path: dirname(linked), recursive: false, names: [basename(linked)] }];
     const list = oncePerFolder(
-      await Promise.all((await targets(this.env, dir, subscription.extra)).map(nearestWatchable))
+      await Promise.all(
+        (await targets(this.env, dir, [...subscription.extra, ...linkTarget])).map(nearestWatchable)
+      )
     );
     const old = subscription.watchers;
     subscription.watchers = [];
@@ -672,7 +684,8 @@ export class Watcher {
             if (target.names && name !== null && !target.names.includes(basename(String(name))))
               return;
             const path = name === null ? undefined : join(target.path, String(name));
-            if (path === this.env.claudeJson) return this.claudeJsonChanged(dir, subscription);
+            if (path !== undefined && subscription.claudeJsonPaths.includes(path))
+              return this.claudeJsonChanged(dir, subscription);
             subscription.touchedAt = Date.now();
             this.noticed(dir, subscription, path);
           }
