@@ -7,7 +7,7 @@ import Screenshot from "../../components/Screenshot.astro";
 
 The Settings section lists every key set in any settings file that applies to the open directory, with the value Claude Code ends up using and the file it comes from.
 
-The buttons in the section's header filter the table by the file that decides each value, with a count for each: **Managed**, **User**, **Project** or **Local**, and **Ignored** for a key no file it is set in is read from. A merged value counts under the highest file it comes from.
+The buttons in the section's header filter the table by the file that decides each value, with a count for each: **Managed**, **User**, **Project** or **Local**, **Ignored** for a key no file it is set in is read from, and **Waits for trust** for one whose only values wait for the trust dialog. A merged value counts under the highest file it comes from.
 
 A key set to the default Claude Code's settings reference gives for it is marked **default**, and the inspector shows that default, so you can see which keys change nothing. A default that overrides a different value in a lower file is not marked, since removing it would change the setting. A key whose documented default is described in words or depends on something else, such as the platform, is never marked.
 
