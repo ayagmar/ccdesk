@@ -22,9 +22,16 @@ function memory(name: string, type: string, description: string, body: string): 
   return `---\nname: ${name}\ndescription: ${description}\nmetadata:\n  type: ${type}\n---\n\n${body}\n`;
 }
 
-/** Transcript lines for tool calls; `answer` marks a call Claude Code asked about. */
-function transcript(cwd: string, calls: [tool: string, input: object, answer?: string][]) {
-  const start = Date.now() - 3 * DAY;
+/**
+ * Transcript lines for tool calls, a minute apart from `daysAgo`; `answer` marks a call Claude Code
+ * asked about.
+ */
+function transcript(
+  cwd: string,
+  calls: [tool: string, input: object, answer?: string][],
+  daysAgo = 3
+) {
+  const start = Date.now() - daysAgo * DAY;
   return calls
     .flatMap(([name, input, answer], i) => {
       const id = `toolu_demo_${i}`;
@@ -430,8 +437,9 @@ function writeMemory({ claude, api, web, write }: Demo): void {
   );
 }
 
-/** Transcripts, so tool counts and suggested rules show up. */
+/** Transcripts, so tool counts, suggested rules and memory reads show up. */
 function writeTranscripts({ claude, api, web, write }: Demo): void {
+  const apiMemory = join(claude, "projects", storeName(api), "memory");
   write(
     join(claude, "projects", storeName(api), "demo-session-1.jsonl"),
     transcript(api, [
@@ -459,7 +467,23 @@ function writeTranscripts({ claude, api, web, write }: Demo): void {
       ["Read", { file_path: join(api, "src", "orders.ts") }],
       ["Read", { file_path: join(api, "src", "schemas", "order.ts") }],
       ["TodoWrite", { todos: [] }],
+      ["Read", { file_path: join(apiMemory, "test-database.md") }],
+      ["Read", { file_path: join(apiMemory, "test-database.md") }],
+      ["Read", { file_path: join(apiMemory, "review-style.md") }],
+      ["Read", { file_path: join(apiMemory, "user-role.md") }],
     ])
+  );
+  // An older session, so one memory was last read more than 30 days ago.
+  write(
+    join(claude, "projects", storeName(api), "demo-session-0.jsonl"),
+    transcript(
+      api,
+      [
+        ["Read", { file_path: join(apiMemory, "release-freeze.md") }],
+        ["Read", { file_path: join(apiMemory, "test-database.md") }],
+      ],
+      45
+    )
   );
   write(
     join(claude, "projects", storeName(web), "demo-session-2.jsonl"),
