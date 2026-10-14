@@ -95,6 +95,17 @@ const QUESTIONS = [
     title: "MCP servers",
   },
   {
+    id: "memory-reads",
+    question: "Which memories does Claude never read?",
+    answer: "How often Claude read each memory, and the ones it has not read lately",
+    shows:
+      "The Memory timetable with reads per memory: staging-url never read, release-freeze not read in 30 days",
+    section: "Memory",
+    key: "5",
+    page: "memory/#reads",
+    title: "Memory reads",
+  },
+  {
     id: "shared-memory",
     question: "Did Claude save the same memory in two projects?",
     answer: "Memories found under more than one directory",
@@ -206,6 +217,26 @@ const QUESTIONS = [
         alt="The model setting open in the inspector, with the diff that changes it from sonnet to opus in the project's settings file"
         width={480}
       />
+    </section>
+
+    <section class="split check" aria-labelledby="check">
+      <div>
+        <h2 id="check">Fail a build when a session would read a broken file</h2>
+        <p class="section-lede">
+          <code>ccdesk check</code> lists the files a session started in a folder reads but Claude
+          Code cannot: a settings file or <code>.mcp.json</code> that is not valid JSON, a
+          settings file whose shape its schema rejects, a <code>CLAUDE.md</code> or rule it cannot read. It exits 1 when
+          there are any, so run it in CI. It only reads, and counts only the repository's own
+          files.
+        </p>
+        <p><a href={`${base}getting-started/#without-the-browser`}>Running ccdesk check in CI</a></p>
+      </div>
+      <pre class="terminal" tabindex="0" aria-label="ccdesk check output"><code><span class="prompt">$</span> npx ccdesk check
+Claude Code cannot read these files and may skip them:
+  .claude/settings.json: not valid JSON (line 4, column 3)
+  .mcp.json: not valid JSON (line 2, column 1)
+
+2 problems in a session started in ~/code/acme-api.</code></pre>
     </section>
 
     <section aria-labelledby="private">
@@ -445,6 +476,35 @@ const QUESTIONS = [
     margin: 0;
   }
 
+  /* The output keeps its lines whole beside the text, and scrolls once the page stacks. */
+  .split.check {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .terminal {
+    margin: 0;
+    padding: 1rem 1.125rem;
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+  }
+
+  .terminal code {
+    padding: 0;
+    background: none;
+    font-size: inherit;
+  }
+
+  .terminal .prompt {
+    color: var(--muted);
+    user-select: none;
+  }
+
   .facts-list {
     margin: 1.25rem 0 0;
     padding: 0;
@@ -503,6 +563,7 @@ const QUESTIONS = [
 
   @media (max-width: 64rem) {
     .split,
+    .split.check,
     .columns {
       grid-template-columns: minmax(0, 1fr);
     }
