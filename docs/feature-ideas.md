@@ -4,9 +4,7 @@ Ideas, not commitments: each one is something the code is already close to suppo
 
 ## On the command line
 
-`ccdesk scan [dir] --json` and `ccdesk explain <file>` are done (step 6 of the split plan). These would sit beside them.
-
-**`ccdesk check [dir]`** (S). Exits non-zero when the scan reports problems: files ccdesk could not read or parse, and above all the ones marked `blocksStart`, which stop Claude Code from starting. A repository could run it in CI to catch a broken `.claude/settings.json` or `.mcp.json` before anyone pulls it.
+`ccdesk scan [dir] --json` and `ccdesk explain <file>` are done (step 6 of the split plan), and so is `ccdesk check [dir]`, which exits 1 when a session started in a folder reads a file of its repository that Claude Code cannot read or parse (see [Getting started](../site/src/content/docs/getting-started.mdx)). These would sit beside them.
 
 **`ccdesk compare <a> <b>`** (S). The page's compare view as text: each setting's value in two directories and the files it comes from, from `compareSettings`.
 
