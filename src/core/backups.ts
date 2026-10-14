@@ -190,7 +190,7 @@ async function planStoreRestore(env: ScanEnv, manifest: BackupManifest, dir: str
       : "The forgotten store is missing from the backup folder.";
   else if (taken)
     blocked =
-      "A store of that name exists again, since Claude Code was used in this directory after it was forgotten. Move that folder aside first to restore this one.";
+      "A folder of that name exists in Claude Code's projects folder again. Move it aside first to restore this one.";
   return { target, moved, listing, blocked, revision: revisionOf(`${taken}\0${listing}`) };
 }
 

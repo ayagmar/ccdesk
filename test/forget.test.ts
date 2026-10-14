@@ -118,7 +118,7 @@ test("a restore is refused while a new store of the same name exists", async () 
 
   const restore = await core.previewRestore(change.id);
 
-  assert.match(restore.blocked ?? "", /exists again/);
+  assert.match(restore.blocked ?? "", /exists in Claude Code's projects folder again/);
   await assert.rejects(core.restoreBackup(change.id, restore.revision), RefusedError);
   assert.deepEqual(
     [existsSync(join(store, "c.jsonl")), existsSync(join(store, "a.jsonl"))],
