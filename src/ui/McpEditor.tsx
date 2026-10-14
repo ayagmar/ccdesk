@@ -75,7 +75,7 @@ export function McpEditor({ view, server, onSaved }: Props) {
           id={ids.name}
           className="mono"
           value={name}
-          placeholder="sentry"
+          placeholder="e.g. sentry"
           spellCheck={false}
           onChange={(e) => {
             setName(e.target.value);

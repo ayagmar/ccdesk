@@ -9,6 +9,8 @@
   --ink-2: #4a4a45;
   --muted: #6b6a63;
   --rule: #dcdad1;
+  /* Field, filter and segmented borders: 3:1 on paper, so an empty field still shows its edge. */
+  --rule-control: #8f8c81;
   --rule-strong: #141414;
   --sel: #fff3c4;
   --sel-ink: #141414;
@@ -57,6 +59,7 @@
     --ink-2: #c7c2b6;
     --muted: #938f84;
     --rule: #2c2b28;
+    --rule-control: #6e6c64;
     --rule-strong: #ece8de;
     --sel: #33302a;
     --sel-ink: #fff6e0;
@@ -90,6 +93,7 @@
   --ink-2: #c7c2b6;
   --muted: #938f84;
   --rule: #2c2b28;
+  --rule-control: #6e6c64;
   --rule-strong: #ece8de;
   --sel: #33302a;
   --sel-ink: #fff6e0;
@@ -377,7 +381,7 @@ html[data-text-size="larger"] #root {
   display: flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--rule-control);
   border-radius: 6px;
   background: var(--paper);
   padding: 0 8px;
@@ -896,6 +900,11 @@ input::placeholder {
   color: var(--sel-ink);
 }
 
+/* Muted ink falls under 4.5:1 on the dark selection, so a selected row's quiet text steps up to ink-2. */
+.tt tbody tr.selected :is(.muted, .vis-personal, td.num:not(.used)) {
+  color: var(--ink-2);
+}
+
 .tt tbody tr.selected .row-name {
   font-weight: 700;
 }
@@ -1198,7 +1207,7 @@ input::placeholder {
   min-width: 0;
   padding: 0;
   display: inline-flex;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--rule-control);
   border-radius: 6px;
   /* Scrolls sideways when the chips do not fit, rather than squeezing their labels. */
   max-width: 100%;
@@ -1214,7 +1223,7 @@ input::placeholder {
   align-items: center;
   gap: 5px;
   border: 0;
-  border-right: 1px solid var(--rule);
+  border-right: 1px solid var(--rule-control);
   background: var(--panel);
   padding: 0 9px;
   height: 24px;
@@ -2286,7 +2295,7 @@ button:disabled {
 .field textarea,
 .path-form input {
   width: 100%;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--rule-control);
   border-radius: 6px;
   background: var(--paper);
   color: var(--ink);
@@ -2471,7 +2480,7 @@ fieldset.field {
   height: 26px;
   max-width: 260px;
   padding: 0 6px;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--rule-control);
   border-radius: 6px;
   background: var(--panel);
   color: var(--ink);

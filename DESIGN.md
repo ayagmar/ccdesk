@@ -10,6 +10,7 @@ colors:
   sunk: "#f1f0ea"
   hover: "#f4f3ec"
   rule: "#dcdad1"
+  rule-control: "#8f8c81"
   selection: "#fff3c4"
   focus: "#0072b2"
   ok: "#1d6b47"
@@ -28,6 +29,7 @@ colors:
   board-sunk: "#222220"
   board-hover: "#1d1d1b"
   board-rule: "#2c2b28"
+  board-rule-control: "#6e6c64"
   board-ink: "#ece8de"
   board-ink-2: "#c7c2b6"
   board-muted: "#938f84"
@@ -259,8 +261,9 @@ Each line has a matching "on" ink for its bullet letter: white on Managed, User,
 - **Panel White** (panel): rail, inspector, palette and secondary buttons.
 - **Sunk Paper** (sunk): raw file and diff wells, the pressed route stop, neutral flags.
 - **Hover Paper** (hover): row and control hover.
-- **Hairline** (rule): row dividers, control borders, column-head underlines on paper.
-- **Second Ink** (ink-2): values, "why" text and descriptions. **Muted** (muted): column heads, counts, skipped rows, placeholders.
+- **Hairline** (rule): row dividers, button borders, wells and panel edges.
+- **Control Line** (rule-control): the border of text fields, filter boxes, selects and segmented controls, at least 3:1 against paper, panel and hover paper in both themes, so an empty field still shows where it is. Buttons keep the hairline, since their label already marks them.
+- **Second Ink** (ink-2): values, "why" text and descriptions. **Muted** (muted): column heads, counts, skipped rows, placeholders. A placeholder that shows a sample value starts with "e.g." so it cannot be read as a value already entered.
 - **Selection Cream** (selection): the selected timetable row and the active palette option. On the board it is **Board Selection Umber** (board-selection) with **Selection White** ink.
 
 ### Named Rules
@@ -350,7 +353,7 @@ A circle with the scope letter, filled with the line colour and lettered in its 
 
 ### Timetable
 - **Section head:** 2px ink rule, title, mono count, optional segmented filter or head action, and inline warning flags.
-- **Rows:** 32px, hairline below, hover in hover paper, selected in selection cream with the name in bold, skipped rows in muted ink.
+- **Rows:** 32px, hairline below, hover in hover paper, selected in selection cream with the name in bold, skipped rows in muted ink. On a selected row, muted text (counts, times, "only you") steps up to second ink, because muted ink falls under 4.5:1 on the board's selection.
 - **Beaten values:** in Settings, values that lost to a higher layer are shown struck through with their own bullet, so the winner and the losers read on one line.
 - **Status and visibility:** coloured words ("loaded", "on match", "skipped"; "tracked in git", "untracked"; "asks first", "runs without asking", "removed"), never bare swatches.
 - **Sorting and paging:** sortable column heads are plain buttons with an arrow mark that cycle ascending, descending, off and set `aria-sort`; the facet chips show "x of y" when narrowed and scroll sideways rather than squeeze their labels when they do not fit; a facet with more than 8 values becomes a select with the counts in its options. Sections longer than 50 rows end in a "Show 50 more · x of y shown" text button, never page numbers.
@@ -392,13 +395,13 @@ Editing happens inside the inspector. A segmented control picks the target layer
 - **Disabled:** 60% opacity with a progress cursor while a write is in flight.
 
 ### Inputs / Fields
-- **Style:** paper fill, hairline border, 6px radius, 30px (filters) or 32px (editor fields) tall. Filter boxes carry a leading search icon and a trailing keycap hint.
+- **Style:** paper fill, control line border, 6px radius, 30px (filters) or 32px (editor fields) tall. Filter boxes carry a leading search icon and a trailing keycap hint.
 - **Focus:** filter boxes turn their border focus-blue; editor fields get a 2px focus outline. Everything else uses the global 2px focus-visible outline offset by 2px. Inside anything that scrolls sideways (segmented controls, the section index) the ring is drawn 2px inside the option instead, because the scroll box would clip it; on a pressed option a 1px paper line separates the ring from the ink fill.
 - **Keycaps:** mono 11px, hairline border with a 2px bottom edge, 4px radius.
 
 ### Chips and Segmented Controls
 - **Flags:** 18px tall, 4px radius, 11.5px text with an optional 13px icon; neutral (sunk), warning (amber) or fault (red).
-- **Segmented control:** joined options with hairline dividers and a 6px outer radius; the pressed option fills with ink. Used for memory-type filters (with the type shapes), Read/Raw, and layer choice (with bullets).
+- **Segmented control:** joined options with control line dividers and border and a 6px outer radius; the pressed option fills with ink. Used for memory-type filters (with the type shapes), Read/Raw, and layer choice (with bullets).
 
 ### Navigation
 - **Rail:** panel white with a hairline right edge. The brand mark is Murmeli's badge at 26px beside "ccdesk" in 700. "All directories" and "Recent changes" sit under it as icon links. Groups ("Opened from", "Used with Claude") are 12px muted labels. Items are 30px, 13.5px, with a mono count on the right; hover in hover paper; the current directory is inverted (ink fill, paper text); a directory that no longer exists is struck through.

@@ -118,7 +118,7 @@ export function PermissionEditor({ view, rule, onSaved }: Props) {
               id={ruleId}
               className="mono"
               value={text}
-              placeholder="Bash(npm test:*)"
+              placeholder="e.g. Bash(npm test:*)"
               spellCheck={false}
               onChange={(e) => {
                 setText(e.target.value);
