@@ -88,7 +88,9 @@ const rowIn = (key: string, title: string, text: string) => async (page: Page) =
 };
 
 const SHOTS: Shot[] = [
-  { name: "directory", width: 1600, height: 1000, regions: true },
+  { name: "directory", width: 1600, height: 1000 },
+  // The landing page's first screen: the main column alone, at a width that keeps its text legible.
+  { name: "hero", width: 1180, height: 700, only: ".work-main", regions: true },
   {
     name: "review",
     width: 1600,
@@ -199,11 +201,11 @@ async function cropBox(target: { row: Locator } | { element: Locator; until?: Lo
 }
 
 /**
- * Where each scope shows on the page, as fractions of the viewport: the app's own route stop and
- * the main column's rows with that scope's bullet. The landing page highlights them on the shot.
+ * Where each scope shows in the shot, as fractions of its clip: the app's own route stop and the
+ * main column's rows with that scope's bullet. The landing page highlights them on the shot.
  */
-function regionsOf(page: Page) {
-  return page.evaluate(() => {
+function regionsOf(page: Page, clip: { x: number; y: number; width: number; height: number }) {
+  return page.evaluate((box) => {
     const lines = ["managed", "user", "project", "local", "memory", "plugin"];
     const round = (n: number) => Math.round(n * 10000) / 10000;
     const parts = [...document.querySelectorAll(".route-stops li, tbody tr")].filter(
@@ -215,20 +217,20 @@ function regionsOf(page: Page) {
         parts
           .filter((e) => e.querySelector(`.bullet-${line}`))
           .map((e) => e.getBoundingClientRect())
-          .filter((r) => r.bottom > 0 && r.top < innerHeight)
+          .filter((r) => r.bottom > box.y && r.top < box.y + box.height)
           .map((r) => {
-            const top = Math.max(r.top, 0);
-            const bottom = Math.min(r.bottom, innerHeight);
+            const top = Math.max(r.top, box.y);
+            const bottom = Math.min(r.bottom, box.y + box.height);
             return [
-              r.left / innerWidth,
-              top / innerHeight,
-              r.width / innerWidth,
-              (bottom - top) / innerHeight,
+              (r.left - box.x) / box.width,
+              (top - box.y) / box.height,
+              r.width / box.width,
+              (bottom - top) / box.height,
             ].map(round);
           }),
       ])
     );
-  });
+  }, clip);
 }
 
 /** Saves a setting change and deletes a memory, so Recent changes has something to list. */
@@ -301,14 +303,14 @@ async function main() {
           const page = await open(shot, theme);
           await shot.setup?.(page);
           const box = shot.only ? await page.locator(shot.only).boundingBox() : null;
-          const png = await page.screenshot(
-            box ? { clip: { ...box, height: Math.min(box.height, shot.height) } } : {}
-          );
-          await sharp(png)
-            .resize({ width: Math.min((box?.width ?? shot.width) * 2, 2400) })
+          const clip = box
+            ? { ...box, height: Math.min(box.height, shot.height) }
+            : { x: 0, y: 0, width: shot.width, height: shot.height };
+          await sharp(await page.screenshot({ clip }))
+            .resize({ width: Math.min(clip.width * 2, 2400) })
             .webp({ quality: 88 })
             .toFile(join(OUT, `${shot.name}-${theme}.webp`));
-          if (shot.regions && theme === "light") regions[shot.name] = await regionsOf(page);
+          if (shot.regions && theme === "light") regions[shot.name] = await regionsOf(page, clip);
           await page.close();
           console.log(`${shot.name}-${theme}.webp`);
         }
