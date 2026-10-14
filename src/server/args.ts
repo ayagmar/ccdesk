@@ -51,7 +51,7 @@ export type Command =
       json: boolean;
       /** Also fail on files Claude Code reads with some entries skipped. */
       strict: boolean;
-      /** Also count files outside the repository: ~/.claude, ~/.claude.json, managed settings. */
+      /** Also count ~/.claude, ~/.claude.json and managed settings, inside the repository or not, and files outside it. */
       all: boolean;
     };
 
