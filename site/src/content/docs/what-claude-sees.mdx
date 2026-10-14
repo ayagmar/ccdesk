@@ -41,9 +41,9 @@ ccdesk divides each part's size in bytes by four. That is a rough figure for com
 Under the list, type a path (relative to the open directory, or absolute) and press **Check**. ccdesk lists what joins the session once Claude reads or edits that file:
 
 - path rules whose `paths` match it;
-- skills whose `paths` match it;
-- the `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md` and rule files of the folders between the open directory and the file.
+- skills found at startup whose `paths` match it;
+- the `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, rule files and skills of the folders between the open directory and the file. A skill there loads whatever its `paths` say, as in Claude Code 2.1.296; the skills docs do not say.
 
-`paths` are matched as Claude Code matches them, which differs from the docs' table; see [on match](../instructions/#status). A skill's `paths` are read from the open directory, wherever the skill is.
+`paths` are matched as Claude Code matches them, which differs from the docs' table; see [on match](../instructions/#status). A `paths` glob of a skill that loads at startup is read from the open directory, wherever the skill is.
 
 The file does not have to exist. Paths outside the open directory get no results, because nothing from this directory's config applies there.
