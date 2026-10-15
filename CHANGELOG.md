@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.3](https://github.com/ayagmar/ccdesk/compare/v0.4.2...v0.4.3) (2026-10-15)
+
+### Features
+
+* **release:** release after a data update, and announce each release ([8f76af0](https://github.com/ayagmar/ccdesk/commit/8f76af0c009606620d3585818de551d5d58863a9))
+
+### Bug Fixes
+
+* **build:** mark the built CLI executable ([f5afa7b](https://github.com/ayagmar/ccdesk/commit/f5afa7b8b682b2e9d887fde8f323d6a605f0f87e))
+
 ## [0.4.2](https://github.com/ayagmar/ccdesk/compare/v0.4.1...v0.4.2) (2026-10-14)
 
 ### Features
