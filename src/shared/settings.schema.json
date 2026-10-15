@@ -4747,5 +4747,5 @@
       "description": "A uniquely named alias: `Settings` alone also matches Node's http2 type."
     }
   },
-  "$comment": "claude-agent-sdk 0.3.299, with SchemaStore for keys it lacks"
+  "$comment": "claude-agent-sdk 0.3.300, with SchemaStore for keys it lacks"
 }
