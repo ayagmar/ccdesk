@@ -65,7 +65,8 @@
     "release:dry": "release-it --ci --dry-run",
     "scopes": "node --import=tsx scripts/generate-settings-scopes.ts",
     "tools": "node --import=tsx scripts/generate-builtin-tools.ts",
-    "docs:fingerprints": "node --import=tsx scripts/fingerprint-docs.ts"
+    "docs:fingerprints": "node --import=tsx scripts/fingerprint-docs.ts",
+    "announce": "node --import=tsx scripts/announce-release.ts"
   },
   "engines": {
     "node": ">=22.19.0"

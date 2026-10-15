@@ -42,7 +42,7 @@ The settings schema comes from the `Settings` type in the SDK, which is publishe
 
 Some of Claude Code's behaviour, such as how rules match commands, is only described in prose, so ccdesk follows it by hand and cites the docs section in a `docs: page#anchor` comment. `pnpm docs:fingerprints` hashes each cited section.
 
-A scheduled workflow runs every day: it updates the SDK to the latest version, runs all five commands, and when anything changed, runs `pnpm check` and opens a pull request. The pull request lists the docs sections whose text changed, so someone can check the code that follows them, and the documented keys that neither the SDK nor SchemaStore defines. Pull requests opened by the workflow do not start CI by themselves; close and reopen the pull request, or push to it, to run CI.
+A scheduled workflow runs every day: it updates the SDK to the latest version, runs all five commands, and when anything changed, runs `pnpm check` and opens a pull request. The pull request lists the docs sections whose text changed, so someone can check the code that follows them, and the documented keys that neither the SDK nor SchemaStore defines. Pull requests opened by the workflow do not start CI by themselves; close and reopen the pull request, or push to it, to run CI. Merging one of these pull requests starts a release, so the new data reaches npm the same day.
 
 ## Docs site
 
@@ -62,6 +62,8 @@ The site is deployed to GitHub Pages from `master` by the Pages workflow, which 
 
 ## Releases
 
-Releases are made by the Release workflow on GitHub, started by hand from `master`. It runs `pnpm check`, then release-it bumps the version from the Conventional Commits since the last tag (or by the increment you pick), writes `CHANGELOG.md`, commits, tags and creates the GitHub release. The workflow then publishes to npm with trusted publishing, so no npm token is stored. A dry run does everything except push and publish.
+Releases are made by the Release workflow on GitHub, started by hand from `master` or by a merged Claude Code data pull request. It runs `pnpm check`, then release-it bumps the version from the Conventional Commits since the last tag (or by the increment you pick), writes `CHANGELOG.md`, commits, tags and creates the GitHub release. The workflow then publishes to npm with trusted publishing, so no npm token is stored. A dry run does everything except push and publish.
+
+Once the package is on npm, the workflow posts a short card to the webhook in the `RELEASE_WEBHOOK_URL` secret: the version, which Claude Code version it tracks and whether that moved, the changelog entry, and what is new in Claude Code since the last release, taken from [its changelog](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md). A Discord webhook gets an embed and a Slack incoming webhook gets a Block Kit message; the URL's host decides which. Without the secret, the card only appears in the run's summary. `pnpm announce discord` (or `slack`) prints the card for the current checkout, so you can pipe it to `curl` and see it in your own channel before a release.
 
 Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages, since they decide the version and the changelog. Only `#` and a number links an issue in the changelog, wherever it appears in a commit; a docs anchor such as `hooks#workspace-trust` stays plain text (`.release-it.ts`).

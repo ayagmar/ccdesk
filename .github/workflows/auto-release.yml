@@ -1,0 +1,32 @@
+name: Release after a data update
+
+# A merged Claude Code data PR (opened by the "Claude Code data" workflow) starts the Release
+# workflow, so the new schema, catalog and tools reach npm without anyone remembering to.
+# The merge itself stays a person's call: the PR body lists the docs sections to check first.
+# The increment is derived from the commits since the last tag, so a feature waiting on master
+# makes a minor release rather than a mislabelled patch.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: >-
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'chore/claude-code-data-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Start the Release workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH" -f increment=auto
+          echo "Started a release from $BRANCH for #${{ github.event.pull_request.number }}" >> "$GITHUB_STEP_SUMMARY"

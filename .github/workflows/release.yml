@@ -4,6 +4,10 @@ name: Release
 #   release-it bumps the version, writes CHANGELOG.md, commits, tags, pushes and
 #   creates the GitHub release; then `npm publish` runs via npm trusted publishing
 #   (OIDC; provenance is added automatically for public repos). No long-lived npm token is needed.
+#   When RELEASE_WEBHOOK_URL is set, the release is then announced there (scripts/announce-release.ts):
+#   a Discord webhook or a Slack incoming webhook, told apart by the URL's host.
+#
+# Started by hand, or by the "Release after a data update" workflow when a Claude Code data PR merges.
 #
 # One-time setup (npmjs.com → package → Settings → Trusted publishing, or from the CLI):
 #   npm trust github ccdesk --repo ayagmar/ccdesk --file release.yml --allow-publish
@@ -121,3 +125,33 @@ jobs:
             echo "### ${{ steps.version.outputs.name }}@${{ steps.version.outputs.version }}"
             if [ "$DRY_RUN" = "true" ]; then echo "Dry run — nothing was pushed or published."; fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # The package is already on npm by now, so a failure here is a warning, not a failed release.
+      - name: Announce
+        if: success()
+        continue-on-error: true
+        env:
+          RELEASE_WEBHOOK_URL: ${{ secrets.RELEASE_WEBHOOK_URL }}
+        run: |
+          # With no webhook, the summary shows the Discord form.
+          if [ -n "$RELEASE_WEBHOOK_URL" ]; then
+            pnpm -s announce > "$RUNNER_TEMP/announcement.json"
+          else
+            pnpm -s announce discord > "$RUNNER_TEMP/announcement.json"
+          fi
+          {
+            echo "<details><summary>Announcement</summary>"
+            echo
+            echo '```json'
+            cat "$RUNNER_TEMP/announcement.json"
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$RELEASE_WEBHOOK_URL" ]; then
+            echo "RELEASE_WEBHOOK_URL is not set; the announcement is in the summary only"
+          elif [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run; not posting. CHANGELOG.md has no entry for this version yet, so the ccdesk changes are missing above."
+          else
+            curl --fail --silent --show-error -X POST -H 'Content-Type: application/json' \
+              --data @"$RUNNER_TEMP/announcement.json" "$RELEASE_WEBHOOK_URL"
+          fi
