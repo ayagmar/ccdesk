@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.4](https://github.com/ayagmar/ccdesk/compare/v0.4.3...v0.4.4) (2026-10-16)
+
+### Bug Fixes
+
+* **release:** make a patch when no commit calls for a bump ([e417b1c](https://github.com/ayagmar/ccdesk/commit/e417b1c701704e595d442fc6ee09f4fd5b9523b9)), references [#51](https://github.com/ayagmar/ccdesk/issues/51)
+
 ## [0.4.3](https://github.com/ayagmar/ccdesk/compare/v0.4.2...v0.4.3) (2026-10-15)
 
 ### Features
