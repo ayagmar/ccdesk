@@ -18,6 +18,7 @@ const OURS = `# Changelog
 ### Bug Fixes
 
 * **core:** cite [memory#how-it-works](https://code.claude.com/docs/en/memory#how-it-works) for the limit ([bd6da38](https://github.com/ayagmar/ccdesk/commit/bd6da38))
+* **release:** make a patch when no commit calls for a bump ([e417b1c](https://github.com/ayagmar/ccdesk/commit/e417b1c701704e595d442fc6ee09f4fd5b9523b9)), references [#51](https://github.com/ayagmar/ccdesk/issues/51)
 
 ## [0.4.2](https://github.com/ayagmar/ccdesk/compare/v0.4.1...v0.4.2) (2026-10-14)
 
@@ -58,6 +59,7 @@ test("the release notes are one version's bullets, in plain text", () => {
   assert.deepEqual(releaseNotes(OURS, "0.4.3"), [
     "ui: a way back from What Claude sees",
     "core: cite memory#how-it-works for the limit",
+    "release: make a patch when no commit calls for a bump, references #51",
   ]);
   assert.deepEqual(releaseNotes(OURS, "0.4.1"), []);
 });
@@ -83,7 +85,7 @@ test("the Slack message is blocks, with its own markup escaped where Slack reads
   assert.deepEqual(blockTexts(payload), [
     "ccdesk v0.4.3",
     `Tracks Claude Code *2.1.300*, up from 2.1.299.\n<${RELEASE_URL}|Release notes>`,
-    "*Changes in ccdesk*\n• ui: a way back from What Claude sees\n• core: cite memory#how-it-works for the limit",
+    "*Changes in ccdesk*\n• ui: a way back from What Claude sees\n• core: cite memory#how-it-works for the limit\n• release: make a patch when no commit calls for a bump, references #51",
     "*New in Claude Code since 2.1.299*\n• Added `virtualText` to a mod's prompt decorations\n• Fixed `&lt;Tab&gt;` &amp; `/autocompact` warning about high token usage",
     "`npx ccdesk@0.4.3`",
   ]);

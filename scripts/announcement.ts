@@ -29,7 +29,7 @@ const BULLET = 180;
 /** Markdown links become their text, bold scopes become plain, and commit links are dropped. */
 function plain(markdown: string): string {
   return markdown
-    .replace(/\s*\(\[[0-9a-f]{7,}\]\([^)]*\)\)\s*$/, "")
+    .replace(/\s*\(\[[0-9a-f]{7,}\]\([^)]*\)\)/g, "")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/\*\*([^*]+):\*\*/g, "$1:")
     .replace(/\*\*([^*]+)\*\*/g, "$1")
