@@ -647,6 +647,13 @@ const SUBCOMMANDS: Record<string, string[]> = {
 const PATH_TOOLS = new Set(["Read", "Edit", "Write", "NotebookEdit", "Glob", "Grep", "LSP"]);
 
 /**
+ * Tools whose prompt is the tool itself, though Claude Code records your reply as an allowed call:
+ * AskUserQuestion needs no permission, so its "accept" is your answer, and ExitPlanMode's prompt is
+ * the plan you review (docs: tools-reference). An allow rule would only skip what you meant to see.
+ */
+const PROMPT_TOOLS = new Set(["AskUserQuestion", "ExitPlanMode"]);
+
+/**
  * The allow rule that would have covered a call, in the form Claude Code's "don't ask again"
  * writes: a Bash program on the allowlists above, with its subcommand where it has them, a fetch's
  * domain, or the tool. None for compound commands, other programs and subcommands, a leading
@@ -673,7 +680,8 @@ function ruleFor(
     return sub ? `Bash(${program} ${sub} *)` : null;
   }
   if (tool === "WebFetch") return host ? `WebFetch(domain:${host})` : null;
-  if (PATH_TOOLS.has(tool) || tool === "PowerShell" || tool === "Monitor") return null;
+  if (PATH_TOOLS.has(tool) || PROMPT_TOOLS.has(tool)) return null;
+  if (tool === "PowerShell" || tool === "Monitor") return null;
   return tool;
 }
 

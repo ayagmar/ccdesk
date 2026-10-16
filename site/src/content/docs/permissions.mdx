@@ -36,7 +36,8 @@ A suggestion is left out when:
 
 - the rule would also cover a call you refused;
 - your rules already decide those calls;
-- the same rule already exists in any list.
+- the same rule already exists in any list;
+- the call was Claude asking you a question (`AskUserQuestion`) or showing you its plan (`ExitPlanMode`): Claude Code records your reply as an allowed call, but a rule would only skip the question or the plan review.
 
 `ccdesk rules --suggest` prints the same list in the terminal; see [Without the browser](../getting-started/#without-the-browser).
 

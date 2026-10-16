@@ -66,6 +66,22 @@ async function suggested(f: Fixture, dir: string, inEffect = rules("allow")) {
   return (await readUsage(f.env, dir, inEffect)).approvals.map((a) => a.rule);
 }
 
+test("answering Claude's question or approving its plan suggests no allow rule", async () => {
+  // Catches AskUserQuestion suggested as a rule, as it was on a real machine: Claude Code records
+  // your answer as an allowed call, and an allow rule for it or ExitPlanMode would only skip the
+  // question or the plan review.
+  const f = makeFixture();
+  const dir = f.at("work", "app");
+  f.write(
+    join(storeOf(f, dir), "one.jsonl"),
+    times(5, () => call("AskUserQuestion", { questions: [] }, "accept")) +
+      call("ExitPlanMode", { plan: "p" }, "accept") +
+      bash("git commit -m one", "accept")
+  );
+
+  assert.deepEqual(await suggested(f, dir), ["Bash(git commit *)"]);
+});
+
 test("calls you allowed by hand are grouped into the allow rule that would cover them", async () => {
   const f = makeFixture();
   const dir = f.at("work", "app");
