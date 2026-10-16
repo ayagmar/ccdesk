@@ -14,6 +14,8 @@ import {
   explainText,
   forgetDirectories,
   scanJson,
+  suggestJson,
+  suggestText,
 } from "../src/server/commands.ts";
 import { storeDirName } from "../src/shared/memory.ts";
 import { startServer } from "../src/server/start.ts";
@@ -516,6 +518,148 @@ test("compare lists the settings that differ with the file behind each side, and
     ].join("\n")
   );
   assert.ok(!(await compareJson(core, a, b)).includes("sk-live-"));
+});
+
+test("rules takes --suggest and one folder, and refuses anything else", () => {
+  // Catches `ccdesk rules` doing something without --suggest, which would leave no room for other
+  // modes, or a flag of another command such as --all being ignored.
+  assert.deepEqual(parse(["rules", "--suggest"]), {
+    command: "rules",
+    dir: undefined,
+    configDir: undefined,
+    json: false,
+  });
+  assert.deepEqual(parse(["rules", "--suggest", "../app", "--json"]), {
+    command: "rules",
+    dir: "../app",
+    configDir: undefined,
+    json: true,
+  });
+  for (const argv of [
+    ["rules"],
+    ["rules", "--suggest", "a", "b"],
+    ["rules", "--suggest", "--all"],
+    ["check", "--suggest"],
+  ])
+    assert.throws(
+      () => parse(argv),
+      (error) => error instanceof UsageError && error.message.endsWith(HELP),
+      argv.join(" ")
+    );
+  assert.throws(
+    () => parse(["rules"]),
+    (error) => error instanceof UsageError && error.message.includes("pass --suggest")
+  );
+});
+
+const TWO_HOURS_AGO = new Date(Date.now() - 2 * 3600_000).toISOString();
+let callId = 0;
+
+/** Transcript lines for a Bash call Claude Code asked you about, and your answer. */
+function answered(command: string, answer: "accept" | "reject"): string {
+  const id = `toolu_${++callId}`;
+  const lines = [
+    {
+      type: "assistant",
+      timestamp: TWO_HOURS_AGO,
+      message: {
+        role: "assistant",
+        content: [{ type: "tool_use", id, name: "Bash", input: { command } }],
+      },
+    },
+    {
+      type: "user",
+      timestamp: TWO_HOURS_AGO,
+      message: { role: "user", content: [{ type: "tool_result", tool_use_id: id, content: "" }] },
+      permissionDecision: {
+        decision: answer,
+        source: answer === "accept" ? "user_temporary" : "user_reject",
+      },
+    },
+  ];
+  return lines.map((l) => `${JSON.stringify(l)}\n`).join("");
+}
+
+/** A folder in the fixture's home with one session made of `transcript`, if given. */
+function workedIn(f: Fixture, transcript?: string): string {
+  const dir = f.at("home", "app");
+  mkdirSync(dir, { recursive: true });
+  if (transcript !== undefined)
+    f.write(join(f.env.claudeDir, "projects", storeDirName(dir), "one.jsonl"), transcript);
+  return dir;
+}
+
+const ADD_ONE =
+  "Add one under permissions.allow in .claude/settings.local.json, or select it under Permissions on the page to review it first.";
+
+test("rules --suggest lists the rules for calls you approved, most approved first, without the commands", async () => {
+  // Catches the order or counts lost, a call Claude Code did not ask about counted, a command
+  // from a transcript printed, which the page never shows, or a heading that does not name the
+  // folder.
+  const f = makeFixture();
+  const dir = workedIn(
+    f,
+    answered("ls -la", "accept") +
+      answered("git commit -m fix-the-login-bug", "accept") +
+      answered("git commit -m second", "accept") +
+      answered("git commit --amend", "accept") +
+      answered("rm -rf build", "accept")
+  );
+
+  const [heading, ...lines] = (await suggestText(createCore(f.env), dir)).split("\n");
+
+  assert.ok(
+    heading?.startsWith(
+      `Allow rules for ${join("~", "app")}, from calls you approved in the session started here`
+    ),
+    String(heading)
+  );
+  assert.deepEqual(lines, [
+    "  Bash(git commit *)  approved 3 times, last 2h ago",
+    "  Bash(ls *)          approved 1 time, last 2h ago",
+    "",
+    ADD_ONE,
+  ]);
+});
+
+test("rules --suggest leaves out a rule already in effect", async () => {
+  // Catches a rule you already saved being suggested again.
+  const f = makeFixture();
+  const dir = workedIn(f, answered("git commit -m one", "accept") + answered("ls", "accept"));
+  f.json("home/.claude/settings.json", { permissions: { allow: ["Bash(git commit *)"] } });
+
+  const lines = (await suggestText(createCore(f.env), dir)).split("\n").slice(1);
+
+  assert.deepEqual(lines, ["  Bash(ls *)  approved 1 time, last 2h ago", "", ADD_ONE]);
+});
+
+test("rules --suggest says when there are no sessions, and when they give nothing to suggest", async () => {
+  // Catches an empty list printed with its heading, which reads as a failure, or the two cases
+  // worded alike when one needs a session first and the other has nothing to add.
+  const none = makeFixture();
+  assert.equal(
+    await suggestText(createCore(none.env), workedIn(none)),
+    `No sessions started in ${join("~", "app")} yet, so there are no calls to suggest rules from.`
+  );
+  const refused = makeFixture();
+  assert.match(
+    await suggestText(createCore(refused.env), workedIn(refused, answered("git push", "reject"))),
+    /^Nothing to suggest: no call you approved by hand in the session started here .*needs a new allow rule\.$/
+  );
+});
+
+test("rules --suggest --json prints the folder, its sessions and each rule with its count", async () => {
+  // Catches the JSON missing the sessions the counts come from, or a field renamed under a script.
+  const f = makeFixture();
+  const dir = workedIn(f, answered("ls", "accept") + answered("ls -la", "accept"));
+
+  assert.deepEqual(JSON.parse(await suggestJson(createCore(f.env), dir)), {
+    dir,
+    sessions: 1,
+    repository: false,
+    since: TWO_HOURS_AGO,
+    suggestions: [{ rule: "Bash(ls *)", approved: 2, last: TWO_HOURS_AGO }],
+  });
 });
 
 /** A directory Claude Code was used in, with two sessions and a memory, whose folder is gone. */

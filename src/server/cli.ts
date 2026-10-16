@@ -13,6 +13,8 @@ import {
   explainText,
   forgetDirectories,
   scanJson,
+  suggestJson,
+  suggestText,
 } from "./commands.ts";
 
 const DEV_TOKEN = "dev";
@@ -93,6 +95,10 @@ async function main() {
     return;
   }
   const dir = resolve(command.dir ?? ".");
+  if (command.command === "rules") {
+    console.log(command.json ? await suggestJson(core, dir) : await suggestText(core, dir));
+    return;
+  }
   if (command.command === "check") {
     const { output, exitCode } = await checkDirectory(core, dir, command);
     if (exitCode === 2) console.error(output);

@@ -10,6 +10,9 @@ Usage:
                                            Claude Code cannot read or parse
   npx ccdesk compare <a> <b> [--json]      Print the settings that differ between two directories,
                                            and the files each value comes from
+  npx ccdesk rules --suggest [dir] [--json]
+                                           Print the allow rules that would have covered calls
+                                           you approved by hand in the sessions started in dir
   npx ccdesk forget <dir> | --all-gone     Forget a directory whose folder is gone: move its
                                            sessions and memory into ccdesk's backups
 
@@ -23,15 +26,16 @@ Options:
   --all                 For check: also count ~/.claude, ~/.claude.json, managed settings and
                         files outside dir's repository. For compare: also list the settings
                         both directories share
+  --suggest             For rules: print the allow rules ccdesk suggests, as Permissions lists them
   --all-gone            For forget: every listed directory whose folder is gone
   -y, --yes             For forget: do not ask first, as needed without a terminal
   -h, --help            Show this help
 
 ccdesk reads ~/.claude (or --config-dir, or $CLAUDE_CONFIG_DIR). The page opens on the directory
 you run ccdesk from and listens on 127.0.0.1 only. dir and file are relative to that directory.
-scan, explain, check and compare write nothing and print no value the page hides. forget shows
-what it moves and asks first; Recent changes on the page can move it back. A command exits 2 when
-its arguments are wrong, its folder does not exist, or it cannot run.`;
+scan, explain, check, compare and rules write nothing and print no value the page hides. forget
+shows what it moves and asks first; Recent changes on the page can move it back. A command exits 2
+when its arguments are wrong, its folder does not exist, or it cannot run.`;
 
 /** The port `--dev` listens on, which `pnpm dev:ui` proxies to. */
 export const DEV_PORT = 4319;
@@ -72,6 +76,8 @@ export type Command =
       /** Also list the settings both directories share. */
       all: boolean;
     }
+  /** Print the allow rules that would have covered calls you approved by hand in `dir`'s sessions. */
+  | { command: "rules"; dir: string | undefined; configDir: string | undefined; json: boolean }
   /** Forget `dir`, whose folder is gone, or with `dir` null every listed directory whose folder is gone. */
   | { command: "forget"; dir: string | null; configDir: string | undefined; yes: boolean };
 
@@ -81,12 +87,16 @@ export class UsageError extends Error {}
 type Flag = keyof ReturnType<typeof options>["values"];
 
 /** The flags each command takes; --help goes with any. */
-const FLAGS: Record<"serve" | "scan" | "explain" | "check" | "compare" | "forget", Flag[]> = {
+const FLAGS: Record<
+  "serve" | "scan" | "explain" | "check" | "compare" | "rules" | "forget",
+  Flag[]
+> = {
   serve: ["port", "open", "dev", "config-dir"],
   scan: ["json", "config-dir"],
   explain: ["dir", "config-dir"],
   check: ["json", "strict", "all", "config-dir"],
   compare: ["json", "all", "config-dir"],
+  rules: ["suggest", "json", "config-dir"],
   forget: ["all-gone", "yes", "config-dir"],
 };
 
@@ -124,9 +134,9 @@ function subcommand(
 ): Command {
   const configDir = values["config-dir"];
   if (name === "scan") {
-    if (rest.length > 1) throw usage("scan takes one dir");
+    const dir = oneDir(name, rest);
     if (!values.json) throw usage("scan prints JSON; pass --json");
-    return { command: "scan", dir: rest[0], configDir };
+    return { command: "scan", dir, configDir };
   }
   if (name === "explain") {
     const [file, ...extra] = rest;
@@ -134,9 +144,9 @@ function subcommand(
     return { command: "explain", file, dir: values.dir, configDir };
   }
   if (name === "check") {
-    if (rest.length > 1) throw usage("check takes one dir");
+    const dir = oneDir(name, rest);
     const { json = false, strict = false, all = false } = values;
-    return { command: "check", dir: rest[0], configDir, json, strict, all };
+    return { command: "check", dir, configDir, json, strict, all };
   }
   if (name === "compare") {
     const [a, b, ...extra] = rest;
@@ -145,10 +155,21 @@ function subcommand(
     const { json = false, all = false } = values;
     return { command: "compare", a, b, configDir, json, all };
   }
+  if (name === "rules") {
+    const dir = oneDir(name, rest);
+    if (!values.suggest) throw usage("rules prints suggestions; pass --suggest");
+    return { command: "rules", dir, configDir, json: values.json ?? false };
+  }
   const allGone = values["all-gone"] ?? false;
   if (rest.length > 1 || (rest.length === 1) === allGone)
     throw usage("forget takes one dir, or --all-gone");
   return { command: "forget", dir: rest[0] ?? null, configDir, yes: values.yes ?? false };
+}
+
+/** The dir of a command that takes at most one; without one, the current folder. */
+function oneDir(name: string, rest: string[]): string | undefined {
+  if (rest.length > 1) throw usage(`${name} takes one dir`);
+  return rest[0];
 }
 
 /** The command the first word names; without one, the page. */
@@ -159,6 +180,7 @@ function commandOf(first: string | undefined): keyof typeof FLAGS {
     first === "explain" ||
     first === "check" ||
     first === "compare" ||
+    first === "rules" ||
     first === "forget"
   )
     return first;
@@ -191,6 +213,7 @@ function options(args: string[]) {
       dir: { type: "string" },
       strict: { type: "boolean" },
       all: { type: "boolean" },
+      suggest: { type: "boolean" },
       "all-gone": { type: "boolean" },
       yes: { type: "boolean", short: "y" },
       help: { type: "boolean", short: "h" },

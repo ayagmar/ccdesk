@@ -38,6 +38,9 @@ npx ccdesk check [dir] [--json]          Exit 1 when a session started in dir re
                                          Claude Code cannot read or parse
 npx ccdesk compare <a> <b> [--json]      Print the settings that differ between two directories,
                                          and the files each value comes from
+npx ccdesk rules --suggest [dir] [--json]
+                                         Print the allow rules that would have covered calls
+                                         you approved by hand in the sessions started in dir
 npx ccdesk forget <dir> | --all-gone     Forget a directory whose folder is gone: move its
                                          sessions and memory into ccdesk's backups
 
@@ -50,6 +53,7 @@ npx ccdesk forget <dir> | --all-gone     Forget a directory whose folder is gone
   --all                 For check: also count ~/.claude, ~/.claude.json, managed settings and
                         files outside dir's repository. For compare: also list the settings
                         both directories share
+  --suggest             For rules: print the allow rules ccdesk suggests, as Permissions lists them
   --all-gone            For forget: every listed directory whose folder is gone
   -y, --yes             For forget: do not ask first, as needed without a terminal
   -h, --help            Show this help
@@ -112,7 +116,18 @@ Settings that differ between ~/code/acme-api and ~/code/acme-web:
 Same in both: 4 settings; --all lists them.
 ```
 
-These four only read: they write no file and keep no backup. Values the page hides, such as env values and headers, are hidden in their output too.
+`ccdesk rules --suggest` is the list of [suggested rules](../permissions/#suggested-rules) at the bottom of Permissions, in the terminal: the allow rules that would have covered calls you approved by hand in the sessions started in a folder, most approved first, with how often and how long ago. Run it after a session to see which prompts one rule would have saved. It prints only rule patterns and counts, never a command or path from a transcript. `--json` prints the folder, the sessions counted and each rule with `approved` and `last`.
+
+```sh
+$ npx ccdesk rules --suggest
+Allow rules for ~/code/acme-api, from calls you approved in the 12 sessions started in this repository since 3 Oct:
+  Bash(pnpm test *)            approved 41 times, last 2h ago
+  WebFetch(domain:nodejs.org)  approved 3 times, last 4d ago
+
+Add one under permissions.allow in .claude/settings.local.json, or select it under Permissions on the page to review it first.
+```
+
+These five only read: they write no file and keep no backup. Values the page hides, such as env values and headers, are hidden in their output too.
 
 `ccdesk forget` clears away a directory whose folder is gone, as [Forget…](../interface/) does on the page, after the same review: it prints the store, its sessions, memories and size, and asks before it moves anything. `--all-gone` does this for every listed directory whose folder is gone, such as the stores test runs leave behind, with one question for all of them. Without a terminal to answer in, pass `--yes`. It exits 0 when every directory is forgotten, and 1 when you answer no or ccdesk refuses one, saying why. [Recent changes](../recent-changes/#forgotten-directories) on the page can move a store back. Like the page, it changes nothing else: `~/.claude.json` keeps the directory's entry.
 

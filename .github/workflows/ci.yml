@@ -44,8 +44,8 @@ jobs:
       - run: pnpm run schema && git diff --exit-code -- src/shared/settings.schema.json src/shared/hook-events.json
       # Install the packed tarball the way npx would, start it in an empty home and load the page
       # and its script, so a file missing from "files" fails here. Importing the package checks
-      # that its "exports" lead to the built core and view. Then run scan, explain, check and
-      # compare on a project, and forget in a home with nothing to forget.
+      # that its "exports" lead to the built core and view. Then run scan, explain, check, compare
+      # and rules --suggest on a project, and forget in a home with nothing to forget.
       - name: Smoke test the package
         run: |
           npm pack --pack-destination "$RUNNER_TEMP"
@@ -71,6 +71,7 @@ jobs:
           grep -q "path rule .*matches src/\*\*" explain.txt
           npx --no -- ccdesk check "$HOME/app"
           npx --no -- ccdesk compare "$HOME/app" "$HOME"
+          npx --no -- ccdesk rules --suggest "$HOME/app"
           npx --no -- ccdesk forget --all-gone --yes | grep -q "No directory whose folder is gone"
           echo '{' > "$HOME/app/.mcp.json"
           # Exit 1 with the file named, so a crash, which also exits 1, does not pass.

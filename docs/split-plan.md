@@ -25,6 +25,6 @@ These landed after v0.2.2.
 
 ## What is left
 
-More subcommands are listed in [feature ideas](feature-ideas.md): `changes` and `undo`, and `rules --suggest`. A terminal UI can draw its rows from `ccdesk/view`.
+More subcommands are listed in [feature ideas](feature-ideas.md): `changes` and `undo`. `rules --suggest` is done. A terminal UI can draw its rows from `ccdesk/view`.
 
 Decide on workspace packages only if the CLI or a TUI needs a release schedule different from the web app's.

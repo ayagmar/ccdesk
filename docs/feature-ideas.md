@@ -4,11 +4,9 @@ Ideas, not commitments: each one is something the code is already close to suppo
 
 ## On the command line
 
-`ccdesk scan [dir] --json` and `ccdesk explain <file>` are done (step 6 of the split plan), and so is `ccdesk check [dir]`, which exits 1 when a session started in a folder reads a file of its repository that Claude Code cannot read or parse (see [Getting started](../site/src/content/docs/getting-started.mdx)). `ccdesk compare <a> <b>` and `ccdesk forget <dir>` (or `--all-gone`) are done too. These would sit beside them.
+`ccdesk scan [dir] --json` and `ccdesk explain <file>` are done (step 6 of the split plan), and so is `ccdesk check [dir]`, which exits 1 when a session started in a folder reads a file of its repository that Claude Code cannot read or parse (see [Getting started](../site/src/content/docs/getting-started.mdx)). `ccdesk compare <a> <b>`, `ccdesk rules --suggest [dir]` and `ccdesk forget <dir>` (or `--all-gone`) are done too. These would sit beside them.
 
 **`ccdesk changes` and `ccdesk undo <id>`** (M). Lists Recent changes and restores one, through a core's `listBackups`, `previewRestore` and `restoreBackup`. Restoring needs a review step in the terminal: print the diff, ask, then pass the reviewed revision, as the page does.
-
-**`ccdesk rules --suggest [dir]`** (M). Lists the allow rules that would cover calls you approved by hand, with how many calls each covers. The counting is a core's `readUsage`; the suggestions are built by `suggestedRules` in `src/view/usage.ts`.
 
 ## In a terminal UI
 

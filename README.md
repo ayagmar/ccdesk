@@ -87,6 +87,7 @@ npx ccdesk explain <file>     Print what loads once Claude reads or edits file
 npx ccdesk check [dir]        Exit 1 when a session started in dir reads a file
                               Claude Code cannot read or parse, for CI
 npx ccdesk compare <a> <b>    Print the settings that differ between two directories
+npx ccdesk rules --suggest    Print the allow rules that would have covered calls you approved
 npx ccdesk forget <dir>       Forget a directory whose folder is gone (--all-gone: all of them)
 ```
 

@@ -10,7 +10,16 @@ import {
   type PathMatch,
   type Problem,
 } from "../core/index.ts";
-import { formatter, MATCH_KIND, plural, preview, size } from "../view/index.ts";
+import {
+  ago,
+  formatter,
+  MATCH_KIND,
+  plural,
+  preview,
+  sessionsHere,
+  size,
+  suggestedRules,
+} from "../view/index.ts";
 
 // The subcommands of `ccdesk`. They go through the core and print what the page would show: the
 // scan is already redacted, so no value the page hides reaches the terminal. All but forget only
@@ -209,6 +218,52 @@ export async function compareText(core: Core, a: string, b: string, all: boolean
         : [`Same in both: ${plural(shared.length, "setting")}; --all lists them.`])
     );
   return lines.join("\n");
+}
+
+/**
+ * The allow rules the page suggests under Permissions for `dir`: counted against the rules in
+ * effect there, as the page counts them, less any rule in effect.
+ */
+async function suggestions(core: Core, dir: string) {
+  const view = await core.scanDirectory(dir);
+  const rules = view.permissions.flatMap((p) =>
+    p.kind === "rule" && p.inEffect ? [{ list: p.list, rule: p.rule }] : []
+  );
+  const usage = await core.readUsage(dir, rules, { profile: view.profile });
+  return { view, usage, suggested: suggestedRules({ ...view, usage }) };
+}
+
+/** `ccdesk rules --suggest --json`: the suggested rules for `dir`, with the sessions they come from. */
+export async function suggestJson(core: Core, dir: string): Promise<string> {
+  const { view, usage, suggested } = await suggestions(core, dir);
+  const { sessions, repository, since } = usage;
+  const report = { dir: view.path, sessions, repository, since, suggestions: suggested };
+  return JSON.stringify(report, null, 2);
+}
+
+/**
+ * `ccdesk rules --suggest`: the allow rules that would have covered calls you approved by hand in
+ * the sessions started in `dir`, most approved first. Only rule patterns and counts, as the page
+ * shows. `dir` is absolute.
+ */
+export async function suggestText(core: Core, dir: string): Promise<string> {
+  const { tilde } = formatter(core.env.home);
+  const { usage, suggested } = await suggestions(core, dir);
+  if (usage.sessions === 0)
+    return `No sessions started in ${tilde(dir)} yet, so there are no calls to suggest rules from.`;
+  if (suggested.length === 0)
+    return `Nothing to suggest: no call you approved by hand in ${sessionsHere(usage)} needs a new allow rule.`;
+
+  const width = Math.max(...suggested.map((a) => a.rule.length));
+  return [
+    `Allow rules for ${tilde(dir)}, from calls you approved in ${sessionsHere(usage)}:`,
+    ...suggested.map(
+      (a) =>
+        `  ${a.rule.padEnd(width)}  approved ${plural(a.approved, "time")}, last ${ago(a.last)}`
+    ),
+    "",
+    "Add one under permissions.allow in .claude/settings.local.json, or select it under Permissions on the page to review it first.",
+  ].join("\n");
 }
 
 /** Prints the review and asks whether to go ahead with `question`; resolves true to go ahead. */
