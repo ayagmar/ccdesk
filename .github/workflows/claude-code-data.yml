@@ -4,12 +4,17 @@ name: Claude Code data
 # which is published with every Claude Code release; SchemaStore's schema fills in documented keys
 # the SDK lacks. Which file each setting is read from and the built-in tools come from the docs.
 # This opens a PR when any of them changed.
-# PRs opened with GITHUB_TOKEN do not trigger CI by themselves; close and reopen the PR,
-# or push to it, to run CI.
+# PRs opened with GITHUB_TOKEN do not trigger CI by themselves, so this workflow dispatches CI itself.
+# A PR whose docs sections did not change is merged and released automatically once CI passes;
+# otherwise it waits for a person.
 
 on:
   schedule:
+    # Daily full run: SDK, SchemaStore and docs.
     - cron: '17 6 * * *'
+    # Hourly: runs only when a new SDK version is out, so a Claude Code release lands within about an hour.
+    - cron: '41 * * * *'
+  # A manual run is a full run.
   workflow_dispatch:
 
 concurrency:
@@ -22,33 +27,57 @@ permissions:
 jobs:
   bump:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 40
     permissions:
       contents: write
       pull-requests: write
+      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24.21.0'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
 
-      - name: Compare SDK versions
-        id: sdk
+      # The hourly run stops here unless there is a new SDK version nobody has a PR for yet,
+      # so it costs a checkout and one npm lookup.
+      - name: Check SDK version
+        id: gate
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          current=$(node -p 'require("./node_modules/@anthropic-ai/claude-agent-sdk/package.json").version')
+          current=$(node -p 'require("./package.json").devDependencies["@anthropic-ai/claude-agent-sdk"]')
           latest=$(npm view @anthropic-ai/claude-agent-sdk version)
           echo "current=$current" >> "$GITHUB_OUTPUT"
           echo "latest=$latest" >> "$GITHUB_OUTPUT"
           echo "claude-agent-sdk: pinned $current, latest $latest"
+          if [ "$SCHEDULE" = "41 * * * *" ]; then
+            if [ "$current" = "$latest" ]; then
+              echo "run=false" >> "$GITHUB_OUTPUT"
+              echo "Already on $latest"
+              exit 0
+            fi
+            if gh pr list --state open --json headRefName --jq '.[].headRefName' | grep -q "^chore/claude-code-data-$latest-"; then
+              echo "run=false" >> "$GITHUB_OUTPUT"
+              echo "A pull request for $latest is already open"
+              exit 0
+            fi
+          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: steps.gate.outputs.run == 'true'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: '24.21.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.gate.outputs.run == 'true'
 
       - name: Regenerate
         id: regenerate
+        if: steps.gate.outputs.run == 'true'
         env:
-          CURRENT: ${{ steps.sdk.outputs.current }}
-          LATEST: ${{ steps.sdk.outputs.latest }}
+          CURRENT: ${{ steps.gate.outputs.current }}
+          LATEST: ${{ steps.gate.outputs.latest }}
         run: |
           if [ "$CURRENT" != "$LATEST" ]; then pnpm add -D "@anthropic-ai/claude-agent-sdk@$LATEST"; fi
           pnpm run schemastore
@@ -69,14 +98,15 @@ jobs:
           fi
 
       - name: Check
-        if: steps.regenerate.outputs.changed == 'true'
+        if: steps.gate.outputs.run == 'true' && steps.regenerate.outputs.changed == 'true'
         run: pnpm run check
 
       - name: Open pull request
-        if: steps.regenerate.outputs.changed == 'true'
+        if: steps.gate.outputs.run == 'true' && steps.regenerate.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LATEST: ${{ steps.sdk.outputs.latest }}
+          RELEASE_WEBHOOK_URL: ${{ secrets.RELEASE_WEBHOOK_URL }}
+          LATEST: ${{ steps.gate.outputs.latest }}
         run: |
           # Named after the content, so an unchanged regeneration does not open a second PR.
           hash=$(git diff | sha256sum | cut -c1-8)
@@ -110,6 +140,53 @@ jobs:
           git add package.json pnpm-lock.yaml src/shared/settings.schema.json src/shared/hook-events.json src/shared/settings-scopes.json src/shared/settings-catalog.json src/shared/builtin-tools.json scripts/docs-fingerprints.json scripts/schemastore-claude-code-settings.json
           git commit -m "chore: update Claude Code data (claude-agent-sdk $LATEST)"
           git push origin "$branch"
-          gh pr create --base master --head "$branch" \
+          url=$(gh pr create --base master --head "$branch" \
             --title "chore: update Claude Code data (claude-agent-sdk $LATEST)" \
-            --body-file "$RUNNER_TEMP/pr-body.md"
+            --body-file "$RUNNER_TEMP/pr-body.md")
+          echo "$url"
+
+          # The new PR carries everything the older ones did, so close them.
+          gh pr list --state open --json number,headRefName \
+            --jq ".[] | select(.headRefName | startswith(\"chore/claude-code-data-\")) | select(.headRefName != \"$branch\") | .number" |
+            while read -r n; do
+              gh pr close "$n" --delete-branch --comment "Superseded by $url"
+            done
+
+          # A workflow_dispatch from GITHUB_TOKEN starts a run, unlike the pull_request event;
+          # its checks attach to the PR's head commit.
+          gh workflow run ci.yml --ref "$branch"
+
+          title="<$url|Claude Code data for claude-agent-sdk $LATEST>"
+          if [ -s "$RUNNER_TEMP/docs-changes.md" ]; then
+            text="$title needs review: docs sections the code follows by hand changed. Merging it releases a patch."
+          else
+            # Nothing for a person to check, so merge it once CI passes.
+            run=""
+            for _ in $(seq 12); do
+              run=$(gh run list --workflow ci.yml --branch "$branch" --event workflow_dispatch --json databaseId --jq '.[0].databaseId') || true
+              if [ -n "$run" ]; then break; fi
+              sleep 5
+            done
+            if [ -z "$run" ]; then
+              text="$title is ready to review; its CI run did not start. Merging it releases a patch."
+            elif ! gh run watch "$run" --exit-status --interval 30 > /dev/null; then
+              text="$title needs review: <$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run|CI failed>."
+            elif ! gh pr merge "$url" --squash --delete-branch; then
+              text="$title passed CI but could not be merged; merge it by hand to release a patch."
+            else
+              # A merge made with GITHUB_TOKEN does not trigger other workflows, so "Release after a
+              # data update" would not run; start the release here instead.
+              # A PR merged by a person still goes through auto-release.yml.
+              gh workflow run release.yml --ref master -f increment=patch
+              text="$title passed CI and was merged; the patch release has started."
+            fi
+          fi
+
+          if [ -z "$RELEASE_WEBHOOK_URL" ]; then
+            echo "RELEASE_WEBHOOK_URL is not set; not posting to Slack"
+            exit 0
+          fi
+          jq -n --arg text "$text" '{text: $text, unfurl_links: false}' > "$RUNNER_TEMP/slack.json"
+          # The PR is open by now, so a failed post is a warning, not a failed run.
+          curl --fail --silent --show-error -X POST -H 'Content-Type: application/json' \
+            --data @"$RUNNER_TEMP/slack.json" "$RELEASE_WEBHOOK_URL" || echo "::warning::Slack post failed"

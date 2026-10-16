@@ -42,7 +42,7 @@ The settings schema comes from the `Settings` type in the SDK, which is publishe
 
 Some of Claude Code's behaviour, such as how rules match commands, is only described in prose, so ccdesk follows it by hand and cites the docs section in a `docs: page#anchor` comment. `pnpm docs:fingerprints` hashes each cited section.
 
-A scheduled workflow runs every day: it updates the SDK to the latest version, runs all five commands, and when anything changed, runs `pnpm check` and opens a pull request. The pull request lists the docs sections whose text changed, so someone can check the code that follows them, and the documented keys that neither the SDK nor SchemaStore defines. Pull requests opened by the workflow do not start CI by themselves; close and reopen the pull request, or push to it, to run CI. Merging one of these pull requests starts a patch release, so the new data reaches npm the same day.
+A scheduled workflow checks npm for a new SDK version every hour. Once a day, or when started by hand, it runs the full update: the SDK, SchemaStore and the docs, all five commands. When anything changed, it runs `pnpm check` and opens a pull request, starts CI on it itself, and closes an older data pull request that the new one supersedes. The pull request lists the docs sections whose text changed, so someone can check the code that follows them, and the documented keys that neither the SDK nor SchemaStore defines. When no docs section the code follows by hand changed, the workflow waits for CI, merges the pull request and starts a patch release. Otherwise, or when CI fails, it leaves the pull request for someone to check, and merging it starts a patch release. Either way the new data reaches npm the same day, and Slack gets the outcome.
 
 ## Docs site
 
