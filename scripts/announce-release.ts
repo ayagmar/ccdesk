@@ -1,7 +1,6 @@
-// Prints the webhook payload announcing the release at HEAD, in the format of the webhook in
-// RELEASE_WEBHOOK_URL (Discord by its host, otherwise Slack), or of the target named as the
-// argument: `pnpm announce discord`. The Release workflow posts it; locally, pipe it to curl to
-// see it in your own channel. The URL itself is never printed.
+// Prints the Slack incoming-webhook payload announcing the release at HEAD. The Release workflow
+// posts it to RELEASE_WEBHOOK_URL; locally, pipe it to curl to preview it in your channel:
+//   pnpm -s announce | curl -X POST -H 'Content-Type: application/json' --data @- "$URL"
 //
 // Inputs: package.json (the version), CHANGELOG.md, the Claude Code version the pinned SDK ships
 // (`claudeCodeVersion` in its package.json), the SDK the previous tag pinned (its Claude Code
@@ -10,7 +9,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Announcement, announcement, type Target, targetOf } from "./announcement.ts";
+import { type Announcement, announcement } from "./announcement.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 const SDK = "@anthropic-ai/claude-agent-sdk";
@@ -36,17 +35,6 @@ function run(file: string, args: string[]): string {
 function json<T>(text: string): T {
   return JSON.parse(text) as T;
 }
-
-function target(): Target {
-  const named = process.argv[2];
-  if (named === "discord" || named === "slack") return named;
-  if (named !== undefined) throw new Error(`Unknown target ${named}; use discord or slack`);
-  const url = process.env.RELEASE_WEBHOOK_URL;
-  if (!url) throw new Error("Name the target (discord or slack) or set RELEASE_WEBHOOK_URL");
-  return targetOf(url);
-}
-
-const format = target();
 
 const pkg = json<PackageJson>(readFileSync(join(ROOT, "package.json"), "utf8"));
 const repo = (pkg.repository?.url ?? "").replace(/^git\+/, "").replace(/\.git$/, "");
@@ -100,4 +88,4 @@ const input: Announcement = {
   },
 };
 
-process.stdout.write(`${JSON.stringify(announcement(input, format), null, 2)}\n`);
+process.stdout.write(`${JSON.stringify(announcement(input), null, 2)}\n`);
