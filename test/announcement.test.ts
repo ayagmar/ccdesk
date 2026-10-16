@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { announcement, claudeCodeNotes, releaseNotes, targetOf } from "../scripts/announcement.ts";
+import {
+  announcement,
+  claudeCodeNotes,
+  releaseNotes,
+  type SlackPayload,
+} from "../scripts/announcement.ts";
 
 const OURS = `# Changelog
 
@@ -13,6 +18,7 @@ const OURS = `# Changelog
 ### Bug Fixes
 
 * **core:** cite [memory#how-it-works](https://code.claude.com/docs/en/memory#how-it-works) for the limit ([bd6da38](https://github.com/ayagmar/ccdesk/commit/bd6da38))
+* **release:** make a patch when no commit calls for a bump ([e417b1c](https://github.com/ayagmar/ccdesk/commit/e417b1c701704e595d442fc6ee09f4fd5b9523b9)), references [#51](https://github.com/ayagmar/ccdesk/issues/51)
 
 ## [0.4.2](https://github.com/ayagmar/ccdesk/compare/v0.4.1...v0.4.2) (2026-10-14)
 
@@ -53,6 +59,7 @@ test("the release notes are one version's bullets, in plain text", () => {
   assert.deepEqual(releaseNotes(OURS, "0.4.3"), [
     "ui: a way back from What Claude sees",
     "core: cite memory#how-it-works for the limit",
+    "release: make a patch when no commit calls for a bump, references #51",
   ]);
   assert.deepEqual(releaseNotes(OURS, "0.4.1"), []);
 });
@@ -66,83 +73,53 @@ test("Claude Code's notes cover every version after the last release, up to the 
   assert.deepEqual(claudeCodeNotes(THEIRS, "2.1.299", "2.1.299"), []);
 });
 
-test("a Discord webhook gets an embed with bold headings, a list and a linked title", () => {
-  const [embed] = announcement(moved, "discord").embeds;
-  assert.equal(embed.title, "ccdesk v0.4.3");
-  assert.equal(embed.url, RELEASE_URL);
-  assert.equal(embed.footer.text, "npx ccdesk@0.4.3");
-  assert.equal(
-    embed.description,
-    [
-      "Tracks Claude Code **2.1.300**, up from 2.1.299.",
-      "",
-      "**Changes in ccdesk**",
-      "- ui: a way back from What Claude sees",
-      "- core: cite memory#how-it-works for the limit",
-      "",
-      "**New in Claude Code since 2.1.299**",
-      "- Added `virtualText` to a mod's prompt decorations",
-      "- Fixed `<Tab>` & `/autocompact` warning about high token usage",
-    ].join("\n")
-  );
-});
+function blockTexts(payload: SlackPayload): string[] {
+  return payload.blocks.map((b) => (b.type === "context" ? b.elements[0].text : b.text.text));
+}
 
-test("a Slack webhook gets blocks, with its own markup escaped where Slack reads it", () => {
-  const payload = announcement(moved, "slack");
+test("the Slack message is blocks, with its own markup escaped where Slack reads it", () => {
+  const payload = announcement(moved);
   assert.equal(payload.text, "ccdesk v0.4.3: tracks Claude Code 2.1.300");
-  const texts = payload.blocks.map((b) =>
-    b.type === "context" ? b.elements[0].text : b.text.text
-  );
-  assert.deepEqual(texts, [
+  assert.equal(payload.unfurl_links, false);
+  assert.equal(payload.unfurl_media, false);
+  assert.deepEqual(blockTexts(payload), [
     "ccdesk v0.4.3",
     `Tracks Claude Code *2.1.300*, up from 2.1.299.\n<${RELEASE_URL}|Release notes>`,
-    "*Changes in ccdesk*\n• ui: a way back from What Claude sees\n• core: cite memory#how-it-works for the limit",
+    "*Changes in ccdesk*\n• ui: a way back from What Claude sees\n• core: cite memory#how-it-works for the limit\n• release: make a patch when no commit calls for a bump, references #51",
     "*New in Claude Code since 2.1.299*\n• Added `virtualText` to a mod's prompt decorations\n• Fixed `&lt;Tab&gt;` &amp; `/autocompact` warning about high token usage",
     "`npx ccdesk@0.4.3`",
   ]);
 });
 
 test("a data-only release with the same pin names the version it tracks and nothing else", () => {
-  const [embed] = announcement(
-    {
-      ...moved,
-      version: "0.4.1",
-      claudeCode: { ...moved.claudeCode, from: "2.1.299", to: "2.1.299" },
-    },
-    "discord"
-  ).embeds;
-  assert.equal(
-    embed.description,
-    "Tracks Claude Code **2.1.299**.\n\nNothing changed in ccdesk itself."
-  );
+  const payload = announcement({
+    ...moved,
+    version: "0.4.1",
+    claudeCode: { ...moved.claudeCode, from: "2.1.299", to: "2.1.299" },
+  });
+  assert.deepEqual(blockTexts(payload).slice(1, -1), [
+    `Tracks Claude Code *2.1.299*.\n<${RELEASE_URL}|Release notes>`,
+    "Nothing changed in ccdesk itself.",
+  ]);
 });
 
-test("without Claude Code's changelog the card links to it instead of listing", () => {
-  const [embed] = announcement(
-    { ...moved, claudeCode: { ...moved.claudeCode, changelog: null } },
-    "discord"
-  ).embeds;
-  assert.match(
-    embed.description,
-    /\[What changed in Claude Code\]\(https:\/\/github\.com\/anthropics/
+test("without Claude Code's changelog the message links to it instead of listing", () => {
+  const texts = blockTexts(
+    announcement({ ...moved, claudeCode: { ...moved.claudeCode, changelog: null } })
   );
-  assert.doesNotMatch(embed.description, /New in Claude Code/);
+  assert.ok(texts.includes(`<${CLAUDE_CODE_URL}|What changed in Claude Code>`));
+  assert.ok(!texts.some((t) => t.includes("New in Claude Code")));
 });
 
 test("long lists stop at eight bullets and link to the rest", () => {
   const bullets = Array.from({ length: 11 }, (_, i) => `- Fixed thing ${i + 1}`).join("\n");
-  const [embed] = announcement(
-    { ...moved, claudeCode: { ...moved.claudeCode, changelog: `## 2.1.300\n\n${bullets}\n` } },
-    "discord"
-  ).embeds;
-  assert.match(
-    embed.description,
-    /- Fixed thing 8\n\[and 3 more\]\(https:\/\/github\.com\/anthropics/
+  const texts = blockTexts(
+    announcement({
+      ...moved,
+      claudeCode: { ...moved.claudeCode, changelog: `## 2.1.300\n\n${bullets}\n` },
+    })
   );
-  assert.doesNotMatch(embed.description, /Fixed thing 9/);
-});
-
-test("the target comes from the webhook's host", () => {
-  assert.equal(targetOf("https://discord.com/api/webhooks/1/abc"), "discord");
-  assert.equal(targetOf("https://hooks.slack.com/services/T1/B1/xyz"), "slack");
+  const list = texts.find((t) => t.includes("Fixed thing 8"));
+  assert.ok(list?.endsWith(`• Fixed thing 8\n<${CLAUDE_CODE_URL}|and 3 more>`));
+  assert.ok(!texts.some((t) => t.includes("Fixed thing 9")));
 });

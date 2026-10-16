@@ -1,9 +1,6 @@
-// The message posted to a chat webhook when a release is published: what changed in ccdesk, and
-// what changed in Claude Code since the last release. Pure: `announce-release.ts` gathers the
-// inputs and posts the result.
-//
-// `announcement` builds the same card in the format of one target. Discord gets an embed, Slack a
-// Block Kit message; each uses its own markup, so headings are bold and the links are real on both.
+// The message posted to a Slack incoming webhook when a release is published: what changed in
+// ccdesk, and what changed in Claude Code since the last release. Pure: `announce-release.ts`
+// gathers the inputs and the Release workflow posts the result.
 
 export interface Announcement {
   /** The ccdesk version released, without a `v`. */
@@ -24,27 +21,15 @@ export interface Announcement {
   };
 }
 
-export type Target = "discord" | "slack";
-
-/** The target a webhook URL posts to: Discord by its host, otherwise Slack. */
-export function targetOf(webhookUrl: string): Target {
-  const host = new URL(webhookUrl).hostname;
-  return host === "discord.com" || host.endsWith(".discord.com") || host === "discordapp.com"
-    ? "discord"
-    : "slack";
-}
-
 /** How many bullets each list shows before "and N more". */
 const SHOWN = 8;
 /** The longest bullet; Claude Code's run to several lines. */
 const BULLET = 180;
-/** The docs site's accent. */
-const ACCENT = 0xf2c14e;
 
 /** Markdown links become their text, bold scopes become plain, and commit links are dropped. */
 function plain(markdown: string): string {
   return markdown
-    .replace(/\s*\(\[[0-9a-f]{7,}\]\([^)]*\)\)\s*$/, "")
+    .replace(/\s*\(\[[0-9a-f]{7,}\]\([^)]*\)\)/g, "")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/\*\*([^*]+):\*\*/g, "$1:")
     .replace(/\*\*([^*]+)\*\*/g, "$1")
@@ -100,100 +85,6 @@ export function claudeCodeNotes(changelog: string, from: string, to: string): st
   });
 }
 
-/** A list of bullets with a link to the rest, in either target's markup. */
-interface Section {
-  heading: string;
-  bullets: string[];
-  /** How many bullets the list left out, and where they are. */
-  more: { count: number; url: string } | null;
-}
-
-/** The card, before either target's markup. */
-interface Card {
-  title: string;
-  releaseUrl: string;
-  /** The first line: which Claude Code version this release tracks. */
-  tracks: { to: string; from: string | null };
-  sections: Section[];
-  /** Shown when ccdesk's changelog lists nothing for the version. */
-  nothingOurs: boolean;
-  /** Shown when the pin moved but the Claude Code changelog could not be read. */
-  claudeCodeLink: string | null;
-  install: string;
-}
-
-function section(heading: string, bullets: string[], url: string): Section {
-  const rest = bullets.length - SHOWN;
-  return {
-    heading,
-    bullets: bullets.slice(0, SHOWN),
-    more: rest > 0 ? { count: rest, url } : null,
-  };
-}
-
-function card(input: Announcement): Card {
-  const { version, releaseUrl, changelog, claudeCode } = input;
-  const moved = claudeCode.from !== claudeCode.to;
-  const ours = releaseNotes(changelog, version);
-  const theirs =
-    moved && claudeCode.changelog
-      ? claudeCodeNotes(claudeCode.changelog, claudeCode.from, claudeCode.to)
-      : [];
-  const sections: Section[] = [];
-  if (ours.length > 0) sections.push(section("Changes in ccdesk", ours, releaseUrl));
-  if (theirs.length > 0)
-    sections.push(section(`New in Claude Code since ${claudeCode.from}`, theirs, claudeCode.url));
-  return {
-    title: `ccdesk v${version}`,
-    releaseUrl,
-    tracks: { to: claudeCode.to, from: moved ? claudeCode.from : null },
-    sections,
-    nothingOurs: ours.length === 0,
-    claudeCodeLink: moved && theirs.length === 0 ? claudeCode.url : null,
-    install: `npx ccdesk@${version}`,
-  };
-}
-
-export interface DiscordPayload {
-  embeds: [
-    {
-      title: string;
-      url: string;
-      description: string;
-      color: number;
-      footer: { text: string };
-    },
-  ];
-}
-
-/** Discord markdown: `**bold**`, `- ` lists, `[text](url)`. */
-function discord(c: Card): DiscordPayload {
-  const paragraphs: string[] = [];
-  paragraphs.push(
-    c.tracks.from
-      ? `Tracks Claude Code **${c.tracks.to}**, up from ${c.tracks.from}.`
-      : `Tracks Claude Code **${c.tracks.to}**.`
-  );
-  if (c.nothingOurs) paragraphs.push("Nothing changed in ccdesk itself.");
-  for (const s of c.sections) {
-    const lines = [`**${s.heading}**`, ...s.bullets.map((b) => `- ${b}`)];
-    if (s.more) lines.push(`[and ${s.more.count} more](${s.more.url})`);
-    paragraphs.push(lines.join("\n"));
-  }
-  if (c.claudeCodeLink) paragraphs.push(`[What changed in Claude Code](${c.claudeCodeLink})`);
-  return {
-    embeds: [
-      {
-        title: c.title,
-        url: c.releaseUrl,
-        description: paragraphs.join("\n\n"),
-        color: ACCENT,
-        footer: { text: c.install },
-      },
-    ],
-  };
-}
-
 type SlackBlock =
   | { type: "header"; text: { type: "plain_text"; text: string } }
   | { type: "section"; text: { type: "mrkdwn"; text: string } }
@@ -203,6 +94,9 @@ export interface SlackPayload {
   /** The notification text; the blocks are what the channel shows. */
   text: string;
   blocks: SlackBlock[];
+  /** Off, so the GitHub links do not expand into previews in the channel. */
+  unfurl_links: false;
+  unfurl_media: false;
 }
 
 /** Slack's mrkdwn reads `&`, `<` and `>` as markup. */
@@ -210,33 +104,51 @@ function slackText(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** Slack mrkdwn: `*bold*`, `•` bullets, `<url|text>` links, each part its own block. */
-function slack(c: Card): SlackPayload {
-  const mrkdwn = (text: string): SlackBlock => ({
-    type: "section",
-    text: { type: "mrkdwn", text },
-  });
-  const blocks: SlackBlock[] = [{ type: "header", text: { type: "plain_text", text: c.title } }];
-  const tracks = c.tracks.from
-    ? `Tracks Claude Code *${c.tracks.to}*, up from ${c.tracks.from}.`
-    : `Tracks Claude Code *${c.tracks.to}*.`;
-  blocks.push(mrkdwn(`${tracks}\n<${c.releaseUrl}|Release notes>`));
-  if (c.nothingOurs) blocks.push(mrkdwn("Nothing changed in ccdesk itself."));
-  for (const s of c.sections) {
-    const lines = [`*${s.heading}*`, ...s.bullets.map((b) => `• ${slackText(b)}`)];
-    if (s.more) lines.push(`<${s.more.url}|and ${s.more.count} more>`);
-    blocks.push(mrkdwn(lines.join("\n")));
-  }
-  if (c.claudeCodeLink) blocks.push(mrkdwn(`<${c.claudeCodeLink}|What changed in Claude Code>`));
-  blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: `\`${c.install}\`` }] });
-  return { text: `${c.title}: tracks Claude Code ${c.tracks.to}`, blocks };
+function mrkdwn(text: string): SlackBlock {
+  return { type: "section", text: { type: "mrkdwn", text } };
 }
 
-/** The webhook payload for a release, in the target's format. */
-export function announcement(input: Announcement, target: "discord"): DiscordPayload;
-export function announcement(input: Announcement, target: "slack"): SlackPayload;
-export function announcement(input: Announcement, target: Target): DiscordPayload | SlackPayload;
-export function announcement(input: Announcement, target: Target): DiscordPayload | SlackPayload {
-  const c = card(input);
-  return target === "discord" ? discord(c) : slack(c);
+/** A bold heading and up to SHOWN bullets, with a link to the rest. */
+function list(heading: string, bullets: string[], url: string): SlackBlock {
+  const lines = [`*${heading}*`, ...bullets.slice(0, SHOWN).map((b) => `• ${slackText(b)}`)];
+  const rest = bullets.length - SHOWN;
+  if (rest > 0) lines.push(`<${url}|and ${rest} more>`);
+  return mrkdwn(lines.join("\n"));
+}
+
+/** The Slack webhook payload for a release. */
+export function announcement(input: Announcement): SlackPayload {
+  const { version, releaseUrl, changelog, claudeCode } = input;
+  const title = `ccdesk v${version}`;
+  const moved = claudeCode.from !== claudeCode.to;
+  const ours = releaseNotes(changelog, version);
+  const theirs =
+    moved && claudeCode.changelog
+      ? claudeCodeNotes(claudeCode.changelog, claudeCode.from, claudeCode.to)
+      : [];
+
+  const tracks = moved
+    ? `Tracks Claude Code *${claudeCode.to}*, up from ${claudeCode.from}.`
+    : `Tracks Claude Code *${claudeCode.to}*.`;
+  const blocks: SlackBlock[] = [
+    { type: "header", text: { type: "plain_text", text: title } },
+    mrkdwn(`${tracks}\n<${releaseUrl}|Release notes>`),
+  ];
+  if (ours.length === 0) blocks.push(mrkdwn("Nothing changed in ccdesk itself."));
+  if (ours.length > 0) blocks.push(list("Changes in ccdesk", ours, releaseUrl));
+  if (theirs.length > 0)
+    blocks.push(list(`New in Claude Code since ${claudeCode.from}`, theirs, claudeCode.url));
+  if (moved && theirs.length === 0)
+    blocks.push(mrkdwn(`<${claudeCode.url}|What changed in Claude Code>`));
+  blocks.push({
+    type: "context",
+    elements: [{ type: "mrkdwn", text: `\`npx ccdesk@${version}\`` }],
+  });
+
+  return {
+    text: `${title}: tracks Claude Code ${claudeCode.to}`,
+    blocks,
+    unfurl_links: false,
+    unfurl_media: false,
+  };
 }

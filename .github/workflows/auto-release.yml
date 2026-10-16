@@ -1,8 +1,9 @@
 name: Release after a data update
 
-# A merged Claude Code data PR (opened by the "Claude Code data" workflow) starts the Release
-# workflow, so the new schema, catalog and tools reach npm without anyone remembering to.
-# The merge itself stays a person's call: the PR body lists the docs sections to check first.
+# A Claude Code data PR (opened by the "Claude Code data" workflow) that a person merges starts the
+# Release workflow, so the new schema, catalog and tools reach npm without anyone remembering to.
+# These are the PRs whose docs sections changed, or that CI failed on; the PR body lists what to check.
+# The data workflow releases the PRs it merges itself.
 # It is always a patch, even with a feature waiting on master: minor releases are started by hand.
 
 on:
