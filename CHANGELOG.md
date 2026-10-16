@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.2](https://github.com/ayagmar/ccdesk/compare/v0.5.1...v0.5.2) (2026-10-16)
+
+### Features
+
+* **release:** Slack announcements, hourly SDK check, and auto-merged data PRs ([#52](https://github.com/ayagmar/ccdesk/issues/52)) ([cf808dc](https://github.com/ayagmar/ccdesk/commit/cf808dc3a9cd0d960fdc8a57adbef4b1ce41ac49))
+
 ## [0.5.1](https://github.com/ayagmar/ccdesk/compare/v0.5.0...v0.5.1) (2026-10-16)
 
 ### Features

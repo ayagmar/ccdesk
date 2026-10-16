@@ -1,6 +1,6 @@
 {
   "name": "ccdesk",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "See and change everything Claude Code loads on your machine: instruction files, settings, permissions, hooks, MCP servers, subagents, skills, plugins and auto memory",
   "keywords": [
     "claude-code",
