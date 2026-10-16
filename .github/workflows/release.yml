@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       increment:
-        description: Version bump (auto = derive from Conventional Commits)
+        description: Version bump (auto = derive from Conventional Commits, or patch when none calls for a bump)
         type: choice
         options: [auto, patch, minor, major]
         default: auto
@@ -85,6 +85,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Only feat, fix, perf, revert and breaking changes call for a bump, so a data update's
+          # chore commit alone gives no version, and release-it would exit 0 having released nothing.
+          if [ "$INCREMENT" = "auto" ] && ! pnpm exec release-it --ci --release-version | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            INCREMENT=patch
+          fi
           args=(--ci)
           [ "$INCREMENT" != "auto" ] && args+=(--increment "$INCREMENT")
           [ "$DRY_RUN" = "true" ] && args+=(--dry-run)

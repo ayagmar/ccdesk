@@ -4,7 +4,7 @@ name: Release after a data update
 # workflow, so the new schema, catalog and tools reach npm without anyone remembering to.
 # The merge itself stays a person's call: the PR body lists the docs sections to check first.
 # The increment is derived from the commits since the last tag, so a feature waiting on master
-# makes a minor release rather than a mislabelled patch.
+# makes a minor release rather than a mislabelled patch; the data update alone makes a patch.
 
 on:
   pull_request:
