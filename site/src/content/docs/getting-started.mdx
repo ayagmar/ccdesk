@@ -36,6 +36,10 @@ npx ccdesk scan [dir] --json             Print what Claude Code loads in dir, as
 npx ccdesk explain <file> [--dir <dir>]  Print what loads once Claude reads or edits file
 npx ccdesk check [dir] [--json]          Exit 1 when a session started in dir reads a file
                                          Claude Code cannot read or parse
+npx ccdesk compare <a> <b> [--json]      Print the settings that differ between two directories,
+                                         and the files each value comes from
+npx ccdesk forget <dir> | --all-gone     Forget a directory whose folder is gone: move its
+                                         sessions and memory into ccdesk's backups
 
   --port <n>            Port to listen on (default: a free port)
   --no-open             Print the URL instead of opening a browser
@@ -44,7 +48,10 @@ npx ccdesk check [dir] [--json]          Exit 1 when a session started in dir re
   --dir <dir>           For explain: the folder the session starts in (default: the current one)
   --strict              For check: also fail on entries Claude Code may skip in a file it reads
   --all                 For check: also count ~/.claude, ~/.claude.json, managed settings and
-                        files outside dir's repository
+                        files outside dir's repository. For compare: also list the settings
+                        both directories share
+  --all-gone            For forget: every listed directory whose folder is gone
+  -y, --yes             For forget: do not ask first, as needed without a terminal
   -h, --help            Show this help
 ```
 
@@ -93,7 +100,21 @@ Problems are listed in the order to fix them: files that stop Claude Code from s
 - A file Claude Code reads with some entries skipped, such as a `permissions.defaultMode` it does not know, is listed but passes. ccdesk's settings schema can lag a newer Claude Code, so failing on these could fail a valid file. `--strict` fails on them.
 - `--json` prints each problem with its absolute `path`, the `file` as shown, the error, and `counted`, whether it fails the check. `failed` is the overall answer.
 
-All three only read: they write no file and keep no backup. Values the page hides, such as env values and headers, are hidden in their output too.
+`ccdesk compare` is the [settings comparison](../settings/) in the terminal: the keys whose values differ between two directories, with each side's value and the files it comes from. Hidden values are compared but never printed. `--all` also lists the keys both share, and `--json` prints every key with `same`, whether the two match.
+
+```sh
+$ npx ccdesk compare ~/code/acme-api ~/code/acme-web
+Settings that differ between ~/code/acme-api and ~/code/acme-web:
+  model
+    ~/code/acme-api  opus     (project .claude/settings.json)
+    ~/code/acme-web  not set
+
+Same in both: 4 settings; --all lists them.
+```
+
+These four only read: they write no file and keep no backup. Values the page hides, such as env values and headers, are hidden in their output too.
+
+`ccdesk forget` clears away a directory whose folder is gone, as [Forget…](../interface/) does on the page, after the same review: it prints the store, its sessions, memories and size, and asks before it moves anything. `--all-gone` does this for every listed directory whose folder is gone, such as the stores test runs leave behind, with one question for all of them. Without a terminal to answer in, pass `--yes`. It exits 0 when every directory is forgotten, and 1 when you answer no or ccdesk refuses one, saying why. [Recent changes](../recent-changes/#forgotten-directories) on the page can move a store back. Like the page, it changes nothing else: `~/.claude.json` keeps the directory's entry.
 
 ## What it reads
 

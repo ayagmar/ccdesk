@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
 import { type ForgetPreview } from "../shared/types.ts";
 import { api, errorText } from "./api.ts";
-import { plural, tilde } from "./format.ts";
-
-function size(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
+import { plural, size, tilde } from "./format.ts";
 
 /**
  * Forgetting a directory whose folder is gone: what moves away and what stays, read when it opens,

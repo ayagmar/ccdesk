@@ -1,16 +1,20 @@
 import { realpath } from "node:fs/promises";
 import { isAbsolute, relative, sep } from "node:path";
 import {
+  type ComparedSetting,
+  type ComparedValue,
   type Core,
   canonicalRoot,
   type DirectoryView,
+  type ForgetPreview,
   type PathMatch,
   type Problem,
 } from "../core/index.ts";
-import { formatter, MATCH_KIND, plural } from "../view/index.ts";
+import { formatter, MATCH_KIND, plural, preview, size } from "../view/index.ts";
 
-// The subcommands of `ccdesk`. They only read, through the core, and print what the page would
-// show: the scan is already redacted, so no value the page hides reaches the terminal.
+// The subcommands of `ccdesk`. They go through the core and print what the page would show: the
+// scan is already redacted, so no value the page hides reaches the terminal. All but forget only
+// read; forget asks first and saves what was reviewed, as the page does.
 
 /** `ccdesk scan --json`: the DirectoryView the page gets for `dir`. */
 export async function scanJson(core: Core, dir: string): Promise<string> {
@@ -156,4 +160,124 @@ export async function checkDirectory(
       : `No ${shown.length > 0 ? "counted " : ""}problems in ${session}.`
   );
   return { output: lines.join("\n"), exitCode };
+}
+
+/** `ccdesk compare --json`: the settings of `a` and `b` key by key, as the page's compare view gets them. */
+export async function compareJson(core: Core, a: string, b: string): Promise<string> {
+  return JSON.stringify(await core.compareSettings(a, b), null, 2);
+}
+
+/**
+ * `ccdesk compare`: the settings Claude Code uses in `a` and in `b` that differ, each with its value
+ * and the files it comes from in both, and with `all` the ones they share too. Both paths are
+ * absolute.
+ */
+export async function compareText(core: Core, a: string, b: string, all: boolean): Promise<string> {
+  const { tilde, tildeAll, relativeTo } = formatter(core.env.home);
+  const { settings } = await core.compareSettings(a, b);
+  const [nameA, nameB] = [tilde(a), tilde(b)];
+  if (settings.length === 0) return `No settings file sets anything in ${nameA} or ${nameB}.`;
+
+  const width = Math.max(nameA.length, nameB.length);
+  const shown = (value: ComparedValue | null) =>
+    value ? tildeAll(preview(value.value)) : "not set";
+  const from = (value: ComparedValue | null, dir: string) =>
+    value
+      ? `  (${value.sources.map((s) => `${s.scope} ${relativeTo(s.path, dir)}`).join(", ")})`
+      : "";
+  const block = (s: ComparedSetting) => {
+    const valueWidth = Math.max(shown(s.a).length, shown(s.b).length);
+    const side = (name: string, value: ComparedValue | null, dir: string) =>
+      `    ${name.padEnd(width)}  ${shown(value).padEnd(value ? valueWidth : 0)}${from(value, dir)}`;
+    return [
+      `  ${s.key}${s.hiddenDiffers ? "  (the hidden values differ)" : ""}`,
+      side(nameA, s.a, a),
+      side(nameB, s.b, b),
+    ];
+  };
+  const differing = settings.filter((s) => !s.same);
+  const shared = settings.filter((s) => s.same);
+  const lines =
+    differing.length > 0
+      ? [`Settings that differ between ${nameA} and ${nameB}:`, ...differing.flatMap(block)]
+      : [`${nameA} and ${nameB} use the same settings.`];
+  if (shared.length > 0)
+    lines.push(
+      "",
+      ...(all
+        ? ["Settings both share:", ...shared.flatMap(block)]
+        : [`Same in both: ${plural(shared.length, "setting")}; --all lists them.`])
+    );
+  return lines.join("\n");
+}
+
+/** Prints the review and asks whether to go ahead with `question`; resolves true to go ahead. */
+export type Confirm = (review: string, question: string) => Promise<boolean>;
+
+/**
+ * `ccdesk forget`: forgets each of `dirs`, or with `dirs` null every listed directory whose folder
+ * is gone, as the page's Forget button does. Each store is reviewed first and `confirm` is asked
+ * once for all of them; a store that changed since then is not forgotten. Exits 0 when every
+ * directory asked for is forgotten, 1 when one is refused or `confirm` says no. Paths are absolute.
+ */
+export async function forgetDirectories(
+  core: Core,
+  dirs: string[] | null,
+  launchDir: string,
+  confirm: Confirm
+): Promise<{ output: string; exitCode: 0 | 1 }> {
+  const { tilde, tildeAll } = formatter(core.env.home);
+  const targets =
+    dirs ??
+    (await core.scanOverview(launchDir)).projects.filter((p) => !p.exists).map((p) => p.path);
+  if (targets.length === 0) return { output: "No directory whose folder is gone.", exitCode: 0 };
+
+  const reviewed: ForgetPreview[] = [];
+  const refused: string[] = [];
+  const refuse = (dir: string, error: unknown) =>
+    refused.push(`  ${tilde(dir)}: ${tildeAll((error as Error).message)}`);
+  for (const dir of targets)
+    await core.previewForget(dir, launchDir).then(
+      (review) => reviewed.push(review),
+      (error: unknown) => refuse(dir, error)
+    );
+  const lines: string[] = [];
+  if (reviewed.length > 0)
+    lines.push(
+      `Forgetting moves ${reviewed.length === 1 ? "this store" : "these stores"} into ccdesk's backups:`,
+      ...reviewed.flatMap((p) => [
+        `  ${tilde(p.path)}  ${plural(p.sessions, "session")}, ${plural(p.memories, "memory", "memories")}, ${size(p.bytes)}, from ${tilde(p.store)}`,
+        ...(p.recentlyActive
+          ? [
+              "    A session was written here in the last few minutes. If Claude Code is still running in this directory, quit it first: its next message would start a new store.",
+            ]
+          : []),
+      ])
+    );
+  if (refused.length > 0) lines.push("Not forgotten:", ...refused);
+  if (reviewed.some((p) => p.claudeJsonEntry))
+    lines.push(
+      "Entries in ~/.claude.json, with your trust answers, stay: ccdesk does not change that file."
+    );
+  if (reviewed.length === 0) return { output: lines.join("\n"), exitCode: 1 };
+
+  const [only] = reviewed;
+  const question = `Forget ${reviewed.length === 1 && only ? tilde(only.path) : plural(reviewed.length, "directory", "directories")}?`;
+  if (!(await confirm(lines.join("\n"), question)))
+    return { output: "Nothing forgotten.", exitCode: 1 };
+
+  const done: string[] = [];
+  const failed: string[] = [];
+  for (const p of reviewed)
+    await core.forgetDirectory(p.path, launchDir, p.revision).then(
+      () => done.push(`Forgot ${tilde(p.path)}.`),
+      (error: unknown) =>
+        failed.push(`Not forgotten: ${tilde(p.path)}: ${tildeAll((error as Error).message)}`)
+    );
+  if (done.length > 0)
+    done.push(`Recent changes on the page can move ${done.length === 1 ? "it" : "them"} back.`);
+  return {
+    output: [...done, ...failed].join("\n"),
+    exitCode: refused.length + failed.length > 0 ? 1 : 0,
+  };
 }

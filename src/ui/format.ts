@@ -1,6 +1,6 @@
 import { type Formatter, formatter } from "../view/format.ts";
 
-export { ago, plural, preview, typedPath } from "../view/format.ts";
+export { ago, plural, preview, size, typedPath } from "../view/format.ts";
 
 // The page shows one machine's paths; useConfig sets its home when the overview arrives.
 let current = formatter("");

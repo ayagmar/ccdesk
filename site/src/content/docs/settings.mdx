@@ -64,7 +64,7 @@ A key whose value holds hidden parts, such as a non-empty `env`, or an `allowedM
 
 ## Comparing two directories
 
-**Compare with…** at the top of the section opens a picker: choose another directory Claude Code has been used in, or type the full path of any folder. The comparison page lists the keys whose values differ, with the value each directory ends up with and the files it comes from. **All** also shows the keys that are the same in both, dimmed. A value that Claude Code ignores in a directory counts as not set there.
+**Compare with…** at the top of the section opens a picker: choose another directory Claude Code has been used in, or type the full path of any folder. The comparison page lists the keys whose values differ, with the value each directory ends up with and the files it comes from. **All** also shows the keys that are the same in both, dimmed. A value that Claude Code ignores in a directory counts as not set there. `ccdesk compare <a> <b>` prints the same comparison in a terminal ([Getting started](../getting-started/#without-the-browser)).
 
 Hidden values stay hidden, but ccdesk compares the real values: when two `env` entries both show `•••` but differ, the key is listed as different, with the note "The hidden values differ". Neither value is sent to the page. The page has its own address, so you can bookmark a comparison or reload it.
 

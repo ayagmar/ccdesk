@@ -3,7 +3,7 @@
 // and the inspector; a terminal UI can draw the same rows. See ARCHITECTURE.md.
 
 export { diffLines, withContext } from "./diff.ts";
-export { ago, type Formatter, firstSentence, formatter, plural, preview } from "./format.ts";
+export { ago, type Formatter, firstSentence, formatter, plural, preview, size } from "./format.ts";
 export { LINES, type Line, lineName } from "./lines.ts";
 export { MATCH_KIND } from "./path-test.ts";
 export { routeStops, type Stop } from "./route.ts";

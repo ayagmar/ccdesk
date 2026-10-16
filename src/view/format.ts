@@ -72,6 +72,12 @@ export function plural(n: number, word: string, many = `${word}s`): string {
   return `${n} ${n === 1 ? word : many}`;
 }
 
+/** A size in KB, or in MB from one MB up. */
+export function size(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 /** A path typed in full: absolute, or under the home folder with ~. */
 export function typedPath(query: string, home: string | undefined): string | null {
   const q = query.trim();

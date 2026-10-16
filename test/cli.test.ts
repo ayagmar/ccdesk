@@ -1,14 +1,23 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync } from "node:fs";
 import { Agent, request } from "node:http";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { createCore, type DirectoryView } from "../src/core/index.ts";
 import { DEV_PORT, HELP, parse, UsageError } from "../src/server/args.ts";
-import { checkDirectory, explainText, scanJson } from "../src/server/commands.ts";
+import {
+  checkDirectory,
+  compareJson,
+  compareText,
+  explainText,
+  forgetDirectories,
+  scanJson,
+} from "../src/server/commands.ts";
+import { storeDirName } from "../src/shared/memory.ts";
 import { startServer } from "../src/server/start.ts";
-import { type Fixture, makeFixture } from "./helpers/fixture.ts";
+import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
 // What the `ccdesk` command promises: its flags and their errors, what its subcommands print, and a
 // server another front end can start and stop. The bin itself only prints what these return.
@@ -423,6 +432,180 @@ test("check on a folder that does not exist is a usage error, not a pass", () =>
 
   assert.equal(run.status, 2);
   assert.equal(run.stderr.trim(), "ccdesk: no-such-folder is not a folder");
+});
+
+test("compare takes two folders, and forget one folder or --all-gone, each with its own flags", () => {
+  // Catches `ccdesk forget` with no folder forgetting every gone directory, or a flag of another
+  // command such as --strict being ignored.
+  assert.deepEqual(parse(["compare", "a", "b", "--all"]), {
+    command: "compare",
+    a: "a",
+    b: "b",
+    configDir: undefined,
+    json: false,
+    all: true,
+  });
+  assert.deepEqual(parse(["forget", "gone", "-y"]), {
+    command: "forget",
+    dir: "gone",
+    configDir: undefined,
+    yes: true,
+  });
+  assert.deepEqual(parse(["forget", "--all-gone"]), {
+    command: "forget",
+    dir: null,
+    configDir: undefined,
+    yes: false,
+  });
+  for (const argv of [
+    ["compare", "a"],
+    ["compare", "a", "b", "c"],
+    ["compare", "a", "b", "--strict"],
+    ["forget"],
+    ["forget", "a", "b"],
+    ["forget", "a", "--all-gone"],
+    ["forget", "a", "--json"],
+    ["check", "--yes"],
+  ])
+    assert.throws(
+      () => parse(argv),
+      (error) => error instanceof UsageError && error.message.endsWith(HELP),
+      argv.join(" ")
+    );
+});
+
+test("compare lists the settings that differ with the file behind each side, and hides hidden values", async () => {
+  // Catches the two sides swapped, a value shown without the file it comes from, or a key under
+  // env printed as written.
+  const f = makeFixture();
+  f.json("home/.claude/settings.json", { alwaysThinkingEnabled: true });
+  f.json("home/a/.claude/settings.json", { model: "opus", env: { API_KEY: "sk-live-aaaa1111" } });
+  f.json("home/b/.claude/settings.local.json", {
+    model: "sonnet",
+    env: { API_KEY: "sk-live-bbbb2222" },
+  });
+  const core = createCore(f.env);
+  const [a, b] = [f.at("home/a"), f.at("home/b")];
+  const project = join(".claude", "settings.json");
+  const local = join(".claude", "settings.local.json");
+  const user = join("~", ".claude", "settings.json");
+  const [nameA, nameB] = [join("~", "a"), join("~", "b")];
+
+  const differ = [
+    `Settings that differ between ${nameA} and ${nameB}:`,
+    "  env  (the hidden values differ)",
+    `    ${nameA}  { API_KEY: "•••" }  (project ${project})`,
+    `    ${nameB}  { API_KEY: "•••" }  (local ${local})`,
+    "  model",
+    `    ${nameA}  opus    (project ${project})`,
+    `    ${nameB}  sonnet  (local ${local})`,
+    "",
+  ];
+  assert.equal(
+    await compareText(core, a, b, false),
+    [...differ, "Same in both: 1 setting; --all lists them."].join("\n")
+  );
+  assert.equal(
+    await compareText(core, a, b, true),
+    [
+      ...differ,
+      "Settings both share:",
+      "  alwaysThinkingEnabled",
+      `    ${nameA}  true  (user ${user})`,
+      `    ${nameB}  true  (user ${user})`,
+    ].join("\n")
+  );
+  assert.ok(!(await compareJson(core, a, b)).includes("sk-live-"));
+});
+
+/** A directory Claude Code was used in, with two sessions and a memory, whose folder is gone. */
+function goneDirectory(f: Fixture, name: string): { dir: string; store: string } {
+  const dir = f.at("work", name);
+  const store = join(f.env.claudeDir, "projects", storeDirName(dir));
+  for (const session of ["a", "b"])
+    f.write(join(store, `${session}.jsonl`), `${JSON.stringify({ type: "user", cwd: dir })}\n`);
+  f.write(`${memoryDirFor(f, dir)}/note.md`, memoryFile("note", "user", "d", "body"));
+  return { dir, store };
+}
+
+test("forget shows what it would move before asking, and moves nothing when told no", async () => {
+  // Catches the store moving before the question, or a "no" that still forgets.
+  const f = makeFixture();
+  const { dir, store } = goneDirectory(f, "deleted");
+  const launch = f.at("home");
+  let asked = "";
+
+  const result = await forgetDirectories(
+    createCore(f.env),
+    [dir],
+    launch,
+    async (review, question) => {
+      assert.ok(existsSync(store));
+      asked = `${review}\n${question}`;
+      return false;
+    }
+  );
+
+  assert.match(asked, /2 sessions, 1 memory, [\d.]+ KB/);
+  assert.ok(asked.endsWith(`Forget ${f.at("work", "deleted")}?`));
+  assert.deepEqual(result, { output: "Nothing forgotten.", exitCode: 1 });
+  assert.ok(existsSync(store));
+});
+
+test("forget --all-gone forgets every directory whose folder is gone, and leaves the others", async () => {
+  // Catches a directory whose folder still exists being forgotten with the gone ones.
+  const f = makeFixture();
+  const gone = [goneDirectory(f, "one"), goneDirectory(f, "two")];
+  const kept = goneDirectory(f, "kept");
+  mkdirSync(kept.dir, { recursive: true });
+  const core = createCore(f.env);
+  let question = "";
+
+  const result = await forgetDirectories(core, null, f.at("home"), async (_review, q) => {
+    question = q;
+    return true;
+  });
+
+  assert.equal(question, "Forget 2 directories?");
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(
+    gone.map(({ store }) => existsSync(store)),
+    [false, false]
+  );
+  assert.ok(existsSync(kept.store));
+  const listed = (await core.scanOverview(f.at("home"))).projects.map((p) => p.path);
+  assert.deepEqual(
+    [...gone, kept].map(({ dir }) => listed.includes(dir)),
+    [false, false, true]
+  );
+});
+
+test("forget refuses a folder that exists without asking, and says why", async () => {
+  // Catches a typo'd path to a live project being offered for forgetting.
+  const f = makeFixture();
+  const { dir, store } = goneDirectory(f, "alive");
+  mkdirSync(dir, { recursive: true });
+
+  const result = await forgetDirectories(createCore(f.env), [dir], f.at("home"), () =>
+    assert.fail("asked to forget a folder that exists")
+  );
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.output, /exists; ccdesk forgets only a directory whose folder is gone/);
+  assert.ok(existsSync(store));
+});
+
+test("forget without a terminal needs --yes rather than waiting for an answer", () => {
+  // Catches a script hanging on a question nobody can answer.
+  const cli = fileURLToPath(new URL("../src/server/cli.ts", import.meta.url));
+  const run = spawnSync(
+    process.execPath,
+    [`--import=${import.meta.resolve("tsx")}`, cli, "forget", "--all-gone"],
+    { cwd: makeFixture().root, encoding: "utf8", input: "y\n" }
+  );
+
+  assert.equal(run.status, 2);
+  assert.match(run.stderr, /pass --yes/);
 });
 
 /** GET `path` on the server at `url` with the token from its fragment; resolves the status. */

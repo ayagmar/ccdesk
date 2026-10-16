@@ -8,6 +8,10 @@ Usage:
   npx ccdesk explain <file> [--dir <dir>]  Print what loads once Claude reads or edits file
   npx ccdesk check [dir] [--json]          Exit 1 when a session started in dir reads a file
                                            Claude Code cannot read or parse
+  npx ccdesk compare <a> <b> [--json]      Print the settings that differ between two directories,
+                                           and the files each value comes from
+  npx ccdesk forget <dir> | --all-gone     Forget a directory whose folder is gone: move its
+                                           sessions and memory into ccdesk's backups
 
 Options:
   --port <n>            Port to listen on (default: a free port)
@@ -17,12 +21,16 @@ Options:
   --dir <dir>           For explain: the folder the session starts in (default: the current one)
   --strict              For check: also fail on entries Claude Code may skip in a file it reads
   --all                 For check: also count ~/.claude, ~/.claude.json, managed settings and
-                        files outside dir's repository
+                        files outside dir's repository. For compare: also list the settings
+                        both directories share
+  --all-gone            For forget: every listed directory whose folder is gone
+  -y, --yes             For forget: do not ask first, as needed without a terminal
   -h, --help            Show this help
 
 ccdesk reads ~/.claude (or --config-dir, or $CLAUDE_CONFIG_DIR). The page opens on the directory
 you run ccdesk from and listens on 127.0.0.1 only. dir and file are relative to that directory.
-scan, explain and check write nothing and print no value the page hides. A command exits 2 when
+scan, explain, check and compare write nothing and print no value the page hides. forget shows
+what it moves and asks first; Recent changes on the page can move it back. A command exits 2 when
 its arguments are wrong, its folder does not exist, or it cannot run.`;
 
 /** The port `--dev` listens on, which `pnpm dev:ui` proxies to. */
@@ -53,7 +61,19 @@ export type Command =
       strict: boolean;
       /** Also count ~/.claude, ~/.claude.json and managed settings, inside the repository or not, and files outside it. */
       all: boolean;
-    };
+    }
+  /** Print the settings Claude Code uses in `a` and in `b`. */
+  | {
+      command: "compare";
+      a: string;
+      b: string;
+      configDir: string | undefined;
+      json: boolean;
+      /** Also list the settings both directories share. */
+      all: boolean;
+    }
+  /** Forget `dir`, whose folder is gone, or with `dir` null every listed directory whose folder is gone. */
+  | { command: "forget"; dir: string | null; configDir: string | undefined; yes: boolean };
 
 /** Arguments ccdesk cannot run with; the message is what to print. */
 export class UsageError extends Error {}
@@ -61,11 +81,13 @@ export class UsageError extends Error {}
 type Flag = keyof ReturnType<typeof options>["values"];
 
 /** The flags each command takes; --help goes with any. */
-const FLAGS: Record<"serve" | "scan" | "explain" | "check", Flag[]> = {
+const FLAGS: Record<"serve" | "scan" | "explain" | "check" | "compare" | "forget", Flag[]> = {
   serve: ["port", "open", "dev", "config-dir"],
   scan: ["json", "config-dir"],
   explain: ["dir", "config-dir"],
   check: ["json", "strict", "all", "config-dir"],
+  compare: ["json", "all", "config-dir"],
+  forget: ["all-gone", "yes", "config-dir"],
 };
 
 /** Reads the arguments after `ccdesk`, without touching the file system. */
@@ -84,8 +106,23 @@ export function parse(argv: string[]): Command {
   for (const flag of Object.keys(values) as Flag[])
     if (!FLAGS[name].includes(flag))
       throw usage(`--${flag} does not go with ${name === "serve" ? "the page" : name}`);
-  const configDir = values["config-dir"];
+  if (name !== "serve") return subcommand(name, rest, values);
+  return {
+    command: "serve",
+    port: portOf(values),
+    configDir: values["config-dir"],
+    open: values.open ?? true,
+    dev: values.dev ?? false,
+  };
+}
 
+/** A subcommand from the words after its name and its flags, which `parse` has checked go with it. */
+function subcommand(
+  name: Exclude<keyof typeof FLAGS, "serve">,
+  rest: string[],
+  values: ReturnType<typeof options>["values"]
+): Command {
+  const configDir = values["config-dir"];
   if (name === "scan") {
     if (rest.length > 1) throw usage("scan takes one dir");
     if (!values.json) throw usage("scan prints JSON; pass --json");
@@ -101,20 +138,30 @@ export function parse(argv: string[]): Command {
     const { json = false, strict = false, all = false } = values;
     return { command: "check", dir: rest[0], configDir, json, strict, all };
   }
-
-  return {
-    command: "serve",
-    port: portOf(values),
-    configDir,
-    open: values.open ?? true,
-    dev: values.dev ?? false,
-  };
+  if (name === "compare") {
+    const [a, b, ...extra] = rest;
+    if (a === undefined || b === undefined || extra.length > 0)
+      throw usage("compare takes two dirs");
+    const { json = false, all = false } = values;
+    return { command: "compare", a, b, configDir, json, all };
+  }
+  const allGone = values["all-gone"] ?? false;
+  if (rest.length > 1 || (rest.length === 1) === allGone)
+    throw usage("forget takes one dir, or --all-gone");
+  return { command: "forget", dir: rest[0] ?? null, configDir, yes: values.yes ?? false };
 }
 
 /** The command the first word names; without one, the page. */
 function commandOf(first: string | undefined): keyof typeof FLAGS {
   if (first === undefined) return "serve";
-  if (first === "scan" || first === "explain" || first === "check") return first;
+  if (
+    first === "scan" ||
+    first === "explain" ||
+    first === "check" ||
+    first === "compare" ||
+    first === "forget"
+  )
+    return first;
   throw usage(`unknown command ${first}`);
 }
 
@@ -144,6 +191,8 @@ function options(args: string[]) {
       dir: { type: "string" },
       strict: { type: "boolean" },
       all: { type: "boolean" },
+      "all-gone": { type: "boolean" },
+      yes: { type: "boolean", short: "y" },
       help: { type: "boolean", short: "h" },
     },
     allowPositionals: true,

@@ -86,6 +86,8 @@ npx ccdesk scan [dir] --json  Print what Claude Code loads in dir, as JSON
 npx ccdesk explain <file>     Print what loads once Claude reads or edits file
 npx ccdesk check [dir]        Exit 1 when a session started in dir reads a file
                               Claude Code cannot read or parse, for CI
+npx ccdesk compare <a> <b>    Print the settings that differ between two directories
+npx ccdesk forget <dir>       Forget a directory whose folder is gone (--all-gone: all of them)
 ```
 
 Requires Node.js 22.19 or newer. Options, the `check` command in CI, and what ccdesk reads and writes are in [Getting started](https://ayagmar.github.io/ccdesk/getting-started/); keyboard shortcuts are in [Reading the interface](https://ayagmar.github.io/ccdesk/interface/#keyboard-shortcuts), and Windows, macOS and WSL in [Platform notes](https://ayagmar.github.io/ccdesk/platforms/).
