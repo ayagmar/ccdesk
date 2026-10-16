@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.1](https://github.com/ayagmar/ccdesk/compare/v0.5.0...v0.5.1) (2026-10-16)
+
+### Features
+
+* **cli:** suggest allow rules from the calls you approved ([fbb94da](https://github.com/ayagmar/ccdesk/commit/fbb94da881c2ddd79f96a815328daa248fe5ef99))
+
+### Bug Fixes
+
+* **core:** suggest no allow rule for answering Claude's questions or plans ([2c97306](https://github.com/ayagmar/ccdesk/commit/2c973063811477d19a65d0e4675aec278ce076e0))
+* **release:** make every release after a data update a patch ([f8a5c49](https://github.com/ayagmar/ccdesk/commit/f8a5c493e1700ca852ebba69fb57e8b82bfc38e0))
+
 ## [0.5.0](https://github.com/ayagmar/ccdesk/compare/v0.4.4...v0.5.0) (2026-10-16)
 
 ### Features
