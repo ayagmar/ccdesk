@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.0](https://github.com/ayagmar/ccdesk/compare/v0.4.4...v0.5.0) (2026-10-16)
+
+### Features
+
+* **cli:** compare two directories and forget gone ones from the terminal ([b9f5202](https://github.com/ayagmar/ccdesk/commit/b9f5202a30763fd8bc7c3d6861af1889738cd25b))
+
 ## [0.4.4](https://github.com/ayagmar/ccdesk/compare/v0.4.3...v0.4.4) (2026-10-16)
 
 ### Bug Fixes
