@@ -43,7 +43,7 @@
     },
     {
       "name": "EndConversation",
-      "description": "Ends the session, in rare cases of sustained abusive input or when you ask Claude to demonstrate the tool. Requires Claude Code v2.1.213 or later.",
+      "description": "Ends the session, in rare cases of sustained abusive input or when you ask Claude to demonstrate the tool.",
       "asks": false
     },
     {
@@ -153,7 +153,7 @@
     },
     {
       "name": "ShareOnboardingGuide",
-      "description": "Uploads `ONBOARDING.md` and returns a share link teammates can open in Claude Code. Called from `/team-onboarding` after the guide is written. Available to claude.ai subscribers on Pro, Max, Team, and Enterprise plans",
+      "description": "Uploads `ONBOARDING.md` and returns a share link teammates can open in Claude Code. Called from `/team-onboarding` after the guide is written. Available to claude.ai subscribers on Team and Enterprise plans",
       "asks": true
     },
     {

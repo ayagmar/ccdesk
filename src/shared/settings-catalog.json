@@ -600,7 +600,7 @@
       "category": "Remote, desktop, and notifications",
       "scopes": ["managed"],
       "docs": "https://code.claude.com/docs/en/settings-reference#disabledesktoplocalsessions",
-      "about": "Turn off Code sessions that run on the device in the [desktop app](https://code.claude.com/docs/en/desktop#local-sessions-on-managed-devices), for deployments where developers should work on remote machines over SSH. In the Code tab, the **Local** environment stays in the environment dropdown but is grayed out and can't be selected, with a tooltip saying your organization turned it off; on Windows the WSL entry is grayed out the same way, though whether WSL sessions run on a managed device at all is [governed separately](https://code.claude.com/docs/en/admin-setup#wsl-sessions-in-claude-code-desktop). New sessions default to the first [SSH connection](https://code.claude.com/docs/en/desktop#ssh-sessions) if one is configured, and the app refuses to start or resume a session on the device, including an SSH connection back to the same machine. SSH sessions to other hosts and cloud sessions are unaffected. The desktop app reads this key; the terminal CLI ignores it. Requires Claude Desktop v1.37937.0 or later.",
+      "about": "Turn off Code sessions that run on the device in the [desktop app](https://code.claude.com/docs/en/desktop#local-sessions-on-managed-devices), for deployments where developers should work on remote machines over SSH. With the key set to `true`, users see this in the Code tab:",
       "type": "Boolean; only the JSON Boolean `true` takes effect\n* `true`: the desktop app offers no on-device Code sessions; existing local sessions stay listed but can't continue\n* `false`: local sessions stay available",
       "default": "unset, so local sessions are available"
     },
@@ -1838,11 +1838,11 @@
       "default": "unset, so Claude Code uses the built-in verbs"
     },
     "sshConfigs": {
-      "summary": "Add [SSH connections](https://code.claude.com/docs/en/desktop#pre-configure-ssh-connections-for-your-team) to the Desktop environment dropdown",
+      "summary": "Add [SSH connections](https://code.claude.com/docs/en/desktop#pre-configure-ssh-connections-for-your-team) to the Desktop environment selector",
       "category": "Remote, desktop, and notifications",
       "scopes": ["managed", "user"],
       "docs": "https://code.claude.com/docs/en/settings-reference#sshconfigs",
-      "about": "Add SSH connections to the [Desktop](https://code.claude.com/docs/en/desktop#pre-configure-ssh-connections-for-your-team) environment dropdown. Administrators use it to distribute shared connections to a team. Connections you define in managed settings show as managed. Users can select them and [set their own **Worktree folder**](https://code.claude.com/docs/en/desktop#choose-where-ssh-session-worktrees-go) for them, but can't edit anything else or delete them in the app.",
+      "about": "Add SSH connections to the [Desktop](https://code.claude.com/docs/en/desktop#pre-configure-ssh-connections-for-your-team) environment selector. Administrators use `sshConfigs` to distribute shared connections to a team. Users can select a managed connection and [set their own **Worktree folder**](https://code.claude.com/docs/en/desktop#set-the-worktree-folder-on-an-existing-connection) for it. They can't edit its other fields or delete it in the app.",
       "type": "array of objects, each with required `id`, `name`, and `sshHost` and optional `sshPort` and `sshIdentityFile`",
       "default": "unset"
     },
@@ -2092,7 +2092,7 @@
       "category": "Interface and terminal",
       "scopes": ["managed", "user"],
       "docs": "https://code.claude.com/docs/en/settings-reference#viminsertmoderemaps",
-      "about": "Map two-key INSERT-mode sequences to Escape in [vim editor mode](https://code.claude.com/docs/en/interactive-mode#vim-editor-mode). Each key is exactly two printable characters typed in sequence, and `\"<Esc>\"` is the only supported target; Claude Code ignores other entries. Requires Claude Code v2.1.208 or later.",
+      "about": "Map two-key INSERT-mode sequences to Escape in [vim editor mode](https://code.claude.com/docs/en/interactive-mode#vim-editor-mode). Each key is exactly two printable characters typed in sequence, and `\"<Esc>\"` is the only supported target; Claude Code ignores other entries.",
       "type": "object mapping a two-character sequence to `\"<Esc>\"`",
       "default": "unset"
     },
