@@ -17,6 +17,7 @@ const LAUNCH_ONLY = new Set([
   "CLAUDE_CODE_DISABLE_DANGEROUS_RM_TIMEOUT",
   "CLAUDE_CODE_DISABLE_SUBSTITUTION_RM_PROMPT",
   "CLAUDE_CODE_DISABLE_INLINE_SHELL_RM_PROMPT",
+  "CLAUDE_CODE_DISABLE_MOUNTED_DRIVE_RM_PROMPT",
 ]);
 
 /** Variables project and local settings cannot set (same section). */
@@ -56,6 +57,7 @@ const NOT_FROM_REPOSITORY = new Set([
   "CLAUDE_AFK_TIMEOUT_MS",
   "CLAUDE_AFK_COUNTDOWN_MS",
   "CLAUDE_CODE_DISABLE_ATTACHMENTS",
+  "CLAUDE_CODE_DISABLE_FILE_MENTIONS",
 ]);
 
 /** Windows variables that pick programs and machine-wide configuration; Windows names ignore case. */
