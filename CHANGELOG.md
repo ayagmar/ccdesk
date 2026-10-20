@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.6](https://github.com/ayagmar/ccdesk/compare/v0.5.5...v0.5.6) (2026-10-20)
+
+### Features
+
+* **cli:** warn about ignored settings in check and at session start ([#59](https://github.com/ayagmar/ccdesk/issues/59)) ([59af78c](https://github.com/ayagmar/ccdesk/commit/59af78cf1694acbcf784043b8e94728eaae52282))
+
 ## [0.5.5](https://github.com/ayagmar/ccdesk/compare/v0.5.4...v0.5.5) (2026-10-20)
 
 ### Features
