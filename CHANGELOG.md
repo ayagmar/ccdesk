@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.9](https://github.com/ayagmar/ccdesk/compare/v0.5.8...v0.5.9) (2026-10-20)
+
+### Bug Fixes
+
+* **server:** keep the page's address across restarts ([d4777da](https://github.com/ayagmar/ccdesk/commit/d4777da287ca130b4ba03494a57c4477be7ac9eb))
+* **server:** reuse the token only shortly after a clean stop ([08c2a74](https://github.com/ayagmar/ccdesk/commit/08c2a740f74c375eeb41e72b7afc8df12b5685c1))
+
 ## [0.5.8](https://github.com/ayagmar/ccdesk/compare/v0.5.7...v0.5.8) (2026-10-20)
 
 ### Bug Fixes
