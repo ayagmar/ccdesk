@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { type BackupKind, type BackupSummary, type RestorePreview } from "../shared/types.ts";
+import {
+  type BackupKind,
+  type BackupSummary,
+  type ChangeView,
+  type RestorePreview,
+} from "../shared/types.ts";
 import { api, errorText } from "./api.ts";
 import { Bullet } from "./Bullet.tsx";
 import { DiffView } from "./DiffView.tsx";
@@ -16,6 +21,9 @@ const WHAT: Record<BackupKind, string> = {
   "mcp-claude": "MCP servers changed through claude mcp",
   "directory-forget": "Directory forgotten",
 };
+
+/** What an open change shows: what it did, or what restoring its backup would do. */
+type Opened = { id: string; showing: "change" | "restore" };
 
 /** Changes grouped under the day they were made, newest first, as they come from the server. */
 function byDay(changes: BackupSummary[]): [string, BackupSummary[]][] {
@@ -41,7 +49,7 @@ export function ChangesPage({ onRestored }: { onRestored: (text: string) => void
   const [backups, setBackups] = useState<BackupSummary[] | null>(null);
   const [more, setMore] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<Opened | null>(null);
 
   const fail = (error: unknown) => setProblem(errorText(error));
   const load = useCallback(() => {
@@ -88,8 +96,12 @@ export function ChangesPage({ onRestored }: { onRestored: (text: string) => void
               <ChangeItem
                 key={b.id}
                 change={b}
-                open={open === b.id}
-                onToggle={() => setOpen(open === b.id ? null : b.id)}
+                showing={open?.id === b.id ? open.showing : null}
+                onToggle={(showing) =>
+                  setOpen(
+                    open?.id === b.id && open.showing === showing ? null : { id: b.id, showing }
+                  )
+                }
                 onDone={(text) => {
                   setOpen(null);
                   load();
@@ -109,27 +121,34 @@ export function ChangesPage({ onRestored }: { onRestored: (text: string) => void
   );
 }
 
-/** One change: what it did to which file and when, with its restore when opened. */
+/**
+ * One change: what it did to which file and when, opened on the diff it made or on its restore. A
+ * claude mcp change shows its diff with the commands that undo it, which is all there is to show.
+ */
 function ChangeItem({
   change: b,
-  open,
+  showing,
   onToggle,
   onDone,
 }: {
   change: BackupSummary;
-  open: boolean;
-  onToggle: () => void;
+  showing: Opened["showing"] | null;
+  onToggle: (showing: Opened["showing"]) => void;
   onDone: (text: string) => void;
 }) {
-  let toggle = "Review restore";
-  let icon: "undo" | "close" | "eye" = "undo";
-  if (open) {
-    toggle = "Close";
-    icon = "close";
-  } else if (b.kind === "mcp-claude") {
-    toggle = "Show change";
-    icon = "eye";
-  }
+  const open = showing !== null;
+  const canShow = b.kind !== "directory-forget";
+  const canRestore = b.kind !== "memory-restore" && b.kind !== "mcp-claude";
+  const button = (what: Opened["showing"], label: string, icon: "eye" | "undo") => (
+    <button
+      type="button"
+      className="head-action"
+      aria-expanded={showing === what}
+      onClick={() => onToggle(what)}
+    >
+      <Icon name={showing === what ? "close" : icon} /> {showing === what ? "Close" : label}
+    </button>
+  );
   const folder = tilde(b.target.replace(/[/\\][^/\\]*$/, ""));
   return (
     <li className="change">
@@ -149,21 +168,23 @@ function ChangeItem({
         <span className="mono muted num" title={new Date(b.createdAt).toLocaleString()}>
           {ago(b.createdAt)}
         </span>
-        <button type="button" className="head-action" aria-expanded={open} onClick={onToggle}>
-          <Icon name={icon} /> {toggle}
-        </button>
+        <span className="change-actions">
+          {canShow && button("change", "Show change", "eye")}
+          {canRestore && button("restore", "Review restore", "undo")}
+        </span>
       </div>
       {open && b.projectPath && b.kind !== "directory-forget" && (
         <p className="muted small change-folder">
           Memory folder: <span className="mono wrap">{folder}</span>
         </p>
       )}
-      {open && b.kind === "memory-restore" && (
-        <p className="muted small review">
-          This put a deleted memory back. To undo it, delete the memory again.
-        </p>
-      )}
-      {open && b.kind !== "memory-restore" && <Restore id={b.id} onDone={onDone} />}
+      {showing === "change" &&
+        (b.kind === "mcp-claude" ? (
+          <Restore id={b.id} onDone={onDone} />
+        ) : (
+          <ShowChange id={b.id} restorable={canRestore} />
+        ))}
+      {showing === "restore" && <Restore id={b.id} onDone={onDone} />}
     </li>
   );
 }
@@ -190,6 +211,52 @@ function ChangeFile({ change: b, folder }: { change: BackupSummary; folder: stri
       )}
     </span>
   );
+}
+
+/** What a change did to its file: the diff from the text before it to the text right after it. */
+function ShowChange({ id, restorable }: { id: string; restorable: boolean }) {
+  const [view, setView] = useState<ChangeView | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => {
+    api.showChange(id).then(setView, (error: unknown) => setProblem(errorText(error)));
+  }, [id]);
+
+  if (problem)
+    return (
+      <p className="flag bad" role="alert">
+        {problem}
+      </p>
+    );
+  if (!view) return <p className="muted small">Reading the backup…</p>;
+  return (
+    <section className="review" aria-label="What this change did">
+      {view.after === undefined ? (
+        <p className="muted small">
+          The file changed outside ccdesk after this, so ccdesk no longer has its text from right
+          after the change.{restorable && " Review restore compares the backup with the file now."}
+        </p>
+      ) : (
+        <>
+          <p className="muted small">{changeHint(view)}</p>
+          <DiffView before={view.before ?? ""} after={view.after ?? ""} />
+        </>
+      )}
+      {view.removedIndexLines && (
+        <p className="muted small">
+          MEMORY.md lost {view.removedIndexLines.length === 1 ? "this line" : "these lines"} with
+          it: <span className="mono">{view.removedIndexLines.join(" · ")}</span>
+        </p>
+      )}
+    </section>
+  );
+}
+
+function changeHint(view: ChangeView): string {
+  if (view.before === null) return "ccdesk created this file.";
+  if (view.after === null) return "ccdesk deleted this file.";
+  if (view.kind === "memory-restore")
+    return "This put a deleted memory back. To undo it, delete the memory again.";
+  return "Lines marked − were in the file before the change; lines marked + came with it.";
 }
 
 function Restore({ id, onDone }: { id: string; onDone: (text: string) => void }) {

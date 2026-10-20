@@ -41,7 +41,7 @@ export { firstError } from "./schema.ts";
 export { RefusedError, StaleError } from "./write.ts";
 
 // History: every change ccdesk saves is a backup that a core can restore by its id.
-export { listBackups, previewRestore } from "./backups.ts";
+export { listBackups, previewRestore, showChange } from "./backups.ts";
 
 // Host.
 export { openBrowser, openInEditor } from "./open.ts";

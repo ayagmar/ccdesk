@@ -1,7 +1,7 @@
 import { lstat, mkdir, readdir, readFile, realpath, rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { Compile } from "typebox/compile";
-import { type BackupSummary, type RestorePreview } from "../shared/types.ts";
+import { type BackupSummary, type ChangeView, type RestorePreview } from "../shared/types.ts";
 import { storeContents } from "./forget.ts";
 import { assertMemoryDir, indexPathIn, revisionOfBoth } from "./mutations.ts";
 import { parseJson } from "./scan/data.ts";
@@ -317,6 +317,57 @@ function blockedReason(plan: Plan): string | undefined {
   if (manifest.kind === "memory-delete" && current !== null && current !== saved)
     return "A memory with this file name exists again; delete or rename it first.";
   return undefined;
+}
+
+/**
+ * What a change did: the file before it, from its backup, and the file right after it. The manifest
+ * keeps only the fingerprint of the after text, so the text comes from the next ccdesk backup of
+ * the same file when that one started from it, or from the file now when it still matches.
+ */
+export async function showChange(env: ScanEnv, id: string): Promise<ChangeView> {
+  const { manifest, dir } = await backupAt(env, id);
+  const { kind } = manifest;
+  if (kind === "mcp-claude") {
+    const { target, before, after } = await claudeMcpPreview(id, manifest, dir);
+    return { id, kind, target, before, after };
+  }
+  if (kind === "directory-forget")
+    throw new RefusedError("A forgotten directory moved a store, not a file; review its restore.");
+  const plan = await planRestore(env, id);
+  const show = kind === "settings" || kind === "mcp" ? shownSettings : shownText;
+  const after = await textAfter(env, id, manifest, plan.current);
+  const lines = manifest.removedIndexLines?.map((line) => shownText(line) ?? line);
+  return {
+    id,
+    kind,
+    target: plan.manifest.target,
+    before: show(plan.saved),
+    ...(after === undefined ? {} : { after: show(after) }),
+    ...(lines && lines.length > 0 ? { removedIndexLines: lines } : {}),
+  };
+}
+
+/** The target's text right after change `id`; undefined when no copy of it is left. */
+async function textAfter(
+  env: ScanEnv,
+  id: string,
+  manifest: BackupManifest,
+  current: string | null
+): Promise<string | null | undefined> {
+  const { after } = manifest;
+  if (after === "pending" || after === "partial") return undefined;
+  if (after === revisionOf(null)) return null;
+  // Ids sort by time; oldest first, the first one for the same file is the next change to it.
+  const later = (await backupIds(env)).filter((other) => other > id).reverse();
+  for (const other of later) {
+    const next = await readManifest(env, other);
+    if (next?.target !== manifest.target) continue;
+    // A later change that started from another text means the file changed in between.
+    if (next.before !== after) return undefined;
+    const text = await readFile(join(backupRoot(env), other, SNAPSHOT), "utf8").catch(() => null);
+    return text !== null && revisionOf(text) === after ? text : undefined;
+  }
+  return revisionOf(current) === after ? current : undefined;
 }
 
 export async function previewRestore(env: ScanEnv, id: string): Promise<RestorePreview> {

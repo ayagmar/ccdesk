@@ -3,6 +3,7 @@ import { eventReader } from "../shared/events.ts";
 import {
   type BackupSummary,
   type Change,
+  type ChangeView,
   type DirectoryView,
   type ForgetPreview,
   type MemoryAction,
@@ -193,6 +194,8 @@ export const api = {
     request<{ changes: BackupSummary[]; more: boolean }>(
       `/api/backups?limit=50${before ? `&before=${encodeURIComponent(before)}` : ""}`
     ),
+  showChange: (id: string) =>
+    request<ChangeView>("/api/backups/change", { method: "POST", body: { id } }),
   previewRestore: (id: string) =>
     request<RestorePreview>("/api/backups/preview", { method: "POST", body: { id } }),
   /** Restores a backup while the file still has the reviewed (or just-changed) revision. */
