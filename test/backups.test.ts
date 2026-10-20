@@ -71,3 +71,63 @@ test("a backup folder ccdesk cannot read is an error, not an empty list", {
     chmodSync(root, 0o700);
   }
 });
+
+test("a change shows the file before it and right after it, even after later changes", async () => {
+  // Catches the after side read from the file as it is now, which would fold later changes into
+  // an earlier one.
+  const f = makeFixture();
+  f.json("app/.claude/settings.json", {});
+  await denyRule(f, "Bash(rm:*)");
+  await denyRule(f, "Bash(curl:*)");
+  const core = createCore(f.env);
+  const [second, first] = (await listBackups(f.env, { limit: 10 })).changes;
+  assert.ok(first && second);
+
+  const one = await core.showChange(first.id);
+  assert.ok(!one.before?.includes("Bash(rm:*)"));
+  assert.ok(one.after?.includes("Bash(rm:*)"));
+  assert.ok(!one.after?.includes("Bash(curl:*)"), one.after ?? "");
+
+  const two = await core.showChange(second.id);
+  assert.ok(two.before?.includes("Bash(rm:*)"));
+  assert.ok(two.after?.includes("Bash(curl:*)"));
+});
+
+test("a change to a file edited outside ccdesk since has no after side to show", async () => {
+  // Catches a hand edit presented as part of what ccdesk wrote.
+  const f = makeFixture();
+  f.json("app/.claude/settings.json", {});
+  await denyRule(f, "Bash(rm:*)");
+  f.json("app/.claude/settings.json", { model: "opus" });
+  const [change] = (await listBackups(f.env, { limit: 1 })).changes;
+  assert.ok(change);
+
+  const view = await createCore(f.env).showChange(change.id);
+
+  assert.equal(view.after, undefined);
+  assert.ok(view.before !== null);
+});
+
+test("a change shows a file it created as new, and env values in a backup stay hidden", async () => {
+  // Catches a secret from a backup reaching the page, and a created file shown as an edit.
+  const f = makeFixture();
+  f.write("app/README.md", "An app.\n");
+  await denyRule(f, "Bash(rm:*)");
+  f.json("app/.claude/settings.json", {
+    env: { API_TOKEN: "secret-123" },
+    permissions: { deny: ["Bash(rm:*)"] },
+  });
+  await denyRule(f, "Bash(curl:*)");
+  const core = createCore(f.env);
+  const [edited, created] = (await listBackups(f.env, { limit: 10 })).changes;
+  assert.ok(edited && created);
+
+  const made = await core.showChange(created.id);
+  assert.equal(made.before, null);
+  assert.equal(made.after, undefined, "the file was rewritten by hand after it was created");
+
+  const view = await core.showChange(edited.id);
+  assert.ok(view.before?.includes("API_TOKEN"), view.before ?? "");
+  assert.ok(view.after?.includes("Bash(curl:*)"), view.after ?? "");
+  assert.ok(!JSON.stringify(view).includes("secret-123"));
+});

@@ -200,6 +200,22 @@ export interface BackupSummary {
   projectPath?: string;
 }
 
+/** What one change in Recent changes did to its file, shown as the page shows files. */
+export interface ChangeView {
+  id: string;
+  kind: BackupKind;
+  target: string;
+  /** The file before the change; null when the change created it. */
+  before: string | null;
+  /**
+   * The file right after the change; null when the change deleted it. Absent when ccdesk cannot
+   * know it: the file changed outside ccdesk since, and no later backup holds that text.
+   */
+  after?: string | null;
+  /** For a deleted memory: the lines taken out of MEMORY.md with it. */
+  removedIndexLines?: string[];
+}
+
 /** A change ccdesk made; Recent changes lists it under `id` and can undo it. */
 export interface Change {
   id: string;

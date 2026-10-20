@@ -1,6 +1,6 @@
 import { stat } from "node:fs/promises";
 import { previewAgentEdit, saveAgentEdit } from "./agent-edit.ts";
-import { listBackups, previewRestore, restoreBackup } from "./backups.ts";
+import { listBackups, previewRestore, restoreBackup, showChange } from "./backups.ts";
 import { forgetDirectory, previewForget } from "./forget.ts";
 import { claudeRunner, previewMcpEdit, type RunClaude, saveMcpEdit } from "./mcp-edit.ts";
 import { changeMemory, previewMemoryChange } from "./mutations.ts";
@@ -110,6 +110,7 @@ export function createCore(env: ScanEnv, options: CoreOptions = {}) {
 
     listBackups: bound(listBackups),
     previewRestore: bound(previewRestore),
+    showChange: bound(showChange),
     restoreBackup: (id: string, revision: string) => restoreBackup(env, id, revision, queue),
   };
 }

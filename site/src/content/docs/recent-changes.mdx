@@ -5,7 +5,7 @@ description: Where ccdesk keeps backups, how undo and restore work, and when a r
 
 import Screenshot from "../../components/Screenshot.astro";
 
-Every file ccdesk writes is backed up first. **Recent changes**, in the rail, lists those changes newest first, and each one can be reviewed and restored.
+Every file ccdesk writes is backed up first. **Recent changes**, in the rail, lists those changes newest first, 50 at a time with **Show older changes** below; each one shows what it did and can be restored.
 
 <Screenshot
   name="changes"
@@ -17,6 +17,10 @@ Every file ccdesk writes is backed up first. **Recent changes**, in the rail, li
 Backups go to `~/.claude/backups/ccdesk/` (or `backups/ccdesk` in `$CLAUDE_CONFIG_DIR`). Each change gets a folder named after its time and kind, holding a copy of the file as it was and a small manifest that records which file changed and a fingerprint of its text before and after. On Linux and macOS the folders and files are readable only by you, because backups of settings can hold secrets. ccdesk never deletes backups; remove old folders yourself if they pile up.
 
 Changes that go through `claude mcp`, for user and local MCP servers, are listed too, but ccdesk keeps no copy of `~/.claude.json` for them. Their folder holds only the servers the change touched, before and after, with secret values shown as `•••` as on the page, and the commands that would put them back. **Show change** on such an entry shows that diff and those commands; ccdesk cannot run them for you. Where a command needs a hidden value, it has `•••` in its place, so fill in the real value before you run it. The commands are written for bash, zsh or Git Bash; on Windows, run them in Git Bash.
+
+## Seeing what a change did
+
+**Show change** on a change shows the diff it made, from the file before it to the file right after it, like a commit. The manifest keeps only a fingerprint of the text after the change, so ccdesk takes that text from the next change it made to the same file, or from the file as it is now if it still matches. When the file changed in some other way in between, by hand or by a memory delete that took a line out of MEMORY.md, neither matches and ccdesk says so; **Review restore** still compares the backup with the file now. A forgotten directory moved a store rather than changing a file, so it has only **Review restore**.
 
 ## Undo
 

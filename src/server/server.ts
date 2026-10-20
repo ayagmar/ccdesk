@@ -261,6 +261,7 @@ function routes(core: Core, watcher: Watcher, launchDir: string): Route[] {
         throw new RequestError(400, "limit must be 1 to 200");
       return core.listBackups({ ...(before ? { before } : {}), limit });
     }),
+    post("/api/backups/change", async ({ body }) => core.showChange(checked(backupBody, body).id)),
     post("/api/backups/preview", async ({ body }) =>
       core.previewRestore(checked(backupBody, body).id)
     ),
