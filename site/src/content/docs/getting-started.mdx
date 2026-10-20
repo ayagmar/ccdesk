@@ -19,7 +19,7 @@ ccdesk is running at http://127.0.0.1:41873/#token=…
 Press Ctrl+C to stop.
 ```
 
-The part after `#token=` is a key generated for this run. The page needs it to talk to the server, so open the printed address rather than typing the host and port by hand. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal to stop ccdesk.
+The part after `#token=` is the key the page needs to talk to the server, so open the printed address rather than typing the host and port by hand. ccdesk keeps the key and the port in `~/.claude/ccdesk/server.json`, readable by you only, and uses both again next time, so a page left open picks up where it was after you restart ccdesk. If another program has taken the port by then, ccdesk starts on a free one and you need the new address. Delete the file to get a new key. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal to stop ccdesk.
 
 <Screenshot
   name="directory"
@@ -47,7 +47,7 @@ npx ccdesk hook --install | --remove [--project] [dir]
                                          Add or take out the session check: a SessionStart hook
                                          that warns when what a new session loads has problems
 
-  --port <n>            Port to listen on (default: a free port)
+  --port <n>            Port to listen on (default: the last run's if free, else any)
   --no-open             Print the URL instead of opening a browser
   --config-dir <path>   Claude folder to read, as CLAUDE_CONFIG_DIR sets it for Claude Code
                         (wins over $CLAUDE_CONFIG_DIR)
@@ -186,7 +186,7 @@ It never reads `~/.claude/.credentials.json`.
 
 ## What it writes
 
-Nothing, until you review a change and press the button that saves it. Then ccdesk writes only the file the diff names: a settings file, a `.mcp.json`, a subagent file, a memory file or `MEMORY.md`. Before each write it copies the old file to `~/.claude/backups/ccdesk/`, and the change shows up in [Recent changes](../recent-changes/), where you can restore it.
+Only `~/.claude/ccdesk/server.json`, the page's key and port, until you review a change and press the button that saves it. Then ccdesk writes only the file the diff names: a settings file, a `.mcp.json`, a subagent file, a memory file or `MEMORY.md`. Before each write it copies the old file to `~/.claude/backups/ccdesk/`, and the change shows up in [Recent changes](../recent-changes/), where you can restore it.
 
 ccdesk never writes `~/.claude.json`. Claude Code rewrites that file during every session. User and local MCP servers live there, so ccdesk changes them by running Claude Code's own `claude mcp` commands. See [MCP servers](../mcp-servers/).
 

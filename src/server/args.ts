@@ -20,7 +20,7 @@ Usage:
                                            that warns when what a new session loads has problems
 
 Options:
-  --port <n>            Port to listen on (default: a free port)
+  --port <n>            Port to listen on (default: the last run's if free, else any)
   --no-open             Print the URL instead of opening a browser
   --config-dir <path>   Claude folder to read, as CLAUDE_CONFIG_DIR sets it for Claude Code
                         (wins over $CLAUDE_CONFIG_DIR)
