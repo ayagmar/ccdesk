@@ -91,13 +91,19 @@ test("the hook command prints one JSON object or nothing at all on stdout", () =
       env: { ...process.env, HOME: f.at("home") },
     });
 
+  // The child reads this machine's managed settings, which the fixture cannot replace, so a clean
+  // run may still warn about them; either way stdout is nothing or the one object.
+  const onlyMessage = (stdout: string) =>
+    stdout === "" || Object.keys(JSON.parse(stdout)).join() === "systemMessage";
   const clean = run(dir);
-  assert.deepEqual([clean.status, clean.stdout], [0, ""]);
+  assert.equal(clean.status, 0);
+  assert.ok(onlyMessage(clean.stdout), clean.stdout);
 
   f.json("home/app/.claude/settings.local.json", { autoMode: {} });
   const warned = run(dir);
   assert.equal(warned.status, 0);
-  assert.deepEqual(Object.keys(JSON.parse(warned.stdout)), ["systemMessage"]);
+  assert.notEqual(warned.stdout, "");
+  assert.ok(onlyMessage(warned.stdout), warned.stdout);
 });
 
 test("an ignored setting is blamed on the file that holds it, and env names never their values", async () => {
