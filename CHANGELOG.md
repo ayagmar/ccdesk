@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.7](https://github.com/ayagmar/ccdesk/compare/v0.5.6...v0.5.7) (2026-10-20)
+
+### Features
+
+* **ui:** show what each change in Recent changes did ([#60](https://github.com/ayagmar/ccdesk/issues/60)) ([fc87109](https://github.com/ayagmar/ccdesk/commit/fc87109ef29437c5cab3434a8a4a56e00bac995a))
+
 ## [0.5.6](https://github.com/ayagmar/ccdesk/compare/v0.5.5...v0.5.6) (2026-10-20)
 
 ### Features
