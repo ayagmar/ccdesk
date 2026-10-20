@@ -79,7 +79,8 @@ for (let i = 1; i < sections.length; i += 2) {
   if (!entry) continue;
   const body = (sections[i + 1] ?? "").split(/^#{2,3} /m)[0] ?? "";
   const lines = body.split("\n");
-  const firstFact = lines.findIndex((line) => line.startsWith("* **"));
+  // The facts list, not a bulleted list inside the description, ends the opening paragraphs.
+  const firstFact = lines.findIndex((line) => /^\* \*\*(Scope|Type|Default)\*\*:/.test(line));
   const about = lines
     .slice(0, firstFact < 0 ? lines.length : firstFact)
     .join("\n")
