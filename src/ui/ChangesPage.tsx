@@ -182,7 +182,7 @@ function ChangeItem({
         (b.kind === "mcp-claude" ? (
           <Restore id={b.id} onDone={onDone} />
         ) : (
-          <ShowChange id={b.id} restorable={canRestore} />
+          <ShowChange id={b.id} restorable={canRestore} incomplete={b.incomplete === true} />
         ))}
       {showing === "restore" && <Restore id={b.id} onDone={onDone} />}
     </li>
@@ -214,7 +214,15 @@ function ChangeFile({ change: b, folder }: { change: BackupSummary; folder: stri
 }
 
 /** What a change did to its file: the diff from the text before it to the text right after it. */
-function ShowChange({ id, restorable }: { id: string; restorable: boolean }) {
+function ShowChange({
+  id,
+  restorable,
+  incomplete,
+}: {
+  id: string;
+  restorable: boolean;
+  incomplete: boolean;
+}) {
   const [view, setView] = useState<ChangeView | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
@@ -232,8 +240,10 @@ function ShowChange({ id, restorable }: { id: string; restorable: boolean }) {
     <section className="review" aria-label="What this change did">
       {view.after === undefined ? (
         <p className="muted small">
-          The file changed outside ccdesk after this, so ccdesk no longer has its text from right
-          after the change.{restorable && " Review restore compares the backup with the file now."}
+          {incomplete
+            ? "This change stopped partway, so ccdesk cannot tell what it wrote."
+            : "The file changed after this, and ccdesk no longer has its text from right after the change."}
+          {restorable && " Review restore compares the backup with the file now."}
         </p>
       ) : (
         <>
@@ -252,10 +262,10 @@ function ShowChange({ id, restorable }: { id: string; restorable: boolean }) {
 }
 
 function changeHint(view: ChangeView): string {
-  if (view.before === null) return "ccdesk created this file.";
-  if (view.after === null) return "ccdesk deleted this file.";
   if (view.kind === "memory-restore")
     return "This put a deleted memory back. To undo it, delete the memory again.";
+  if (view.before === null) return "ccdesk created this file.";
+  if (view.after === null) return "ccdesk deleted this file.";
   return "Lines marked − were in the file before the change; lines marked + came with it.";
 }
 

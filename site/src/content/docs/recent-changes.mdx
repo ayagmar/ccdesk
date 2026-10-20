@@ -20,7 +20,7 @@ Changes that go through `claude mcp`, for user and local MCP servers, are listed
 
 ## Seeing what a change did
 
-**Show change** on a change shows the diff it made, from the file before it to the file right after it, like a commit. The manifest keeps only a fingerprint of the text after the change, so ccdesk takes that text from the next change it made to the same file, or from the file as it is now if it still matches. When the file was edited outside ccdesk in between, neither matches and ccdesk says so; **Review restore** still compares the backup with the file now. A forgotten directory moved a store rather than changing a file, so it has only **Review restore**.
+**Show change** on a change shows the diff it made, from the file before it to the file right after it, like a commit. The manifest keeps only a fingerprint of the text after the change, so ccdesk takes that text from the next change it made to the same file, or from the file as it is now if it still matches. When the file changed in some other way in between, by hand or by a memory delete that took a line out of MEMORY.md, neither matches and ccdesk says so; **Review restore** still compares the backup with the file now. A forgotten directory moved a store rather than changing a file, so it has only **Review restore**.
 
 ## Undo
 
