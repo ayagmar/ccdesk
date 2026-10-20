@@ -28,12 +28,12 @@
     },
     {
       "name": "CronDelete",
-      "description": "Cancels a scheduled task by ID",
+      "description": "Cancels a session-scoped scheduled task by ID",
       "asks": false
     },
     {
       "name": "CronList",
-      "description": "Lists all scheduled tasks in the session",
+      "description": "Lists all session-scoped scheduled tasks",
       "asks": false
     },
     {
@@ -108,7 +108,7 @@
     },
     {
       "name": "PushNotification",
-      "description": "Sends a desktop notification, and a phone push when Remote Control is connected, so a long-running task or scheduled task can reach you when you step away. Push delivery runs through Anthropic-hosted infrastructure, which is not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
+      "description": "Sends a desktop notification, and a phone push when Remote Control is connected, so a long-running task or session-scoped scheduled task can reach you when you step away. Push delivery runs through Anthropic-hosted infrastructure, which is not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
       "asks": false
     },
     {
@@ -123,7 +123,7 @@
     },
     {
       "name": "RemoteTrigger",
-      "description": "Creates, updates, runs, and lists Routines on claude.ai. Backs the `/schedule` command. The `RemoteTrigger` input reference documents every action and the organization policies that remove the tool. Routines live on claude.ai and require a Pro, Max, Team, or Enterprise plan, so this tool is not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
+      "description": "Creates, updates, runs, and lists cloud scheduled tasks, formerly routines, on claude.ai. Backs the `/schedule` command. The `RemoteTrigger` input reference documents every action and the organization policies that remove the tool. Cloud scheduled tasks live on claude.ai and require a Pro, Max, Team, or Enterprise plan. This tool is therefore not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
       "asks": false
     },
     {
