@@ -96,7 +96,7 @@ Requires Node.js 22.19 or newer. Options, the `check` command in CI, the [sessio
 
 ## Privacy and safety
 
-- The server listens on `127.0.0.1` only, and every API call needs a token generated for that run. Nothing leaves your machine.
+- The server listens on `127.0.0.1` only, and every API call needs a token that only your user account can read, kept in `~/.claude/ccdesk/server.json`. Nothing leaves your machine.
 - Values under `env` and `headers`, a URL's user name, password and query string, and secrets in MCP server arguments are hidden everywhere in the UI, diffs included, and ccdesk refuses any edit that would change them.
 - ccdesk never reads `~/.claude/.credentials.json`. From your transcripts, only counts and rule patterns reach the page.
 

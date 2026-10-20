@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -157,15 +156,16 @@ async function main() {
 async function serve(core: Core, { dev, port, open }: Extract<Command, { command: "serve" }>) {
   // Loaded here so that the subcommands, which only read, never load the HTTP server.
   const { startServer } = await import("./start.ts");
+  const { startSavedServer } = await import("./address.ts");
   let server: Awaited<ReturnType<typeof startServer>>;
+  let saved = true;
   try {
-    server = await startServer({
-      core,
-      launchDir: process.cwd(),
-      token: dev ? DEV_TOKEN : randomBytes(18).toString("base64url"),
-      uiDir: dev ? null : fileURLToPath(new URL("../ui", import.meta.url)),
-      port,
-    });
+    const options = { core, launchDir: process.cwd(), port };
+    if (dev) server = await startServer({ ...options, token: DEV_TOKEN, uiDir: null });
+    else {
+      const uiDir = fileURLToPath(new URL("../ui", import.meta.url));
+      ({ server, saved } = await startSavedServer({ ...options, uiDir }, core.env.claudeDir));
+    }
   } catch (error) {
     const { code, message } = error as NodeJS.ErrnoException;
     console.error(
@@ -185,6 +185,10 @@ async function serve(core: Core, { dev, port, open }: Extract<Command, { command
     return;
   }
   console.log(`ccdesk is running at ${server.url}\nPress Ctrl+C to stop.`);
+  if (!saved)
+    console.error(
+      "ccdesk: could not save this address, so a page left open will need the new link after a restart"
+    );
   if (open && (await openBrowser(server.url, core.env)) !== null)
     console.log("Could not open a browser; open the URL above.");
 }

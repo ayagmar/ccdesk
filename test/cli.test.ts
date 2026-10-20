@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
-import { Agent, request } from "node:http";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { Agent, createServer, request } from "node:http";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
@@ -18,6 +18,7 @@ import {
   suggestText,
 } from "../src/server/commands.ts";
 import { storeDirName } from "../src/shared/memory.ts";
+import { addressFile, startSavedServer } from "../src/server/address.ts";
 import { startServer } from "../src/server/start.ts";
 import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
@@ -827,4 +828,44 @@ test("startServer rejects when the port is taken, so the command can say so", as
   const port = Number(new URL(first.url).port);
   await assert.rejects(startServer({ ...options, port }), { code: "EADDRINUSE" });
   await first.close();
+});
+
+test("a restarted server keeps its port and token, so a page left open finds it again", async () => {
+  // Catches a new token or a new free port on each run, which strands every open tab with a
+  // "lost its access token" error, and a saved token other users of the machine could read.
+  const fixture = makeFixture();
+  const options = { core: createCore(fixture.env), launchDir: fixture.at("home"), uiDir: null };
+  const first = await startSavedServer({ ...options, port: 0 }, fixture.env.claudeDir);
+  assert.equal(first.saved, true);
+  await first.server.close();
+
+  const second = await startSavedServer({ ...options, port: 0 }, fixture.env.claudeDir);
+  assert.equal(second.server.url, first.server.url);
+  assert.equal(await get(first.server.url, "/api/overview"), 200);
+  await second.server.close();
+  if (process.platform !== "win32")
+    assert.equal(statSync(addressFile(fixture.env.claudeDir)).mode & 0o777, 0o600);
+});
+
+test("when the last port is taken the server starts on another, and a damaged file is replaced", async () => {
+  // Catches a restart that fails because another program took the port, and one that crashes on
+  // a half-written or hand-edited address file.
+  const fixture = makeFixture();
+  const options = { core: createCore(fixture.env), launchDir: fixture.at("home"), uiDir: null };
+  const first = await startSavedServer({ ...options, port: 0 }, fixture.env.claudeDir);
+  await first.server.close();
+  const lastPort = Number(new URL(first.server.url).port);
+  const squatter = createServer();
+  await new Promise<void>((listening) => squatter.listen(lastPort, "127.0.0.1", listening));
+
+  const second = await startSavedServer({ ...options, port: 0 }, fixture.env.claudeDir);
+  assert.notEqual(Number(new URL(second.server.url).port), lastPort);
+  assert.equal(new URL(second.server.url).hash, new URL(first.server.url).hash);
+  await second.server.close();
+  await new Promise((closed) => squatter.close(closed));
+
+  writeFileSync(addressFile(fixture.env.claudeDir), "{");
+  const third = await startSavedServer({ ...options, port: 0 }, fixture.env.claudeDir);
+  assert.equal(await get(third.server.url, "/api/overview"), 200);
+  await third.server.close();
 });
