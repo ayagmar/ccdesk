@@ -12,7 +12,8 @@ ccdesk makes no network requests of its own. It does not connect to MCP servers,
 ## The local server
 
 - It listens on `127.0.0.1` only, so other machines on your network cannot reach it.
-- Each run generates a random token. The browser receives it in the address fragment (`#token=…`), which browsers do not send to servers or in referrers, and moves it into the tab's session storage. Every API call must carry it.
+- ccdesk generates a random token. Stopping ccdesk with Ctrl+C and starting it again within 15 minutes keeps the token and port, so an open page keeps working; after that, or after ccdesk was killed, the token is new and every old copy of the link (in a tab, the browser history or the terminal) stops working. The token and port are kept in `ccdesk/server.json` in your Claude folder, which must be readable by you only: one another account could read or has written is replaced. On a machine shared with other accounts, any of them can listen on the port while ccdesk is stopped, and a tab left open keeps sending the token to it, so close the tab when you stop ccdesk.
+- The browser receives the token in the address fragment (`#token=…`), which browsers do not send to servers or in referrers, and moves it into the tab's session storage. Every API call must carry it.
 - Requests whose `Host` is not `127.0.0.1` or `localhost` on ccdesk's port are refused, which stops DNS rebinding. Requests that change something are also refused when they come from another origin.
 - Pages are served with a content security policy that allows only ccdesk's own scripts.
 

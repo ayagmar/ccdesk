@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { Agent, createServer, request } from "node:http";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,7 +18,7 @@ import {
   suggestText,
 } from "../src/server/commands.ts";
 import { storeDirName } from "../src/shared/memory.ts";
-import { addressFile, startSavedServer } from "../src/server/address.ts";
+import { addressFile, REUSE_WINDOW_MS, startSavedServer } from "../src/server/address.ts";
 import { startServer } from "../src/server/start.ts";
 import { type Fixture, makeFixture, memoryDirFor, memoryFile } from "./helpers/fixture.ts";
 
@@ -868,4 +868,32 @@ test("when the last port is taken the server starts on another, and a damaged fi
   const third = await startSavedServer({ ...options, port: 0 }, fixture.env.claudeDir);
   assert.equal(await get(third.server.url, "/api/overview"), 200);
   await third.server.close();
+});
+
+test("the token is new when the last run stopped long ago, crashed, or left a file others can read", async () => {
+  // Catches a token that never expires, which keeps every copy of the old link working (a stale
+  // tab, the browser history, another account that took the port while ccdesk was stopped), and
+  // one taken from a file another account could have written.
+  const fixture = makeFixture();
+  const options = { core: createCore(fixture.env), launchDir: fixture.at("home"), uiDir: null };
+  const file = addressFile(fixture.env.claudeDir);
+  const first = await startSavedServer({ ...options, port: 0 }, fixture.env.claudeDir);
+  await first.server.close();
+  const { token, port } = JSON.parse(readFileSync(file, "utf8"));
+  const tokenOf = async () => {
+    const { server } = await startSavedServer({ ...options, port: 0 }, fixture.env.claudeDir);
+    await server.close();
+    return new URL(server.url).hash.replace("#token=", "");
+  };
+  const restore = (saved: object) => writeFileSync(file, JSON.stringify({ token, port, ...saved }));
+
+  restore({ stoppedAt: Date.now() - REUSE_WINDOW_MS - 1000 });
+  assert.notEqual(await tokenOf(), token, "stopped long ago");
+  restore({});
+  assert.notEqual(await tokenOf(), token, "never stopped cleanly");
+  if (process.platform !== "win32") {
+    restore({ stoppedAt: Date.now() });
+    chmodSync(file, 0o644);
+    assert.notEqual(await tokenOf(), token, "readable by others");
+  }
 });
