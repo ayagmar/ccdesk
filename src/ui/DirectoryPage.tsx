@@ -130,7 +130,7 @@ export function DirectoryPage({
   }, []);
 
   // A row asked for from elsewhere is shown even if the filters or paging hid it.
-  const reveal = useReveal(jump, onJumped, (id) => {
+  const reveal = useReveal(jump, onJumped, (id, focus) => {
     const row = rows.find((r) => r.id === id);
     if (!row) return false;
     setSeeing(false);
@@ -138,7 +138,7 @@ export function DirectoryPage({
     if (group && !group.matching.includes(row)) changeList(NO_LIST_STATE);
     else if (group && !group.shown.includes(row))
       setShown((s) => ({ ...s, [row.section]: group.matching.indexOf(row) + PAGE }));
-    requestAnimationFrame(() => select(id));
+    requestAnimationFrame(() => select(id, focus));
     return true;
   });
 
@@ -246,20 +246,21 @@ export function DirectoryPage({
 
 /**
  * Selects a row with `show`, for a jump asked for from elsewhere (handled once) and for the
- * inspector; the function it returns stays the same across renders.
+ * inspector, which also moves focus to the row; the function it returns stays the same across renders.
  */
 function useReveal(
   jump: { id: string } | null,
   onJumped: () => void,
-  show: (id: string) => boolean
+  show: (id: string, focus: boolean) => boolean
 ): (id: string) => void {
   const latest = useRef(show);
   latest.current = show;
   // biome-ignore lint/correctness/useExhaustiveDependencies: each jump is handled once, when asked for.
   useEffect(() => {
-    if (jump && latest.current(jump.id)) onJumped();
+    if (jump && latest.current(jump.id, false)) onJumped();
   }, [jump]);
-  return useCallback((id: string) => void latest.current(id), []);
+  // The link that asked for the row goes away with the old inspector, so focus follows the row.
+  return useCallback((id: string) => void latest.current(id, true), []);
 }
 
 /** What the rows and the inspector can do here: open, add, save and change, each with its toast. */
