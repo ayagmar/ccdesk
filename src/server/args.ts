@@ -7,7 +7,7 @@ Usage:
   npx ccdesk scan [dir] --json             Print what Claude Code loads in dir, as JSON
   npx ccdesk explain <file> [--dir <dir>]  Print what loads once Claude reads or edits file
   npx ccdesk check [dir] [--json]          Exit 1 when a session started in dir reads a file
-                                           Claude Code cannot read or parse
+                                           Claude Code cannot read or parse, or a setting it ignores
   npx ccdesk compare <a> <b> [--json]      Print the settings that differ between two directories,
                                            and the files each value comes from
   npx ccdesk rules --suggest [dir] [--json]
@@ -15,6 +15,9 @@ Usage:
                                            you approved by hand in the sessions started in dir
   npx ccdesk forget <dir> | --all-gone     Forget a directory whose folder is gone: move its
                                            sessions and memory into ccdesk's backups
+  npx ccdesk hook --install | --remove [--project] [dir]
+                                           Add or take out the session check: a SessionStart hook
+                                           that warns when what a new session loads has problems
 
 Options:
   --port <n>            Port to listen on (default: a free port)
@@ -28,13 +31,16 @@ Options:
                         both directories share
   --suggest             For rules: print the allow rules ccdesk suggests, as Permissions lists them
   --all-gone            For forget: every listed directory whose folder is gone
-  -y, --yes             For forget: do not ask first, as needed without a terminal
+  --install, --remove   For hook: add the session check to your user settings, or take it out
+  --project             For hook: use dir's .claude/settings.json, for everyone in the repository
+  --run                 For hook: what the hook itself runs; reads its input on stdin
+  -y, --yes             For forget and hook: do not ask first, as needed without a terminal
   -h, --help            Show this help
 
 ccdesk reads ~/.claude (or --config-dir, or $CLAUDE_CONFIG_DIR). The page opens on the directory
 you run ccdesk from and listens on 127.0.0.1 only. dir and file are relative to that directory.
 scan, explain, check, compare and rules write nothing and print no value the page hides. forget
-shows what it moves and asks first; Recent changes on the page can move it back. A command exits 2
+and hook show what they change and ask first; Recent changes on the page can undo it. A command exits 2
 when its arguments are wrong, its folder does not exist, or it cannot run.`;
 
 /** The port `--dev` listens on, which `pnpm dev:ui` proxies to. */
@@ -79,7 +85,17 @@ export type Command =
   /** Print the allow rules that would have covered calls you approved by hand in `dir`'s sessions. */
   | { command: "rules"; dir: string | undefined; configDir: string | undefined; json: boolean }
   /** Forget `dir`, whose folder is gone, or with `dir` null every listed directory whose folder is gone. */
-  | { command: "forget"; dir: string | null; configDir: string | undefined; yes: boolean };
+  | { command: "forget"; dir: string | null; configDir: string | undefined; yes: boolean }
+  /** Add the session check to settings, take it out, or run it as the hook does. */
+  | {
+      command: "hook";
+      action: "install" | "remove" | "run";
+      /** Change dir's project settings rather than the user's. */
+      project: boolean;
+      dir: string | undefined;
+      configDir: string | undefined;
+      yes: boolean;
+    };
 
 /** Arguments ccdesk cannot run with; the message is what to print. */
 export class UsageError extends Error {}
@@ -88,7 +104,7 @@ type Flag = keyof ReturnType<typeof options>["values"];
 
 /** The flags each command takes; --help goes with any. */
 const FLAGS: Record<
-  "serve" | "scan" | "explain" | "check" | "compare" | "rules" | "forget",
+  "serve" | "scan" | "explain" | "check" | "compare" | "rules" | "forget" | "hook",
   Flag[]
 > = {
   serve: ["port", "open", "dev", "config-dir"],
@@ -98,6 +114,7 @@ const FLAGS: Record<
   compare: ["json", "all", "config-dir"],
   rules: ["suggest", "json", "config-dir"],
   forget: ["all-gone", "yes", "config-dir"],
+  hook: ["install", "remove", "run", "project", "yes", "config-dir"],
 };
 
 /** Reads the arguments after `ccdesk`, without touching the file system. */
@@ -160,10 +177,23 @@ function subcommand(
     if (!values.suggest) throw usage("rules prints suggestions; pass --suggest");
     return { command: "rules", dir, configDir, json: values.json ?? false };
   }
+  if (name === "hook") return hookOf(rest, values);
   const allGone = values["all-gone"] ?? false;
   if (rest.length > 1 || (rest.length === 1) === allGone)
     throw usage("forget takes one dir, or --all-gone");
   return { command: "forget", dir: rest[0] ?? null, configDir, yes: values.yes ?? false };
+}
+
+/** `hook` with exactly one of --install, --remove and --run. */
+function hookOf(rest: string[], values: ReturnType<typeof options>["values"]): Command {
+  const dir = oneDir("hook", rest);
+  const [action, ...others] = (["install", "remove", "run"] as const).filter((a) => values[a]);
+  if (action === undefined || others.length > 0)
+    throw usage("hook takes one of --install, --remove or --run");
+  const { project = false, yes = false } = values;
+  if (action === "run" && (project || yes || dir !== undefined))
+    throw usage("hook --run takes its input on stdin, and no dir, --project or --yes");
+  return { command: "hook", action, project, dir, configDir: values["config-dir"], yes };
 }
 
 /** The dir of a command that takes at most one; without one, the current folder. */
@@ -181,7 +211,8 @@ function commandOf(first: string | undefined): keyof typeof FLAGS {
     first === "check" ||
     first === "compare" ||
     first === "rules" ||
-    first === "forget"
+    first === "forget" ||
+    first === "hook"
   )
     return first;
   throw usage(`unknown command ${first}`);
@@ -215,6 +246,10 @@ function options(args: string[]) {
       all: { type: "boolean" },
       suggest: { type: "boolean" },
       "all-gone": { type: "boolean" },
+      install: { type: "boolean" },
+      remove: { type: "boolean" },
+      run: { type: "boolean" },
+      project: { type: "boolean" },
       yes: { type: "boolean", short: "y" },
       help: { type: "boolean", short: "h" },
     },

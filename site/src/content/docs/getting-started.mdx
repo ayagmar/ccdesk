@@ -35,7 +35,7 @@ npx ccdesk [options]                     Open the page in your browser
 npx ccdesk scan [dir] --json             Print what Claude Code loads in dir, as JSON
 npx ccdesk explain <file> [--dir <dir>]  Print what loads once Claude reads or edits file
 npx ccdesk check [dir] [--json]          Exit 1 when a session started in dir reads a file
-                                         Claude Code cannot read or parse
+                                         Claude Code cannot read or parse, or a setting it ignores
 npx ccdesk compare <a> <b> [--json]      Print the settings that differ between two directories,
                                          and the files each value comes from
 npx ccdesk rules --suggest [dir] [--json]
@@ -43,6 +43,9 @@ npx ccdesk rules --suggest [dir] [--json]
                                          you approved by hand in the sessions started in dir
 npx ccdesk forget <dir> | --all-gone     Forget a directory whose folder is gone: move its
                                          sessions and memory into ccdesk's backups
+npx ccdesk hook --install | --remove [--project] [dir]
+                                         Add or take out the session check: a SessionStart hook
+                                         that warns when what a new session loads has problems
 
   --port <n>            Port to listen on (default: a free port)
   --no-open             Print the URL instead of opening a browser
@@ -55,7 +58,10 @@ npx ccdesk forget <dir> | --all-gone     Forget a directory whose folder is gone
                         both directories share
   --suggest             For rules: print the allow rules ccdesk suggests, as Permissions lists them
   --all-gone            For forget: every listed directory whose folder is gone
-  -y, --yes             For forget: do not ask first, as needed without a terminal
+  --install, --remove   For hook: add the session check to your user settings, or take it out
+  --project             For hook: use dir's .claude/settings.json, for everyone in the repository
+  --run                 For hook: what the hook itself runs; reads its input on stdin
+  -y, --yes             For forget and hook: do not ask first, as needed without a terminal
   -h, --help            Show this help
 ```
 
@@ -80,7 +86,7 @@ Once Claude reads or edits src/api/users.ts in ~/code/acme-api, these load:
   project  folder instructions  src/CLAUDE.md
 ```
 
-`ccdesk check` fails when a session started in a folder would trip over a file it reads: a `.claude/settings.json` or `.mcp.json` that is not valid JSON, a settings file whose shape Claude Code's schema rejects, a `CLAUDE.md` or rule it cannot read. It checks what a session started in that one folder reads, the current one or the one you name, so a monorepo whose packages have their own `.claude` folder needs one run per folder people start Claude Code in. It exits 0 when there are none, 1 when there are, and 2 when the arguments are wrong, the folder does not exist, or ccdesk cannot run the check, so a mistyped path fails too. Run it in CI to catch a broken file before anyone pulls it. In a GitHub Actions job, after checking out the repository and setting up Node.js 22.19 or newer:
+`ccdesk check` fails when a session started in a folder would trip over a file it reads: a `.claude/settings.json` or `.mcp.json` that is not valid JSON, a settings file whose shape Claude Code's schema rejects, a `CLAUDE.md` or rule it cannot read. It also fails on a setting Claude Code ignores in the file it is in, such as `autoMode` in `.claude/settings.local.json`, which Claude Code reads only from user or managed settings; the [settings reference](https://code.claude.com/docs/en/settings-reference) says which files each key is read from. It checks what a session started in that one folder reads, the current one or the one you name, so a monorepo whose packages have their own `.claude` folder needs one run per folder people start Claude Code in. It exits 0 when there are none, 1 when there are, and 2 when the arguments are wrong, the folder does not exist, or ccdesk cannot run the check, so a mistyped path fails too. Run it in CI to catch a broken file before anyone pulls it. In a GitHub Actions job, after checking out the repository and setting up Node.js 22.19 or newer:
 
 ```yaml
 - run: npx --yes ccdesk@0.3 check
@@ -98,11 +104,20 @@ Claude Code cannot read these files and may skip them:
 2 problems in a session started in ~/code/acme-api.
 ```
 
-Problems are listed in the order to fix them: files that stop Claude Code from starting (a managed settings file that does not parse as a JSON object), then files it cannot read, then files it reads with some entries skipped. Paths are relative to the repository.
+Problems are listed in the order to fix them: files that stop Claude Code from starting (a managed settings file that does not parse as a JSON object), then files it cannot read, then files it reads with some entries skipped, then settings it ignores. Paths are relative to the repository.
+
+```sh
+$ npx ccdesk check
+Claude Code ignores these settings in the files they are in:
+  .claude/settings.local.json: autoMode (Claude Code reads this key only from managed or user settings)
+
+1 problem in a session started in ~/code/acme-api.
+```
 
 - Only the repository's own files count: those under the git root, or under the folder itself outside git, and for a linked worktree also those in the main checkout, which the session reads through to. Your Claude folder, `~/.claude.json` and managed settings never count, even when the repository holds them. A CI runner usually has none of them, and a broken one is the machine's, not the repository's. ccdesk says how many such files it left out; `--all` counts them too.
 - A file Claude Code reads with some entries skipped, such as a `permissions.defaultMode` it does not know, is listed but passes. ccdesk's settings schema can lag a newer Claude Code, so failing on these could fail a valid file. `--strict` fails on them.
-- `--json` prints each problem with its absolute `path`, the `file` as shown, the error, and `counted`, whether it fails the check. `failed` is the overall answer.
+- A value that waits for [workspace trust](../permissions/), such as an `env` variable in project settings, is not a problem: Claude Code applies it once you trust the folder.
+- `--json` prints each problem with its absolute `path`, the `file` as shown, the error, and `counted`, whether it fails the check; an ignored setting also has `setting`, the key. `failed` is the overall answer.
 
 `ccdesk compare` is the [settings comparison](../settings/) in the terminal: the keys whose values differ between two directories, with each side's value and the files it comes from. Hidden values are compared but never printed. `--all` also lists the keys both share, and `--json` prints every key with `same`, whether the two match.
 
@@ -130,6 +145,32 @@ Add one under permissions.allow in .claude/settings.local.json, or select it und
 These five only read: they write no file and keep no backup. Values the page hides, such as env values and headers, are hidden in their output too.
 
 `ccdesk forget` clears away a directory whose folder is gone, as [Forget…](../interface/) does on the page, after the same review: it prints the store, its sessions, memories and size, and asks before it moves anything. `--all-gone` does this for every listed directory whose folder is gone, such as the stores test runs leave behind, with one question for all of them. Without a terminal to answer in, pass `--yes`. It exits 0 when every directory is forgotten, and 1 when you answer no or ccdesk refuses one, saying why. [Recent changes](../recent-changes/#forgotten-directories) on the page can move a store back. Like the page, it changes nothing else: `~/.claude.json` keeps the directory's entry.
+
+### Session check
+
+The session check is `ccdesk check` at the start of every Claude Code session, without the CI rules: it covers your Claude folder and user settings too. It is off until you add it:
+
+```sh
+npx ccdesk hook --install
+```
+
+That adds one `SessionStart` hook, for new sessions only, to `~/.claude/settings.json`. Like an edit on the page, ccdesk shows the diff first and asks, backs up the file, and lists the change in [Recent changes](../recent-changes/). `--project` puts it in the repository's `.claude/settings.json` instead, for everyone who works there; Claude Code runs a project hook only once the folder is trusted. `--remove` takes it out again and leaves your other hooks alone.
+
+When nothing is wrong, the hook prints nothing. Otherwise you see a short warning above the prompt:
+
+```
+ccdesk found 1 problem in what this session loads:
+  .claude/settings.local.json: autoMode (Claude Code reads this key only from managed or user settings)
+Run npx ccdesk here to see and fix them.
+```
+
+It lists up to five problems and says how many more there are. Values in managed settings are left out, since only your organisation can change them.
+
+What it costs:
+
+- **No context and no usage.** The hook answers with a `systemMessage`, which Claude Code shows to you and does not send to Claude. Plain text from a `SessionStart` hook would go into Claude's context, so the hook never prints any. It runs no model.
+- **About half a second.** It runs `npx -y ccdesk@<version> hook --run`, pinned to the version that installed it, so npx uses its cached copy and does not ask the registry for updates at every start. The first run after installing downloads that version. Claude Code runs `SessionStart` hooks in the background, though Claude's first reply waits for them. Run `--install` again after updating ccdesk to move the pin.
+- **No writes.** It only reads, like `ccdesk check`.
 
 ## What it reads
 

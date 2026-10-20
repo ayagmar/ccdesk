@@ -16,6 +16,7 @@ import {
   suggestJson,
   suggestText,
 } from "./commands.ts";
+import { changeHook, sessionCheck, VERSION } from "./hook.ts";
 
 const DEV_TOKEN = "dev";
 
@@ -52,6 +53,45 @@ async function forget({ dir, yes }: Extract<Command, { command: "forget" }>, cor
   );
   console.log(output);
   process.exitCode = exitCode;
+}
+
+async function hook(command: Extract<Command, { command: "hook" }>, core: Core) {
+  if (command.action === "run") {
+    // Only the hook's JSON goes to stdout: Claude Code adds any other text to Claude's context.
+    const output = await sessionCheck(core, await stdinText());
+    if (output) console.log(output);
+    return;
+  }
+  if (!command.yes && !process.stdin.isTTY) {
+    console.error(
+      "ccdesk: hook asks before it changes settings; pass --yes to run it without a terminal"
+    );
+    process.exitCode = 2;
+    return;
+  }
+  const { output, exitCode } = await changeHook(
+    core,
+    {
+      dir: resolve(command.dir ?? "."),
+      scope: command.project ? "project" : "user",
+      remove: command.action === "remove",
+      version: VERSION,
+    },
+    async (review, question) => {
+      console.log(review);
+      return command.yes || ask(question);
+    }
+  );
+  if (exitCode === 2) console.error(output);
+  else console.log(output);
+  process.exitCode = exitCode;
+}
+
+/** Everything on stdin, as a hook gets its input. */
+async function stdinText(): Promise<string> {
+  let text = "";
+  for await (const chunk of process.stdin) text += chunk;
+  return text;
 }
 
 async function main() {
@@ -99,6 +139,7 @@ async function main() {
     console.log(command.json ? await suggestJson(core, dir) : await suggestText(core, dir));
     return;
   }
+  if (command.command === "hook") return hook(command, core);
   if (command.command === "check") {
     const { output, exitCode } = await checkDirectory(core, dir, command);
     if (exitCode === 2) console.error(output);

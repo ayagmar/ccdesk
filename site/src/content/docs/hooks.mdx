@@ -38,3 +38,7 @@ A plugin's `hooks/hooks.json`, and each hooks file its manifest names, holds its
 Select an existing hook to change it in place or remove it. Hooks are checked against Claude Code's settings schema and get the same diff review, backup and undo as [settings](../settings/#changing-a-setting). If the hook changed in the file after you opened it, ccdesk refuses and asks you to look again.
 
 Plugin and managed hooks are read-only. ccdesk also leaves a file's hooks for you to edit by hand when any hook in that file sends header values or calls a URL with a user name, password or query string, because those values are hidden from the page and ccdesk cannot write them back.
+
+## ccdesk's own hook
+
+`npx ccdesk hook --install` adds the [session check](../getting-started/#session-check), a `SessionStart` hook that warns when what a new session loads has problems. It shows in this section like any other hook, and you can change or remove it here or with `npx ccdesk hook --remove`.
