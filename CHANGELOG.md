@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.5](https://github.com/ayagmar/ccdesk/compare/v0.5.4...v0.5.5) (2026-10-20)
+
+### Features
+
+* **ui:** link a nested setting to the setting that holds it ([#58](https://github.com/ayagmar/ccdesk/issues/58)) ([5c9afa9](https://github.com/ayagmar/ccdesk/commit/5c9afa9852c63d9d6644534250a13915a7fabf1e))
+
+### Bug Fixes
+
+* **data:** keep bulleted lists in setting descriptions ([#57](https://github.com/ayagmar/ccdesk/issues/57)) ([767214e](https://github.com/ayagmar/ccdesk/commit/767214ec5fa0b65710a7c6c704f5284eeb2f0a08))
+
 ## [0.5.4](https://github.com/ayagmar/ccdesk/compare/v0.5.3...v0.5.4) (2026-10-20)
 
 ### Bug Fixes
