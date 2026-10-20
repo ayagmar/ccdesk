@@ -1328,6 +1328,12 @@ input::placeholder {
   border-right: 0;
 }
 
+/* A file Claude Code ignores for this key: plainly unavailable, not busy. */
+.segmented button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .segmented button[aria-pressed="true"] {
   background: var(--ink);
   color: var(--paper);

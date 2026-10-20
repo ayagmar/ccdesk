@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
-import { allowedScopes, EDITABLE_SCOPES } from "../shared/scopes.ts";
+import { allowedScopes, EDITABLE_SCOPES, EVERY_FILE } from "../shared/scopes.ts";
 import {
   type DirectoryView,
   type Scope,
@@ -118,11 +118,17 @@ export function SettingEditor({ view, settingKey, defaultScope, onSaved }: Props
               allowed.includes(s) ? undefined : `Claude Code ignores ${key} in this file`
             }
           />
-          {!allowed.includes(scope) && (
+          {!allowed.includes(scope) ? (
             <p className="flag warn">
               Claude Code reads {key} only from {allowed.join(" or ") || "~/.claude.json"}; pick
               another file.
             </p>
+          ) : (
+            allowed.length < EVERY_FILE.length && (
+              <p className="muted small">
+                Claude Code reads {key} only from {allowed.join(" or ")} settings.
+              </p>
+            )
           )}
           <p className="muted small mono wrap">
             {layer ? tilde(layer.path) : ""}
