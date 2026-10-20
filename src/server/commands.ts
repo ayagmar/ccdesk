@@ -112,24 +112,46 @@ const GROUPS: Array<{ heading: string; has: (p: Problem) => boolean }> = [
 const IGNORED = "Claude Code ignores these settings in the files they are in";
 
 /**
- * What the scan of `view` finds wrong: its problems, then each value Claude Code ignores in the file
- * it is in. Values waiting for workspace trust are left out, since they apply once it is given.
+ * What the scan of `view` finds wrong: its problems, then each value Claude Code ignores because of
+ * the file it is in. Left out: values waiting for workspace trust, which apply once it is given, and
+ * values another file overrules, such as a managed lock, which no edit to this file would fix.
  */
 export function findings(view: DirectoryView): Finding[] {
-  const pathOf = (scope: Scope) => view.settings.find((l) => l.scope === scope && !l.legacy)?.path;
   const ignored = view.effective.flatMap((s) =>
     s.ignored.flatMap((i) => {
-      const path = pathOf(i.scope);
-      if (i.waitsForTrust || path === undefined) return [];
+      if (i.waitsForTrust || i.overruled) return [];
       // An ignored env holds only the ignored variables, with their values hidden.
       const names =
         s.key === "env" && typeof i.value === "object" && i.value !== null
-          ? ` ${Object.keys(i.value).join(", ")}`
-          : "";
-      return [{ path, setting: `${s.key}${names}`, error: i.reason }];
+          ? Object.keys(i.value)
+          : [];
+      const path = fileWith(view, i.scope, s.key, names[0]);
+      if (path === undefined) return [];
+      const setting = names.length > 0 ? `${s.key} ${names.join(", ")}` : s.key;
+      return [{ path, setting, error: i.reason }];
     })
   );
   return [...view.problems, ...ignored];
+}
+
+/**
+ * The file of `scope` that sets `key`, and for env the variable `name`: a scope can have two, such
+ * as the local file in the folder a session starts in under the repository's own.
+ */
+function fileWith(
+  view: DirectoryView,
+  scope: Scope,
+  key: string,
+  name: string | undefined
+): string | undefined {
+  const files = view.settings.filter((l) => l.scope === scope && l.data);
+  const sets = (data: Record<string, unknown> | null) => {
+    const value = data?.[key];
+    return name === undefined
+      ? value !== undefined
+      : typeof value === "object" && value !== null && name in value;
+  };
+  return (files.find((l) => sets(l.data)) ?? files[0])?.path;
 }
 
 /** One finding as a line under its heading. */

@@ -94,24 +94,30 @@ export async function changeHook(
   confirm: Confirm
 ): Promise<{ output: string; exitCode: 0 | 1 | 2 }> {
   const { tilde } = formatter(core.env.home);
-  const words = WORDS[change.remove ? "remove" : "install"];
   const done: string[] = [];
   try {
     // One edit at a time: removing a hook moves the place of the next one in the file.
     for (let edit = await nextEdit(core, change); edit; edit = await nextEdit(core, change)) {
       const name = tilde(edit.file);
+      // An install that only takes out an older session check says so.
+      const words = WORDS[edit.add ? "install" : "remove"];
       const preview = await core.previewHookEdit(edit);
       if (preview.errors.length > 0) throw new Error(preview.errors.join("; "));
       const review = diffText(name, preview.before ?? "", preview.after);
       if (!(await confirm(review, `${words.ask} ${name}?`)))
-        return { output: [...done, "Nothing more changed."].join("\n"), exitCode: 1 };
+        return {
+          output: [...done, done.length > 0 ? "Nothing more changed." : "Nothing changed."].join(
+            "\n"
+          ),
+          exitCode: 1,
+        };
       await core.saveHookEdit(edit, preview.revision);
       done.push(`${words.did} ${name}. Recent changes on the page can undo it.`);
-      if (!change.remove) break;
     }
     if (done.length === 0) {
       const file = (await settingsFile(core, change)).path;
-      return { output: `The session check is ${words.none} ${tilde(file)}.`, exitCode: 0 };
+      const none = WORDS[change.remove ? "remove" : "install"].none;
+      return { output: `The session check is ${none} ${tilde(file)}.`, exitCode: 0 };
     }
   } catch (error) {
     return { output: `ccdesk: ${(error as Error).message}`, exitCode: 2 };
@@ -131,8 +137,9 @@ async function settingsFile(
 }
 
 /**
- * The next edit the change needs, or null when it is done. Installing replaces a session check of
- * another version in place; removing takes out the first one left.
+ * The next edit the change needs, or null when it is done. Removing takes out the first session
+ * check left. Installing takes out each one of another version or matcher, the first of them
+ * replaced by the new hook in place, and adds the new hook if none of them could be.
  */
 async function nextEdit(core: Core, change: HookChange): Promise<HookEdit | null> {
   const { view, path } = await settingsFile(core, change);
@@ -145,14 +152,14 @@ async function nextEdit(core: Core, change: HookChange): Promise<HookEdit | null
       OURS.test(h.command)
   );
   const current = (h: Hook) => h.command === command && h.matcher === "startup";
-  if (!change.remove && ours.some(current)) return null;
   const old = change.remove ? ours[0] : ours.find((h) => !current(h));
-  if (change.remove && !old) return null;
+  const add = !change.remove && !ours.some(current);
+  if (!old && !add) return null;
   return {
     dir: view.path,
     file: path,
     ...(old ? { remove: { event: old.event, at: old.at, definition: old.definition } } : {}),
-    ...(change.remove
+    ...(!add
       ? {}
       : {
           add: {

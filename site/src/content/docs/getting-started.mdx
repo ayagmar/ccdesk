@@ -114,10 +114,10 @@ Claude Code ignores these settings in the files they are in:
 1 problem in a session started in ~/code/acme-api.
 ```
 
-- Only the repository's own files count: those under the git root, or under the folder itself outside git, and for a linked worktree also those in the main checkout, which the session reads through to. Your Claude folder, `~/.claude.json` and managed settings never count, even when the repository holds them. A CI runner usually has none of them, and a broken one is the machine's, not the repository's. ccdesk says how many such files it left out; `--all` counts them too.
+- Only the repository's own files count: those under the git root, or under the folder itself outside git, and for a linked worktree also those in the main checkout, which the session reads through to. Your Claude folder, `~/.claude.json` and managed settings never count, even when the repository holds them. A CI runner usually has none of them, and a broken one is the machine's, not the repository's. ccdesk says how many problems it left out; `--all` counts them too.
 - A file Claude Code reads with some entries skipped, such as a `permissions.defaultMode` it does not know, is listed but passes. ccdesk's settings schema can lag a newer Claude Code, so failing on these could fail a valid file. `--strict` fails on them.
-- A value that waits for [workspace trust](../permissions/), such as an `env` variable in project settings, is not a problem: Claude Code applies it once you trust the folder.
-- `--json` prints each problem with its absolute `path`, the `file` as shown, the error, and `counted`, whether it fails the check; an ignored setting also has `setting`, the key. `failed` is the overall answer.
+- A value that waits for [workspace trust](../permissions/), such as an `env` variable in project settings, is not a problem: Claude Code applies it once you trust the folder. Nor is a value another file overrules, such as a repository's `availableModels` when managed settings set their own list: no edit to the file it is in would change that.
+- `--json` prints each problem with its absolute `path`, the `file` as shown, the error, and `counted`, whether it fails the check; an ignored setting also has `setting`: the key, and for `env` the key and the names of the ignored variables, never their values. `failed` is the overall answer.
 
 `ccdesk compare` is the [settings comparison](../settings/) in the terminal: the keys whose values differ between two directories, with each side's value and the files it comes from. Hidden values are compared but never printed. `--all` also lists the keys both share, and `--json` prints every key with `same`, whether the two match.
 
@@ -154,7 +154,7 @@ The session check is `ccdesk check` at the start of every Claude Code session, w
 npx ccdesk hook --install
 ```
 
-That adds one `SessionStart` hook, for new sessions only, to `~/.claude/settings.json`. Like an edit on the page, ccdesk shows the diff first and asks, backs up the file, and lists the change in [Recent changes](../recent-changes/). `--project` puts it in the repository's `.claude/settings.json` instead, for everyone who works there; Claude Code runs a project hook only once the folder is trusted. `--remove` takes it out again and leaves your other hooks alone.
+That adds one `SessionStart` hook, for new sessions only, to `~/.claude/settings.json`. Like an edit on the page, ccdesk shows the diff first and asks, backs up the file, and lists the change in [Recent changes](../recent-changes/). `--project` puts it in the `.claude/settings.json` of the folder you name, the current one by default, for everyone who works there; Claude Code runs a project hook only once the folder is trusted. `--remove` takes it out again and leaves your other hooks alone.
 
 When nothing is wrong, the hook prints nothing. Otherwise you see a short warning above the prompt:
 
