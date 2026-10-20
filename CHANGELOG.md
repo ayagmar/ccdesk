@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.8](https://github.com/ayagmar/ccdesk/compare/v0.5.7...v0.5.8) (2026-10-20)
+
+### Bug Fixes
+
+* **core:** mark two more env variables Claude Code ignores from settings ([e989413](https://github.com/ayagmar/ccdesk/commit/e9894130608328f8e1ef8deefa210564fa3f3cc4))
+
 ## [0.5.7](https://github.com/ayagmar/ccdesk/compare/v0.5.6...v0.5.7) (2026-10-20)
 
 ### Features
