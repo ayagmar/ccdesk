@@ -288,7 +288,7 @@ test("check counts only the repository's files unless --all, and lists what stop
     repoOnly.output
       .split("\n")
       .includes(
-        "Not counted: problems in 3 files of the Claude folder, ~/.claude.json, managed settings or outside the repository; --all counts them."
+        "Not counted: 3 problems in the Claude folder, ~/.claude.json, managed settings or outside the repository; --all counts them."
       ),
     repoOnly.output
   );
@@ -321,7 +321,7 @@ test("check never counts the Claude folder or ~/.claude.json without --all, even
     first.output
       .split("\n")
       .includes(
-        "Not counted: problems in 2 files of the Claude folder, ~/.claude.json, managed settings or outside the repository; --all counts them."
+        "Not counted: 2 problems in the Claude folder, ~/.claude.json, managed settings or outside the repository; --all counts them."
       ),
     first.output
   );
@@ -392,6 +392,34 @@ test("check counts the repository's files when it is reached through a symlink",
   f.link("home/linked", f.at("home/app"));
 
   assert.equal((await check(f, f.at("home/linked"))).exitCode, 1);
+});
+
+test("check fails on a setting Claude Code ignores in the file it is in, and names the key", async () => {
+  // Catches a key that does nothing where it is written, such as autoMode in a local settings file,
+  // passing the check because the file itself parses.
+  const f = repository();
+  f.json("home/app/.claude/settings.local.json", { autoMode: { classifyAllShell: true } });
+
+  const result = await check(f, f.at("home/app"));
+
+  assert.equal(result.exitCode, 1);
+  const lines = result.output.split("\n");
+  assert.equal(lines[0], "Claude Code ignores these settings in the files they are in:");
+  assert.equal(
+    lines[1],
+    `  ${join(".claude", "settings.local.json")}: autoMode (Claude Code reads this key only from managed or user settings)`
+  );
+  assert.equal(lines.at(-1), `1 problem in a session started in ${join("~", "app")}.`);
+});
+
+test("check does not count a value that waits for workspace trust", async () => {
+  // Catches project env values, which apply once the folder is trusted, failing every CI run.
+  const f = repository();
+  f.json("home/app/.claude/settings.json", { env: { APP_MODE: "dev" } });
+
+  const result = await check(f, f.at("home/app"));
+
+  assert.equal(result.exitCode, 0, result.output);
 });
 
 test("check --json prints each problem with its path and whether it counts", async () => {

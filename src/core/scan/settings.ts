@@ -524,7 +524,7 @@ function scopesThatCount(
 ): { defined: Scope[]; ignored: EffectiveSetting["ignored"] } {
   const allowed = allowedScopes(key);
   const present = PRECEDENCE.filter((scope) => valueIn(scope) !== undefined);
-  const ignored = present
+  const ignored: EffectiveSetting["ignored"] = present
     .filter((scope) => !allowed.includes(scope))
     .map((scope) => ({ scope, value: valueIn(scope), reason: ignoredReason(key) }));
   const defined = present.filter((scope) => allowed.includes(scope));
@@ -534,6 +534,7 @@ function scopesThatCount(
       scope,
       value: valueIn(scope),
       reason: "Managed settings set availableModels, so Claude Code uses that list as-is",
+      overruled: true,
     });
   return { defined: ["managed"], ignored };
 }

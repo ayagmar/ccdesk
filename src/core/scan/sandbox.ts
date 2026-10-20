@@ -8,6 +8,8 @@ export interface Dropped {
   reason: string;
   /** Held only until you trust the folder, rather than ignored. */
   waitsForTrust?: boolean;
+  /** Ignored because of a value in another file, such as a managed lock, not the file it is in. */
+  overruled?: boolean;
 }
 
 interface Rule {
@@ -18,6 +20,7 @@ interface Rule {
   reason: string;
   /** Ignores only this value or these list entries, not the whole field. */
   drops?: { value: unknown } | { entries: (entry: unknown) => boolean };
+  overruled?: boolean;
 }
 
 const REPOSITORY: Scope[] = ["project", "local"];
@@ -61,6 +64,18 @@ function rulesFor(valueIn: (key: string, scope: Scope) => unknown): Rule[] {
   const managed = valueIn("sandbox", "managed");
   const rules: Rule[] = [];
   const managedFiles = at(managed, ["credentials", "files"]);
+  const adder =
+    (overruled: boolean): Lock["add"] =>
+    (fields, from, reason, drops) => {
+      for (const field of fields)
+        rules.push({
+          field,
+          from,
+          reason,
+          ...(drops ? { drops } : {}),
+          ...(overruled ? { overruled } : {}),
+        });
+    };
   const lock: Lock = {
     managed,
     user: valueIn("sandbox", "user"),
@@ -70,15 +85,15 @@ function rulesFor(valueIn: (key: string, scope: Scope) => unknown): Rule[] {
     filesystemLocked:
       isRecord(at(managed, ["filesystem"])) ||
       (Array.isArray(managedFiles) && managedFiles.some((f) => isRecord(f) && f.mode === "deny")),
-    add: (fields, from, reason, drops) => {
-      for (const field of fields) rules.push({ field, from, reason, ...(drops ? { drops } : {}) });
-    },
+    add: adder(false),
   };
   addScopeRules(lock);
-  addManagedLocks(lock);
-  addAdminRequiredRules(lock);
-  addLocksWithoutAdmin(lock);
-  addReadBlockRules(lock);
+  // The rest depend on what other files say, so the values they drop are overruled.
+  const byOthers: Lock = { ...lock, add: adder(true) };
+  addManagedLocks(byOthers);
+  addAdminRequiredRules(byOthers);
+  addLocksWithoutAdmin(byOthers);
+  addReadBlockRules(byOthers);
   return rules;
 }
 
@@ -94,7 +109,7 @@ interface Lock {
 }
 
 /** Fields read from fewer files than the others, and entries dropped from repository files. */
-function addScopeRules({ add, filesystemLocked }: Lock): void {
+function addScopeRules({ add }: Lock): void {
   // Keys read from fewer files (docs: settings-reference, each key's Scope).
   for (const field of [
     "filesystem.allowManagedReadPathsOnly",
@@ -119,10 +134,8 @@ function addScopeRules({ add, filesystemLocked }: Lock): void {
     );
   add(
     ["filesystem.disabled"],
-    filesystemLocked ? NOT_MANAGED : REPOSITORY,
-    filesystemLocked
-      ? "Managed settings configure the sandbox filesystem, so only they can turn it off"
-      : "Claude Code reads sandbox.filesystem.disabled only from user or managed settings"
+    REPOSITORY,
+    "Claude Code reads sandbox.filesystem.disabled only from user or managed settings"
   );
   add(
     ["credentials.files", "credentials.envVars"],
@@ -132,8 +145,14 @@ function addScopeRules({ add, filesystemLocked }: Lock): void {
   );
 }
 
-/** A false allowUnsandboxedCommands that holds, and the managed-only allowlists. */
-function addManagedLocks({ add, user, managedSays }: Lock): void {
+/** A false allowUnsandboxedCommands that holds, and the managed-only allowlists and filesystem. */
+function addManagedLocks({ add, user, managedSays, filesystemLocked }: Lock): void {
+  if (filesystemLocked)
+    add(
+      ["filesystem.disabled"],
+      ["user"],
+      "Managed settings configure the sandbox filesystem, so only they can turn it off"
+    );
   // docs: sandboxing#turn-off-the-retry-with-strict-sandbox-mode
   if (
     managedSays("allowUnsandboxedCommands", false) ||
@@ -280,7 +299,11 @@ export function sandboxFilter(valueIn: (key: string, scope: Scope) => unknown) {
       const split = splitField(rule, at(out, path));
       if (!split) continue;
       out = replaced(out, path, split.kept);
-      dropped.push({ value: nested(path, split.removed), reason: rule.reason });
+      dropped.push({
+        value: nested(path, split.removed),
+        reason: rule.reason,
+        ...(rule.overruled ? { overruled: true } : {}),
+      });
     }
     return { value: out, dropped };
   };

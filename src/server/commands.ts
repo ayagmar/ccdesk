@@ -9,6 +9,7 @@ import {
   type ForgetPreview,
   type PathMatch,
   type Problem,
+  type Scope,
 } from "../core/index.ts";
 import {
   ago,
@@ -75,8 +76,17 @@ export interface CheckOptions {
   all: boolean;
 }
 
-/** A problem as `ccdesk check --json` prints it. */
-interface CheckedProblem extends Problem {
+/**
+ * Something wrong with what a session started in a directory loads: a file Claude Code cannot read
+ * or parse, or with `setting`, a value Claude Code ignores in that file, and `error` says why.
+ */
+export interface Finding extends Problem {
+  /** The ignored key; for `env`, the key and the names of the ignored variables. */
+  setting?: string;
+}
+
+/** A finding as `ccdesk check --json` prints it. */
+interface CheckedProblem extends Finding {
   /** The path relative to the repository when inside it, otherwise under `~`. */
   file: string;
   /** Whether this problem makes the check fail, given --strict and --all. */
@@ -98,6 +108,56 @@ const GROUPS: Array<{ heading: string; has: (p: Problem) => boolean }> = [
   },
   { heading: "Claude Code may skip entries in these files", has: (p) => p.partial === true },
 ];
+
+const IGNORED = "Claude Code ignores these settings in the files they are in";
+
+/**
+ * What the scan of `view` finds wrong: its problems, then each value Claude Code ignores because of
+ * the file it is in. Left out: values waiting for workspace trust, which apply once it is given, and
+ * values another file overrules, such as a managed lock, which no edit to this file would fix.
+ */
+export function findings(view: DirectoryView): Finding[] {
+  const ignored = view.effective.flatMap((s) =>
+    s.ignored.flatMap((i) => {
+      if (i.waitsForTrust || i.overruled) return [];
+      // An ignored env holds only the ignored variables, with their values hidden.
+      const names =
+        s.key === "env" && typeof i.value === "object" && i.value !== null
+          ? Object.keys(i.value)
+          : [];
+      const path = fileWith(view, i.scope, s.key, names[0]);
+      if (path === undefined) return [];
+      const setting = names.length > 0 ? `${s.key} ${names.join(", ")}` : s.key;
+      return [{ path, setting, error: i.reason }];
+    })
+  );
+  return [...view.problems, ...ignored];
+}
+
+/**
+ * The file of `scope` that sets `key`, and for env the variable `name`: a scope can have two, such
+ * as the local file in the folder a session starts in under the repository's own.
+ */
+function fileWith(
+  view: DirectoryView,
+  scope: Scope,
+  key: string,
+  name: string | undefined
+): string | undefined {
+  const files = view.settings.filter((l) => l.scope === scope && l.data);
+  const sets = (data: Record<string, unknown> | null) => {
+    const value = data?.[key];
+    return name === undefined
+      ? value !== undefined
+      : typeof value === "object" && value !== null && name in value;
+  };
+  return (files.find((l) => sets(l.data)) ?? files[0])?.path;
+}
+
+/** One finding as a line under its heading. */
+export function findingLine(file: string, f: Finding): string {
+  return f.setting === undefined ? `${file}: ${f.error}` : `${file}: ${f.setting} (${f.error})`;
+}
 
 function isWithin(parent: string, path: string): boolean {
   const rel = relative(parent, path);
@@ -133,7 +193,7 @@ export async function checkDirectory(
     path === env.claudeJson || isWithin(env.claudeDir, path) || isWithin(env.managedDir, path);
   const inRepository = (path: string) =>
     !ofRunner(path) && roots.some((root) => isWithin(root, path));
-  const problems: CheckedProblem[] = view.problems.map((p) => ({
+  const problems: CheckedProblem[] = findings(view).map((p) => ({
     ...p,
     file: relativeTo(p.path, roots[0] ?? view.path),
     counted: (options.all || inRepository(p.path)) && (options.strict || !p.partial),
@@ -147,19 +207,22 @@ export async function checkDirectory(
 
   const lines: string[] = [];
   const shown = options.all ? problems : problems.filter((p) => inRepository(p.path));
+  const ignored = shown.filter((p) => p.setting !== undefined);
   for (const { heading, has } of GROUPS) {
-    const group = shown.filter(has);
+    const group = shown.filter((p) => p.setting === undefined && has(p));
     if (group.length === 0) continue;
     const note = group.some((p) => p.counted) ? "" : " (not counted; --strict counts them)";
-    lines.push(`${heading}${note}:`, ...group.map((p) => `  ${p.file}: ${p.error}`), "");
+    lines.push(`${heading}${note}:`, ...group.map((p) => `  ${findingLine(p.file, p)}`), "");
   }
+  if (ignored.length > 0)
+    lines.push(`${IGNORED}:`, ...ignored.map((p) => `  ${findingLine(p.file, p)}`), "");
   // Outside files with skipped entries are left out: --all alone would not count them either.
   const outside = problems.filter(
     (p) => !shown.includes(p) && (options.strict || !p.partial)
   ).length;
   if (outside > 0)
     lines.push(
-      `Not counted: problems in ${plural(outside, "file")} of the Claude folder, ~/.claude.json, managed settings or outside the repository; --all counts them.`
+      `Not counted: ${plural(outside, "problem")} in the Claude folder, ~/.claude.json, managed settings or outside the repository; --all counts them.`
     );
   const session = `a session started in ${tilde(view.path)}`;
   const counted = problems.filter((p) => p.counted).length;
