@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.4](https://github.com/ayagmar/ccdesk/compare/v0.5.3...v0.5.4) (2026-10-20)
+
+### Bug Fixes
+
+* **ui:** show why a settings file cannot be picked ([#56](https://github.com/ayagmar/ccdesk/issues/56)) ([4d3c0a0](https://github.com/ayagmar/ccdesk/commit/4d3c0a00c75c4cbe4494c84069347fcf9fd92360))
+
 ## [0.5.3](https://github.com/ayagmar/ccdesk/compare/v0.5.2...v0.5.3) (2026-10-19)
 
 ## [0.5.2](https://github.com/ayagmar/ccdesk/compare/v0.5.1...v0.5.2) (2026-10-16)
