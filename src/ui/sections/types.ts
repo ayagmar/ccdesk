@@ -15,6 +15,8 @@ export interface Actions {
   onOpenDirectory: (path: string) => void;
   /** Asks for another directory to compare this one's settings with. */
   onCompare: () => void;
+  /** Selects a row by id, showing it even if the filters or paging hid it. */
+  onShowRow: (id: string) => void;
   onAdd: (what: Adding) => void;
   onSaved: (saved: Saved) => void;
   /** Runs one change and reports it; `select` is the row to show afterwards, null for none. */

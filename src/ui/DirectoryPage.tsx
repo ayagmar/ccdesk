@@ -130,19 +130,17 @@ export function DirectoryPage({
   }, []);
 
   // A row asked for from elsewhere is shown even if the filters or paging hid it.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: each jump is handled once, when asked for.
-  useEffect(() => {
-    if (!jump) return;
-    const row = rows.find((r) => r.id === jump.id);
-    if (!row) return;
-    onJumped();
+  const reveal = useReveal(jump, onJumped, (id, focus) => {
+    const row = rows.find((r) => r.id === id);
+    if (!row) return false;
     setSeeing(false);
     const group = groups.find((g) => g.section.id === row.section);
     if (group && !group.matching.includes(row)) changeList(NO_LIST_STATE);
     else if (group && !group.shown.includes(row))
       setShown((s) => ({ ...s, [row.section]: group.matching.indexOf(row) + PAGE }));
-    requestAnimationFrame(() => select(jump.id));
-  }, [jump]);
+    requestAnimationFrame(() => select(id, focus));
+    return true;
+  });
 
   const closeInspector = useCallback(() => {
     // With nothing open, Escape leaves focus where it is.
@@ -171,6 +169,7 @@ export function DirectoryPage({
     onCompare,
     onToast,
     reload,
+    reveal,
     setSelected,
     setAdding,
   });
@@ -245,6 +244,25 @@ export function DirectoryPage({
   );
 }
 
+/**
+ * Selects a row with `show`, for a jump asked for from elsewhere (handled once) and for the
+ * inspector, which also moves focus to the row; the function it returns stays the same across renders.
+ */
+function useReveal(
+  jump: { id: string } | null,
+  onJumped: () => void,
+  show: (id: string, focus: boolean) => boolean
+): (id: string) => void {
+  const latest = useRef(show);
+  latest.current = show;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each jump is handled once, when asked for.
+  useEffect(() => {
+    if (jump && latest.current(jump.id, false)) onJumped();
+  }, [jump]);
+  // The link that asked for the row goes away with the old inspector, so focus follows the row.
+  return useCallback((id: string) => void latest.current(id, true), []);
+}
+
 /** What the rows and the inspector can do here: open, add, save and change, each with its toast. */
 function usePageActions({
   view,
@@ -253,9 +271,11 @@ function usePageActions({
   onCompare,
   onToast,
   reload,
+  reveal,
   setSelected,
   setAdding,
 }: Pick<Props, "view" | "overview" | "onOpenDirectory" | "onCompare" | "onToast" | "reload"> & {
+  reveal: (id: string) => void;
   setSelected: (id: string | null) => void;
   setAdding: (adding: Adding | null) => void;
 }): Actions {
@@ -290,6 +310,7 @@ function usePageActions({
       sharedNames: new Set(overview?.sharedMemories.map((s) => s.name) ?? []),
       onOpenDirectory,
       onCompare: () => onCompare(view.path),
+      onShowRow: reveal,
       onAdd: (what) => {
         setSelected(null);
         setAdding(what);
@@ -304,7 +325,18 @@ function usePageActions({
         }
       },
     }),
-    [view, overview, onOpenDirectory, onCompare, saved, onToast, reload, setSelected, setAdding]
+    [
+      view,
+      overview,
+      onOpenDirectory,
+      onCompare,
+      reveal,
+      saved,
+      onToast,
+      reload,
+      setSelected,
+      setAdding,
+    ]
   );
 }
 

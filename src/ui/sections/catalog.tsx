@@ -1,10 +1,11 @@
 import { EDITABLE_SCOPES, HIGHEST_FIRST } from "../../shared/scopes.ts";
+import { LINES, type Line, lineName } from "../../view/lines.ts";
 import { plain, valueHere } from "../../view/sections/catalog.ts";
 import { type RowOf } from "../../view/sections/types.ts";
-import { LINES, type Line, lineName } from "../../view/lines.ts";
 import { Bullet } from "../Bullet.tsx";
 import { preview, tildeAll } from "../format.ts";
 import { Icon } from "../Icon.tsx";
+import { reference } from "../reference.ts";
 import { SettingEditor } from "../SettingEditor.tsx";
 import { propertyFor } from "../settingsSchema.ts";
 import { Field, NameButton, Prose } from "./kit.tsx";
@@ -47,7 +48,12 @@ function SetIt({
   if (field)
     return (
       <p className="muted small">
-        It is a field of <code>{top}</code>; edit that setting to change it.
+        It is a field of <code>{top}</code>; edit that setting to change it.{" "}
+        {reference().catalog.some((c) => c.key === top) && (
+          <button type="button" className="link" onClick={() => actions.onShowRow(`cat:${top}`)}>
+            Edit {top}
+          </button>
+        )}
       </p>
     );
   if (propertyFor(top) === undefined)
