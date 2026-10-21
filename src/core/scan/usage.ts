@@ -8,6 +8,7 @@ import {
   type ToolUsage,
   type Usage,
 } from "../../shared/types.ts";
+import { isRecord } from "./data.ts";
 import { type ScanEnv } from "./env.ts";
 import {
   isCredentials,
@@ -17,7 +18,6 @@ import {
   openUnlessCredentials,
   wildcard,
 } from "./files.ts";
-import { isRecord } from "./data.ts";
 import { worktrees } from "./git.ts";
 import { namesTool, parseRule } from "./tools.ts";
 
@@ -658,7 +658,7 @@ const PROMPT_TOOLS = new Set(["AskUserQuestion", "ExitPlanMode"]);
  * writes: a Bash program on the allowlists above, with its subcommand where it has them, a fetch's
  * domain, or the tool. None for compound commands, other programs and subcommands, a leading
  * variable assignment (an allow rule does not match past most of them, docs:
- * permissions#process-wrappers) and file tools. A rule takes no other words from a command, so
+ * permissions#wrappers) and file tools. A rule takes no other words from a command, so
  * arguments never leave the server.
  */
 function ruleFor(
@@ -669,6 +669,8 @@ function ruleFor(
   if (tool === "Bash") {
     if (command === undefined || /[`$<>(){}]/.test(command)) return null;
     if (/^\s*\w+=/.test(command)) return null;
+    // docs: permissions#compound-commands
+    if (/(&&|\|\|)\s*$/.test(command)) return null;
     const parts = subcommands(command);
     if (parts.length !== 1) return null;
     const [program, ...rest] = (parts[0] ?? "").split(/\s+/);
@@ -686,7 +688,7 @@ function ruleFor(
 }
 
 const SEPARATORS = /&&|\|\||\|&|[;|&\n]/;
-/** docs: permissions#process-wrappers */
+/** docs: permissions#wrappers */
 const WRAPPERS = new Set([
   "timeout",
   "time",

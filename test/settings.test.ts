@@ -268,6 +268,7 @@ test("sandbox keys read only from user or managed settings are ignored in a repo
   const repository = {
     sandbox: {
       bwrapPath: "/tmp/bwrap",
+      allowNestedUserNamespaces: true,
       filesystem: { disabled: true },
       network: { tlsTerminate: true },
       credentials: {
@@ -292,6 +293,7 @@ test("sandbox keys read only from user or managed settings are ignored in a repo
     ["local", { bwrapPath: "/tmp/bwrap" }],
     ["local", { network: { tlsTerminate: true } }],
     ["local", { filesystem: { disabled: true } }],
+    ["local", { allowNestedUserNamespaces: true }],
     ["local", { credentials: { files: [{ path: "~/.netrc", mode: "mask" }] } }],
   ]);
 });
@@ -636,6 +638,8 @@ test("a quoted managed allowManagedMcpServersOnly holds, an invalid deny list is
     allowedMcpServers: [{ serverName: "corp" }],
     deniedMcpServers: "everything",
     sandbox: {
+      // A key that loosens the sandbox counts as false when its value is invalid.
+      allowNestedUserNamespaces: "sometimes",
       credentials: {
         files: [{ path: "~/.aws/credentials", mode: "mask", extract: 5 }, { mode: "deny" }],
       },
@@ -653,6 +657,7 @@ test("a quoted managed allowManagedMcpServersOnly holds, an invalid deny list is
   );
   assert.equal(managed?.data?.deniedMcpServers, undefined);
   assert.deepEqual(managed?.data?.sandbox, {
+    allowNestedUserNamespaces: false,
     credentials: { files: [{ path: "~/.aws/credentials", mode: "deny" }] },
   });
 });

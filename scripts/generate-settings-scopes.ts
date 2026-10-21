@@ -34,15 +34,22 @@ interface CatalogEntry {
 
 /**
  * Links in the page are site-relative or page anchors; the catalog shows them on their own. The
- * docs' callout components (`<Warning>` and the like) become a bold label, since the catalog
- * renders Markdown without HTML.
+ * docs' callouts (`<Warning>` components and `> [!WARNING]` alerts alike) become a bold label,
+ * since the catalog renders Markdown without HTML or alerts.
  */
 function absolute(markdown: string): string {
   return markdown
     .replace(/\]\(\/docs\//g, `](${SITE}/docs/`)
     .replace(/\]\(#/g, `](${SITE}/docs/en/settings-reference#`)
     .replace(/<(Warning|Note|Tip|Info|Check)>\s*/g, (_, name: string) => `**${name}:** `)
-    .replace(/\s*<\/(Warning|Note|Tip|Info|Check)>/g, "");
+    .replace(/\s*<\/(Warning|Note|Tip|Info|Check)>/g, "")
+    .replace(
+      /^> \[!(WARNING|NOTE|TIP|INFO|CHECK|IMPORTANT|CAUTION)\]\n((?:>.*(?:\n|$))*)/gm,
+      (_, name: string, body: string) =>
+        `**${name[0]}${name.slice(1).toLowerCase()}:** ${body
+          .replace(/^> ?/gm, "")
+          .trim()}${body.endsWith("\n") ? "\n" : ""}`
+    );
 }
 
 const response = await fetch(SOURCE);

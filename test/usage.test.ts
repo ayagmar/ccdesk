@@ -144,6 +144,8 @@ test("no rule is suggested that would allow more than you approved", async () =>
       bash("cargo ghp_x", "accept") +
       // An allow rule does not match past most variable assignments.
       bash("FOO=1 git commit", "accept") +
+      // A command ending in && or || is not split, so no rule matches it.
+      bash("git status &&", "accept") +
       // Flags of these run commands (sed's e, make --eval, go test -exec, git fetch
       // --upload-pack, cargo --config), and installs run the package's scripts.
       bash("sed -i s/a/b/ x.ts", "accept") +

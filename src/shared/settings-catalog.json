@@ -915,7 +915,7 @@
       "category": "Memory and context",
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#idlecompaction",
-      "about": "Idle compaction [compacts](https://code.claude.com/docs/en/context-window#what-survives-compaction) a long conversation that you've stepped away from, shortly before its prompt cache expires. Your next message then sends a summary instead of the whole conversation. When you come back, the conversation shows `Compacted while idle, before the prompt cache expired`.\n\nIdle compaction is on by default for conversations that meet all of these conditions:\n\n* **Session**: you're in an interactive terminal session\n* **Prompt cache**: the conversation is on the [one-hour prompt cache TTL](https://code.claude.com/docs/en/prompt-caching#which-ttl-each-request-gets)\n* **Feature flags**: Claude Code can [fetch feature flags from Anthropic](https://code.claude.com/docs/en/env-vars#features-that-need-feature-flag-fetching)\n* **Size**: the conversation's context has reached the token threshold, which you can [change](https://code.claude.com/docs/en/settings-reference#change-the-idle-compaction-threshold) from its default of 200,000\n* **Idle time**: about 54 minutes have passed since the last request, and your computer is awake at that point\n\nTo turn idle compaction off, set this key to `false`.",
+      "about": "Idle compaction [compacts](https://code.claude.com/docs/en/context-window#what-survives-compaction) a long conversation that you've stepped away from, shortly before its prompt cache expires. Your next message then sends a summary instead of the whole conversation. When you come back, the conversation shows a line that starts with `Compacted while idle, before the prompt cache expired`.\n\nIdle compaction is on by default for conversations that meet all of these conditions:\n\n* **Session**: you're in an interactive terminal session\n* **Prompt cache**: the conversation is on the [one-hour prompt cache TTL](https://code.claude.com/docs/en/prompt-caching#which-ttl-each-request-gets)\n* **Feature flags**: Claude Code can [fetch feature flags from Anthropic](https://code.claude.com/docs/en/env-vars#features-that-need-feature-flag-fetching)\n* **Size**: the conversation's context has reached the token threshold, which you can [change](https://code.claude.com/docs/en/settings-reference#change-the-idle-compaction-threshold) from its default of 200,000\n* **Idle time**: about 54 minutes have passed since the last request, and your computer is awake at that point\n\nTo turn idle compaction off, set this key to `false`.",
       "type": "Boolean\n* `true`: Claude Code compacts idle conversations that meet the conditions\n* `false`: Claude Code doesn't compact while your session is idle",
       "default": "`true`"
     },
@@ -1257,7 +1257,7 @@
       "category": "Remote, desktop, and notifications",
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#preferrednotifchannel",
-      "about": "Choose how Claude Code notifies you when a task completes or a permission prompt is waiting. Appears in `/config` as **Local notifications**.",
+      "about": "Choose how Claude Code notifies you when a task completes or a permission prompt is waiting. A [mod's notifications](https://code.claude.com/docs/en/plugins/mods/api#show-something-without-starting-a-turn) use the same setting. Appears in `/config` as **Local notifications**.",
       "type": "string, one of:\n* `\"auto\"`: Claude Code sends a desktop notification in iTerm2, Ghostty, and Kitty, rings the bell in Terminal.app only when its audible bell is off, and does nothing elsewhere\n* `\"terminal_bell\"`: Claude Code rings the bell character in any terminal\n* `\"iterm2\"`: Claude Code sends an iTerm2 desktop notification\n* `\"iterm2_with_bell\"`: Claude Code sends an iTerm2 desktop notification and rings the bell\n* `\"kitty\"`: Claude Code sends a Kitty desktop notification\n* `\"ghostty\"`: Claude Code sends a Ghostty desktop notification\n* `\"notifications_disabled\"`: Claude Code sends no notification",
       "default": "`\"auto\"`"
     },
@@ -1734,7 +1734,7 @@
       "category": "Model and responses",
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#showthinkingsummaries",
-      "about": "See summaries of Claude's [extended thinking](https://code.claude.com/docs/en/model-config#extended-thinking) in interactive sessions. Set it if you want the full summaries when you expand thinking with `Ctrl+O`. When unset or `false`, the Anthropic API redacts thinking blocks and Claude Code shows a collapsed stub; third-party providers don't redact.",
+      "about": "See summaries of Claude's [extended thinking](https://code.claude.com/docs/en/model-config#extended-thinking) in interactive sessions. Set it if you want the full summaries when you expand thinking with `Ctrl+O`. When unset or `false`, the Anthropic API redacts thinking blocks and Claude Code shows a collapsed stub.",
       "type": "Boolean\n* `true`: you see full thinking summaries when you expand thinking with `Ctrl+O`\n* `false`: the Anthropic API redacts thinking blocks and Claude Code shows a collapsed stub",
       "default": "`false`"
     },
@@ -1896,7 +1896,7 @@
       "category": "Plugins and skills",
       "scopes": ["managed"],
       "docs": "https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization-hooks",
-      "about": "Lock the `hooks` surface. Claude Code stops running hooks from user, project, and local `settings.json`, and keeps running plugin hooks and hooks in managed settings.",
+      "about": "Lock the `hooks` surface:\n\n* **Stops running**:\n  * Hooks from user, project, and local `settings.json`\n  * Frontmatter hooks in skills, custom commands, and agents, from the sources that a [`skills`](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization-skills) or [`agents`](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization-agents) lock would block\n* **Keeps running**: plugin hooks and hooks in managed settings\n\nSkills, custom commands, and agents whose frontmatter hooks stop running still load while their own surface isn't locked.",
       "type": "the string `\"hooks\"` in the [`strictPluginOnlyCustomization`](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization) array",
       "default": "not locked"
     },

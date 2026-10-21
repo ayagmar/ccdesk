@@ -66,6 +66,7 @@ const SANDBOX_OFF = new Set([
   "autoAllowBashIfSandboxed",
   "enableWeakerNestedSandbox",
   "enableWeakerNetworkIsolation",
+  "allowNestedUserNamespaces",
   "allowAppleEvents",
   "network.allowAllUnixSockets",
   "network.allowLocalBinding",

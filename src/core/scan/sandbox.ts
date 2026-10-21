@@ -1,6 +1,6 @@
 import { type Scope } from "../../shared/types.ts";
-import { stringsIn } from "./files.ts";
 import { isRecord } from "./data.ts";
+import { stringsIn } from "./files.ts";
 
 /** A part of one file's `sandbox` value that Claude Code ignores, and why. */
 export interface Dropped {
@@ -136,6 +136,13 @@ function addScopeRules({ add }: Lock): void {
     ["filesystem.disabled"],
     REPOSITORY,
     "Claude Code reads sandbox.filesystem.disabled only from user or managed settings"
+  );
+  // Only its schema description says so; the docs do not list it yet.
+  add(
+    ["allowNestedUserNamespaces"],
+    REPOSITORY,
+    "Claude Code ignores a true sandbox.allowNestedUserNamespaces from repository settings",
+    { value: true }
   );
   add(
     ["credentials.files", "credentials.envVars"],

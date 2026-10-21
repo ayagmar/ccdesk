@@ -1189,6 +1189,21 @@ test("a managed settings file that is not JSON stops Claude Code from starting; 
   assert.equal(broken.problems[0]?.blocksStart, true);
 });
 
+test("a managed settings file that fails to read stops Claude Code from starting, unless a higher source supplies a policy", async () => {
+  const f = makeFixture();
+  // Reading a folder fails with EISDIR, a failure other than the system denying the read.
+  mkdirSync(f.at("etc/claude-code/managed-settings.json"), { recursive: true });
+  f.write("app/README.md", "x");
+
+  const alone = await scanDirectory(f.env, f.at("app"));
+  assert.equal(alone.problems.length, 1);
+  assert.equal(alone.problems[0]?.blocksStart, true);
+
+  f.json("home/.claude/remote-settings.json", { model: "opus" });
+  const withServer = await scanDirectory(f.env, f.at("app"));
+  assert.equal(withServer.problems[0]?.blocksStart, undefined);
+});
+
 test("a JSON file that starts with a byte order mark is read, as Claude Code reads it", async () => {
   // Windows PowerShell 5.1's Set-Content -Encoding UTF8 writes one.
   const f = makeFixture();
@@ -1444,7 +1459,11 @@ test("MCP policy entries and server values match after variable expansion, each 
     plugins: { "kit@market": [{ scope: "user", installPath: f.at("plugins/kit") }] },
   });
   f.json("plugins/kit/.mcp.json", {
-    mcpServers: { srv: { command: `${ref("CLAUDE_PLUGIN_ROOT")}/srv` } },
+    mcpServers: {
+      srv: { command: `${ref("CLAUDE_PLUGIN_ROOT")}/srv` },
+      // A plugin's server gets the project root without a default.
+      local: { command: `${ref("CLAUDE_PROJECT_DIR")}/bin/local` },
+    },
   });
   f.json("home/.claude.json", {
     mcpServers: {
@@ -1465,6 +1484,7 @@ test("MCP policy entries and server values match after variable expansion, each 
       { serverCommand: [`${ref("TOOLS")}/bin/b`] },
       { serverCommand: [`${ref("FILL_DIR")}/c`] },
       { serverCommand: [`${f.at("plugins/kit")}/srv`] },
+      { serverCommand: [`${f.at("app")}/bin/local`] },
     ],
   });
   // An allow entry whose expansion changes its host is ignored.
@@ -1491,6 +1511,7 @@ test("MCP policy entries and server values match after variable expansion, each 
       // The ignored entry is a URL one, so it could never have admitted a command.
       stray: "Not in allowedMcpServers",
       "plugin:kit:srv": "Blocked by deniedMcpServers",
+      "plugin:kit:local": "Blocked by deniedMcpServers",
     }
   );
   // The page shows each value as written, never expanded.
