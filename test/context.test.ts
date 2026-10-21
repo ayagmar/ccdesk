@@ -190,6 +190,27 @@ test("context counts what Claude Code injects: no frontmatter, no HTML comments,
   assert.equal(byKind("agents"), "- reviewer: Reviews diffs");
 });
 
+test("a command file is listed with its when_to_use or first line, unless it opts out with 1", async () => {
+  const f = makeFixture();
+  f.write(
+    "home/.claude/commands/release.md",
+    "---\ndescription: Cut a release\nwhen_to_use: After a merge\n---\nSteps.\n"
+  );
+  f.write("home/.claude/commands/lint.md", "\nRun the linter on changed files.\nMore.\n");
+  f.write(
+    "home/.claude/commands/wipe.md",
+    "---\ndescription: Wipe\ndisable-model-invocation: 1\n---\nx\n"
+  );
+  f.write("home/work/app/README.md", "x");
+
+  const view = await scanDirectory(f.env, f.at("home/work/app"));
+
+  assert.equal(
+    view.context.find((b) => b.kind === "skills")?.text,
+    "- lint: Run the linter on changed files.\n- release: Cut a release After a merge"
+  );
+});
+
 test("a row of what Claude sees names a scope only when all of it comes from that scope", async () => {
   const f = makeFixture();
   f.write(

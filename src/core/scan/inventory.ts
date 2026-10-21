@@ -13,6 +13,7 @@ import {
   type Trust,
 } from "../../shared/types.ts";
 import { redactSecrets, shownText, shownUrl } from "../secrets.ts";
+import { isRecord, parseFrontmatter } from "./data.ts";
 import { isUserClaudeFolder, type ScanEnv } from "./env.ts";
 import {
   isDir,
@@ -25,7 +26,6 @@ import {
   resolvedPath,
   stringField,
 } from "./files.ts";
-import { isRecord, parseFrontmatter } from "./data.ts";
 import { ancestorsRootFirst } from "./instructions.ts";
 import { readMcpServers } from "./mcp.ts";
 import { foldedName, isReservedName, isSyncedFolder } from "./names.ts";
@@ -55,7 +55,9 @@ interface ReadOptions {
 }
 
 function isTrue(value: unknown): boolean {
-  return value === true || (typeof value === "string" && /^(true|yes|on|1)$/i.test(value));
+  return (
+    value === true || value === 1 || (typeof value === "string" && /^(true|yes|on|1)$/i.test(value))
+  );
 }
 
 /**
@@ -71,7 +73,7 @@ async function readEntry(
 ): Promise<Entry | null> {
   const file = await readTextFile(env, path, problems);
   if (!file) return null;
-  const { data } = parseFrontmatter(file.text);
+  const { data, body } = parseFrontmatter(file.text);
   const entry: Entry = {
     name: (!isCommand && stringField(data, "name")) || fileName,
     description: stringField(data, "description"),
@@ -79,6 +81,13 @@ async function readEntry(
     scope,
     text: file.text,
   };
+  // A command takes a skill's fields, so without a description it lists the body's first line
+  // (docs: skills#frontmatter-reference).
+  if (isCommand) {
+    entry.description ||= (body.split("\n").find((line) => line.trim() !== "") ?? "").trim();
+    const whenToUse = stringField(data, "when_to_use");
+    if (whenToUse) entry.whenToUse = whenToUse;
+  }
   const model = stringField(data, "model");
   if (model) entry.model = model;
   if (plugin) entry.plugin = plugin;
@@ -179,7 +188,7 @@ const RESERVED_NOTE =
 /**
  * Why Claude Code skips a skill outside a plugin for its name, or null: a folder named `synced` in
  * any case, or a folder or frontmatter name in the `anthropic-skills` namespace
- * (docs: skills#where-skills-live, skills#names-reserved-for-synced-skills).
+ * (docs: skills#choose-where-skills-load, skills#names-reserved-for-synced-skills).
  */
 export function reservedSkillNote(skill: Entry): string | null {
   const folder = basename(skill.folder ?? "");
