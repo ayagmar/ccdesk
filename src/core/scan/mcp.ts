@@ -435,7 +435,7 @@ interface Environments {
  * The environment ccdesk runs in stands for the one Claude Code starts with. Each file's env is
  * applied as Claude Code applies it: without the variables it ignores from that file, and from a
  * repository's files under the trust rule for hooks (docs: settings-reference#when-claude-code-applies-env-values,
- * permissions#what-runs-before-you-trust-a-folder, managed-mcp#how-policy-entries-expand).
+ * permissions#what-runs-before-you-trust-a-folder, managed-mcp#environment-variables-in-servercommand-and-serverurl-entries).
  */
 function environmentsOf({ env, layers, trust, profile }: Input): Environments {
   const envOf = (layer: SettingsLayer): Record<string, unknown> => {

@@ -244,7 +244,7 @@ export function stringsIn(value: unknown): string[] {
 /**
  * A frontmatter list given as a YAML list or a comma-separated string, such as `paths`. Like
  * Claude Code, it splits a string and each list item at commas outside braces, so
- * `src/*.{ts,tsx}` stays one glob (docs: memory#rules-frontmatter-reference).
+ * `src/*.{ts,tsx}` stays one glob (docs: memory#rule-frontmatter-reference).
  */
 function toStringList(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(toStringList);

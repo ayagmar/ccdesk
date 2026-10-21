@@ -145,7 +145,7 @@ function mergeSettings(
  * Where Claude Code keeps `.claude/settings.local.json` for a session started in `dir`: the
  * repository root (the main checkout's root in a worktree), except outside git, when that root is
  * the home directory, on Windows, or when the root, its .git or its .claude is not yours
- * (docs: settings#where-claude-code-looks-for-each-file).
+ * (docs: settings#where-claude-code-keeps-the-local-file-in-a-git-repository).
  */
 async function localSettingsDir(env: ScanEnv, dir: string): Promise<string> {
   if (env.platform === "win32") return dir;
