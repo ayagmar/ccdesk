@@ -4734,7 +4734,7 @@
         },
         "permissionExplainerEnabled": {
           "type": "boolean",
-          "description": "> [!WARNING] > > Removed in v2.1.257, together with the Ctrl+E command explanation on Bash and PowerShell permission prompts. Setting it has no effect on current versions. Through v2.1.256, you could press Ctrl+E on a Bash or PowerShell permission prompt to see a model-generated explanation of the command, and set this key to false to turn that shortcut off.",
+          "description": "Warning: Removed in v2.1.257, together with the Ctrl+E command explanation on Bash and PowerShell permission prompts. Setting it has no effect on current versions. Through v2.1.256, you could press Ctrl+E on a Bash or PowerShell permission prompt to see a model-generated explanation of the command, and set this key to false to turn that shortcut off.",
           "default": true,
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
@@ -4751,7 +4751,7 @@
             "string",
             "null"
           ],
-          "description": "> [!WARNING] > > Removed in v2.1.234, together with its /config row Default teammate model. Setting it has no effect on current versions. Through v2.1.233, you set this key to the model for agent team teammates your prompt didn't name a model for: an alias such as \"sonnet\", or null to follow the lead's model. For the model Claude Code picks for such teammates now, see specify teammates and models.",
+          "description": "Warning: Removed in v2.1.234, together with its /config row Default teammate model. Setting it has no effect on current versions. Through v2.1.233, you set this key to the model for agent team teammates your prompt didn't name a model for: an alias such as \"sonnet\", or null to follow the lead's model. For the model Claude Code picks for such teammates now, see specify teammates and models.",
           "examples": [
             "sonnet"
           ],

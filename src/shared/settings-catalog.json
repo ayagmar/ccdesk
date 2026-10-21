@@ -537,7 +537,7 @@
       "category": "Remote, desktop, and notifications",
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#disableartifact",
-      "about": "> [!WARNING]\n>\n> Deprecated, and replaced by [`enableArtifact`](https://code.claude.com/docs/en/settings-reference#enableartifact). Claude Code still honors `disableArtifact: true` as equivalent to `enableArtifact: false`, and ignores `disableArtifact: false`.\n\nUse [`enableArtifact`](https://code.claude.com/docs/en/settings-reference#enableartifact) instead to turn off the [Artifact](https://code.claude.com/docs/en/artifacts) tool, which publishes session output as a private web page on claude.ai. When you turn the **Artifacts** row off in `/config`, Claude Code writes `enableArtifact` to your user settings and clears this key.",
+      "about": "**Warning:** Deprecated, and replaced by [`enableArtifact`](https://code.claude.com/docs/en/settings-reference#enableartifact). Claude Code still honors `disableArtifact: true` as equivalent to `enableArtifact: false`, and ignores `disableArtifact: false`.\n\nUse [`enableArtifact`](https://code.claude.com/docs/en/settings-reference#enableartifact) instead to turn off the [Artifact](https://code.claude.com/docs/en/artifacts) tool, which publishes session output as a private web page on claude.ai. When you turn the **Artifacts** row off in `/config`, Claude Code writes `enableArtifact` to your user settings and clears this key.",
       "type": "Boolean\n* `true`: Claude Code turns the Artifact tool off for every session the file applies to, and no other file turns it back on\n* `false`: ignored; to leave the tool on, remove the key",
       "default": "unset, so the tool follows your account's [availability](https://code.claude.com/docs/en/artifacts#availability)"
     },
@@ -924,7 +924,7 @@
       "category": "Git and attribution",
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#includecoauthoredby",
-      "about": "> [!WARNING]\n>\n> Deprecated since v2.0.62, when [`attribution`](https://code.claude.com/docs/en/settings-reference#attribution) replaced it. Claude Code still reads it, but new configurations should set `attribution`.\n\nUse [`attribution`](https://code.claude.com/docs/en/settings-reference#attribution) instead, which replaces this key and lets you change or hide the commit trailer, the pull request text, and the session link separately. Claude Code still honors `includeCoAuthoredBy: false` from settings files that predate `attribution`, but ignores it once you set `attribution.commit` or `attribution.pr`.",
+      "about": "**Warning:** Deprecated since v2.0.62, when [`attribution`](https://code.claude.com/docs/en/settings-reference#attribution) replaced it. Claude Code still reads it, but new configurations should set `attribution`.\n\nUse [`attribution`](https://code.claude.com/docs/en/settings-reference#attribution) instead, which replaces this key and lets you change or hide the commit trailer, the pull request text, and the session link separately. Claude Code still honors `includeCoAuthoredBy: false` from settings files that predate `attribution`, but ignores it once you set `attribution.commit` or `attribution.pr`.",
       "type": "Boolean\n* `true`: the same as unset; Claude Code adds the commit trailer and the pull request attribution text\n* `false`: Claude Code omits both the commit trailer and the pull request attribution text, unless `attribution` sets `commit` or `pr`, in which case the [`attribution`](https://code.claude.com/docs/en/settings-reference#attribution) rules apply",
       "default": "`true`"
     },
@@ -960,7 +960,7 @@
       "category": "Interface and terminal",
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#keybindingflavor",
-      "about": "> [!WARNING]\n>\n> Deprecated since v2.1.261 and has no effect. The prompt's word-editing keys always [follow readline conventions](https://code.claude.com/docs/en/interactive-mode#make-ctrl-w-delete-back-to-whitespace), as in Bash. Claude Code still accepts `keybindingFlavor`, so a settings file that sets it stays valid.\n\nIn v2.1.238 through v2.1.260, setting it to `\"readline\"` made `Ctrl+W` delete back to the previous whitespace instead of only the previous word.",
+      "about": "**Warning:** Deprecated since v2.1.261 and has no effect. The prompt's word-editing keys always [follow readline conventions](https://code.claude.com/docs/en/interactive-mode#make-ctrl-w-delete-back-to-whitespace), as in Bash. Claude Code still accepts `keybindingFlavor`, so a settings file that sets it stays valid.\n\nIn v2.1.238 through v2.1.260, setting it to `\"readline\"` made `Ctrl+W` delete back to the previous whitespace instead of only the previous word.",
       "type": "string, `\"classic\"` or `\"readline\"`",
       "default": "unset"
     },
@@ -1104,7 +1104,7 @@
       "category": "Global config settings",
       "scopes": [],
       "docs": "https://code.claude.com/docs/en/settings-reference#permissionexplainerenabled",
-      "about": "> [!WARNING]\n>\n> Removed in v2.1.257, together with the `Ctrl+E` command explanation on Bash and PowerShell permission prompts. Setting it has no effect on current versions.\n\nThrough v2.1.256, you could press `Ctrl+E` on a Bash or PowerShell permission prompt to see a model-generated explanation of the command, and set this key to `false` to turn that shortcut off.",
+      "about": "**Warning:** Removed in v2.1.257, together with the `Ctrl+E` command explanation on Bash and PowerShell permission prompts. Setting it has no effect on current versions.\n\nThrough v2.1.256, you could press `Ctrl+E` on a Bash or PowerShell permission prompt to see a model-generated explanation of the command, and set this key to `false` to turn that shortcut off.",
       "type": "Boolean",
       "default": "`true`"
     },
@@ -1977,14 +1977,14 @@
       "category": "Memory and context",
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#taskoutputmaxchars",
-      "about": "> [!WARNING]\n>\n> Removed in v2.1.277, together with the `TaskOutput` tool it sized. Setting it has no effect on current versions. Claude reads a background task's [output file](https://code.claude.com/docs/en/tools-reference#background-commands) with `Read` instead.\n\nThrough v2.1.276, you set this key to the number of characters of a [background task's](https://code.claude.com/docs/en/tools-reference#background-commands) output that Claude received inline when it read the task with the `TaskOutput` tool."
+      "about": "**Warning:** Removed in v2.1.277, together with the `TaskOutput` tool it sized. Setting it has no effect on current versions. Claude reads a background task's [output file](https://code.claude.com/docs/en/tools-reference#background-commands) with `Read` instead.\n\nThrough v2.1.276, you set this key to the number of characters of a [background task's](https://code.claude.com/docs/en/tools-reference#background-commands) output that Claude received inline when it read the task with the `TaskOutput` tool."
     },
     "teammateDefaultModel": {
       "summary": "Removed in v2.1.234; see [Specify teammates and models](https://code.claude.com/docs/en/agent-teams#specify-teammates-and-models) for how Claude Code picks a teammate's model",
       "category": "Global config settings",
       "scopes": [],
       "docs": "https://code.claude.com/docs/en/settings-reference#teammatedefaultmodel",
-      "about": "> [!WARNING]\n>\n> Removed in v2.1.234, together with its `/config` row **Default teammate model**. Setting it has no effect on current versions.\n\nThrough v2.1.233, you set this key to the model for [agent team](https://code.claude.com/docs/en/agent-teams#specify-teammates-and-models) teammates your prompt didn't name a model for: an alias such as `\"sonnet\"`, or `null` to follow the lead's model. For the model Claude Code picks for such teammates now, see [specify teammates and models](https://code.claude.com/docs/en/agent-teams#specify-teammates-and-models).",
+      "about": "**Warning:** Removed in v2.1.234, together with its `/config` row **Default teammate model**. Setting it has no effect on current versions.\n\nThrough v2.1.233, you set this key to the model for [agent team](https://code.claude.com/docs/en/agent-teams#specify-teammates-and-models) teammates your prompt didn't name a model for: an alias such as `\"sonnet\"`, or `null` to follow the lead's model. For the model Claude Code picks for such teammates now, see [specify teammates and models](https://code.claude.com/docs/en/agent-teams#specify-teammates-and-models).",
       "type": "string, a model alias or full model ID, or `null`",
       "default": "unset"
     },
@@ -2110,7 +2110,7 @@
       "category": "Interface and terminal",
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#voiceenabled",
-      "about": "> [!WARNING]\n>\n> Deprecated since v2.1.92, when the [`voice`](https://code.claude.com/docs/en/settings-reference#voice) object replaced it. Claude Code still reads it so older settings files keep working, but new configurations should set `voice.enabled`.\n\nTurn voice dictation on with the single Boolean form that predates the `voice` object. When both are set, `voice.enabled` applies.",
+      "about": "**Warning:** Deprecated since v2.1.92, when the [`voice`](https://code.claude.com/docs/en/settings-reference#voice) object replaced it. Claude Code still reads it so older settings files keep working, but new configurations should set `voice.enabled`.\n\nTurn voice dictation on with the single Boolean form that predates the `voice` object. When both are set, `voice.enabled` applies.",
       "type": "Boolean\n* `true`: voice dictation is on when you're logged in with a claude.ai account and your organization's policy allows voice, unless `voice.enabled` is set\n* `false`: voice dictation is off, unless `voice.enabled` is set",
       "default": "unset"
     },
