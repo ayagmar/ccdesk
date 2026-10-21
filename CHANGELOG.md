@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.10](https://github.com/ayagmar/ccdesk/compare/v0.5.9...v0.5.10) (2026-10-21)
+
+### Bug Fixes
+
+* **context:** list command files the way Claude Code reads their frontmatter ([7777212](https://github.com/ayagmar/ccdesk/commit/7777212f9d37cdd2cad4c71877450d57d94857a6))
+* **core:** show a managed settings file that fails to read as stopping Claude Code ([1af20e1](https://github.com/ayagmar/ccdesk/commit/1af20e10bde4f6cb7b41abe79963a554e45c8ce3))
+* **core:** stop listing the AFK timers among env variables settings cannot set ([8cd7907](https://github.com/ayagmar/ccdesk/commit/8cd7907915d2da1193116225af364bb293804a7b))
+* **mcp:** expand ${CLAUDE_PROJECT_DIR} in a plugin's servers ([0b8a891](https://github.com/ayagmar/ccdesk/commit/0b8a891fcfb76982010f45480b6f8d92b4e8814e))
+* **sandbox:** handle the new sandbox.allowNestedUserNamespaces ([92e60e1](https://github.com/ayagmar/ccdesk/commit/92e60e17c318aa101f1fd032fe8ac63965377367))
+* **scripts:** turn the docs' new alert callouts into a bold label ([ea46682](https://github.com/ayagmar/ccdesk/commit/ea4668280a45d83c186578a5ac18e4e944299c9b))
+* **usage:** suggest no rule for a command ending in && or || ([ee11ccb](https://github.com/ayagmar/ccdesk/commit/ee11ccbb9353848bf50360dde81274933569afc0))
+
 ## [0.5.9](https://github.com/ayagmar/ccdesk/compare/v0.5.8...v0.5.9) (2026-10-20)
 
 ### Bug Fixes
