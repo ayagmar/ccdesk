@@ -281,6 +281,15 @@ export interface ManagedSettings {
 }
 
 /**
+ * Whether a managed file that failed to read stops Claude Code from starting: the system denying
+ * the read only skips the file, any other failure does, unless a higher source supplies a policy
+ * (docs: managed-settings#find-entries-claude-code-dropped).
+ */
+function failsClosed(code: string | undefined): boolean {
+  return code !== undefined && !["ENOENT", "EACCES", "EPERM"].includes(code);
+}
+
+/**
  * managed-settings.json, then every *.json in managed-settings.d in alphabetical order, merged and
  * repaired as Claude Code repairs entries that fail validation, with nothing hidden: for checks such
  * as managedMcpServers that must see header values. Never sent to the page as is.
@@ -293,6 +302,7 @@ export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings
   const sources: string[] = [];
   const errors: string[] = [];
   let blocksStart = false;
+  let unreadable = false;
   let data: Record<string, unknown> | null = null;
   for (const source of [join(env.managedDir, "managed-settings.json"), ...dropIns]) {
     // An empty managed file counts as {}.
@@ -300,6 +310,7 @@ export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings
     if (!result.ok) {
       if (!result.missing) errors.push(`${source}: ${result.error}`);
       if (result.unparsed) blocksStart = true;
+      if (failsClosed(result.code)) unreadable = true;
       continue;
     }
     sources.push(source);
@@ -319,6 +330,7 @@ export async function readManagedSettings(env: ScanEnv): Promise<ManagedSettings
   );
   if (machine) higher.push(HKLM_POLICY);
   const lower = user ? [HKCU_POLICY] : [];
+  if (unreadable && higher.length === 0) blocksStart = true;
   return {
     data: repaired?.data ?? null,
     sources,

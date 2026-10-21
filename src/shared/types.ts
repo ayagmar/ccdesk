@@ -121,7 +121,7 @@ export interface SettingsLayer {
   error?: string;
   /** Entries Claude Code may skip while the rest of the file applies. */
   warning?: string;
-  /** For managed settings: a file that is not a JSON object, so Claude Code refuses to start. */
+  /** For managed settings: a file that is not a JSON object or fails to read, so Claude Code refuses to start. */
   blocksStart?: boolean;
   /**
    * For managed settings: managed sources that rank above these files and that ccdesk does not

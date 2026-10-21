@@ -186,8 +186,8 @@ export async function resolvedPath(path: string): Promise<string> {
 
 type JsonResult =
   | { ok: true; data: Record<string, unknown> }
-  /** `unparsed`: the file was read, but is not a JSON object. */
-  | { ok: false; missing: boolean; unparsed?: boolean; error: string };
+  /** `unparsed`: the file was read, but is not a JSON object. `code`: why it could not be read. */
+  | { ok: false; missing: boolean; unparsed?: boolean; code?: string; error: string };
 
 /** A JSON object file; `emptyIsObject` reads an empty file as `{}`. */
 export async function readJsonObject(
@@ -210,6 +210,7 @@ export async function readJsonObject(
     return {
       ok: false,
       missing: code === "ENOENT",
+      ...(code ? { code } : {}),
       error: `cannot be read (${code ?? String(error)})`,
     };
   }
