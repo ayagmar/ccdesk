@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { Compile } from "typebox/compile";
+import serverSchema from "../../shared/mcp-server.schema.json" with { type: "json" };
 import {
   type McpApproval,
   type McpServer,
@@ -9,11 +10,13 @@ import {
   type SettingsLayer,
   type Trust,
 } from "../../shared/types.ts";
+import { schemaErrors } from "../schema.ts";
 import { redactSecrets, shownUrl } from "../secrets.ts";
+import { isRecord } from "./data.ts";
 import { type ScanEnv } from "./env.ts";
 import { readJsonOrReport, stringField, stringsIn, wildcard } from "./files.ts";
-import { isRecord } from "./data.ts";
 import { claudeJsonKey } from "./git.ts";
+import { hooksWait } from "./permissions.ts";
 import {
   fromRepository,
   type LoadedPlugin,
@@ -23,11 +26,8 @@ import {
   pluginOnlySurfaces,
   pluginsRoot,
 } from "./plugins.ts";
-import { hooksWait } from "./permissions.ts";
 import { unredactedData } from "./settings.ts";
 import { envFilter } from "./settings-env.ts";
-import serverSchema from "../../shared/mcp-server.schema.json" with { type: "json" };
-import { schemaErrors } from "../schema.ts";
 
 const validateServer = Compile(serverSchema);
 
@@ -268,7 +268,7 @@ export async function readMcpServers(input: Input, plugins: LoadedPlugin[]): Pro
   const managedJson = await readJsonOrReport(env, managedFile, problems);
   const defined = [
     ...(await configuredServers(input, project, managedFile, managedJson)),
-    ...(await pluginServers(env, plugins, problems)),
+    ...(await pluginServers(env, input.projectDir, plugins, problems)),
   ];
   // A managed-mcp.json that does not parse is reported; ccdesk cannot tell which servers it lists,
   // so it does not show it taking control.
@@ -358,6 +358,7 @@ async function configuredServers(
 /** The servers each enabled plugin brings, from its .mcp.json and its manifest, by registered name. */
 async function pluginServers(
   env: ScanEnv,
+  projectDir: string,
   plugins: LoadedPlugin[],
   problems: Problem[]
 ): Promise<Defined[]> {
@@ -374,8 +375,10 @@ async function pluginServers(
     if (file) add(define(file.mcpServers ?? file, "plugin", path));
     for (const part of await manifestConfigs(env, loaded, "mcpServers", problems))
       add(define(part.value, "plugin", part.path));
-    // The path placeholders a plugin's servers may use (docs: plugins-reference#environment-variables).
+    // The path placeholders a plugin's servers may use (docs: plugins-reference#environment-variables,
+    // mcp#plugin-provided-mcp-servers).
     const placeholders = {
+      CLAUDE_PROJECT_DIR: projectDir,
       CLAUDE_PLUGIN_ROOT: plugin.installPath,
       CLAUDE_PLUGIN_DATA: join(pluginsRoot(env), "data", plugin.id.replace(/[^\w-]/g, "-")),
     };

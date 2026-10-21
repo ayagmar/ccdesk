@@ -1444,7 +1444,11 @@ test("MCP policy entries and server values match after variable expansion, each 
     plugins: { "kit@market": [{ scope: "user", installPath: f.at("plugins/kit") }] },
   });
   f.json("plugins/kit/.mcp.json", {
-    mcpServers: { srv: { command: `${ref("CLAUDE_PLUGIN_ROOT")}/srv` } },
+    mcpServers: {
+      srv: { command: `${ref("CLAUDE_PLUGIN_ROOT")}/srv` },
+      // A plugin's server gets the project root without a default.
+      local: { command: `${ref("CLAUDE_PROJECT_DIR")}/bin/local` },
+    },
   });
   f.json("home/.claude.json", {
     mcpServers: {
@@ -1465,6 +1469,7 @@ test("MCP policy entries and server values match after variable expansion, each 
       { serverCommand: [`${ref("TOOLS")}/bin/b`] },
       { serverCommand: [`${ref("FILL_DIR")}/c`] },
       { serverCommand: [`${f.at("plugins/kit")}/srv`] },
+      { serverCommand: [`${f.at("app")}/bin/local`] },
     ],
   });
   // An allow entry whose expansion changes its host is ignored.
@@ -1491,6 +1496,7 @@ test("MCP policy entries and server values match after variable expansion, each 
       // The ignored entry is a URL one, so it could never have admitted a command.
       stray: "Not in allowedMcpServers",
       "plugin:kit:srv": "Blocked by deniedMcpServers",
+      "plugin:kit:local": "Blocked by deniedMcpServers",
     }
   );
   // The page shows each value as written, never expanded.
