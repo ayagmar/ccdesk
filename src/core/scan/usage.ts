@@ -669,6 +669,8 @@ function ruleFor(
   if (tool === "Bash") {
     if (command === undefined || /[`$<>(){}]/.test(command)) return null;
     if (/^\s*\w+=/.test(command)) return null;
+    // docs: permissions#compound-commands
+    if (/(&&|\|\|)\s*$/.test(command)) return null;
     const parts = subcommands(command);
     if (parts.length !== 1) return null;
     const [program, ...rest] = (parts[0] ?? "").split(/\s+/);
