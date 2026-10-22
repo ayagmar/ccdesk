@@ -24,7 +24,7 @@
       "category": "Remote, desktop, and notifications",
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#agentpushnotifenabled",
-      "about": "Allow Claude to send a push notification to your phone when it decides one is worth sending, for example when a long task finishes. Claude Code syncs this choice to your account, and pushes arrive while [Remote Control](https://code.claude.com/docs/en/remote-control) is connected. Appears in `/config` as **Push when Claude decides**.",
+      "about": "Allow Claude to send a push notification to your phone when it decides one is worth sending, for example when a long task finishes. Claude can send one while [Remote Control](https://code.claude.com/docs/en/remote-control) is connected. Appears in `/config` as **Push when Claude decides**. When you change it there, Claude Code also saves the value to your account.",
       "type": "Boolean\n* `true`: Claude can send a push notification to your phone when it decides one is worth sending\n* `false`: Claude doesn't send those notifications",
       "default": "`false`"
     },
@@ -70,7 +70,7 @@
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#allowedmcpservers",
       "about": "Allowlist the MCP servers people can add. Claude Code blocks any server that doesn't match an entry wherever it's defined, including plugin servers, servers a user passes with `--mcp-config`, and servers from claude.ai.\n\nBuilt-in servers such as Claude in Chrome, the `ide` server Claude Code connects to in a running [VS Code](https://code.claude.com/docs/en/vs-code#the-built-in-ide-mcp-server) or [JetBrains](https://code.claude.com/docs/en/jetbrains#the-built-in-ide-mcp-server) IDE, and servers the CLI itself configures are exempt from the allowlist, and the denylist still applies to them. On Claude Code v2.1.268 or later, a [Claude Tag](https://code.claude.com/docs/en/claude-tag) session's Slack tools are also exempt from the allowlist, and the denylist still applies to them. In-process `type: \"sdk\"` servers are exempt from both lists; the [app that started the session](https://code.claude.com/docs/en/mcp#how-connectors-reach-claude-code) registers them.\n\nServers your organization delivers are also exempt from the allowlist, and the denylist still applies to them. The exemption covers every [`managedMcpServers`](https://code.claude.com/docs/en/settings-reference#managedmcpservers) entry, and any [`managed-mcp.json`](https://code.claude.com/docs/en/managed-mcp#exclusive-control-with-managed-mcp-json) entry whose values use no `${VAR}` expansion. See [How a server is evaluated](https://code.claude.com/docs/en/managed-mcp#how-a-server-is-evaluated) for the full check order. Before v2.1.259, servers from `managed-mcp.json` had to match too.",
-      "type": "array of objects, each with exactly one key: `serverName`, a string limited to letters, numbers, hyphens, and underscores; `serverCommand`, an array of the command and its arguments matched exactly; or `serverUrl`, a URL pattern with `*` wildcards",
+      "type": "array of objects, each with exactly one key. Use `serverName`, a string limited to letters, numbers, hyphens, and underscores; `serverCommand`, an array of the command and its arguments matched exactly; or `serverUrl`, a URL pattern with `*` wildcards",
       "default": "unset, so every server is allowed; an empty array blocks every server users add"
     },
     "allowedProviders": {
@@ -1384,7 +1384,7 @@
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#sandbox",
       "about": "Isolate the Bash commands Claude runs from your filesystem and network with [sandboxing](https://code.claude.com/docs/en/sandboxing). Turn the sandbox on with `enabled`, then narrow or widen what sandboxed commands can touch with the `filesystem`, `network`, and `credentials` sub-objects. The sandbox runs on macOS, Linux, and WSL2.",
-      "type": "object with `enabled`, `failIfUnavailable`, `autoAllowBashIfSandboxed`, `excludedCommands`, `allowUnsandboxedCommands`, `enableWeakerNestedSandbox`, `enableWeakerNetworkIsolation`, `allowAppleEvents`, `bwrapPath`, `socatPath`, `ignoreViolations`, and `ripgrep`, plus the `filesystem`, `network`, and `credentials` objects",
+      "type": "object with `enabled`, `failIfUnavailable`, `autoAllowBashIfSandboxed`, `excludedCommands`, `allowUnsandboxedCommands`, `enableWeakerNestedSandbox`, `enableWeakerNetworkIsolation`, `allowAppleEvents`, `allowNestedUserNamespaces`, `bwrapPath`, `socatPath`, `ignoreViolations`, and `ripgrep`, plus the `filesystem`, `network`, and `credentials` objects",
       "default": "unset, so Claude Code runs commands without a sandbox"
     },
     "sandbox.allowAppleEvents": {
@@ -1394,6 +1394,15 @@
       "docs": "https://code.claude.com/docs/en/settings-reference#sandbox-allowappleevents",
       "about": "Let sandboxed commands on macOS send Apple Events, which `open`, `osascript`, and tools that open URLs in a browser need; without it they fail with error `-600`. This removes code-execution isolation: sandboxed commands can launch other applications unsandboxed with no user prompt, and can send AppleScript commands to running applications such as Terminal, subject to the per-app macOS automation-consent prompt (TCC).",
       "type": "Boolean\n* `true`: sandboxed commands on macOS can send Apple Events\n* `false`: sandboxed commands on macOS can't send Apple Events, so `open` and `osascript` fail with error `-600`",
+      "default": "`false`"
+    },
+    "sandbox.allowNestedUserNamespaces": {
+      "summary": "Let [sandboxed](https://code.claude.com/docs/en/sandboxing#chromium-or-rootless-podman-fails-inside-the-sandbox-on-linux) commands create user namespaces on Linux and WSL2",
+      "category": "Sandbox settings",
+      "scopes": ["managed", "user"],
+      "docs": "https://code.claude.com/docs/en/settings-reference#sandbox-allownestedusernamespaces",
+      "about": "Let sandboxed commands on Linux and WSL2 create user namespaces, which Chromium's and Electron's own sandbox, a nested bubblewrap, and `unshare` need. If you set this key to `true`, you turn off a security boundary: code from a sandboxed command can end up running outside the sandbox. For rootless Podman or Buildah, use [`excludedCommands`](https://code.claude.com/docs/en/settings-reference#sandbox-excludedcommands) instead, because the sandbox stops them in other ways too. Requires Claude Code v2.1.305 or later.",
+      "type": "Boolean\n* `true`: sandboxed commands can create user namespaces\n* `false`: this key allows nothing extra, and the sandbox's default applies",
       "default": "`false`"
     },
     "sandbox.allowUnsandboxedCommands": {
@@ -1887,7 +1896,7 @@
       "category": "Plugins and skills",
       "scopes": ["managed"],
       "docs": "https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization-agents",
-      "about": "Lock the `agents` surface. Claude Code stops loading agents from `~/.claude/agents/`, `.claude/agents/`, and `--add-dir` directories. It keeps loading plugin agents, built-in agents, and agents in the managed policy directory.",
+      "about": "Lock the `agents` surface. Claude Code stops loading agents from `~/.claude/agents/`, `.claude/agents/`, and `--add-dir` directories. It keeps loading built-in agents, agents in the managed policy directory, and agents from plugins other than [skills-directory plugins](https://code.claude.com/docs/en/plugins/loading#skills-directory-plugins-blocked-by-managed-settings).",
       "type": "the string `\"agents\"` in the [`strictPluginOnlyCustomization`](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization) array",
       "default": "not locked"
     },
@@ -1896,7 +1905,7 @@
       "category": "Plugins and skills",
       "scopes": ["managed"],
       "docs": "https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization-hooks",
-      "about": "Lock the `hooks` surface:\n\n* **Stops running**:\n  * Hooks from user, project, and local `settings.json`\n  * Frontmatter hooks in skills, custom commands, and agents, from the sources that a [`skills`](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization-skills) or [`agents`](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization-agents) lock would block\n* **Keeps running**: plugin hooks and hooks in managed settings\n\nSkills, custom commands, and agents whose frontmatter hooks stop running still load while their own surface isn't locked.",
+      "about": "Lock the `hooks` surface:\n\n* **Stops running**:\n  * Hooks from user, project, and local `settings.json`\n  * Frontmatter hooks in skills, custom commands, and agents, from the sources that a [`skills`](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization-skills) or [`agents`](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization-agents) lock would block\n* **Keeps running**: hooks in managed settings, and hooks from plugins other than [skills-directory plugins](https://code.claude.com/docs/en/plugins/loading#skills-directory-plugins-blocked-by-managed-settings)\n\nSkills, custom commands, and agents whose frontmatter hooks stop running still load while their own surface isn't locked.",
       "type": "the string `\"hooks\"` in the [`strictPluginOnlyCustomization`](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization) array",
       "default": "not locked"
     },
@@ -1905,7 +1914,7 @@
       "category": "Plugins and skills",
       "scopes": ["managed"],
       "docs": "https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization-mcp",
-      "about": "Lock the `mcp` surface. Claude Code stops loading MCP servers from `~/.claude.json` and `.mcp.json`, and keeps loading plugin MCP servers, [`managed-mcp.json`](https://code.claude.com/docs/en/managed-mcp) servers, and servers from [`managedMcpServers`](https://code.claude.com/docs/en/settings-reference#managedmcpservers).",
+      "about": "Lock the `mcp` surface. Claude Code stops loading MCP servers from `~/.claude.json` and `.mcp.json`. It keeps loading [`managed-mcp.json`](https://code.claude.com/docs/en/managed-mcp) servers, servers from [`managedMcpServers`](https://code.claude.com/docs/en/settings-reference#managedmcpservers), and MCP servers from plugins other than [skills-directory plugins](https://code.claude.com/docs/en/plugins/loading#skills-directory-plugins-blocked-by-managed-settings).",
       "type": "the string `\"mcp\"` in the [`strictPluginOnlyCustomization`](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization) array",
       "default": "not locked"
     },
@@ -1914,7 +1923,7 @@
       "category": "Plugins and skills",
       "scopes": ["managed"],
       "docs": "https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization-skills",
-      "about": "Lock the `skills` surface. Claude Code stops loading skills from `~/.claude/skills/` and `.claude/skills/`, custom commands from `~/.claude/commands/` and `.claude/commands/`, skills and commands under `--add-dir` directories, and skills synced from your claude.ai account. It keeps loading plugin skills, bundled skills, and skills in the managed policy directory.",
+      "about": "Lock the `skills` surface. Claude Code stops loading skills from `~/.claude/skills/` and `.claude/skills/`, custom commands from `~/.claude/commands/` and `.claude/commands/`, skills and commands under `--add-dir` directories, and skills synced from your claude.ai account. It keeps loading bundled skills, skills in the managed policy directory, and skills from plugins other than [skills-directory plugins](https://code.claude.com/docs/en/plugins/loading#skills-directory-plugins-blocked-by-managed-settings).",
       "type": "the string `\"skills\"` in the [`strictPluginOnlyCustomization`](https://code.claude.com/docs/en/settings-reference#strictpluginonlycustomization) array",
       "default": "not locked"
     },
