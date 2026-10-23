@@ -43,6 +43,10 @@
     "availableModelsMatch": [
       "managed"
     ],
+    "axScreenReader": [
+      "managed",
+      "user"
+    ],
     "bashEditDiffEnabled": [
       "managed",
       "user"
