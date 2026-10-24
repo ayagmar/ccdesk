@@ -10,13 +10,13 @@
     "typecheck": "astro sync && tsc --noEmit -p ."
   },
   "dependencies": {
-    "@astrojs/starlight": "0.42.6",
+    "@astrojs/starlight": "0.42.7",
     "@fontsource-variable/hanken-grotesk": "5.3.0",
     "@fontsource-variable/jetbrains-mono": "5.3.0",
-    "astro": "7.3.8"
+    "astro": "7.4.2"
   },
   "devDependencies": {
-    "playwright-core": "1.64.0",
+    "playwright-core": "1.64.1",
     "sharp": "0.35.5",
     "typescript": "7.0.2"
   }

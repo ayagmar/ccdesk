@@ -6,3 +6,7 @@ allowBuilds:
 # settings schema, so it skips the 24 h wait pnpm puts on fresh packages.
 minimumReleaseAgeExclude:
   - '@anthropic-ai/claude-agent-sdk*'
+
+overrides:
+  basic-ftp: 6.2.3
+  undici: 7.30.1
