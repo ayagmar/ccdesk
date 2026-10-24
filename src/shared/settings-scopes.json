@@ -43,6 +43,10 @@
     "availableModelsMatch": [
       "managed"
     ],
+    "axScreenReader": [
+      "managed",
+      "user"
+    ],
     "bashEditDiffEnabled": [
       "managed",
       "user"
@@ -174,6 +178,10 @@
     ],
     "sshHostAllowlist": [
       "managed"
+    ],
+    "sshHostCommands": [
+      "managed",
+      "user"
     ],
     "strictKnownMarketplaces": [
       "managed"
