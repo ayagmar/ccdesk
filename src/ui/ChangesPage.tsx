@@ -10,6 +10,7 @@ import { Bullet } from "./Bullet.tsx";
 import { DiffView } from "./DiffView.tsx";
 import { ago, tilde } from "./format.ts";
 import { Icon } from "./Icon.tsx";
+import { reveal } from "./reveal.ts";
 
 const WHAT: Record<BackupKind, string> = {
   settings: "Settings changed",
@@ -237,7 +238,7 @@ function ShowChange({
     );
   if (!view) return <p className="muted small">Reading the backup…</p>;
   return (
-    <section className="review" aria-label="What this change did">
+    <section className="review" aria-label="What this change did" ref={reveal}>
       {view.after === undefined ? (
         <p className="muted small">
           {incomplete
@@ -298,7 +299,7 @@ function Restore({ id, onDone }: { id: string; onDone: (text: string) => void })
     );
   };
   return (
-    <section className="review" aria-label="Review restore">
+    <section className="review" aria-label="Review restore" ref={reveal}>
       <RestoreReview preview={preview} busy={busy} onRestore={restore} />
     </section>
   );

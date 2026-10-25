@@ -3,6 +3,7 @@ import { type Change, type SettingsEditPreview } from "../shared/types.ts";
 import { errorText } from "./api.ts";
 import { DiffView } from "./DiffView.tsx";
 import { tilde } from "./format.ts";
+import { reveal } from "./reveal.ts";
 
 /** A saved edit: the change to undo, what to tell you, and the row to show afterwards. */
 export interface Saved {
@@ -62,7 +63,7 @@ export function useReviewedChange<E>(
   const shown = (
     <>
       {problem && (
-        <p className="flag bad" role="alert">
+        <p className="flag bad" role="alert" ref={reveal}>
           {problem}
         </p>
       )}
@@ -103,7 +104,7 @@ function Review({
 }) {
   const blocked = preview.errors.length > 0;
   return (
-    <section className="review" aria-label="Review change">
+    <section className="review" aria-label="Review change" ref={reveal}>
       <h3 className="sub-title">
         {blocked ? "This value does not fit the schema" : `Change to ${tilde(preview.path)}`}
       </h3>

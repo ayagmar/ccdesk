@@ -14,6 +14,7 @@ import { Bullet } from "../Bullet.tsx";
 import { DiffView } from "../DiffView.tsx";
 import { ago, plural, tilde } from "../format.ts";
 import { Icon } from "../Icon.tsx";
+import { reveal } from "../reveal.ts";
 import { Contents, Count, Field, NameButton, PathValue } from "./kit.tsx";
 import { type Actions, type SectionUi } from "./types.ts";
 
@@ -215,7 +216,7 @@ function MemoryReview({
   }, [action, path]);
 
   return (
-    <section className="review memory-review" aria-label="Review memory change">
+    <section className="review memory-review" aria-label="Review memory change" ref={reveal}>
       <MemoryFiles preview={preview} problem={problem} />
       <div className="editor-buttons">
         {preview && !problem && (
