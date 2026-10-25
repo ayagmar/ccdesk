@@ -2240,6 +2240,11 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+/* A notice's items are sentences: as flex rows, each path in one became its own line. */
+.problems li {
+  display: block;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before {
