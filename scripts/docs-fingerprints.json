@@ -53,7 +53,7 @@
   "settings#exceptions-to-managed-settings-precedence": "1871cd90e2dadb90",
   "settings#fix-a-broken-settings-file": "8f18c8b9ec3b5ad4",
   "settings#where-claude-code-keeps-the-local-file-in-a-git-repository": "b0ffe61ed0d9a5cc",
-  "settings-reference#allowmanagedhooksonly": "b95bc22aeffb8473",
+  "settings-reference#allowmanagedhooksonly": "75c07ce571aa7584",
   "settings-reference#automemorydirectory": "f2feacb0471975e0",
   "settings-reference#automemoryenabled": "ac78a86390df19dd",
   "settings-reference#automode": "9fcfc847e3c9dd85",
@@ -79,6 +79,6 @@
   "sub-agents#subagent-files-claude-code-skips": "31d73503e3e7c4b0",
   "tools-reference#configure-tools-with-permission-rules-and-hooks": "56413547956883b6",
   "tools-reference#endconversation-tool-behavior": "b1aa93ea677c0429",
-  "tools-reference#monitor-tool": "4626ebeadc68ae00",
+  "tools-reference#monitor-tool": "267d75355f0d361e",
   "worktrees#what-worktrees-share-with-the-main-checkout": "9cdd1d5d6d1c1cb3"
 }
