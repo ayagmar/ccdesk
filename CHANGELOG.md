@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.12](https://github.com/ayagmar/ccdesk/compare/v0.5.11...v0.5.12) (2026-10-25)
+
+### Bug Fixes
+
+* **ui:** keep a revealed review clear of the sticky headers ([1ac3d35](https://github.com/ayagmar/ccdesk/commit/1ac3d356d1e34befaa0c869c907b98d546e40599))
+* **ui:** measure the inspector header when revealing a review ([2dec05f](https://github.com/ayagmar/ccdesk/commit/2dec05f84b18ad952abe4d4a570404c778dde30c))
+* **ui:** scroll a review into view when it opens ([6e9172e](https://github.com/ayagmar/ccdesk/commit/6e9172ebd4c42dbec9a5ee13e92bba2bc5ec4aba))
+* **ui:** space the Values heading from the setting text above it ([a773666](https://github.com/ayagmar/ccdesk/commit/a773666a2005a77049c42c2399bcbc80965e7c42))
+* **ui:** stop the page scrolling into blank space past the app ([32da98c](https://github.com/ayagmar/ccdesk/commit/32da98cb6671057f42db1ac845b661fba0f8ccc0))
+* **ui:** wrap notice text as sentences ([98b3f67](https://github.com/ayagmar/ccdesk/commit/98b3f6701725b632cd42e972a7fc5602a6b95c8e))
+
 ## [0.5.11](https://github.com/ayagmar/ccdesk/compare/v0.5.10...v0.5.11) (2026-10-25)
 
 ## [0.5.10](https://github.com/ayagmar/ccdesk/compare/v0.5.9...v0.5.10) (2026-10-21)
