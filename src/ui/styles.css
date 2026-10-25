@@ -2782,6 +2782,11 @@ fieldset.field {
   margin-bottom: 0;
 }
 
+/* The docs text has no bottom margin of its own, so a section after it needs the gap. */
+.docs-text + .sub {
+  margin-top: 16px;
+}
+
 .tool-switch-rule {
   display: flex;
   align-items: center;
