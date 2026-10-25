@@ -593,6 +593,11 @@ input::placeholder {
   scroll-margin-top: var(--head);
 }
 
+/* A review that reveal.ts scrolls to stops below the sticky header over it, not under it. */
+.tt-section :is(.review, .confirm, [role="alert"]) {
+  scroll-margin-top: var(--head);
+}
+
 .via-agents {
   margin-left: 8px;
   vertical-align: middle;
@@ -1365,6 +1370,8 @@ input::placeholder {
   border-left: 1px solid var(--rule);
   background: var(--panel);
   overflow-y: auto;
+  /* Room for the sticky .insp-head, which is about 58px tall, when a review scrolls into view. */
+  scroll-padding-top: 64px;
   min-width: 0;
 }
 
@@ -2408,7 +2415,8 @@ button:disabled {
     direction: ltr;
   }
 
-  .tt-section {
+  .tt-section,
+  .tt-section :is(.review, .confirm, [role="alert"]) {
     scroll-margin-top: 0;
   }
 
