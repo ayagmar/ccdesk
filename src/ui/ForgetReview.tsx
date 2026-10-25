@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { type ForgetPreview } from "../shared/types.ts";
 import { api, errorText } from "./api.ts";
 import { plural, size, tilde } from "./format.ts";
+import { reveal } from "./reveal.ts";
 
 /**
  * Forgetting a directory whose folder is gone: what moves away and what stays, read when it opens,
@@ -45,7 +46,7 @@ export function ForgetReview({
   };
 
   return (
-    <section className="confirm" aria-label="Review forgetting this directory">
+    <section className="confirm" aria-label="Review forgetting this directory" ref={reveal}>
       {problem && (
         <p className="flag bad" role="alert">
           {problem}
