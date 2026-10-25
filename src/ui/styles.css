@@ -1370,8 +1370,6 @@ input::placeholder {
   border-left: 1px solid var(--rule);
   background: var(--panel);
   overflow-y: auto;
-  /* Room for the sticky .insp-head, which is about 58px tall, when a review scrolls into view. */
-  scroll-padding-top: 64px;
   min-width: 0;
 }
 
