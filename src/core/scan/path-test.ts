@@ -102,7 +102,7 @@ function startRuleMatches(view: DirectoryView, target: string, cwd: string): Pat
   for (const rule of view.instructions) {
     if (!rule.paths || rule.status !== "on-match") continue;
     // A project rule's globs are relative to the folder holding its .claude; user and managed
-    // rules' to the start directory (observed in v2.1.296; the docs do not say).
+    // rules' to the start directory (docs: memory#path-specific-rules).
     const base = rule.scope === "project" || rule.scope === "local" ? rule.dir : cwd;
     const glob = matchingGlob(rule.paths, slashed(relative(base, target)));
     if (glob) matches.push({ kind: "rule", path: rule.path, scope: rule.scope, glob });

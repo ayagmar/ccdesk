@@ -4748,7 +4748,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Limit the hosts a Desktop SSH session can connect to. Only the Desktop app reads this key; the CLI doesn't. Patterns are case-insensitive: * matches any host, *.example.com matches example.com and every subdomain, and anything else is an exact match against the hostname after ~/.ssh/config resolution. An empty array turns SSH sessions off.",
+          "description": "Limit the hosts a Desktop SSH session can connect to. Only the Desktop app reads this key; the CLI doesn't. Patterns are case-insensitive: * matches any host, *.example.com matches example.com and every subdomain, and anything else is an exact match against the hostname after ~/.ssh/config resolution. An empty array turns SSH sessions off. With Claude Desktop v3.1623.0 or later, a session's jump hosts have to match a pattern too.",
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
         "teammateDefaultModel": {
