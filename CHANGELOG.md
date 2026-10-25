@@ -1,5 +1,7 @@
 # Changelog
 
+## [0.5.13](https://github.com/ayagmar/ccdesk/compare/v0.5.12...v0.5.13) (2026-10-25)
+
 ## [0.5.12](https://github.com/ayagmar/ccdesk/compare/v0.5.11...v0.5.12) (2026-10-25)
 
 ### Bug Fixes
