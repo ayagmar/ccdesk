@@ -152,6 +152,9 @@ kbd {
   /* Not 100vh: the text size zoom scales vh too, which would push the page past the window. */
   height: 100%;
   overflow: hidden;
+  /* Holds absolutely placed descendants such as .visually-hidden labels, which would otherwise
+     sit on the page itself and make it scroll past the shell. */
+  position: relative;
 }
 
 .main {
