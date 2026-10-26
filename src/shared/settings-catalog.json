@@ -1528,7 +1528,7 @@
       "scopes": ["managed", "user", "project", "local"],
       "docs": "https://code.claude.com/docs/en/settings-reference#sandbox-failifunavailable",
       "about": "Make Claude Code exit with an error at startup when `sandbox.enabled` is `true` but the sandbox can't start, because a dependency is missing or the platform is unsupported. Without this key, Claude Code runs commands unsandboxed. Managed deployments that require sandboxing as a security gate can use this setting.\n\nOn a platform the sandbox doesn't support, Claude Code doesn't start with this key on. See [Enforce sandboxing with managed settings](https://code.claude.com/docs/en/sandboxing.md#enforce-sandboxing-with-managed-settings).",
-      "type": "Boolean\n* `true`: Claude Code exits with an error at startup when `sandbox.enabled` is `true` but the sandbox can't start\n* `false`: Claude Code runs commands unsandboxed when the sandbox can't start",
+      "type": "Boolean\n* `true`: Claude Code exits with an error at startup when `sandbox.enabled` is `true` but the sandbox can't start. If the sandbox passes that check and then fails to initialize, the session keeps running and Claude Code [refuses each sandboxed command](https://code.claude.com/docs/en/sandboxing.md#commands-refused-with-sandbox-is-required)\n* `false`: Claude Code runs commands unsandboxed when the sandbox can't start",
       "default": "`false`"
     },
     "sandbox.filesystem": {
