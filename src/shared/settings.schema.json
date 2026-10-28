@@ -212,6 +212,11 @@
               "type": "boolean",
               "description": "Refuse file-tool reads (Read, Grep, Glob, LSP) outside the working directories in every permission mode; true in any settings source wins. Also set when the user picks \"block\" on the one-time auto-mode prompt for a read outside the working directories."
             },
+            "disableAutoMode": {
+              "type": "string",
+              "const": "disable",
+              "description": "Disable auto mode"
+            },
             "additionalDirectories": {
               "type": "array",
               "items": {
@@ -1518,6 +1523,16 @@
               "autoUpdate": {
                 "type": "boolean",
                 "description": "Whether to automatically update this marketplace and its installed plugins on startup"
+              },
+              "pluginDigests": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "description": "Managed settings only: the plugins of this marketplace that an organization delivers with its own tier, by plugin name, each with the digests of its releases. A plugin also enabled and listed in prependPlugins or appendPlugins by managed settings the session vouches for loads its hooks module only from a folder that proves one of them, and is then seated in that tier; any other copy does not load. A digest is sha256- and the base64 SHA-256 of, for every regular file in the folder in UTF-16 code unit order of its path, not normalized, \"f PATH\" NUL BYTE-LENGTH NUL BYTES, with / in paths; .git, .in_use, .orphaned_at, .claude-plugin-link and .links_materialized at the root are left out. The plugin keeps its manifest at .claude-plugin/plugin.json and names one module in hooks/hooks.json. A string of any other form, or a list that is empty or of any other shape, matches no folder. A symbolic link, or a surface module, proves nothing. A proved plugin ships bundled with no install step: the digest covers the whole folder, node_modules included. A checkout whose line endings were converted proves nothing."
               }
             },
             "required": [
@@ -2021,6 +2036,16 @@
               "autoUpdate": {
                 "type": "boolean",
                 "description": "Whether to automatically update this marketplace and its installed plugins on startup"
+              },
+              "pluginDigests": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "description": "Managed settings only: the plugins of this marketplace that an organization delivers with its own tier, by plugin name, each with the digests of its releases. A plugin also enabled and listed in prependPlugins or appendPlugins by managed settings the session vouches for loads its hooks module only from a folder that proves one of them, and is then seated in that tier; any other copy does not load. A digest is sha256- and the base64 SHA-256 of, for every regular file in the folder in UTF-16 code unit order of its path, not normalized, \"f PATH\" NUL BYTE-LENGTH NUL BYTES, with / in paths; .git, .in_use, .orphaned_at, .claude-plugin-link and .links_materialized at the root are left out. The plugin keeps its manifest at .claude-plugin/plugin.json and names one module in hooks/hooks.json. A string of any other form, or a list that is empty or of any other shape, matches no folder. A symbolic link, or a surface module, proves nothing. A proved plugin ships bundled with no install step: the digest covers the whole folder, node_modules included. A checkout whose line endings were converted proves nothing."
               }
             },
             "required": [
@@ -3659,7 +3684,7 @@
                   "items": {
                     "type": "string"
                   },
-                  "description": "macOS only: Additional XPC/Mach service names to allow looking up. Supports trailing-wildcard prefix matching (e.g., \"com.apple.coresimulator.*\"). Needed for tools that communicate via XPC such as the iOS Simulator or Playwright. Merged across settings sources. When managed settings or a --settings file set allowUnsandboxedCommands: false, or managed settings set network.allowManagedDomainsOnly: true, values from project settings (.claude/settings.json and .claude/settings.local.json) are ignored."
+                  "description": "macOS only: Additional XPC/Mach service names to allow looking up. Supports trailing-wildcard prefix matching (e.g., \"com.apple.CoreSimulator.*\"). Needed for tools that communicate via XPC such as the iOS Simulator or Playwright. Merged across settings sources. When managed settings or a --settings file set allowUnsandboxedCommands: false, or managed settings set network.allowManagedDomainsOnly: true, values from project settings (.claude/settings.json and .claude/settings.local.json) are ignored."
                 },
                 "httpProxyPort": {
                   "type": "number",
@@ -4622,6 +4647,53 @@
           "type": "boolean",
           "description": "Allow Claude to push proactive mobile notifications"
         },
+        "skipAutoPermissionPrompt": {
+          "type": "boolean",
+          "description": "Whether the user has accepted the auto mode opt-in dialog"
+        },
+        "useAutoModeDuringPlan": {
+          "type": "boolean",
+          "description": "Whether plan mode uses auto mode semantics when auto mode is available (default: true)"
+        },
+        "autoMode": {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Rules for the auto mode classifier allow section. Include the literal string \"$defaults\" to inherit the built-in rules at that position."
+            },
+            "soft_deny": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Rules for the auto mode classifier SOFT BLOCK section — destructive/irreversible actions that user intent can clear. Include the literal string \"$defaults\" to inherit the built-in rules at that position."
+            },
+            "hard_deny": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Rules for the auto mode classifier HARD BLOCK section — security boundaries that user intent does NOT clear. Include the literal string \"$defaults\" to inherit the built-in rules at that position."
+            },
+            "environment": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Entries for the auto mode classifier environment section. Include the literal string \"$defaults\" to inherit the built-in entries at that position."
+            },
+            "classifyAllShell": {
+              "type": "boolean",
+              "description": "When true, every Bash/PowerShell allow rule is suspended while auto mode is active so all shell commands are routed through the classifier (higher safety, more classifier calls). Default: false."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Auto mode classifier prompt customization"
+        },
         "disableDeepLinkRegistration": {
           "type": "string",
           "const": "disable",
@@ -4649,47 +4721,6 @@
           "type": "boolean",
           "description": "Install the Claude Code IDE extension automatically when you run Claude Code from a VS Code terminal. Appears in /config as Auto-install IDE extension when you run Claude Code inside a VS Code or JetBrains terminal.",
           "default": true,
-          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
-        },
-        "autoMode": {
-          "type": "object",
-          "description": "Add your own rules to what the auto mode classifier blocks and allows. Use it to tell the classifier which repos, buckets, and domains your organization trusts, so it stops blocking routine internal operations. The classifier ships with built-in allow and deny rules. Include the literal string \"$defaults\" in an array to keep those built-in rules at that position and add yours around them; leave it out to replace them with yours.",
-          "additionalProperties": false,
-          "properties": {
-            "allow": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Rules for the auto mode classifier allow section. Replaces the built-in allow rules entirely unless the literal string \"$defaults\" is included as an entry, which splices the built-in defaults in at that position."
-            },
-            "soft_deny": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Rules for the auto mode classifier soft-deny section. Replaces the built-in soft-deny rules entirely unless the literal string \"$defaults\" is included as an entry, which splices the built-in defaults in at that position."
-            },
-            "environment": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Entries for the auto mode classifier environment section. Replaces the built-in environment context entirely unless the literal string \"$defaults\" is included as an entry, which splices the built-in defaults in at that position."
-            },
-            "hard_deny": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Rules for the auto mode classifier hard-deny section. Hard-deny rules block unconditionally regardless of user intent. Replaces the built-in hard-deny rules entirely unless the literal string \"$defaults\" is included as an entry, which splices the built-in defaults in at that position. See https://code.claude.com/docs/en/permissions"
-            },
-            "classifyAllShell": {
-              "type": "boolean",
-              "description": "Send every Bash and PowerShell command through the auto mode classifier while auto mode is active. By default, auto mode suspends only allow rules that could run arbitrary code: tool-wide and wildcard rules such as Bash(*), and interpreter or shell-wrapper prefixes such as Bash(python *). A command that any other allow rule matches, such as Bash(npm test), skips the classifier unless it carries per-command allowed domains. When it skips, a destructive argument the rule's prefix didn't anticipate can get through unseen. Setting this key suspends every shell allow rule for the session so the classifier sees every command. Requires Claude Code v2.1.193 or later.",
-              "default": false
-            }
-          },
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         },
         "awaySummaryEnabled": {
@@ -4761,15 +4792,10 @@
             "sonnet"
           ],
           "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
-        },
-        "useAutoModeDuringPlan": {
-          "type": "boolean",
-          "description": "Choose whether Claude Code uses the auto mode classifier to review shell commands in plan mode. With the default true, the classifier reviews each command during planning when auto mode is available and you see no prompt, except for critical-path removals. Set false to get a permission prompt for every command outside the built-in read-only set. Appears in /config as Use auto mode during plan.",
-          "$comment": "Checked against SchemaStore's schema: Claude Code's SDK does not define this key yet."
         }
       },
       "description": "A uniquely named alias: `Settings` alone also matches Node's http2 type."
     }
   },
-  "$comment": "claude-agent-sdk 0.3.310, with SchemaStore for keys it lacks"
+  "$comment": "claude-agent-sdk 0.3.312, with SchemaStore for keys it lacks"
 }
