@@ -453,17 +453,30 @@ const CREDENTIAL_VARIABLES = new Set([
   "GOAUTH",
 ]);
 
-/** Provider base URLs, which expand unless their value carries a user or password. */
+/**
+ * Provider base URLs, which expand unless their value embeds a credential: a user and password,
+ * or a credential query parameter such as `api_key=`. Claude Code also counts a token-shaped user
+ * name alone; that is not modelled.
+ */
 const PROVIDER_BASE_URL = /^ANTHROPIC_(\w+_)?BASE_URL$/;
+const EMBEDDED_CREDENTIAL = [
+  /:\/\/[^/?#@\s]*:[^/?#@\s]*@/,
+  /[?&#;][\w.-]*(?:password|passwd|pwd|secret|token|(?:access|api|private|subscription)[-_]?key|signature|sig|credential|[_.-]auth)=[^&#\s]+/i,
+];
 
-/** Whether a remote server's URL reads `name` as empty. Names compare in any case, also behind INPUT_. */
+/**
+ * Whether a remote server's URL reads `name` as empty. Names compare in any case, also behind
+ * INPUT_. Claude Code also reads a few of its own credentials and every OTEL_* as empty in a
+ * server's command and in policy entries when they are set (observed in v2.1.312, not in the docs);
+ * that is not modelled.
+ */
 function readsAsEmpty(name: string, value: string | undefined): boolean {
   const upper = name.toUpperCase().replace(/^INPUT_/, "");
   if (CREDENTIAL_VARIABLES.has(upper) || upper.startsWith("OTEL_")) return true;
   return (
     PROVIDER_BASE_URL.test(upper) &&
     value !== undefined &&
-    /^[a-z][a-z0-9+.-]*:\/\/[^/?#\s]*@/i.test(value)
+    EMBEDDED_CREDENTIAL.some((pattern) => pattern.test(value))
   );
 }
 
