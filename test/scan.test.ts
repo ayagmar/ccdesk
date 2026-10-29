@@ -1547,6 +1547,9 @@ test("a credential variable in a remote MCP server's URL reads as empty, default
       ANTHROPIC_AUTH_TOKEN: "fake-token-6",
       ANTHROPIC_BASE_URL: "https://gw.example",
       ANTHROPIC_BEDROCK_BASE_URL: "https://user:fake-pass@br.example",
+      ANTHROPIC_VERTEX_BASE_URL: "https://vx.example/v1?api_key=fake-key-7",
+      // A user name alone is no credential.
+      ANTHROPIC_FOUNDRY_BASE_URL: "https://alice@fd.example",
     },
   };
   f.json("home/.claude.json", {
@@ -1555,6 +1558,11 @@ test("a credential variable in a remote MCP server's URL reads as empty, default
       unset: { type: "http", url: `https://b.example/${ref("NPM_TOKEN:-anon")}/mcp` },
       base: { type: "http", url: `${ref("ANTHROPIC_BASE_URL")}/mcp` },
       embedded: { type: "http", url: `https://e.example/${ref("ANTHROPIC_BEDROCK_BASE_URL:-x")}` },
+      query: { type: "http", url: `https://q.example/${ref("ANTHROPIC_VERTEX_BASE_URL")}` },
+      user: { type: "http", url: `https://u.example/?to=${ref("ANTHROPIC_FOUNDRY_BASE_URL")}` },
+      input: { type: "http", url: `https://i.example/${ref("input_npm_token:-x")}` },
+      // A server's command still expands it.
+      stdio: { command: "/fake/tool", args: ["--token", ref("ANTHROPIC_AUTH_TOKEN")] },
     },
   });
   f.json("home/.claude/settings.json", {
@@ -1563,6 +1571,10 @@ test("a credential variable in a remote MCP server's URL reads as empty, default
       { serverUrl: "https://b.example//mcp" },
       { serverUrl: "https://gw.example/mcp" },
       { serverUrl: "https://e.example/" },
+      { serverUrl: "https://q.example/" },
+      { serverUrl: "https://u.example/?to=https://alice@fd.example" },
+      { serverUrl: "https://i.example/" },
+      { serverCommand: ["/fake/tool", "--token", "fake-token-6"] },
     ],
   });
   f.write("app/README.md", "x");
@@ -1574,6 +1586,10 @@ test("a credential variable in a remote MCP server's URL reads as empty, default
     unset: "blocked",
     base: "blocked",
     embedded: "blocked",
+    query: "blocked",
+    user: "blocked",
+    input: "blocked",
+    stdio: "blocked",
   });
 });
 
