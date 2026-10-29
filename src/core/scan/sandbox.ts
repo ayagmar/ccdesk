@@ -137,7 +137,7 @@ function addScopeRules({ add }: Lock): void {
     REPOSITORY,
     "Claude Code reads sandbox.filesystem.disabled only from user or managed settings"
   );
-  // Only its schema description says so; the docs do not list it yet.
+  // CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 drops a true from every file too; that is not modelled.
   add(
     ["allowNestedUserNamespaces"],
     REPOSITORY,
