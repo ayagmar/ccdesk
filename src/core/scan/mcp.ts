@@ -406,17 +406,18 @@ function expandServers(defined: Defined[], environments: Environments): void {
 }
 
 /**
- * `text` with each ${VAR} and ${VAR:-default} expanded from `vars`; `fill` gives a value for a
- * reference with neither a value nor a default. One with none of them stays as written (docs:
- * mcp#supported-syntax, #unset-variables-without-a-default).
+ * `text` with each ${VAR} and ${VAR:-default} expanded from `vars`; a variable set to an empty
+ * string counts as set. `fill` gives a value for a reference with neither a value nor a default.
+ * One with none of them stays as written (docs: mcp#environment-variable-expansion-in-mcp-json,
+ * mcp#unset-variables-without-a-default, mcp#variables-set-to-an-empty-string).
  */
 function expand(text: string, vars: Vars, fill?: Vars): string {
   return text.replace(
     /\$\{([A-Za-z_]\w*)(?::-([^}]*))?\}/g,
     (reference, name: string, fallback: string | undefined) => {
       const value = vars(name);
-      if (value) return value;
-      return fallback ?? value ?? fill?.(name) ?? reference;
+      if (value !== undefined) return value;
+      return fallback ?? fill?.(name) ?? reference;
     }
   );
 }
