@@ -400,9 +400,71 @@ type Vars = (name: string) => string | undefined;
 function expandServers(defined: Defined[], environments: Environments): void {
   for (const d of defined) {
     const vars = (name: string) => d.placeholders?.[name] ?? environments.live(name);
+    const remoteVars = (name: string) => {
+      const value = vars(name);
+      return readsAsEmpty(name, value) ? "" : value;
+    };
     d.command = d.command?.map((part) => expand(part, vars)) ?? null;
-    d.url = d.url === null ? null : expand(d.url, vars);
+    d.url = d.url === null ? null : expand(d.url, remoteVars);
   }
+}
+
+/**
+ * Credential variables a remote server's URL reads as empty, set or not and whatever its default,
+ * so a config cannot send them to the server it names (docs: mcp#credential-variables-that-read-as-empty).
+ * The docs give examples only; Claude Code's own list is longer and partly depends on how the
+ * session started. These are the names it blanks in v2.1.312 that fall in the documented groups:
+ * its own credentials, cloud provider credentials, proxies and package registry tokens.
+ */
+const CREDENTIAL_VARIABLES = new Set([
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_AUTH_TOKEN",
+  "ANTHROPIC_CUSTOM_HEADERS",
+  "ANTHROPIC_IDENTITY_TOKEN",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+  "CLAUDE_CODE_OAUTH_REFRESH_TOKEN",
+  "CLAUDE_CODE_CLIENT_CERT",
+  "CLAUDE_CODE_CLIENT_KEY",
+  "CLAUDE_CODE_CLIENT_KEY_PASSPHRASE",
+  "AWS_BEARER_TOKEN_BEDROCK",
+  "AWS_SECRET_ACCESS_KEY",
+  "AWS_SESSION_TOKEN",
+  "AWS_CONTAINER_AUTHORIZATION_TOKEN",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "GOOGLE_OAUTH_ACCESS_TOKEN",
+  "CLOUDSDK_AUTH_ACCESS_TOKEN",
+  "AZURE_PASSWORD",
+  "AZURE_CLIENT_CERTIFICATE_PASSWORD",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "NPM_TOKEN",
+  "CARGO_REGISTRY_TOKEN",
+  "CODEARTIFACT_AUTH_TOKEN",
+  "PYPI_TOKEN",
+  "TWINE_PASSWORD",
+  "PIP_INDEX_URL",
+  "PIP_EXTRA_INDEX_URL",
+  "UV_INDEX",
+  "UV_INDEX_URL",
+  "UV_EXTRA_INDEX_URL",
+  "UV_DEFAULT_INDEX",
+  "GOPROXY",
+  "GOAUTH",
+]);
+
+/** Provider base URLs, which expand unless their value carries a user or password. */
+const PROVIDER_BASE_URL = /^ANTHROPIC_(\w+_)?BASE_URL$/;
+
+/** Whether a remote server's URL reads `name` as empty. Names compare in any case, also behind INPUT_. */
+function readsAsEmpty(name: string, value: string | undefined): boolean {
+  const upper = name.toUpperCase().replace(/^INPUT_/, "");
+  if (CREDENTIAL_VARIABLES.has(upper) || upper.startsWith("OTEL_")) return true;
+  return (
+    PROVIDER_BASE_URL.test(upper) &&
+    value !== undefined &&
+    /^[a-z][a-z0-9+.-]*:\/\/[^/?#\s]*@/i.test(value)
+  );
 }
 
 /**

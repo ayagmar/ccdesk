@@ -1538,6 +1538,45 @@ test("an MCP variable set to an empty string expands to it, not to its default",
   assert.equal(view.inventory.mcpServers.find((s) => s.name === "srv")?.status, "blocked");
 });
 
+test("a credential variable in a remote MCP server's URL reads as empty, default and all", async () => {
+  const f = makeFixture();
+  const ref = (name: string) => `\${${name}}`;
+  const env = {
+    ...f.env,
+    processEnv: {
+      ANTHROPIC_AUTH_TOKEN: "fake-token-6",
+      ANTHROPIC_BASE_URL: "https://gw.example",
+      ANTHROPIC_BEDROCK_BASE_URL: "https://user:fake-pass@br.example",
+    },
+  };
+  f.json("home/.claude.json", {
+    mcpServers: {
+      token: { type: "http", url: `https://a.example/${ref("ANTHROPIC_AUTH_TOKEN")}/mcp` },
+      unset: { type: "http", url: `https://b.example/${ref("NPM_TOKEN:-anon")}/mcp` },
+      base: { type: "http", url: `${ref("ANTHROPIC_BASE_URL")}/mcp` },
+      embedded: { type: "http", url: `https://e.example/${ref("ANTHROPIC_BEDROCK_BASE_URL:-x")}` },
+    },
+  });
+  f.json("home/.claude/settings.json", {
+    deniedMcpServers: [
+      { serverUrl: "https://a.example//mcp" },
+      { serverUrl: "https://b.example//mcp" },
+      { serverUrl: "https://gw.example/mcp" },
+      { serverUrl: "https://e.example/" },
+    ],
+  });
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(env, f.at("app"));
+
+  assert.deepEqual(Object.fromEntries(view.inventory.mcpServers.map((s) => [s.name, s.status])), {
+    token: "blocked",
+    unset: "blocked",
+    base: "blocked",
+    embedded: "blocked",
+  });
+});
+
 test("managed strictPluginOnlyCustomization withholds your and the project's skills, commands, agents, hooks and MCP servers", async () => {
   const f = makeFixture();
   const skill = (name: string, description: string) =>
