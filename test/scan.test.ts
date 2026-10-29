@@ -1523,6 +1523,21 @@ test("MCP policy entries and server values match after variable expansion, each 
   );
 });
 
+test("an MCP variable set to an empty string expands to it, not to its default", async () => {
+  const f = makeFixture();
+  const env = { ...f.env, processEnv: { TOOLS: "" } };
+  f.json("home/.claude.json", {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: a literal ${VAR} reference is the case under test.
+    mcpServers: { srv: { command: "${TOOLS:-/fake/tools}/bin/srv" } },
+  });
+  f.json("home/.claude/settings.json", { deniedMcpServers: [{ serverCommand: ["/bin/srv"] }] });
+  f.write("app/README.md", "x");
+
+  const view = await scanDirectory(env, f.at("app"));
+
+  assert.equal(view.inventory.mcpServers.find((s) => s.name === "srv")?.status, "blocked");
+});
+
 test("managed strictPluginOnlyCustomization withholds your and the project's skills, commands, agents, hooks and MCP servers", async () => {
   const f = makeFixture();
   const skill = (name: string, description: string) =>
