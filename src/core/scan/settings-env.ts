@@ -18,6 +18,9 @@ const LAUNCH_ONLY = new Set([
   "CLAUDE_CODE_DISABLE_SUBSTITUTION_RM_PROMPT",
   "CLAUDE_CODE_DISABLE_INLINE_SHELL_RM_PROMPT",
   "CLAUDE_CODE_DISABLE_MOUNTED_DRIVE_RM_PROMPT",
+  "CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS",
+  "CLAUDE_CODE_WARN_DISK_FREE_GIB",
+  "CLAUDE_CODE_WARN_MEMORY_FREE_GIB",
 ]);
 
 /** Variables project and local settings cannot set (same section). */
@@ -68,9 +71,13 @@ const WINDOWS_NOT_FROM_REPOSITORY = new Set([
   "PSMODULEPATH",
 ]);
 
-/** The XDG_* family, the ProgramFiles family, and the OTLP exporter's endpoint and connection variables. */
+/**
+ * The XDG_* family, the ProgramFiles family, the screen reader variables, and the OTLP exporter's
+ * endpoint and connection variables.
+ */
 const NOT_FROM_REPOSITORY_PATTERNS = [
   /^XDG_/,
+  /^CLAUDE_AX_/,
   /^PROGRAMFILES/i,
   /^OTEL_EXPORTER_OTLP_(\w+_)?(ENDPOINT|HEADERS|PROTOCOL|CERTIFICATE|CLIENT_KEY|INSECURE)$/,
 ];
