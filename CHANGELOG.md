@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.14](https://github.com/ayagmar/ccdesk/compare/v0.5.13...v0.5.14) (2026-10-29)
+
+### Bug Fixes
+
+* **core:** expand an MCP variable set to an empty string to that string ([276dc14](https://github.com/ayagmar/ccdesk/commit/276dc144580c2e34f102dc551426e11164fba2f3))
+* **core:** mark more env variables Claude Code ignores from settings ([9c1669c](https://github.com/ayagmar/ccdesk/commit/9c1669c1e6db80cde29ab08b081adf492d4c8caa))
+
 ## [0.5.13](https://github.com/ayagmar/ccdesk/compare/v0.5.12...v0.5.13) (2026-10-25)
 
 ## [0.5.12](https://github.com/ayagmar/ccdesk/compare/v0.5.11...v0.5.12) (2026-10-25)
