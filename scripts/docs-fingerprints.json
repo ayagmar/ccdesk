@@ -10,6 +10,7 @@
   "managed-settings#find-entries-claude-code-dropped": "bda1d6cb79681cff",
   "managed-settings#how-claude-code-combines-managed-sources": "f9b41e3e27a4be3b",
   "managed-settings#where-each-mechanism-stores-the-policy": "7c8c4664e525bb78",
+  "mcp#credential-variables-that-read-as-empty": "080b8d3ec384b40d",
   "mcp#environment-variable-expansion-in-mcp-json": "63dd124abd0b92cb",
   "mcp#plugin-provided-mcp-servers": "52772a9c696428d2",
   "mcp#project-server-approvals-and-workspace-trust": "2da968473f79b4c8",
