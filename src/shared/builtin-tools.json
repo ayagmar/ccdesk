@@ -8,7 +8,7 @@
     },
     {
       "name": "Artifact",
-      "description": "Publishes an HTML or Markdown file as an artifact: a private, interactive page on claude.ai. You can share it with a public link, or inside your organization on Team and Enterprise plans, where public sharing requires an Owner to enable it. Requires a Pro, Max, Team, or Enterprise plan and `/login` authentication",
+      "description": "Publishes an HTML or Markdown file to claude.ai as an artifact: a private, interactive page. You can share it with a public link, or inside your organization on Team and Enterprise plans, where public sharing requires an Owner to enable it. Requires a Pro, Max, Ultra, Team, or Enterprise plan and `/login` authentication",
       "asks": true
     },
     {
@@ -123,7 +123,7 @@
     },
     {
       "name": "RemoteTrigger",
-      "description": "Creates, updates, runs, and lists cloud scheduled tasks, formerly routines, on claude.ai. Backs the `/schedule` command. The `RemoteTrigger` input reference documents every action and the organization policies that remove the tool. Cloud scheduled tasks live on claude.ai and require a Pro, Max, Team, or Enterprise plan. This tool is therefore not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
+      "description": "Creates, updates, runs, and lists cloud scheduled tasks, formerly routines, on claude.ai. Backs the `/schedule` command. The `RemoteTrigger` input reference documents every action and the organization policies that remove the tool. Cloud scheduled tasks live on claude.ai and require a Pro, Max, Ultra, Team, or Enterprise plan. This tool is therefore not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
       "asks": false
     },
     {
