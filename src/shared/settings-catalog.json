@@ -377,7 +377,7 @@
       "docs": "https://code.claude.com/docs/en/settings-reference#channelsenabled",
       "about": "Allow [channels](https://code.claude.com/docs/en/channels.md) for your organization. On claude.ai Team and Enterprise plans, Claude Code blocks channels until you set this to `true`. For [Anthropic Console](https://code.claude.com/docs/en/authentication.md#claude-console-authentication) accounts that authenticate with an API key, channels are allowed by default. If your organization deploys managed settings, Claude Code blocks channels on those accounts too until you set this key to `true`.",
       "type": "Boolean\n* `true`: Claude Code allows channels for your organization\n* `false`: the same as unset; whether channels are blocked depends on your plan, as the Default says",
-      "default": "unset; channels are blocked on Team and Enterprise plans and on Console accounts with managed settings, and allowed on Pro and Max plans and on Console accounts without managed settings"
+      "default": "unset; channels are blocked on Team and Enterprise plans and on Console accounts with managed settings, and allowed on Pro, Max, and Ultra plans and on Console accounts without managed settings"
     },
     "claudeInChromeDefaultEnabled": {
       "summary": "Turn on [Chrome integration](https://code.claude.com/docs/en/chrome.md) when a session starts, in the interactive CLI and the VS Code extension",
