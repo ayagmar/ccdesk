@@ -8,7 +8,7 @@
     },
     {
       "name": "Artifact",
-      "description": "Publishes an HTML or Markdown file as an artifact: a private, interactive page on claude.ai. You can share it with a public link, or inside your organization on Team and Enterprise plans, where public sharing requires an Owner to enable it. Requires a Pro, Max, Team, or Enterprise plan and `/login` authentication",
+      "description": "Publishes an HTML or Markdown file to claude.ai as an artifact: a private, interactive page. You can share it with a public link, or inside your organization on Team and Enterprise plans, where public sharing requires an Owner to enable it. Requires a Pro, Max, Ultra, Team, or Enterprise plan and `/login` authentication",
       "asks": true
     },
     {
@@ -53,7 +53,7 @@
     },
     {
       "name": "EnterWorktree",
-      "description": "Creates an isolated git worktree and switches into it. Pass a `path` to switch into an existing worktree instead of creating a new one. On first entry the target may be a worktree of the current repository or, in a multi-repo workspace, of a repository nested inside it. Before v2.1.203, a nested repository's worktree was rejected. A `path` outside `.claude/worktrees/` prompts for your approval before entering, since it moves the session's working directory and write access to that location. New-worktree creation and paths under `.claude/worktrees/` don't prompt. Before v2.1.206, Claude entered paths outside `.claude/worktrees/` without a prompt. From within a worktree session, or from a subagent with a pinned working directory such as `isolation: worktree`, only the `path` form is available and the target must be under `.claude/worktrees/` of the session's repository",
+      "description": "Creates an isolated git worktree and switches into it, or switches into an existing worktree.",
       "asks": true
     },
     {
@@ -63,7 +63,7 @@
     },
     {
       "name": "ExitWorktree",
-      "description": "Exits a worktree session and returns to the original directory. Not available to subagents that already run in their own working directory, such as with `isolation: worktree`",
+      "description": "Exits a worktree session and returns to the original directory. Not available to subagents that already run in their own working directory, such as with `isolation: worktree`. Removed or refused once `permissions.blockWritesOutsideWorkingDirectories` is on",
       "asks": false
     },
     {
@@ -123,7 +123,7 @@
     },
     {
       "name": "RemoteTrigger",
-      "description": "Creates, updates, runs, and lists cloud scheduled tasks, formerly routines, on claude.ai. Backs the `/schedule` command. The `RemoteTrigger` input reference documents every action and the organization policies that remove the tool. Cloud scheduled tasks live on claude.ai and require a Pro, Max, Team, or Enterprise plan. This tool is therefore not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
+      "description": "Creates, updates, runs, and lists cloud scheduled tasks, formerly routines, on claude.ai. Backs the `/schedule` command. The `RemoteTrigger` input reference documents every action and the organization policies that remove the tool. Cloud scheduled tasks live on claude.ai and require a Pro, Max, Ultra, Team, or Enterprise plan. This tool is therefore not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
       "asks": false
     },
     {
