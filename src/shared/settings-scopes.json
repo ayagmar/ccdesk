@@ -91,6 +91,9 @@
     "disableMobileSimulatorTools": [
       "managed"
     ],
+    "disableRemotePreviewScripts": [
+      "managed"
+    ],
     "disableSideloadFlags": [
       "managed"
     ],
