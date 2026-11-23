@@ -91,7 +91,13 @@
     "disableMobileSimulatorTools": [
       "managed"
     ],
+    "disableRemotePreviewScripts": [
+      "managed"
+    ],
     "disableSideloadFlags": [
+      "managed"
+    ],
+    "enforceAnthropicSignIn": [
       "managed"
     ],
     "externalEditorContext": [],
