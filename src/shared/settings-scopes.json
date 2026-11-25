@@ -88,10 +88,19 @@
     "disableDesktopLocalSessions": [
       "managed"
     ],
+    "disableDirectMcpSkills": [
+      "managed"
+    ],
     "disableMobileSimulatorTools": [
       "managed"
     ],
+    "disableRemotePreviewScripts": [
+      "managed"
+    ],
     "disableSideloadFlags": [
+      "managed"
+    ],
+    "enforceAnthropicSignIn": [
       "managed"
     ],
     "externalEditorContext": [],

@@ -8,7 +8,7 @@
     },
     {
       "name": "Artifact",
-      "description": "Publishes an HTML or Markdown file as an artifact: a private, interactive page on claude.ai. You can share it with a public link, or inside your organization on Team and Enterprise plans, where public sharing requires an Owner to enable it. Requires a Pro, Max, Team, or Enterprise plan and `/login` authentication",
+      "description": "Publishes an HTML or Markdown file to claude.ai as an artifact: a private, interactive page. You can share it with a public link, or inside your organization on Team and Enterprise plans, where public sharing requires an Owner to enable it. Requires a Pro, Max, Ultra, Team, or Enterprise plan and `/login` authentication",
       "asks": true
     },
     {
@@ -23,7 +23,7 @@
     },
     {
       "name": "CronCreate",
-      "description": "Schedules a recurring or one-shot prompt within the current session. Tasks are session-scoped and restored on `--resume` or `--continue` if unexpired.",
+      "description": "Schedules a recurring or one-shot prompt within the current session.",
       "asks": false
     },
     {
@@ -43,7 +43,7 @@
     },
     {
       "name": "EndConversation",
-      "description": "Ends the session, in rare cases of sustained abusive input or when you ask Claude to demonstrate the tool.",
+      "description": "Ends the session, in rare cases of sustained abusive input or when you ask Claude to end the session and then confirm.",
       "asks": false
     },
     {
@@ -52,19 +52,9 @@
       "asks": false
     },
     {
-      "name": "EnterWorktree",
-      "description": "Creates an isolated git worktree and switches into it. Pass a `path` to switch into an existing worktree instead of creating a new one. On first entry the target may be a worktree of the current repository or, in a multi-repo workspace, of a repository nested inside it. Before v2.1.203, a nested repository's worktree was rejected. A `path` outside `.claude/worktrees/` prompts for your approval before entering, since it moves the session's working directory and write access to that location. New-worktree creation and paths under `.claude/worktrees/` don't prompt. Before v2.1.206, Claude entered paths outside `.claude/worktrees/` without a prompt. From within a worktree session, or from a subagent with a pinned working directory such as `isolation: worktree`, only the `path` form is available and the target must be under `.claude/worktrees/` of the session's repository",
-      "asks": true
-    },
-    {
       "name": "ExitPlanMode",
       "description": "Presents a plan for approval and exits plan mode",
       "asks": true
-    },
-    {
-      "name": "ExitWorktree",
-      "description": "Exits a worktree session and returns to the original directory. Not available to subagents that already run in their own working directory, such as with `isolation: worktree`",
-      "asks": false
     },
     {
       "name": "Glob",
@@ -84,6 +74,16 @@
     {
       "name": "ListMcpResourcesTool",
       "description": "Lists resources exposed by connected MCP servers, leaving out MCP Apps UI resources, which are pages for a host application to render",
+      "asks": false
+    },
+    {
+      "name": "ListPlugins",
+      "description": "Lists the plugins enabled for your claude.ai account. Requires a cloud session or the desktop app. Not available on third-party providers",
+      "asks": false
+    },
+    {
+      "name": "ListSkills",
+      "description": "Lists the skills enabled for your claude.ai account. Available in the same sessions as `ListPlugins`",
       "asks": false
     },
     {
@@ -108,7 +108,7 @@
     },
     {
       "name": "PushNotification",
-      "description": "Sends a desktop notification, and a phone push when Remote Control is connected, so a long-running task or session-scoped scheduled task can reach you when you step away. Push delivery runs through Anthropic-hosted infrastructure, which is not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
+      "description": "Sends a desktop notification from a local session, and a phone push with Remote Control or in a cloud session. Push delivery runs through Anthropic-hosted infrastructure, which is not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
       "asks": false
     },
     {
@@ -123,7 +123,12 @@
     },
     {
       "name": "RemoteTrigger",
-      "description": "Creates, updates, runs, and lists cloud scheduled tasks, formerly routines, on claude.ai. Backs the `/schedule` command. The `RemoteTrigger` input reference documents every action and the organization policies that remove the tool. Cloud scheduled tasks live on claude.ai and require a Pro, Max, Team, or Enterprise plan. This tool is therefore not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
+      "description": "Creates, updates, runs, and lists cloud scheduled tasks, formerly routines, on claude.ai. Backs the `/schedule` command. The `RemoteTrigger` input reference documents every action and the organization policies that remove the tool. Cloud scheduled tasks live on claude.ai and require a Pro, Max, Ultra, Team, or Enterprise plan. This tool is therefore not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry",
+      "asks": false
+    },
+    {
+      "name": "REPL",
+      "description": "Runs the JavaScript that Claude writes in Code Mode. Available only when Code Mode is on. For how Claude Code checks the tool calls in that code, see Permission checks",
       "asks": false
     },
     {
@@ -134,6 +139,16 @@
     {
       "name": "ScheduleWakeup",
       "description": "Reschedules the next iteration of a self-paced `/loop`. Claude calls this at the end of each iteration to pick when the next one runs, between one minute and one hour out; you don't call it directly. To end the loop instead, Claude calls it with `stop: true`, which cancels the pending wakeup. The pending wakeup appears in `session_crons` in Stop hook input",
+      "asks": false
+    },
+    {
+      "name": "SearchPlugins",
+      "description": "Searches your claude.ai plugin catalog. Available in the same sessions as `ListPlugins`",
+      "asks": false
+    },
+    {
+      "name": "SearchSkills",
+      "description": "Searches claude.ai skills. Available in the same sessions as `ListPlugins`",
       "asks": false
     },
     {
@@ -157,13 +172,18 @@
       "asks": true
     },
     {
-      "name": "Skill",
-      "description": "Executes a skill within the main conversation",
-      "asks": true
-    },
-    {
       "name": "SubagentHandback",
       "description": "Delivers a subagent's final report to whichever conversation receives that subagent's result. Provided only in auto mode, to subagents that the Agent tool runs locally other than forks, and available in the terminal CLI, IDE extensions, cloud sessions, and the Agent SDK; the classifier reviews the report before it's delivered. Requires Claude Code v2.1.271 or later",
+      "asks": false
+    },
+    {
+      "name": "SuggestPluginInstall",
+      "description": "Shows a card of suggested plugins you can add. Available in the same sessions as `ListPlugins`",
+      "asks": false
+    },
+    {
+      "name": "SuggestSkills",
+      "description": "Shows a card of claude.ai skills you can add. Available in the same sessions as `ListPlugins`",
       "asks": false
     },
     {
