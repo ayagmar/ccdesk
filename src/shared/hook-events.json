@@ -31,5 +31,6 @@
   "CwdChanged",
   "FileChanged",
   "DirectoryAdded",
-  "MessageDisplay"
+  "MessageDisplay",
+  "PreSkillShellCommand"
 ]
